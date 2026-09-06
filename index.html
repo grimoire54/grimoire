@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Гримуар — текстовая RPG с ИИ">
+<meta name="description" content="Гримуар — текстовая RPG в духе AI Dungeon, на движке Gemini.">
 <title>Гримуар</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17193,8 +17193,10 @@ var _domBase = window.__modules['react-dom'] || {};
 var _domClient = window.__modules['react-dom/client'] || {};
 window.ReactDOM = Object.assign({}, _domBase, _domClient);
 
+
 </script>
 <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -17243,19 +17245,29 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
         }
       };
     })();
+
+    // ---- Supabase client (cloud saves) ----
+    // The anon/public key below is safe to ship in this file — it only
+    // identifies which Supabase project to talk to, it is not a secret.
+    // Real access control comes from the grimoire_saves table's row-level
+    // security policies (auth.uid() = user_id), not from hiding this key.
+    // See README.md for the exact policy SQL and where to find your key.
+    var SUPABASE_URL = 'https://nftbvhmwfselibtzxepj.supabase.co';
+    var SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE';
+    window.supabaseClient = (SUPABASE_ANON_KEY.indexOf('PASTE_YOUR_') !== 0 && window.supabase)
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      : null;
 </script>
 <script>
-// Precompiled ahead of time (JSX -> React.createElement) so the browser
-// never has to run an in-page Babel transform. This removes the failure
-// mode where @babel/standalone's runtime script-tag transform breaks under
-// file:// or on slower machines (the 'Cannot use import statement outside
-// a module' crash / endless blank screen). Behavior is unchanged — this is
-// the exact same code, just transformed at build time instead of load time.
 "use strict";
-// Standalone-website build: React, ReactDOM, Babel (JSX) and mammoth are all
-// loaded as plain <script> globals by index.html (no bundler, no ES modules —
-// see index.html's <head> for the CDN tags). This line just pulls the hooks
-// out of the global React object instead of an ES import.
+// Standalone-website build: this file is precompiled ahead of time
+// (JSX -> React.createElement, via `tsc --jsx react`) and loaded by
+// index.html as a plain <script> — no bundler, no ES modules, no in-browser
+// Babel transform. React/ReactDOM are inlined directly in index.html's
+// <head>; mammoth and supabase-js load from a CDN. See index.html for all
+// of that wiring. This line just pulls the hooks out of the global React
+// object instead of an ES import — everything else below is untouched by
+// the precompile step except JSX syntax itself.
 const { useState, useRef, useEffect } = React;
 // ============================================================================
 // GRIMOIRE — file map
@@ -17287,13 +17299,37 @@ const TRANSLATIONS = {
         apiKeyPlaceholder: 'Вставь свой ключ',
         apiKeyHint: 'Нужен собственный ключ — получи бесплатно в Google AI Studio (aistudio.google.com → «Get API key»). Хранится только в этом браузере и отправляется напрямую в Google, больше никуда.',
         modelLabel: 'Модель',
-        modelHint: 'Например: gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-pro — полный список смотри в Google AI Studio. Google часто снимает старые модели с поддержки быстрее заявленных сроков — если появится ошибка «is no longer available», впиши сюда модель из текста ошибки.',
+        modelHint: 'Например: gemini-3.8-flash, gemini-3.6-flash, gemini-3-pro — полный список смотри в Google AI Studio. Google часто снимает старые модели с поддержки быстрее заявленных сроков — если появится ошибка «is no longer available», впиши сюда модель из текста ошибки.',
         languageLabel: 'Язык',
         itemInteractionLabel: 'Взаимодействие с предметами',
         itemInteractionOn: 'Включено',
         itemInteractionOff: 'Выключено',
         importLink: 'Импорт',
         settingsLink: 'Настройки',
+        // -- Cloud saves --
+        cloudLink: 'Облако',
+        cloudTitle: 'Облачные сохранения',
+        cloudSignInTab: 'Вход',
+        cloudSignUpTab: 'Регистрация',
+        cloudEmailLabel: 'Email',
+        cloudPasswordLabel: 'Пароль',
+        cloudSignInButton: 'Войти',
+        cloudSignUpButton: 'Создать аккаунт',
+        cloudGoogleButton: 'Войти через Google',
+        cloudSignOutButton: 'Выйти',
+        cloudSignedInAsPrefix: 'Вошли как ',
+        cloudSlotEmpty: 'Пустой слот',
+        cloudSlotUpdatedPrefix: 'Обновлено: ',
+        cloudSaveButton: 'Сохранить',
+        cloudLoadButton: 'Загрузить',
+        cloudDeleteButton: 'Удалить',
+        cloudOverwriteConfirm: 'В этом слоте уже есть сохранение. Перезаписать?',
+        cloudLoadConfirm: 'Загрузить это сохранение? Текущий прогресс в приложении будет заменён.',
+        cloudDeleteConfirm: 'Удалить это сохранение? Отменить не получится.',
+        cloudCheckEmailNotice: 'Проверь почту и подтверди адрес — после этого сможешь войти.',
+        cloudErrorPrefix: 'Ошибка: ',
+        cloudLoadingLabel: 'Загрузка…',
+        cloudNotConfigured: 'Supabase ещё не настроен — впиши свой anon key в index.html (см. README).',
         // -- Setup screen: world & hero creation --
         worldLabel: 'Мир',
         worldPlaceholder: 'Опиши мир, эпоху и тон истории — или возьми набросок ниже',
@@ -17590,13 +17626,37 @@ const TRANSLATIONS = {
         apiKeyPlaceholder: 'Paste your key',
         apiKeyHint: 'Needs your own key — get one free at Google AI Studio (aistudio.google.com → "Get API key"). Stored only in this browser and sent straight to Google, nowhere else.',
         modelLabel: 'Model',
-        modelHint: 'e.g. gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-pro — see the full list in Google AI Studio. Google often retires old models earlier than announced — if you see an "is no longer available" error, paste the model name it suggests here.',
+        modelHint: 'e.g. gemini-3.8-flash, gemini-3.6-flash, gemini-3-pro — see the full list in Google AI Studio. Google often retires old models earlier than announced — if you see an "is no longer available" error, paste the model name it suggests here.',
         languageLabel: 'Language',
         itemInteractionLabel: 'Item interaction',
         itemInteractionOn: 'On',
         itemInteractionOff: 'Off',
         importLink: 'Import',
         settingsLink: 'Settings',
+        // -- Cloud saves --
+        cloudLink: 'Cloud',
+        cloudTitle: 'Cloud saves',
+        cloudSignInTab: 'Sign in',
+        cloudSignUpTab: 'Sign up',
+        cloudEmailLabel: 'Email',
+        cloudPasswordLabel: 'Password',
+        cloudSignInButton: 'Sign in',
+        cloudSignUpButton: 'Create account',
+        cloudGoogleButton: 'Sign in with Google',
+        cloudSignOutButton: 'Sign out',
+        cloudSignedInAsPrefix: 'Signed in as ',
+        cloudSlotEmpty: 'Empty slot',
+        cloudSlotUpdatedPrefix: 'Updated: ',
+        cloudSaveButton: 'Save',
+        cloudLoadButton: 'Load',
+        cloudDeleteButton: 'Delete',
+        cloudOverwriteConfirm: 'This slot already has a save. Overwrite it?',
+        cloudLoadConfirm: "Load this save? Your current in-app progress will be replaced.",
+        cloudDeleteConfirm: "Delete this save? This can't be undone.",
+        cloudCheckEmailNotice: 'Check your email to confirm your address — then you can sign in.',
+        cloudErrorPrefix: 'Error: ',
+        cloudLoadingLabel: 'Loading…',
+        cloudNotConfigured: "Supabase isn't configured yet — paste your anon key into index.html (see README).",
         // -- Setup screen: world & hero creation --
         worldLabel: 'World',
         worldPlaceholder: 'Describe the world, era, and tone of the story — or pick a starter below',
@@ -20708,6 +20768,56 @@ function SettingsModal({ uiLang, onSetLanguage, itemInteractionEnabled, onSetIte
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
+function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSetEmail, cloudPassword, onSetPassword, cloudAuthLoading, cloudAuthError, cloudAuthNotice, onSignInEmail, onSignUpEmail, onSignInGoogle, onSignOut, cloudSaves, cloudSavesLoading, cloudActionSlot, cloudActionError, onSaveSlot, onLoadSlot, onDeleteSlot, onClose, t }) {
+    if (!window.supabaseClient) {
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                onClose(); } },
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" }, t('cloudTitle')),
+                React.createElement("p", { className: "hint-text hint-text-block" }, t('cloudNotConfigured')),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
+    }
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onClose(); } },
+        React.createElement("div", { className: "modal-card" },
+            React.createElement("h2", { className: "modal-title" }, t('cloudTitle')),
+            !cloudUser ? (React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "provider-row" },
+                    React.createElement("button", { onClick: () => onSetAuthMode('signin'), className: 'provider-btn' + (cloudAuthMode === 'signin' ? ' provider-btn-active' : ''), type: "button" }, t('cloudSignInTab')),
+                    React.createElement("button", { onClick: () => onSetAuthMode('signup'), className: 'provider-btn' + (cloudAuthMode === 'signup' ? ' provider-btn-active' : ''), type: "button" }, t('cloudSignUpTab'))),
+                React.createElement("label", { className: "field-label" }, t('cloudEmailLabel')),
+                React.createElement("input", { value: cloudEmail, onChange: e => onSetEmail(e.target.value), className: "text-field", type: "email", autoComplete: "email" }),
+                React.createElement("label", { className: "field-label" }, t('cloudPasswordLabel')),
+                React.createElement("input", { value: cloudPassword, onChange: e => onSetPassword(e.target.value), className: "text-field", type: "password", autoComplete: cloudAuthMode === 'signup' ? 'new-password' : 'current-password' }),
+                cloudAuthNotice && React.createElement("p", { className: "hint-text hint-text-block" }, cloudAuthNotice),
+                cloudAuthError && React.createElement("p", { className: "hint-text hint-text-block" }, cloudAuthError),
+                React.createElement("div", { className: "modal-actions" },
+                    cloudAuthMode === 'signin' ? (React.createElement("button", { onClick: onSignInEmail, disabled: cloudAuthLoading || !cloudEmail || !cloudPassword, className: "btn btn-primary", type: "button" }, t('cloudSignInButton'))) : (React.createElement("button", { onClick: onSignUpEmail, disabled: cloudAuthLoading || !cloudEmail || !cloudPassword, className: "btn btn-primary", type: "button" }, t('cloudSignUpButton'))),
+                    React.createElement("button", { onClick: onSignInGoogle, disabled: cloudAuthLoading, className: "btn btn-ghost", type: "button" }, t('cloudGoogleButton'))))) : (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "hint-text hint-text-block" },
+                    t('cloudSignedInAsPrefix'),
+                    cloudUser.email),
+                cloudActionError && React.createElement("p", { className: "hint-text hint-text-block" }, cloudActionError),
+                cloudSavesLoading ? (React.createElement("p", { className: "hint-text hint-text-block" }, t('cloudLoadingLabel'))) : [0, 1, 2, 3].map(slot => {
+                    const save = cloudSaves.find(s => s.slot === slot);
+                    const busy = cloudActionSlot === slot;
+                    return (React.createElement("div", { key: slot, className: "cloud-slot-row" },
+                        React.createElement("span", { className: "cloud-slot-info" },
+                            React.createElement("span", null, save ? (save.save_name || 'Grimoire') : t('cloudSlotEmpty')),
+                            save && React.createElement("span", null,
+                                t('cloudSlotUpdatedPrefix'),
+                                new Date(save.updated_at).toLocaleString())),
+                        React.createElement("span", { className: "cloud-slot-actions" },
+                            React.createElement("button", { onClick: () => onSaveSlot(slot), disabled: busy, className: "chip-btn", type: "button" }, t('cloudSaveButton')),
+                            React.createElement("button", { onClick: () => onLoadSlot(slot), disabled: busy || !save, className: "chip-btn", type: "button" }, t('cloudLoadButton')),
+                            React.createElement("button", { onClick: () => onDeleteSlot(slot), disabled: busy || !save, className: "chip-btn", type: "button" }, t('cloudDeleteButton')))));
+                }),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: onSignOut, className: "btn btn-ghost", type: "button" }, t('cloudSignOutButton'))))),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
+}
 function DirectorModal({ value, onChange, onSave, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onCancel(); } },
@@ -20797,6 +20907,18 @@ function App() {
     const [itemInteractionEnabled, setItemInteractionEnabled] = useState(true);
     const [geminiApiKey, setGeminiApiKey] = useState('');
     const [geminiModel, setGeminiModel] = useState(DEFAULT_GEMINI_MODEL);
+    const [cloudUser, setCloudUser] = useState(null);
+    const [cloudModalOpen, setCloudModalOpen] = useState(false);
+    const [cloudAuthMode, setCloudAuthMode] = useState('signin');
+    const [cloudEmail, setCloudEmail] = useState('');
+    const [cloudPassword, setCloudPassword] = useState('');
+    const [cloudAuthLoading, setCloudAuthLoading] = useState(false);
+    const [cloudAuthError, setCloudAuthError] = useState(null);
+    const [cloudAuthNotice, setCloudAuthNotice] = useState(null);
+    const [cloudSaves, setCloudSaves] = useState([]);
+    const [cloudSavesLoading, setCloudSavesLoading] = useState(false);
+    const [cloudActionSlot, setCloudActionSlot] = useState(null);
+    const [cloudActionError, setCloudActionError] = useState(null);
     const [initializing, setInitializing] = useState(true);
     const [stage, setStage] = useState('setup');
     // -- Setup form: world & hero --
@@ -20982,22 +21104,7 @@ function App() {
             try {
                 const saveResult = await window.storage.get(SAVE_KEY, false);
                 if (!cancelled && saveResult && saveResult.value) {
-                    const saved = JSON.parse(saveResult.value);
-                    setWorldSetting(saved.worldSetting || '');
-                    setHeroName(saved.heroName || '');
-                    setHeroConcept(saved.heroConcept || '');
-                    setMessages(saved.messages || []);
-                    setGameState(normalizeGameState(saved.gameState));
-                    setItemRarities(saved.itemRarities || {});
-                    setItemWeights(saved.itemWeights || {});
-                    setNpcReputations(saved.npcReputations || {});
-                    setNpcKindnessCooldowns(saved.npcKindnessCooldowns || {});
-                    setFactionReputations(saved.factionReputations || {});
-                    setEquipment(normalizeEquipment(saved.equipment));
-                    narrativeSummaryRef.current = saved.narrativeSummary || '';
-                    summarizedUpToRef.current = saved.summarizedUpTo || 0;
-                    if (saved.messages && saved.messages.length > 0)
-                        setStage('playing');
+                    applyLoadedSave(JSON.parse(saveResult.value));
                 }
             }
             catch (e) {
@@ -21010,6 +21117,24 @@ function App() {
         })();
         return () => { cancelled = true; };
     }, []);
+    // onAuthStateChange fires once immediately with whatever session already
+    // exists — including one just completed via a Google OAuth redirect back
+    // to this page, which supabase-js resolves from the URL on its own before
+    // this first fires — and again on every future sign-in/out/token refresh.
+    useEffect(() => {
+        if (!window.supabaseClient)
+            return;
+        const { data: listener } = window.supabaseClient.auth.onAuthStateChange((event, session) => {
+            setCloudUser(session ? session.user : null);
+        });
+        return () => { listener && listener.subscription && listener.subscription.unsubscribe(); };
+    }, []);
+    useEffect(() => {
+        if (cloudUser)
+            refreshCloudSaves();
+        else
+            setCloudSaves([]);
+    }, [cloudUser]);
     useEffect(() => {
         if (scrollRef.current)
             scrollRef.current.scrollTop = 0;
@@ -21090,6 +21215,210 @@ function App() {
             // still fall back to a manual export/download.
         }
     }
+    // Applies a fully-loaded save payload (same shape saveGame/buildExportText
+    // produce) to live state and mirrors it into the local autosave, so
+    // loading from an import, a cloud slot, or the local autosave on startup
+    // all leave the app in an identical state afterward.
+    function applyLoadedSave(saved) {
+        setWorldSetting(saved.worldSetting || '');
+        setHeroName(saved.heroName || '');
+        setHeroConcept(saved.heroConcept || '');
+        setMessages(saved.messages || []);
+        const normalizedState = normalizeGameState(saved.gameState);
+        setGameState(normalizedState);
+        setItemRarities(saved.itemRarities || {});
+        setItemWeights(saved.itemWeights || {});
+        setNpcReputations(saved.npcReputations || {});
+        setNpcKindnessCooldowns(saved.npcKindnessCooldowns || {});
+        setFactionReputations(saved.factionReputations || {});
+        const normalizedEquipment = normalizeEquipment(saved.equipment);
+        setEquipment(normalizedEquipment);
+        narrativeSummaryRef.current = saved.narrativeSummary || '';
+        summarizedUpToRef.current = saved.summarizedUpTo || 0;
+        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.itemWeights || {}, saved.npcReputations || {}, saved.factionReputations || {}, saved.npcKindnessCooldowns || {});
+        if (saved.messages && saved.messages.length > 0)
+            setStage('playing');
+    }
+    // ---- CLOUD SAVES (Supabase) ----
+    // window.supabaseClient is created once in index.html's own wrapper script
+    // (same pattern as window.storage) from a project URL + anon key baked in
+    // there — see that file. The anon key is safe to ship in the page; access
+    // control comes from the grimoire_saves table's row-level security
+    // policies (auth.uid() = user_id), not from keeping the key secret.
+    async function refreshCloudSaves() {
+        if (!cloudUser || !window.supabaseClient)
+            return;
+        setCloudSavesLoading(true);
+        try {
+            const { data, error } = await window.supabaseClient
+                .from('grimoire_saves')
+                .select('slot, save_name, updated_at')
+                .eq('user_id', cloudUser.id)
+                .order('slot', { ascending: true });
+            if (error)
+                throw error;
+            setCloudSaves(data || []);
+        }
+        catch (e) {
+            setCloudActionError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudSavesLoading(false);
+        }
+    }
+    async function signUpWithEmail() {
+        setCloudAuthLoading(true);
+        setCloudAuthError(null);
+        setCloudAuthNotice(null);
+        try {
+            const { data, error } = await window.supabaseClient.auth.signUp({ email: cloudEmail, password: cloudPassword });
+            if (error)
+                throw error;
+            setCloudPassword('');
+            if (!data.session) {
+                // Confirmation email required before a session exists — Supabase
+                // project setting, not something this code controls either way.
+                setCloudAuthNotice(t('cloudCheckEmailNotice'));
+                setCloudAuthMode('signin');
+            }
+        }
+        catch (e) {
+            setCloudAuthError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudAuthLoading(false);
+        }
+    }
+    async function signInWithEmail() {
+        setCloudAuthLoading(true);
+        setCloudAuthError(null);
+        setCloudAuthNotice(null);
+        try {
+            const { error } = await window.supabaseClient.auth.signInWithPassword({ email: cloudEmail, password: cloudPassword });
+            if (error)
+                throw error;
+            setCloudPassword('');
+        }
+        catch (e) {
+            setCloudAuthError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudAuthLoading(false);
+        }
+    }
+    async function signInWithGoogle() {
+        setCloudAuthError(null);
+        try {
+            // Full-page redirect to Google and back — needs this exact origin
+            // added to the Supabase project's allowed Redirect URLs, and Google
+            // OAuth credentials configured in Supabase's Auth providers. Only
+            // works over http(s); a page opened via file:// can't complete this.
+            const { error } = await window.supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: window.location.origin + window.location.pathname }
+            });
+            if (error)
+                throw error;
+        }
+        catch (e) {
+            setCloudAuthError(t('cloudErrorPrefix') + e.message);
+        }
+    }
+    async function signOutCloud() {
+        try {
+            await window.supabaseClient.auth.signOut();
+        }
+        catch (e) {
+            // sign-out failing client-side just leaves the local session lingering
+            // until it naturally expires — not worth blocking the player over
+        }
+        setCloudEmail('');
+        setCloudPassword('');
+        setCloudAuthMode('signin');
+        setCloudAuthError(null);
+        setCloudAuthNotice(null);
+    }
+    async function saveToCloudSlot(slot) {
+        if (!cloudUser)
+            return;
+        const existing = cloudSaves.find(s => s.slot === slot);
+        if (existing && !window.confirm(t('cloudOverwriteConfirm')))
+            return;
+        setCloudActionSlot(slot);
+        setCloudActionError(null);
+        try {
+            const payload = {
+                worldSetting, heroName, heroConcept,
+                messages: stripEphemeralForExport(messages),
+                gameState,
+                itemRarities, itemWeights, npcReputations, npcKindnessCooldowns, factionReputations, equipment,
+                narrativeSummary: narrativeSummaryRef.current,
+                summarizedUpTo: summarizedUpToRef.current
+            };
+            const { error } = await window.supabaseClient
+                .from('grimoire_saves')
+                .upsert({ user_id: cloudUser.id, slot, save_name: heroName.trim() || 'Grimoire', payload, updated_at: new Date().toISOString() }, { onConflict: 'user_id,slot' });
+            if (error)
+                throw error;
+            await refreshCloudSaves();
+        }
+        catch (e) {
+            setCloudActionError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudActionSlot(null);
+        }
+    }
+    async function loadFromCloudSlot(slot) {
+        if (!cloudUser)
+            return;
+        if (!window.confirm(t('cloudLoadConfirm')))
+            return;
+        setCloudActionSlot(slot);
+        setCloudActionError(null);
+        try {
+            const { data, error } = await window.supabaseClient
+                .from('grimoire_saves')
+                .select('payload')
+                .eq('user_id', cloudUser.id)
+                .eq('slot', slot)
+                .single();
+            if (error)
+                throw error;
+            applyLoadedSave(data.payload);
+            setCloudModalOpen(false);
+        }
+        catch (e) {
+            setCloudActionError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudActionSlot(null);
+        }
+    }
+    async function deleteCloudSlot(slot) {
+        if (!cloudUser)
+            return;
+        if (!window.confirm(t('cloudDeleteConfirm')))
+            return;
+        setCloudActionSlot(slot);
+        setCloudActionError(null);
+        try {
+            const { error } = await window.supabaseClient
+                .from('grimoire_saves')
+                .delete()
+                .eq('user_id', cloudUser.id)
+                .eq('slot', slot);
+            if (error)
+                throw error;
+            await refreshCloudSaves();
+        }
+        catch (e) {
+            setCloudActionError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudActionSlot(null);
+        }
+    }
     // A generation can take a while (streamed narrative plus several
     // follow-up calls), and on a phone the single biggest reason the tab gets
     // backgrounded mid-turn is the screen simply timing out and locking while
@@ -21142,14 +21471,16 @@ function App() {
     // capped at 1024 — Gemini's hidden "thinking" tokens are drawn from the
     // same budget as the visible output, so leaving maxOutputTokens low (the
     // old value was 2048, sized for non-thinking models) let thinking alone
-    // eat the whole ceiling and left nothing for the actual scene/JSON. The
-    // turn is still split into several focused calls (narrative, then
-    // secrets/state/events separately) since that split is about keeping each
-    // call's job simple, not about a token budget. A response that still comes
-    // back truncated (finishReason "MAX_TOKENS") gets one silent retry for a
-    // chance at a cleaner result, but never blocks: whatever text came back is
-    // still usable — better to show it than to interrupt the player with an
-    // error.
+    // eat the whole ceiling and left nothing for the actual scene/JSON. (Gemini
+    // 3.x models officially prefer thinkingLevel over thinkingBudget, but
+    // thinkingBudget is what's been tested here and it works — if a future
+    // model rejects it, that's the first thing to try switching.) The turn is
+    // still split into several focused calls (narrative, then secrets/state/
+    // events separately) since that split is about keeping each call's job
+    // simple, not about a token budget. A response that still comes back
+    // truncated (finishReason "MAX_TOKENS") gets one silent retry for a chance
+    // at a cleaner result, but never blocks: whatever text came back is still
+    // usable — better to show it than to interrupt the player with an error.
     // ---- GEMINI API CALL HELPERS ----
     function geminiEndpoint(model, method) {
         return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model || DEFAULT_GEMINI_MODEL)}:${method}`;
@@ -21185,14 +21516,10 @@ function App() {
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: system }] },
                 contents: toGeminiContents(messages),
-                // Gemini's "thinking" tokens are drawn from the SAME
-                // maxOutputTokens budget as the visible response — at the
-                // default (unbounded/HIGH) thinking level, the model can burn
-                // the entire budget on hidden reasoning and leave nothing for
-                // the actual scene/JSON, which is what caused truncated
-                // narrative and an unfilled character sheet. thinkingBudget
-                // caps that hidden spend, and maxOutputTokens is raised well
-                // past it so there's still generous room for the real answer.
+                // thinkingBudget caps Gemini's hidden reasoning spend so it can't
+                // silently consume the whole maxOutputTokens ceiling and leave
+                // nothing for the actual scene/JSON — see the comment above this
+                // section for the full story.
                 generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 1024 } }
             })
         });
@@ -23872,26 +24199,9 @@ Rules:
                 setImportError(t('importPrefixError'));
                 return;
             }
-            setWorldSetting(decoded.worldSetting || '');
-            setHeroName(decoded.heroName || '');
-            setHeroConcept(decoded.heroConcept || '');
-            setMessages(decoded.messages || []);
-            const normalizedState = normalizeGameState(decoded.gameState);
-            setGameState(normalizedState);
-            setItemRarities(decoded.itemRarities || {});
-            setItemWeights(decoded.itemWeights || {});
-            setNpcReputations(decoded.npcReputations || {});
-            setNpcKindnessCooldowns(decoded.npcKindnessCooldowns || {});
-            setFactionReputations(decoded.factionReputations || {});
-            const normalizedEquipment = normalizeEquipment(decoded.equipment);
-            setEquipment(normalizedEquipment);
-            narrativeSummaryRef.current = decoded.narrativeSummary || '';
-            summarizedUpToRef.current = decoded.summarizedUpTo || 0;
-            saveGame(decoded.messages || [], normalizedState, decoded.itemRarities || {}, normalizedEquipment, decoded.itemWeights || {}, decoded.npcReputations || {}, decoded.factionReputations || {}, decoded.npcKindnessCooldowns || {});
+            applyLoadedSave(decoded);
             setImportModalOpen(false);
             setImportText('');
-            if (decoded.messages && decoded.messages.length > 0)
-                setStage('playing');
         }
         catch (e) {
             setImportError(t('importParseError'));
@@ -24001,6 +24311,7 @@ Rules:
                             t('menuButton')),
                         menuOpen && (React.createElement(MenuDropdown, { onClose: () => setMenuOpen(false), items: [
                                 { label: t('importLink'), onClick: () => setImportModalOpen(true) },
+                                { label: t('cloudLink'), onClick: () => setCloudModalOpen(true) },
                                 { label: t('settingsLink'), onClick: () => setSettingsOpen(true) }
                             ] })))),
                 React.createElement("div", { className: "setup-header" },
@@ -24033,7 +24344,8 @@ Rules:
                         " ",
                         t('openingBookLoading'))) : t('openBookButton')))),
             importModalOpen && (React.createElement(ImportModal, { value: importText, onChange: setImportText, error: importError, onLoad: handleImportSave, onCancel: () => { setImportModalOpen(false); setImportText(''); setImportError(null); }, t: t })),
-            settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t }))));
+            settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
+            cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: saveToCloudSlot, onLoadSlot: loadFromCloudSlot, onDeleteSlot: deleteCloudSlot, onClose: () => setCloudModalOpen(false), t: t }))));
     }
     const secretsText = currentTurn && currentTurn.narrator.secrets
         ? currentTurn.narrator.secrets
@@ -24055,6 +24367,7 @@ Rules:
                         { label: t('mapMenuLabel'), onClick: () => setMapModalOpen(true) },
                         { label: t('questsMenuLabel'), onClick: () => setQuestJournalOpen(true) },
                         { label: t('sheetToggleButton'), onClick: () => setSheetOpen(true), mobileOnly: true },
+                        { label: t('cloudLink'), onClick: () => setCloudModalOpen(true) },
                         { label: t('settingsLink'), onClick: () => setSettingsOpen(true) },
                         { label: t('restartButton'), onClick: () => setRestartConfirmOpen(true) }
                     ] })))),
@@ -24147,6 +24460,7 @@ Rules:
         dropConfirmIndex !== null && (React.createElement(DropConfirmModal, { itemName: (gameState.inventory[dropConfirmIndex] || {}).name || '', onConfirm: () => dropItem(dropConfirmIndex), onCancel: () => setDropConfirmIndex(null), t: t })),
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
+        cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: saveToCloudSlot, onLoadSlot: loadFromCloudSlot, onDeleteSlot: deleteCloudSlot, onClose: () => setCloudModalOpen(false), t: t })),
         mapModalOpen && (React.createElement(MapModal, { map: gameState.map, quests: gameState.quests, factionReputations: factionReputations, onClose: () => setMapModalOpen(false), onRequestTravel: requestMapTravel, onCancelTravel: cancelMapTravel, pendingMapTravel: pendingMapTravel, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGift, onCancel: () => setGiftTargetNpc(null), t: t })),
@@ -24401,6 +24715,9 @@ const APP_STYLES = `
   .pending-note-chip button { background: none; border: none; color: #8a76b5; cursor: pointer; flex-shrink: 0; }
   .pending-note-chip button:hover { color: #cbbfe0; }
   .editing-banner-chip { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--stone-950); border: 1px solid var(--amber-700); border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--amber-500); }
+  .cloud-slot-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--stone-950); border: 1px solid var(--stone-700); border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--amber-100); }
+  .cloud-slot-info { display: flex; flex-direction: column; gap: 0.15rem; }
+  .cloud-slot-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
   .editing-banner-chip button { background: none; border: none; color: var(--amber-600); cursor: pointer; flex-shrink: 0; }
   .editing-banner-chip button:hover { color: var(--amber-300); }
   .checkbox-row { display: flex; align-items: center; gap: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--stone-400); margin: 0.25rem 0 1rem; cursor: pointer; }
@@ -24552,10 +24869,11 @@ const APP_STYLES = `
   .icon-btn:hover { color: var(--amber-500); }
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
+
+
 // ---- Mount ----
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(App, null));
-
 </script>
 </body>
 </html>
