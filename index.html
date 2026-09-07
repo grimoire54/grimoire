@@ -17395,8 +17395,6 @@ const TRANSLATIONS = {
         mapLegendHero: 'Ты здесь',
         mapLegendQuest: 'Задание',
         mapLegendRoute: 'Маршрут',
-        mapLegendResentfulTerritory: 'Обиженная территория',
-        mapLegendHostileTerritory: 'Враждебная территория',
         mapHint: 'Тяни карту, своди/разводи пальцы или крути колёсико. Нажми на значок — покажется описание.',
         mapEmptyText: 'Карта заполнится, как только история начнёт называть места.',
         mapFogLabel: 'Неисследовано',
@@ -17461,7 +17459,6 @@ const TRANSLATIONS = {
         itemCapacityBonusLabel: 'Бонус к переносимому весу',
         itemDefenseLabel: 'Защита',
         itemDamageLabel: 'Урон',
-        setBonusLabel: 'Бонус комплекта',
         itemEquippedNote: 'Сейчас надето / используется',
         useItemButton: 'Использовать',
         equipItemButton: 'Экипировать',
@@ -17556,19 +17553,9 @@ const TRANSLATIONS = {
         npcsHeading: 'Персонажи',
         npcHereLabel: 'Здесь',
         npcAwayLabel: 'В другом месте',
-        factionsHeading: 'Фракции',
-        currentTerritoryLabel: 'Текущая территория',
-        factionNoMembersText: 'Пока нет известных персонажей этой фракции.',
-        factionRankEnemy: 'Враг',
-        factionRankOutcast: 'Изгой',
-        factionRankUnknown: 'Неизвестен',
-        factionRankAcquaintance: 'Знакомый',
-        factionRankRespected: 'Уважаемый',
-        factionRankAlly: 'Союзник',
-        factionRankHero: 'Герой фракции',
         // -- Gift item to NPC --
-        giftItemLink: 'Подарить',
-        giftModalTitle: 'Подарок',
+        giftItemLink: 'Подарить предмет',
+        giftModalTitle: 'Подарить предмет',
         giftEmptyInventory: 'Тебе нечего подарить.',
         giftRecipientLabel: 'Получатель',
         giftReputationHint: 'Отношение немного улучшится — тем сильнее, чем ценнее подарок.',
@@ -17579,6 +17566,21 @@ const TRANSLATIONS = {
         giftCurrencyAvailableLabel: 'Доступно',
         giftCurrencyMaxButton: 'Всё',
         giftCurrencyReputationHint: 'Отношение улучшится тем сильнее, чем бо́льшую долю своих денег ты отдашь.',
+        giftConfirmAria: 'Подарить',
+        // -- Group / party --
+        groupMenuLabel: '🤝 Группа',
+        groupModalTitle: 'Группа',
+        groupCapacityLabel: 'Спутников',
+        groupEmptyText: 'Пока никто не путешествует с тобой.',
+        dismissFromPartyButton: 'Отпустить',
+        recruitLink: 'Позвать в группу',
+        recruitModalTitle: 'Приглашение в группу',
+        recruitConfirmText: 'Он присоединится к тебе и будет путешествовать вместе, пока ты не решишь иначе.',
+        recruitConfirmAria: 'Пригласить',
+        groupFullText: 'Группа уже полна — сначала отпусти кого-то из спутников.',
+        startingPartyButton: 'Группа',
+        startingPartyNoneOption: '0',
+        startingPartyHint: 'Спутники уже будут путешествовать с героем с самого начала истории.',
         // -- Equipment modal --
         equipmentButton: 'Снаряжение',
         equipmentModalTitle: 'Снаряжение',
@@ -17596,6 +17598,31 @@ const TRANSLATIONS = {
         equipTwoHandedOccupied: 'Занято двуручным оружием',
         unequipButton: 'Снять',
         equipNoneAvailable: 'Нет подходящих предметов',
+        // -- Party member gear: give/take-back items, equip/unequip --
+        partyGearInventoryHeading: 'Переданные предметы',
+        partyGearEmptyText: 'Этому спутнику пока ничего не передано.',
+        partyGiveItemLink: 'Дать предмет',
+        partyGiveModalTitle: 'Дать предмет',
+        partyGiveEmptyInventory: 'Тебе нечего дать.',
+        partyGiveHint: 'Предмет можно будет в любой момент забрать обратно.',
+        partyGiveConfirmAria: 'Дать',
+        partyTakeBackConfirmTitle: 'Забрать предмет?',
+        partyTakeBackConfirmText: 'Предмет вернётся в твой инвентарь:',
+        partyTakeBackConfirmButton: 'Забрать',
+        // -- Factions, set bonuses, territory (see FACTION REPUTATION / SET BONUSES) --
+        factionsHeading: 'Фракции',
+        factionNoMembersText: 'Пока нет известных персонажей этой фракции.',
+        currentTerritoryLabel: 'Текущая территория',
+        factionRankEnemy: 'Враг',
+        factionRankOutcast: 'Изгой',
+        factionRankUnknown: 'Неизвестен',
+        factionRankAcquaintance: 'Знакомый',
+        factionRankRespected: 'Уважаемый',
+        factionRankAlly: 'Союзник',
+        factionRankHero: 'Герой фракции',
+        setBonusLabel: 'Бонус комплекта',
+        mapLegendResentfulTerritory: 'Обиженная территория',
+        mapLegendHostileTerritory: 'Враждебная территория',
         // -- Suggestions & regenerate --
         suggestionsLabel: 'Возможные действия',
         regenerateButton: 'Повтор',
@@ -17722,8 +17749,6 @@ const TRANSLATIONS = {
         mapLegendHero: 'You',
         mapLegendQuest: 'Quest',
         mapLegendRoute: 'Route',
-        mapLegendResentfulTerritory: 'Resentful territory',
-        mapLegendHostileTerritory: 'Hostile territory',
         mapHint: 'Drag to pan, pinch or scroll to zoom. Tap a marker for its description.',
         mapEmptyText: 'The map fills in as the story starts naming places.',
         mapFogLabel: 'Unexplored',
@@ -17788,7 +17813,6 @@ const TRANSLATIONS = {
         itemCapacityBonusLabel: 'Carry capacity bonus',
         itemDefenseLabel: 'Defense',
         itemDamageLabel: 'Damage',
-        setBonusLabel: 'Set bonus',
         itemEquippedNote: 'Currently equipped / in use',
         useItemButton: 'Use',
         equipItemButton: 'Equip',
@@ -17883,19 +17907,9 @@ const TRANSLATIONS = {
         npcsHeading: 'Characters',
         npcHereLabel: 'Here',
         npcAwayLabel: 'Elsewhere',
-        factionsHeading: 'Factions',
-        currentTerritoryLabel: 'Current territory',
-        factionNoMembersText: 'No known characters from this faction yet.',
-        factionRankEnemy: 'Enemy',
-        factionRankOutcast: 'Outcast',
-        factionRankUnknown: 'Unknown',
-        factionRankAcquaintance: 'Acquaintance',
-        factionRankRespected: 'Respected',
-        factionRankAlly: 'Ally',
-        factionRankHero: 'Faction Hero',
         // -- Gift item to NPC --
-        giftItemLink: 'Gift',
-        giftModalTitle: 'Gift',
+        giftItemLink: 'Gift an item',
+        giftModalTitle: 'Gift an item',
         giftEmptyInventory: 'You have nothing to gift.',
         giftRecipientLabel: 'Recipient',
         giftReputationHint: 'Their opinion of you will improve slightly — more so for a more valuable gift.',
@@ -17906,6 +17920,21 @@ const TRANSLATIONS = {
         giftCurrencyAvailableLabel: 'Available',
         giftCurrencyMaxButton: 'All',
         giftCurrencyReputationHint: 'Their opinion will improve more, the larger a share of your money you give away.',
+        giftConfirmAria: 'Gift',
+        // -- Group / party --
+        groupMenuLabel: '🤝 Group',
+        groupModalTitle: 'Group',
+        groupCapacityLabel: 'Companions',
+        groupEmptyText: 'No one is traveling with you yet.',
+        dismissFromPartyButton: 'Dismiss',
+        recruitLink: 'Invite to group',
+        recruitModalTitle: 'Invite to the group',
+        recruitConfirmText: 'They will join you and travel together, until you decide otherwise.',
+        recruitConfirmAria: 'Invite',
+        groupFullText: 'The group is already full — dismiss a companion first.',
+        startingPartyButton: 'Group',
+        startingPartyNoneOption: '0',
+        startingPartyHint: 'Companions will already be traveling with the hero from the very start of the story.',
         // -- Equipment modal --
         equipmentButton: 'Equipment',
         equipmentModalTitle: 'Equipment',
@@ -17923,6 +17952,31 @@ const TRANSLATIONS = {
         equipTwoHandedOccupied: 'Occupied by a two-handed weapon',
         unequipButton: 'Unequip',
         equipNoneAvailable: 'No matching items',
+        // -- Party member gear: give/take-back items, equip/unequip --
+        partyGearInventoryHeading: 'Given items',
+        partyGearEmptyText: 'Nothing has been given to this companion yet.',
+        partyGiveItemLink: 'Give an item',
+        partyGiveModalTitle: 'Give an item',
+        partyGiveEmptyInventory: 'You have nothing to give.',
+        partyGiveHint: 'You can take the item back at any time.',
+        partyGiveConfirmAria: 'Give',
+        partyTakeBackConfirmTitle: 'Take back the item?',
+        partyTakeBackConfirmText: 'The item will return to your inventory:',
+        partyTakeBackConfirmButton: 'Take back',
+        // -- Factions, set bonuses, territory (see FACTION REPUTATION / SET BONUSES) --
+        factionsHeading: 'Factions',
+        factionNoMembersText: 'No known characters from this faction yet.',
+        currentTerritoryLabel: 'Current territory',
+        factionRankEnemy: 'Enemy',
+        factionRankOutcast: 'Outcast',
+        factionRankUnknown: 'Unknown',
+        factionRankAcquaintance: 'Acquaintance',
+        factionRankRespected: 'Respected',
+        factionRankAlly: 'Ally',
+        factionRankHero: 'Faction Hero',
+        setBonusLabel: 'Set bonus',
+        mapLegendResentfulTerritory: 'Resentful territory',
+        mapLegendHostileTerritory: 'Hostile territory',
         // -- Suggestions & regenerate --
         suggestionsLabel: 'Possible actions',
         regenerateButton: 'Retry',
@@ -18246,8 +18300,7 @@ function applyPlayerChosenDestination(mapState, destinationId) {
         if (!alreadyWalked)
             visitedEdges.push([priorCurrent.id, destinationId]);
     }
-    const nodes = mapState.nodes.map(n => (n.id === destinationId ? { ...n, discovered: true } : n));
-    return { ...mapState, nodes, currentId: destinationId, visitedEdges };
+    return { ...mapState, currentId: destinationId, visitedEdges };
 }
 // Guarantees a quest's objective is actually visible on the map the
 // instant the quest itself becomes active, rather than leaving it behind
@@ -18320,6 +18373,10 @@ function normalizeFactions(raw) {
 const LANG_KEY = 'grimoire-ui-lang';
 const ITEM_TOGGLE_KEY = 'grimoire-item-interaction';
 const EDIT_WARNING_SKIP_KEY = 'grimoire-skip-edit-warning';
+// "Don't show this again" for the gift confirm screen — see
+// GiftItemModal's skipGiftConfirm prop and confirmGift below, which
+// persists it here exactly like EDIT_WARNING_SKIP_KEY does for its own
+// confirm screen.
 const GIFT_CONFIRM_SKIP_KEY = 'grimoire-skip-gift-confirm';
 const SAVE_KEY = 'grimoire-save';
 const API_KEY_STORAGE_KEY = 'grimoire-gemini-api-key';
@@ -18841,6 +18898,36 @@ function factionStandingLabelKey(value) {
         return 'factionRankAlly';
     return 'factionRankHero';
 }
+// ==============================================================================
+// PARTY / GROUP — companion recruitment and roster
+// ==============================================================================
+// The party (see the "party" state in App()) is deliberately NOT a parallel
+// character record. It's just a short list of normalized name-keys — exactly
+// the same key format npcReputations already uses (see resolveNpcReputationKey)
+// — marking which already-tracked entries in gameState.npcs currently count
+// as traveling companions. Recruiting/dismissing never touches an NPC's
+// note or inventory; it only adds or removes that character's key here.
+// Reputation is the sole gate (see PARTY_REPUTATION_THRESHOLD): once a
+// character's standing is high enough, they've effectively already agreed
+// to travel together, so the confirm step is about the player's choice, not
+// a fresh persuasion roll. Capacity is fixed and small (MAX_PARTY_SIZE) —
+// a real narrative constraint, not a soft suggestion — so recruiting past
+// it is refused outright rather than silently bumping someone out.
+const PARTY_REPUTATION_THRESHOLD = 50;
+const MAX_PARTY_SIZE = 4;
+function normalizeParty(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    const seen = new Set();
+    for (const entry of raw) {
+        if (typeof entry !== 'string')
+            continue;
+        const key = entry.trim().toLowerCase();
+        if (key)
+            seen.add(key);
+    }
+    return Array.from(seen).slice(0, MAX_PARTY_SIZE);
+}
 // The equipment paper-doll: fixed slots, each matched against the inventory
 // item "slot" type the state model assigns (see EQUIPMENT_SLOT_TYPES).
 // Icons are plain emoji placeholders — swapping in real art later is just a
@@ -18871,6 +18958,43 @@ function normalizeEquipment(raw) {
     for (const slot of EQUIPMENT_SLOT_CONFIG) {
         if (typeof raw[slot.key] === 'string' && raw[slot.key].trim())
             next[slot.key] = raw[slot.key];
+    }
+    return next;
+}
+// partyInventories/partyEquipment (see the same-named state in App()) let
+// the player hand items to a party member and equip/unequip them exactly
+// like the hero's own gear — a companion's paper-doll, keyed by the same
+// normalized name-keys the party roster itself uses (see normalizeParty).
+// Each one is just an object of per-companion values in the hero's own
+// shapes — normalizeInventory's {name, slot, twoHanded} array and
+// normalizeEquipment's slot->name map respectively — reused per-entry
+// rather than inventing a parallel item scheme. Deliberately separate from
+// a companion's n.inventory (their narrative-established belongings,
+// plain strings — see reconcileNpcs): only items the player explicitly
+// gave them ever live here, and only those can be equipped or taken back.
+function normalizePartyInventories(raw) {
+    if (!raw || typeof raw !== 'object')
+        return {};
+    const next = {};
+    for (const key of Object.keys(raw)) {
+        const normalizedKey = key.trim().toLowerCase();
+        if (!normalizedKey)
+            continue;
+        const inventory = normalizeInventory(raw[key]);
+        if (inventory.length > 0)
+            next[normalizedKey] = inventory;
+    }
+    return next;
+}
+function normalizePartyEquipment(raw) {
+    if (!raw || typeof raw !== 'object')
+        return {};
+    const next = {};
+    for (const key of Object.keys(raw)) {
+        const normalizedKey = key.trim().toLowerCase();
+        if (!normalizedKey)
+            continue;
+        next[normalizedKey] = normalizeEquipment(raw[key]);
     }
     return next;
 }
@@ -19599,7 +19723,7 @@ function TravelOffer({ narratorMessage, interactive, onToggle, t }) {
 // already completed. Always rendered when present, regardless of the
 // item-interaction setting — see the rationale on getUnresolvedQuestOffers.
 // ---- Character sheet ----
-function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, itemWeights, equipment, npcReputations, factionReputations, onOpenEquipment, onOpenQuests, onSelectItem, onGiftNpc, t }) {
+function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, itemWeights, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenQuests, onSelectItem, onGiftNpc, onRecruitNpc, t }) {
     const isEmpty = !gameState.time &&
         gameState.effects.length === 0 &&
         gameState.inventory.length === 0 &&
@@ -19630,12 +19754,12 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
     // lowercased faction name, same normalization as findFactionReputation,
     // so a click toggles regardless of how the name is cased anywhere else.
     const [expandedFactions, setExpandedFactions] = useState(() => new Set());
-    // Which NPC rows are expanded to reveal their note/gift-link — collapsed
-    // by default (see the header-only onClick below) so a long roster of
-    // characters doesn't turn into a wall of prose; name + reputation bar
-    // stay visible either way, only the descriptive/action parts hide.
-    // Keyed by lowercased name rather than index so a toggle survives the
-    // list re-sorting or gaining/losing entries between renders.
+    // Which NPC rows are expanded to reveal their note/gift-link/recruit-link
+    // — collapsed by default (see the header-only onClick below) so a long
+    // roster of characters doesn't turn into a wall of prose; name +
+    // reputation bar stay visible either way, only the descriptive/action
+    // parts hide. Keyed by lowercased name rather than index so a toggle
+    // survives the list re-sorting or gaining/losing entries between renders.
     const [expandedNpcs, setExpandedNpcs] = useState(() => new Set());
     const presentSlotTypes = Array.from(new Set(inventoryGroups.map(g => g.item.slot)))
         .filter(slot => ITEM_SLOT_LABEL_KEYS[slot]);
@@ -19690,13 +19814,13 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
             gameState.effects.map((e, i) => (React.createElement("p", { key: i, className: "sheet-list-item" },
                 "\u2014 ",
                 e))))),
-        React.createElement("div", { className: "sheet-section" },
+        (gameState.inventory.length > 0 || gameState.currency > 0) && (React.createElement("div", { className: "sheet-section" },
             React.createElement("p", { className: "sheet-heading" }, t('inventoryHeading')),
-            React.createElement("div", { className: "sheet-currency-row" },
+            gameState.currency > 0 && (React.createElement("div", { className: "sheet-currency-row" },
                 React.createElement("span", { className: "sheet-stat-label" },
                     "\uD83E\uDE99 ",
                     t('currencyLabel')),
-                React.createElement("span", { className: "sheet-currency-value" }, gameState.currency)),
+                React.createElement("span", { className: "sheet-currency-value" }, gameState.currency))),
             gameState.inventory.length > 0 && (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "sheet-weight-row" },
                     React.createElement("span", { className: "sheet-stat-label" }, t('weightLabel')),
@@ -19741,7 +19865,7 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                             t('weightUnit'),
                             statBadge ? ' · ' + statBadge : '',
                             count > 1 ? ' ×' + count : '')));
-                })))),
+                }))))),
         gameState.quests.length > 0 && (React.createElement("div", { className: "sheet-section" },
             React.createElement("div", { className: "sheet-section-header" },
                 React.createElement("p", { className: "sheet-heading" }, t('questsHeading')),
@@ -19787,7 +19911,14 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                 // tracked from earlier in the story, but not currently in the
                 // scene, reads as away (grey dot, no gift link).
                 const isPresent = n.presentNow === true;
+                // Same normalized-key format the party array itself stores (see
+                // normalizeParty/recruitToParty) — matched directly rather than
+                // through resolveNpcReputationKey's fuzzy substring matching,
+                // since party membership is an exact recruit/dismiss decision,
+                // never a loosely-guessed one.
                 const npcKey = n.name.trim().toLowerCase();
+                const isPartyMember = Array.isArray(party) && party.includes(npcKey);
+                const canRecruit = isPresent && !isPartyMember && reputation >= PARTY_REPUTATION_THRESHOLD;
                 const isNpcExpanded = expandedNpcs.has(npcKey);
                 return (React.createElement("div", { key: i, className: "sheet-npc" },
                     React.createElement("div", { className: "sheet-npc-header", onClick: () => {
@@ -19804,7 +19935,8 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                         React.createElement("span", { className: 'sheet-npc-name' + (hostile ? ' sheet-npc-hostile' : resentful ? ' sheet-npc-resentful' : '') },
                             n.name,
                             typeof n.role === 'string' && n.role.trim() ? ' - ' + n.role.trim() : '',
-                            hostile ? ' ⚔' : resentful ? ' 🚫' : ''),
+                            hostile ? ' ⚔' : resentful ? ' 🚫' : '',
+                            isPartyMember ? ' 🤝' : ''),
                         React.createElement("span", { className: 'sheet-npc-dot' + (isPresent ? ' sheet-npc-dot-present' : ' sheet-npc-dot-away'), "aria-label": isPresent ? t('npcHereLabel') : t('npcAwayLabel'), title: isPresent ? t('npcHereLabel') : t('npcAwayLabel') })),
                     React.createElement("p", { className: "reputation-bar-caption" }, t('reputationLabel')),
                     React.createElement("div", { className: "reputation-bar-track", "aria-label": t('reputationLabel') + ': ' + reputation },
@@ -19816,6 +19948,9 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                         isPresent && onGiftNpc && (React.createElement("button", { onClick: () => onGiftNpc(n.name), className: "sheet-heading-link sheet-gift-link", type: "button" },
                             "\uD83C\uDF81 ",
                             t('giftItemLink'))),
+                        canRecruit && onRecruitNpc && (React.createElement("button", { onClick: () => onRecruitNpc(n.name), className: "sheet-heading-link sheet-recruit-link", type: "button" },
+                            "\uD83E\uDD1D ",
+                            t('recruitLink'))),
                         React.createElement("p", { className: "sheet-npc-note" }, n.note)))));
             }))),
         gameState.factions.length > 0 && (React.createElement("div", { className: "sheet-section" },
@@ -20030,6 +20165,279 @@ function GiftItemModal({ npcName, gameState, itemRarities, itemWeights, skipGift
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
 }
+// Confirms recruiting a present, sufficiently-trusted NPC into the party
+// (see the recruit link in CharacterSheet, gated on presentNow + reputation
+// >= PARTY_REPUTATION_THRESHOLD there). Branches on whether the roster is
+// already at MAX_PARTY_SIZE, mirroring GiftItemModal's own branch on
+// selectedItem: full roster shows only an explanation and a close button —
+// no confirm control exists to accidentally press — otherwise the usual
+// ✓/✗ confirm pair. onConfirm (recruitToParty, in App()) is the only path
+// that actually adds anyone to the roster.
+function RecruitModal({ npcName, partyFull, onConfirm, onCancel, t }) {
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onCancel(); } },
+        React.createElement("div", { className: "modal-card" },
+            React.createElement("h2", { className: "modal-title" },
+                t('recruitModalTitle'),
+                " \u2014 ",
+                npcName),
+            partyFull ? (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "hint-text hint-text-block" }, t('groupFullText')),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: onCancel, className: "btn btn-primary", type: "button" }, t('closeButton'))))) : (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "hint-text hint-text-block" }, t('recruitConfirmText')),
+                React.createElement("div", { className: "gift-confirm-actions" },
+                    React.createElement("button", { onClick: onConfirm, className: "gift-confirm-btn item-choice-active-take", "aria-label": t('recruitConfirmAria'), type: "button" }, "\u2713"),
+                    React.createElement("button", { onClick: onCancel, className: "gift-confirm-btn item-choice-active-decline", "aria-label": t('cancelButton'), type: "button" }, "\u2717")))))));
+}
+// The roster screen for the party menu item. Party membership is just a
+// list of name-keys (see normalizeParty) resolved back against
+// gameState.npcs here to pull each companion's actual tracked record —
+// note and inventory exist for every NPC already; health/psyche/stats/
+// effects exist ONLY once someone is a party member (see the companion
+// branch in reconcileNpcs) and simply read as "—" until the next turn's
+// state extraction has had a chance to fill them in for a just-recruited
+// companion. Dismissing is a single direct action, unlike recruiting —
+// it only ever shrinks the roster and reputation is untouched, so there's
+// nothing here worth a confirm step the way a gift or a recruit gets one.
+function GroupModal({ party, npcs, onDismiss, onOpenGear, onClose, t }) {
+    const members = (party || [])
+        .map(key => (npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key))
+        .filter(Boolean);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onClose(); } },
+        React.createElement("div", { className: "modal-card group-card" },
+            React.createElement("h2", { className: "modal-title" }, t('groupModalTitle')),
+            React.createElement("p", { className: "group-capacity" },
+                t('groupCapacityLabel'),
+                ": ",
+                party.length,
+                " / ",
+                MAX_PARTY_SIZE),
+            members.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('groupEmptyText')),
+            members.map((n, i) => (React.createElement("div", { key: i, className: "group-member" },
+                React.createElement("div", { className: "group-member-header" },
+                    React.createElement("span", { className: "sheet-npc-name" }, n.name)),
+                React.createElement("div", { className: "group-member-actions" },
+                    onOpenGear && React.createElement("button", { onClick: () => onOpenGear(n.name), className: "btn btn-ghost", type: "button" },
+                        "\uD83C\uDFBD ",
+                        t('equipmentButton')),
+                    React.createElement("button", { onClick: () => onDismiss(n.name), className: "btn btn-ghost", type: "button" }, t('dismissFromPartyButton'))),
+                n.note && React.createElement("p", { className: "sheet-npc-note" }, n.note),
+                React.createElement("div", { className: "sheet-vitals" },
+                    React.createElement("div", { className: "sheet-vital-row" },
+                        React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
+                        React.createElement("span", { className: "sheet-vital-value" }, typeof n.health === 'number' ? n.health : '—')),
+                    React.createElement("div", { className: "sheet-vital-row" },
+                        React.createElement("span", { className: "sheet-stat-label" }, t('psycheLabel')),
+                        React.createElement("span", { className: "sheet-vital-value" }, typeof n.psyche === 'number' ? n.psyche : '—'))),
+                n.stats && typeof n.stats === 'object' && (React.createElement("div", { className: "sheet-section" },
+                    React.createElement("div", { className: "sheet-stat-row" },
+                        React.createElement("span", { className: "sheet-stat-label" }, t('strengthLabel')),
+                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.strength)),
+                    React.createElement("div", { className: "sheet-stat-row" },
+                        React.createElement("span", { className: "sheet-stat-label" }, t('agilityLabel')),
+                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.agility)),
+                    React.createElement("div", { className: "sheet-stat-row" },
+                        React.createElement("span", { className: "sheet-stat-label" }, t('intelligenceLabel')),
+                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.intelligence)))),
+                Array.isArray(n.effects) && n.effects.length > 0 && (React.createElement("div", { className: "sheet-section" },
+                    React.createElement("p", { className: "sheet-heading" }, t('effectsHeading')),
+                    n.effects.map((e, ei) => React.createElement("p", { key: ei, className: "sheet-list-item" },
+                        "\u2014 ",
+                        e)))),
+                Array.isArray(n.inventory) && n.inventory.length > 0 && (React.createElement("div", { className: "sheet-section" },
+                    React.createElement("p", { className: "sheet-heading" }, t('inventoryHeading')),
+                    n.inventory.map((item, ii) => React.createElement("p", { key: ii, className: "sheet-list-item" },
+                        "\u2014 ",
+                        item))))))),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
+}
+// ---- Party member gear: give/take-back items, equip/unequip ----
+// Opened from GroupModal's per-member gear button (see onOpenGear). A
+// companion's equipment paper-doll is the EXACT same grid EquipmentModal
+// renders for the hero (same EQUIPMENT_SLOT_CONFIG, same EquipSlotPicker),
+// just pointed at that companion's own partyInventories/partyEquipment
+// (App() state) instead of the hero's gameState.inventory/equipment. That
+// inventory is a pool the player builds by hand — see GivePartyItemModal
+// below — never the character's narrative-established n.inventory (still
+// shown read-only over in GroupModal): only items physically handed over
+// can be equipped or taken back here. pickerSlot is local (not lifted to
+// App(), unlike the hero's own equipPickerSlot) since nothing outside this
+// modal ever needs to know which slot's picker is open.
+function PartyGearModal({ npcName, inventory, equipment, itemRarities, onEquip, onUnequip, onGiveItem, onTakeBack, onClose, t }) {
+    const [pickerSlot, setPickerSlot] = useState(null);
+    // Taking back an item is a single click on its row (see the belongings
+    // list below) followed by a confirm — mirroring GiftItemModal's own
+    // list->confirm swap of its ENTIRE content rather than stacking a second
+    // modal on top, so this feels exactly like the gift flow the player
+    // already knows. Local to this modal, same reasoning as pickerSlot.
+    const [takeBackIndex, setTakeBackIndex] = useState(null);
+    function handleEquip(slotKey, itemName) {
+        onEquip(slotKey, itemName);
+        setPickerSlot(null);
+    }
+    function handleUnequip(slotKey) {
+        onUnequip(slotKey);
+        setPickerSlot(null);
+    }
+    const takeBackItem = takeBackIndex !== null ? inventory[takeBackIndex] : null;
+    if (takeBackItem) {
+        const rarity = findItemRarity(takeBackItem.name, itemRarities);
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                setTakeBackIndex(null); } },
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" }, t('partyTakeBackConfirmTitle')),
+                React.createElement("p", { className: "hint-text hint-text-block" }, t('partyTakeBackConfirmText')),
+                React.createElement("p", { className: "sheet-list-item gift-confirm-item", style: rarity ? { color: rarityColor(rarity) } : undefined },
+                    "[",
+                    takeBackItem.name,
+                    "]"),
+                React.createElement("div", { className: "gift-confirm-actions" },
+                    React.createElement("button", { onClick: () => { onTakeBack(takeBackIndex); setTakeBackIndex(null); }, className: "gift-confirm-btn item-choice-active-take", "aria-label": t('partyTakeBackConfirmButton'), type: "button" }, "\u2713"),
+                    React.createElement("button", { onClick: () => setTakeBackIndex(null), className: "gift-confirm-btn item-choice-active-decline", "aria-label": t('cancelButton'), type: "button" }, "\u2717")))));
+    }
+    // A two-handed weapon in their right hand occupies the left hand slot
+    // too — same rule as the hero's own isWeaponLeftDisabled, just read
+    // straight off the props here instead of a separate App()-level helper,
+    // since PartyGearModal already has both inventory and equipment on hand.
+    const equippedRightItem = equipment.weaponRight ? inventory.find(it => it.name === equipment.weaponRight) : null;
+    const weaponLeftDisabled = !!(equippedRightItem && equippedRightItem.twoHanded);
+    const equippedNames = new Set(Object.values(equipment).filter(Boolean));
+    const groups = groupInventoryByName(inventory);
+    const activeSets = computeActiveEquipmentSets(equipment, inventory, itemRarities);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onClose(); } },
+        React.createElement("div", { className: "modal-card equipment-card" },
+            React.createElement("h2", { className: "modal-title" },
+                t('equipmentModalTitle'),
+                " \u2014 ",
+                npcName),
+            React.createElement("div", { className: "equipment-grid" }, EQUIPMENT_SLOT_CONFIG.map(slot => {
+                if (slot.spacer) {
+                    return React.createElement("div", { key: slot.key, className: "equip-slot-wrap equip-slot-spacer", "aria-hidden": "true" });
+                }
+                const disabled = slot.key === 'weaponLeft' && weaponLeftDisabled;
+                const equippedName = disabled ? null : equipment[slot.key];
+                const rarity = equippedName ? findItemRarity(equippedName, itemRarities) : null;
+                const setBonus = equippedName ? getSetBonusForSlot(slot.key, activeSets) : { defense: 0, size: 0 };
+                const baseArmorDefense = equippedName ? getArmorDefenseForSlot(slot.matchSlot, rarity || 'common') : null;
+                const armorDefense = baseArmorDefense !== null ? baseArmorDefense + setBonus.defense : null;
+                const equippedItem = equippedName ? inventory.find(it => it.name === equippedName && it.slot === slot.matchSlot) : null;
+                const weaponDamage = equippedName ? getWeaponDamageForSlot(slot.matchSlot, rarity || 'common', equippedItem && equippedItem.twoHanded) : null;
+                const candidates = inventory.filter(it => {
+                    if (it.slot !== slot.matchSlot)
+                        return false;
+                    if (slot.key === 'weaponLeft') {
+                        if (it.twoHanded)
+                            return false;
+                        const pairCount = inventory.filter(other => other.slot === 'weapon' && other.name === it.name).length;
+                        if (pairCount < 2)
+                            return false;
+                    }
+                    return true;
+                });
+                return (React.createElement("div", { key: slot.key, className: "equip-slot-wrap" },
+                    React.createElement("button", { onClick: () => setPickerSlot(current => (current === slot.key ? null : slot.key)), className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : '') + (equippedName ? ' equip-slot-btn-filled' : ''), type: "button", disabled: disabled, "aria-label": t(slot.labelKey) },
+                        React.createElement("span", { className: "equip-slot-icon" }, disabled ? '🚫' : slot.icon),
+                        armorDefense !== null && (React.createElement("span", { className: "equip-slot-defense-badge", "aria-label": t('itemDefenseLabel') }, armorDefense)),
+                        weaponDamage !== null && (React.createElement("span", { className: "equip-slot-damage-badge", "aria-label": t('itemDamageLabel') }, weaponDamage)),
+                        setBonus.size >= 2 && (React.createElement("span", { className: "equip-slot-set-badge", "aria-label": t('setBonusLabel'), title: t('setBonusLabel') },
+                            "\uD83D\uDD17",
+                            setBonus.size))),
+                    React.createElement("p", { className: "equip-slot-label" }, t(slot.labelKey)),
+                    React.createElement("p", { className: "equip-slot-item-name", style: equippedName && rarity ? { color: rarityColor(rarity) } : undefined }, equippedName ? '[' + equippedName + ']' : (disabled ? t('equipTwoHandedOccupied') : '\u00A0')),
+                    pickerSlot === slot.key && !disabled && (React.createElement(EquipSlotPicker, { equippedName: equipment[slot.key], currentStat: armorDefense !== null ? armorDefense : weaponDamage, candidates: candidates, itemRarities: itemRarities, onEquip: name => handleEquip(slot.key, name), onUnequip: () => handleUnequip(slot.key), t: t }))));
+            })),
+            React.createElement("div", { className: "sheet-section" },
+                React.createElement("div", { className: "sheet-section-header" },
+                    React.createElement("p", { className: "sheet-heading" }, t('partyGearInventoryHeading')),
+                    React.createElement("button", { onClick: onGiveItem, className: "sheet-heading-link", type: "button" },
+                        "\u2795 ",
+                        t('partyGiveItemLink'))),
+                groups.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('partyGearEmptyText')),
+                groups.map((group, gi) => {
+                    const { item, firstIndex, count } = group;
+                    const rarity = findItemRarity(item.name, itemRarities);
+                    const isEquipped = equippedNames.has(item.name);
+                    const armorDefense = getArmorDefenseForSlot(item.slot, rarity || 'common');
+                    const weaponDamage = getWeaponDamageForSlot(item.slot, rarity || 'common', item.twoHanded);
+                    const statBadge = armorDefense !== null ? `🛡️${armorDefense}` : weaponDamage !== null ? `⚔️${weaponDamage}` : null;
+                    return (React.createElement("p", { key: gi, className: "sheet-list-item sheet-list-item-clickable", style: rarity ? { color: rarityColor(rarity) } : undefined, onClick: () => setTakeBackIndex(firstIndex) },
+                        "[",
+                        item.name,
+                        "]",
+                        isEquipped ? ' ✓' : '',
+                        React.createElement("span", { className: "sheet-item-meta" },
+                            statBadge ? ' · ' + statBadge : '',
+                            count > 1 ? ' ×' + count : '')));
+                })),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
+}
+// Hands one item from the HERO's own inventory over to a party member —
+// the give half of the party-gear system (PartyGearModal above is the
+// paper-doll + take-back half). Mirrors GiftItemModal's own list->confirm
+// swap exactly, since this is meant to feel identical to gifting — the
+// difference is entirely in what onConfirm does afterward
+// (giveItemToPartyMember, in App(): no reputation change, and unlike a
+// gift it can be taken back later) and in which inventory is being
+// browsed (always the hero's gameState.inventory, regardless of which
+// companion is receiving it). Opened by PartyGearModal's onGiveItem and
+// stacks on top of it — same layering CharacterSheet's own sheet-overlay
+// already uses under GiftItemModal — rather than closing it, so cancelling
+// or confirming a gift returns straight to that companion's gear screen.
+function GivePartyItemModal({ npcName, gameState, itemRarities, itemWeights, onConfirm, onCancel, t }) {
+    const [selectedIndex, setSelectedIndex] = useState(null);
+    const selectedItem = selectedIndex !== null ? gameState.inventory[selectedIndex] : null;
+    if (selectedItem) {
+        const rarity = findItemRarity(selectedItem.name, itemRarities);
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                onCancel(); } },
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" },
+                    t('partyGiveModalTitle'),
+                    " \u2014 ",
+                    npcName),
+                React.createElement("p", { className: "sheet-list-item gift-confirm-item", style: rarity ? { color: rarityColor(rarity) } : undefined },
+                    "[",
+                    selectedItem.name,
+                    "]"),
+                React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('giftRecipientLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" }, npcName)),
+                React.createElement("p", { className: "hint-text hint-text-block" }, t('partyGiveHint')),
+                React.createElement("div", { className: "gift-confirm-actions" },
+                    React.createElement("button", { onClick: () => onConfirm(selectedIndex), className: "gift-confirm-btn item-choice-active-take", "aria-label": t('partyGiveConfirmAria'), type: "button" }, "\u2713"),
+                    React.createElement("button", { onClick: onCancel, className: "gift-confirm-btn item-choice-active-decline", "aria-label": t('cancelButton'), type: "button" }, "\u2717")))));
+    }
+    const groups = groupInventoryByName(gameState.inventory);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onCancel(); } },
+        React.createElement("div", { className: "modal-card" },
+            React.createElement("h2", { className: "modal-title" },
+                t('partyGiveModalTitle'),
+                " \u2014 ",
+                npcName),
+            groups.length === 0 ? (React.createElement("p", { className: "hint-text hint-text-block" }, t('partyGiveEmptyInventory'))) : (React.createElement("div", { className: "gift-item-list" }, groups.map((group, gi) => {
+                const { item, firstIndex, count } = group;
+                const rarity = findItemRarity(item.name, itemRarities);
+                const weight = findItemWeight(item.name, itemWeights);
+                return (React.createElement("p", { key: gi, className: "sheet-list-item sheet-list-item-clickable", style: rarity ? { color: rarityColor(rarity) } : undefined, onClick: () => setSelectedIndex(firstIndex) },
+                    "[",
+                    item.name,
+                    "]",
+                    React.createElement("span", { className: "sheet-item-meta" },
+                        " \u00B7 ",
+                        weight,
+                        " ",
+                        t('weightUnit'),
+                        count > 1 ? ' ×' + count : '')));
+            }))),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
+}
 // ---- Equipment ----
 function EquipSlotPicker({ equippedName, currentStat, candidates, itemRarities, onEquip, onUnequip, t }) {
     const selectable = candidates.filter(c => c.name !== equippedName);
@@ -20082,8 +20490,7 @@ function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, weapon
                 const baseArmorDefense = equippedName ? getArmorDefenseForSlot(slot.matchSlot, rarity || 'common') : null;
                 const armorDefense = baseArmorDefense !== null ? baseArmorDefense + setBonus.defense : null;
                 const equippedItem = equippedName ? gameState.inventory.find(it => it.name === equippedName && it.slot === slot.matchSlot) : null;
-                const baseWeaponDamage = equippedName ? getWeaponDamageForSlot(slot.matchSlot, rarity || 'common', equippedItem && equippedItem.twoHanded) : null;
-                const weaponDamage = baseWeaponDamage;
+                const weaponDamage = equippedName ? getWeaponDamageForSlot(slot.matchSlot, rarity || 'common', equippedItem && equippedItem.twoHanded) : null;
                 const candidates = gameState.inventory.filter(it => {
                     if (it.slot !== slot.matchSlot)
                         return false;
@@ -20128,6 +20535,10 @@ function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equi
     const isEquippable = item.slot !== 'none' && item.slot !== 'consumable';
     const healRange = isConsumable ? (HEAL_RANGE_BY_RARITY[rarity] || HEAL_RANGE_BY_RARITY.common) : null;
     const capacityBonus = isBackpack ? (BACKPACK_CAPACITY_BY_RARITY[rarity] || BACKPACK_CAPACITY_BY_RARITY.common) : null;
+    // Only an EQUIPPED item can ever actually be contributing to (or benefit
+    // from) a set — an unequipped duplicate sitting in the bag shows its
+    // plain base stat, same as EquipmentModal only scores currently-equipped
+    // slots (see computeActiveEquipmentSets).
     const equippedSlotKey = isEquipped && equipment ? Object.keys(equipment).find(k => equipment[k] === item.name) : null;
     const activeSets = isEquipped ? computeActiveEquipmentSets(equipment, gameState.inventory, itemRarities) : {};
     const setBonus = equippedSlotKey ? getSetBonusForSlot(equippedSlotKey, activeSets) : { defense: 0, size: 0 };
@@ -20925,6 +21336,14 @@ function App() {
     const [worldSetting, setWorldSetting] = useState('');
     const [heroName, setHeroName] = useState('');
     const [heroConcept, setHeroConcept] = useState('');
+    // How many companions (0..MAX_PARTY_SIZE) to start the game already
+    // traveling with, chosen via the "🤝 Группа" picker on the setup screen —
+    // see OPENING SCENE STARTING COMPANIONS in buildNarrativeSystemPrompt and
+    // OPENING PARTY in buildStateAndEventsSystemPrompt for what this actually
+    // drives, and handleStart for where it's consumed. Purely a setup-time
+    // choice, never read again once the game is running.
+    const [startingPartySize, setStartingPartySize] = useState(0);
+    const [startingPartyPickerOpen, setStartingPartyPickerOpen] = useState(false);
     // -- Core campaign state --
     const [messages, setMessages] = useState([]);
     const [gameState, setGameState] = useState(EMPTY_STATE);
@@ -20941,10 +21360,11 @@ function App() {
     const [directorModalOpen, setDirectorModalOpen] = useState(false);
     const [directorInput, setDirectorInput] = useState('');
     const [pendingNote, setPendingNote] = useState('');
-    // -- Secrets / map / quest journal modals --
+    // -- Secrets / map / quest journal / group modals --
     const [secretsModalOpen, setSecretsModalOpen] = useState(false);
     const [mapModalOpen, setMapModalOpen] = useState(false);
     const [questJournalOpen, setQuestJournalOpen] = useState(false);
+    const [groupModalOpen, setGroupModalOpen] = useState(false);
     // -- Export / import --
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportText, setExportText] = useState('');
@@ -20984,11 +21404,27 @@ function App() {
     const [npcKindnessCooldowns, setNpcKindnessCooldowns] = useState({});
     const [factionReputations, setFactionReputations] = useState({});
     const [equipment, setEquipment] = useState(EMPTY_EQUIPMENT);
+    // Roster of party name-keys (see normalizeParty/PARTY_REPUTATION_THRESHOLD)
+    // — a separate, client-owned side-state exactly like npcReputations above,
+    // for the same reason: who's traveling with the hero is the player's own
+    // decision, never something the narrative model gets to freely rewrite.
+    const [party, setParty] = useState([]);
+    // Items physically handed to a party member, and what they currently
+    // have equipped from that pool — see normalizePartyInventories/
+    // normalizePartyEquipment and giveItemToPartyMember/
+    // takeItemFromPartyMember/equipPartyItemInSlot below. Same normalized
+    // name-keys as `party` itself, one level deeper: each value is a full
+    // {name, slot, twoHanded} inventory array / slot->name equipment map in
+    // the hero's own shapes, reused per-companion rather than a parallel
+    // item scheme.
+    const [partyInventories, setPartyInventories] = useState({});
+    const [partyEquipment, setPartyEquipment] = useState({});
     // -- Pending turn-resolution refs (cleared each turn) --
     const pendingJustEquippedRef = useRef([]);
     const pendingJustUsedRef = useRef([]);
     const pendingQuestEventsRef = useRef([]);
     const pendingTravelEventRef = useRef([]);
+    const pendingPartyEventsRef = useRef([]);
     // Set when the player confirms a map-click trip (see requestMapTravel) —
     // holds the destination node id so generateStateAndEvents can force
     // map.currentId to it once this turn resolves, guaranteeing arrival even
@@ -21026,6 +21462,14 @@ function App() {
     const [itemDetailIndex, setItemDetailIndex] = useState(null);
     const [dropConfirmIndex, setDropConfirmIndex] = useState(null);
     const [giftTargetNpc, setGiftTargetNpc] = useState(null);
+    const [recruitTargetNpc, setRecruitTargetNpc] = useState(null);
+    // Which party member's gear screen (see PartyGearModal) is open, by
+    // display name — same null-or-name-string shape as giftTargetNpc/
+    // recruitTargetNpc above. partyGiveModalOpen stacks GivePartyItemModal
+    // on top of it for the "give an item" step; closing the gear screen
+    // resets both together (see the onClose wiring below).
+    const [partyGearTarget, setPartyGearTarget] = useState(null);
+    const [partyGiveModalOpen, setPartyGiveModalOpen] = useState(false);
     // -- Misc refs: DOM handles, counters, non-reactive state --
     const scrollRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -21048,6 +21492,10 @@ function App() {
     const loadingActionsToShow = getTrailingActions(messages).length > 0
         ? getTrailingActions(messages)
         : (currentTurn ? currentTurn.actions : []);
+    // Normalized lookup key for whichever party member's gear screen is open
+    // (see partyGearTarget) — same key format partyInventories/
+    // partyEquipment/party itself all use.
+    const partyGearKey = partyGearTarget ? partyGearTarget.trim().toLowerCase() : '';
     // ---- EFFECTS: load saved language/settings/campaign on mount; keep scroll & turn-index in sync ----
     useEffect(() => {
         let cancelled = false;
@@ -21194,7 +21642,7 @@ function App() {
             // storage unavailable — model choice just won't persist
         }
     }
-    async function saveGame(nextMessages, nextState, nextItemRarities, nextEquipment, nextItemWeights, nextNpcReputations, nextFactionReputations, nextNpcKindnessCooldowns) {
+    async function saveGame(nextMessages, nextState, nextItemRarities, nextEquipment, nextItemWeights, nextNpcReputations, nextParty, nextPartyInventories, nextPartyEquipment, nextFactionReputations, nextNpcKindnessCooldowns) {
         try {
             await window.storage.set(SAVE_KEY, JSON.stringify({
                 worldSetting, heroName, heroConcept,
@@ -21206,6 +21654,9 @@ function App() {
                 npcKindnessCooldowns: nextNpcKindnessCooldowns !== undefined ? nextNpcKindnessCooldowns : npcKindnessCooldowns,
                 factionReputations: nextFactionReputations !== undefined ? nextFactionReputations : factionReputations,
                 equipment: nextEquipment !== undefined ? nextEquipment : equipment,
+                party: nextParty !== undefined ? nextParty : party,
+                partyInventories: nextPartyInventories !== undefined ? nextPartyInventories : partyInventories,
+                partyEquipment: nextPartyEquipment !== undefined ? nextPartyEquipment : partyEquipment,
                 narrativeSummary: narrativeSummaryRef.current,
                 summarizedUpTo: summarizedUpToRef.current
             }), false);
@@ -21231,11 +21682,17 @@ function App() {
         setNpcReputations(saved.npcReputations || {});
         setNpcKindnessCooldowns(saved.npcKindnessCooldowns || {});
         setFactionReputations(saved.factionReputations || {});
+        const normalizedParty = normalizeParty(saved.party);
+        setParty(normalizedParty);
         const normalizedEquipment = normalizeEquipment(saved.equipment);
         setEquipment(normalizedEquipment);
+        const normalizedPartyInventories = normalizePartyInventories(saved.partyInventories);
+        setPartyInventories(normalizedPartyInventories);
+        const normalizedPartyEquipment = normalizePartyEquipment(saved.partyEquipment);
+        setPartyEquipment(normalizedPartyEquipment);
         narrativeSummaryRef.current = saved.narrativeSummary || '';
         summarizedUpToRef.current = saved.summarizedUpTo || 0;
-        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.itemWeights || {}, saved.npcReputations || {}, saved.factionReputations || {}, saved.npcKindnessCooldowns || {});
+        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.itemWeights || {}, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {});
         if (saved.messages && saved.messages.length > 0)
             setStage('playing');
     }
@@ -21352,6 +21809,7 @@ function App() {
                 messages: stripEphemeralForExport(messages),
                 gameState,
                 itemRarities, itemWeights, npcReputations, npcKindnessCooldowns, factionReputations, equipment,
+                party, partyInventories, partyEquipment,
                 narrativeSummary: narrativeSummaryRef.current,
                 summarizedUpTo: summarizedUpToRef.current
             };
@@ -21639,18 +22097,34 @@ function App() {
 STORY SO FAR (summary of earlier events, older than the recent transcript included below — treat as established history, do not contradict it):
 ${narrativeSummaryRef.current}`
             : '';
-        return { narrativeLanguage, context: `WORLD AND SETTING:
+        // Resolved against state.npcs rather than stored as display names in
+        // `party` itself, for the same reason reputation is always looked up
+        // by key and never cached as a name: a character can get renamed
+        // mid-story (see reconcileNpcs' rename handling / migratePartyKeys),
+        // and state.npcs always has whatever name is currently correct.
+        const partyMemberNames = party
+            .map(key => {
+            const npc = (state.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+            return npc ? npc.name : null;
+        })
+            .filter(Boolean);
+        const partySection = partyMemberNames.length > 0
+            ? `
+
+CURRENT PARTY — these characters are established traveling companions of the hero, having formally agreed to journey together: ${partyMemberNames.join(', ')}. Treat them as continuously present alongside the hero in every scene from now on unless the story explicitly and deliberately separates them (a real parting of ways, someone left behind, a genuine split) — never let one simply vanish from the narrative without that being an actual story beat.`
+            : '';
+        return { narrativeLanguage, partyMemberNames, context: `WORLD AND SETTING:
 ${worldSetting}
 
 THE PLAYER'S HERO: ${heroName}${heroConcept ? ', ' + heroConcept : ''}${summarySection}
 
 CURRENT GAME STATE (take this into account and do not contradict it):
-${JSON.stringify(state)}` };
+${JSON.stringify(state)}${partySection}` };
     }
-    function buildNarrativeSystemPrompt(state, justEquipped, justUsed, justQuestEvents, justTravelEvents) {
-        const { narrativeLanguage, context } = sharedContext(state);
+    function buildNarrativeSystemPrompt(state, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents) {
+        const { narrativeLanguage, context, partyMemberNames } = sharedContext(state);
         const isOpeningTurn = state === EMPTY_STATE;
-        let ruleNum = 8;
+        let ruleNum = 9;
         const itemRuleNum = itemInteractionEnabled ? ++ruleNum : null;
         const itemRule = itemInteractionEnabled
             ? `\n${itemRuleNum}. If the scene naturally offers the hero one or more takeable items (an object found, something a character offers, a choice between alternatives like weapons or garments), introduce it and then STOP there — end the scene at the offer (e.g. a character gesturing at it, asking if the hero wants it). Do not resolve whether the hero takes it, and do not mention that item again for the rest of this response. The outcome will be handled next turn based on the player's choice.`
@@ -21727,9 +22201,16 @@ ${JSON.stringify(state)}` };
         if (justTravelEvents && justTravelEvents.length > 0) {
             gearContext += `\n\n[TRAVEL DECISION FROM PREVIOUS TURN — RESOLVE THIS FIRST, BEFORE ANYTHING ELSE]: The hero just ${justTravelEvents.join('; ')}. Open THIS scene by actually carrying that out: if they chose to go, the very first thing you write is the journey and their arrival at the new place — do not open back in the old location and do not silently skip the travel. If they declined, open with them simply remaining where they were instead. Resolve this before introducing anything new.`;
         }
+        if (justPartyEvents && justPartyEvents.length > 0) {
+            gearContext += `\n\n[PARTY DECISION FROM PREVIOUS TURN]: The hero just ${justPartyEvents.join('; ')}. Reflect this naturally near the start of the scene: someone who just joined is now traveling alongside the hero and should be treated as present going forward; someone who just left is no longer accompanying them.`;
+        }
         const openingGearRuleNum = isOpeningTurn ? ++ruleNum : null;
         const openingGearRule = isOpeningTurn
             ? `\n${openingGearRuleNum}. OPENING SCENE STARTING GEAR: Unless the world/hero description above explicitly says the hero starts naked, unarmed, destitute, or stripped of belongings, establish in this opening scene that the hero already has a modest, unremarkable starting kit fitting the setting. Two pieces are mandatory and must be included regardless of anything else in the setup — the hero can never begin the story with a bare torso or bare feet: one "armor"-slot item (body clothing or light armor covering the torso) and one "boots"-slot item (footwear of some kind). Only skip one of these two if the world/hero description explicitly says so for that specific piece (e.g. an explicitly barefoot or armorless hero) — a setting simply not mentioning gear is not that exception. Add to that a simple one-handed weapon and maybe a small bag or pack where it fits the setting, all mentioned naturally in the prose (what they're wearing, carrying, armed with). Keep everything plainly ordinary or even worn-out junk; never give anything rare, special, or valuable at the very start.`
+            : '';
+        const openingPartyRuleNum = (isOpeningTurn && startingPartySize > 0) ? ++ruleNum : null;
+        const openingPartyRule = (isOpeningTurn && startingPartySize > 0)
+            ? `\n${openingPartyRuleNum}. OPENING SCENE STARTING COMPANIONS: The hero begins this story already traveling with exactly ${startingPartySize} established companion${startingPartySize > 1 ? 's' : ''} — not strangers being met for the first time, but people who have already been journeying with the hero for some time. Introduce all ${startingPartySize} of them by name in this opening scene, each with a distinct personality and real presence (their own dialogue, initiative, a visible role as the scene opens), and let the existing bond between them and the hero come through naturally — an easy familiarity, an established rapport, shared history alluded to in passing — rather than writing a first meeting. Do not introduce more or fewer than exactly ${startingPartySize} such companions.`
             : '';
         const reactionRuleNum = ++ruleNum;
         const reactionRule = `\n${reactionRuleNum}. NPC ITEM REACTIONS: The first time a character meets the hero this scene, or right after the context above notes the hero just equipped a new item, roll independently for roughly an 80% chance that one character present reacts — vividly, emotionally, in their own voice and personality, not as a throwaway line — to ONE item drawn from "HERO'S CURRENTLY EQUIPPED GEAR WITH KNOWN RARITY TIER" above. Only react to an item whose rarity tier is actually given there; if none of the hero's gear has a known tier, skip this reaction entirely. Calibrate the reaction's tone strictly to that item's tier (these are examples of the tone to hit, not lines to repeat verbatim — write a fresh reaction fitting the character each time):
@@ -21768,6 +22249,10 @@ ${JSON.stringify(state)}` };
         const territoryHostileRule = (currentFactionName && isFactionHostile(currentFactionRep))
             ? `\n${territoryHostileRuleNum}. HOSTILE TERRITORY: the hero is currently in land controlled by ${currentFactionName}, who now consider the hero an open enemy as a group (see "THE HERO IS CURRENTLY IN TERRITORY..." above). Ordinary members of this faction encountered here treat the hero as a threat on sight — refusing all dealings, raising an alarm, moving to detain or drive the hero out, rather than merely being unhelpful. Only hold back outright violence if the immediate situation makes it genuinely implausible right now (badly outnumbered and unarmed, a bigger threat demanding attention) — even then, make the hostility unmistakable.`
             : '';
+        const partyRuleNum = partyMemberNames.length > 0 ? ++ruleNum : null;
+        const partyRule = partyMemberNames.length > 0
+            ? `\n${partyRuleNum}. PARTY MEMBERS: everyone named above under "CURRENT PARTY" travels with the hero as an established companion. Give them real presence in the scene — their own reactions, initiative, and dialogue — rather than reducing them to silent background or forgetting they're there. If the scene puts the hero in danger, a companion can be threatened, hurt, exhausted, or otherwise affected too, exactly like the hero can; reflect that naturally in the prose rather than treating them as invulnerable set dressing.`
+            : '';
         return `You are an experienced text role-playing game master, in the spirit of interactive fiction like Infinite Worlds or AI Dungeon.
 
 ${context}${gearContext}
@@ -21789,7 +22274,8 @@ GAME MASTER RULES:
 5. Don't contradict the facts already in the state — that's the established history of the world and plot.
 6. Introduce complications, conflicts, and unexpected turns; don't let the plot stall.
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
-8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands.${itemRule}${questRule}${travelRule}${openingGearRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}
+8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands.
+9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.${itemRule}${questRule}${travelRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${partyRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own — just the scene itself.`;
     }
@@ -21828,39 +22314,49 @@ Respond with ONLY this hidden information (or the single word "(none)"), written
     function buildStateAndEventsSystemPrompt(state, itemInteractionEnabled) {
         const { context } = sharedContext(state);
         const narrativeLanguage = uiLang === 'en' ? 'English' : 'Russian';
+        // Same reference check buildNarrativeSystemPrompt uses — `state` here is
+        // literally EMPTY_STATE, unchanged, only for the opening call (see
+        // handleStart), so this needs no extra parameter threaded through.
+        const isOpeningTurn = state === EMPTY_STATE;
         const activeQuests = state.quests.filter(q => q.status === 'active');
         const questContext = activeQuests.length > 0
             ? `\n\nTHE HERO'S CURRENTLY ACTIVE QUESTS (reference these ids in "quests"/"rewardOffers" below — never invent a new id for an existing quest; a brand-new quest goes in "newQuestOffers" instead, with its own fresh id):\n${activeQuests.map(q => `- id "${q.id}": "${q.title}" (given by ${q.giver})`).join('\n')}`
             : '\n\nTHE HERO CURRENTLY HAS NO ACTIVE QUESTS.';
         const mapNodes = state.map && state.map.nodes.length > 0 ? state.map.nodes : [];
         const mapContext = mapNodes.length > 0
-            ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character; do not create a near-duplicate with slightly different wording):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${n.faction ? ', controlled by: ' + n.faction : ''}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}`
-            : '';
-        // Mirrors mapContext's own name-reuse instruction, for the separate
-        // faction registry (see "factions" below) — keeps the model from
-        // inventing "the Ashfall Legion" on one turn and "Ashfall's Legion" on
-        // the next for what's meant to be the same group.
-        const knownFactions = Array.isArray(state.factions) ? state.factions : [];
-        const factionsContext = knownFactions.length > 0
-            ? `\n\nKNOWN FACTIONS SO FAR (for "factions", "npcs[].faction", and "location.faction"/"location.nearbyMentioned[].faction" below — if this scene involves one of these, reuse its name EXACTLY, character for character; do not create a near-duplicate with slightly different wording):\n${knownFactions.map(f => `- "${f.name}"${f.note ? ' — ' + f.note : ''}`).join('\n')}`
+            ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character; do not create a near-duplicate with slightly different wording):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}`
             : '';
         const itemOffersSchemaField = itemInteractionEnabled
             ? `, "itemOffers": [{"groupId": "short_id", "selectionMode": "single", "items": [{"id": "short_id", "label": "item name as it appears in the scene, in the scene's own language", "slot": "weapon", "twoHanded": false}]}]`
+            : '';
+        // Companion count requested on the setup screen (see startingPartySize /
+        // the OPENING SCENE STARTING COMPANIONS rule in
+        // buildNarrativeSystemPrompt, which is what actually makes the model
+        // write them into the scene) — opening turn only, same reasoning as
+        // openingGearRule there. reconcileNpcs needs to know their names too
+        // (see generateStateAndEvents, right below where this is called) since
+        // `party` itself is still empty at this point in a brand-new game — this
+        // field is how it finds out.
+        const openingPartySchemaField = (isOpeningTurn && startingPartySize > 0)
+            ? `, "startingPartyMembers": ["name exactly as spelled in npcs above"]`
+            : '';
+        const openingPartyInstruction = (isOpeningTurn && startingPartySize > 0)
+            ? `\n\nOPENING PARTY: this story was set up to begin with the hero already traveling alongside ${startingPartySize} established companion${startingPartySize > 1 ? 's' : ''}. Introduce exactly that many named companions in "npcs" below, each with "presentNow": true, and — exactly like the party-member fields described just above — also give each of them "health", "psyche", "stats", and "effects", judged fresh from how you've just portrayed them in this opening scene. List their names, spelled exactly as in "npcs", in a new field: "startingPartyMembers", an array of exactly those ${startingPartySize} name${startingPartySize > 1 ? 's' : ''}.`
             : '';
         const itemOffersSection = itemInteractionEnabled
             ? `
 
 === EVENT: ITEM OFFERS ===
-"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. Never create an entry here for plain currency/money — a purse, a handful of coins, a cash reward — even when it's offered alongside real items as one of the choices; leave money out of this list entirely and let it flow through "currencyChange" once the scene actually shows the hero taking it. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot": exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is single-use (potion, food, scroll). "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items.`
+"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot": exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is single-use (potion, food, scroll). "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items.`
             : '';
         return `You are the game-state engine for a text role-playing game. You are not the narrator — never write prose, only the JSON described below. Given the scene that just happened, you both (A) return the full updated structured state and (B) detect any of several distinct kinds of moment the scene may contain.
 
-${context}${questContext}${mapContext}${factionsContext}
+${context}${questContext}${mapContext}
 
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"time": "current in-story date and time of day", "health": 500, "psyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": ["short description"], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one"}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did"}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "nearbyMentioned": [{"name": "name", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear"}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only"}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "suggestions": ["short action", "short action", "short action"]${itemOffersSchemaField}}
+{"time": "current in-story date and time of day", "health": 500, "psyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": ["short description"], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "health": 500, "psyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": ["short description"]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did"}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "nearbyMentioned": [{"name": "name", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear"}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only"}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "suggestions": ["short action", "short action", "short action"]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
@@ -21870,9 +22366,10 @@ Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no te
 "effects" is a list of short phrases for the hero's current ongoing conditions — injuries, illnesses, poisons, curses, or similar lingering effects (e.g. "deep gash on the left arm", "mild poisoning", "cursed with rotten luck"). Add a new entry when the scene introduces one, and remove an entry once the scene resolves or heals it. This is separate from the health/psyche numbers — those track overall condition, this tracks what specifically is currently affecting the hero. Leave it as an empty list when nothing is currently affecting the hero.
 Nothing else belongs in "stats" — no other attributes, skills, or invented characteristics.
 Each "inventory" entry has a "name", a "slot", and (for weapons only) "twoHanded". "slot" must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (a document, key, or valuable that's neither worn nor used up). "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is anything single-use (a potion, food, a scroll). "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items.
-Only include an item in "inventory" if the scene explicitly settles the hero as now possessing it — already carried over from before, explicitly handed over and accepted, explicitly picked up, or (opening scene only) established as starting kit. An item that was merely offered, noticed, or nearby but not yet resolved does NOT belong in "inventory" yet — leave it out rather than assuming the hero took it. Never include the hero's own currency here in any form — a purse, a pouch of coins, a stack of chits, a sum of cash — no matter how the scene describes receiving or carrying it; money is never an inventory item in this system, it is tracked ONLY through "currencyChange" below.
+Only include an item in "inventory" if the scene explicitly settles the hero as now possessing it — already carried over from before, explicitly handed over and accepted, explicitly picked up, or (opening scene only) established as starting kit. An item that was merely offered, noticed, or nearby but not yet resolved does NOT belong in "inventory" yet — leave it out rather than assuming the hero took it.
 "currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity — a payment received, a price paid, money found and picked up, a bribe or toll, winnings or a loss from a wager, an outright theft. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. "reason" is a short, dry phrase for what happened (e.g. "sold the pelts", "paid for a room"), omitted along with the rest of the field when amount is 0.
-"npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). This is for durable belongings only — never list a sum of money or a purse/pouch of coins as one of these entries, even if the scene mentions this character having or handling some; a character's wealth is flavor for their "note", not a trackable item. Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has \"location\" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known \"location\" by default — carry it forward unchanged turn after turn, the same as inventory above — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. \"presentNow\" must stay consistent with this: it can only be true when \"location\" equals the hero's own current location this turn, or is \"with the hero\" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list above where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
+"npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
+Every character named above under CURRENT PARTY is a traveling companion, not just an ordinary tracked NPC — treat their entry in "npcs" differently in two ways. First, they MUST appear in "npcs" every single turn without exception, even a turn where they didn't speak or act — never drop a party member from this list the way an ordinary NPC can be dropped once no longer relevant — and their "presentNow" must be true unless the scene just played explicitly, deliberately separated them from the hero. Second, for a party member ONLY — never for any other character — also include "health", "psyche", "stats" (an object with "strength", "agility", "intelligence"), and "effects" in their entry, using the exact same 1-1000/1-1000/1-100 scales, calibration, and judgment described above for the hero's own fields of the same name: a companion can be hurt, exhausted, healed, or emboldened by the scene just played exactly like the hero can. The very first turn a character has these fields (the turn they're recruited), judge them fresh from how the scene and story have portrayed that character so far; on every later turn, carry them forward and adjust only as much as this scene's events actually warrant, the same restrained way the hero's own vitals move turn to turn — never reset them arbitrarily. Omit all four of these fields entirely for every character who is not currently a party member.${openingPartyInstruction}
 "quests" tracks the active list above (by their given id) and feeds a quest journal, so keep entries short and factual, like a log, not narrated prose. "status" is set ONLY when the scene clearly shows that quest now resolved: "completed" if the hero achieved what it asked, "failed" if it's now impossible or was abandoned for good — omit "status" entirely if it's still simply ongoing (don't repeat "active" for everything). "progress" is a SEPARATE, optional one-line note — telegraphic, dry, a few words to one short sentence, no more (e.g. "Learned the gate is guarded at night", "Reached the abandoned mill") — include it ONLY when the scene meaningfully moved that specific quest forward (a lead found, a step completed, a setback); omit it on turns where the quest wasn't meaningfully touched, and never restate the objective itself or pad it with atmosphere. Skip a quest's entry entirely (both fields) if nothing about it changed this turn. NEVER invent a new quest here or use an id that isn't in the active list; new quests go in "newQuestOffers" below instead.
 "reputationHits" flags any named character (matching how they appear in "HERO'S STANDING WITH CHARACTERS..." or the npcs list above) that the hero insulted, threatened, mocked, acted with outright hostility toward, showed real unprompted kindness to, or helped in some meaningful way, IN THE SCENE JUST PLAYED. Each entry has "name" and "type": "insult" for verbal disrespect, mockery, or threats; "hostile" for actual violence, betrayal, sabotage, or an attack; "kindness" for a genuine, notable act of warmth, respect, or generosity that clearly goes beyond ordinary politeness (a real compliment that visibly moves them, comforting them through genuine distress, standing up for them at some cost to the hero); "help" for something substantial done in their favor — saving them from real danger, a costly sacrifice on their behalf, solving a serious problem for them outside of an active quest. Only include a character here if the scene just played genuinely shows the HERO doing this to THEM — never for a character who is simply unfriendly, refuses a request, or negotiates hard back at the hero, and never for the hero merely disagreeing or being blunt; likewise never for routine courtesy, a passing "thank you," or cooperating because the scene calls for it — "kindness" and "help" are for moments that clearly stand out, not everyday pleasantness. This is a rare event in both directions: leave the list empty on the large majority of turns where nothing like this happened.
 "factionReputationHits" is the same idea as "reputationHits" immediately above, but for a FACTION as a whole rather than one tracked person — reserve it for something the scene shows rising to the level of the group as an institution noticing and caring, not just the one individual on the receiving end. An insult traded with a single guard is a "reputationHits" entry for that guard, not automatically a hit against the whole legion he serves — only flag the faction too when the act is clearly directed at, done in the name of, or witnessed in a way that would credibly reach the faction as a whole (defying a direct order issued in the faction's name, sabotaging something that belongs to them collectively, publicly humiliating their authority, risking real danger to save several of their people at once, a notable public act of loyalty or generosity toward them as a group). Each entry has "faction" (exactly as tracked) and the same "type" values as above: "insult", "hostile", "kindness", "help". Just as rare as "reputationHits", if not rarer — leave it empty on the large majority of turns.
@@ -21953,7 +22450,9 @@ Rules:
         pendingQuestEventsRef.current = [];
         const justTravelEvents = pendingTravelEventRef.current;
         pendingTravelEventRef.current = [];
-        const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents);
+        const justPartyEvents = pendingPartyEventsRef.current;
+        pendingPartyEventsRef.current = [];
+        const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents);
         setStreamingText('');
         try {
             const text = await callGeminiStreaming(system, apiMessages, setStreamingText);
@@ -22219,15 +22718,25 @@ ${chunkText}`;
     // location the hero has since departed from lingering as "present" —
     // whether from the model simply forgetting to update them, or from a
     // map jump the narrative itself never got around to depicting.
-    function reconcileNpcs(parsedNpcs, currentNpcs, currentLocationName) {
+    //
+    // `party` (name-keys, see normalizeParty) additionally decides whether an
+    // entry gets the companion-only health/psyche/stats/effects fields (see
+    // the CURRENT PARTY paragraph in buildStateAndEventsSystemPrompt): present
+    // and clamped, with the prior turn's value as fallback, for a party
+    // member; stripped entirely otherwise, so a character who's since been
+    // dismissed doesn't keep carrying stale vitals around forever, and so a
+    // stray value the model attaches to a non-companion by mistake never
+    // lingers either.
+    function reconcileNpcs(parsedNpcs, currentNpcs, party, currentLocationName) {
         if (!Array.isArray(parsedNpcs))
             return { npcs: currentNpcs, renames: [] };
+        const partyKeys = Array.isArray(party) ? party : [];
         const priorByName = new Map((currentNpcs || []).map(n => [n.name.trim().toLowerCase(), n]));
         const renames = [];
         const npcs = parsedNpcs.map(n => {
             if (!n || typeof n !== 'object')
                 return n;
-            const { previousName, ...rest } = n;
+            const { previousName, health, psyche, stats, effects, ...rest } = n;
             const hasPreviousName = typeof previousName === 'string' && previousName.trim();
             if (hasPreviousName &&
                 typeof n.name === 'string' && n.name.trim() &&
@@ -22250,7 +22759,22 @@ ${chunkText}`;
             // above, so an unexpected value from the model, or its plain absence
             // on an npc carried over from an older save, reads as "not present"
             // rather than a stale truthy leftover.
-            return { ...rest, location, presentNow: n.presentNow === true && locationMatchesHero };
+            const base = { ...rest, location, presentNow: n.presentNow === true && locationMatchesHero };
+            const key = typeof n.name === 'string' ? n.name.trim().toLowerCase() : '';
+            if (!key || !partyKeys.includes(key))
+                return base;
+            const priorStats = prior && prior.stats && typeof prior.stats === 'object' ? prior.stats : null;
+            return {
+                ...base,
+                health: clampVital(health, prior && typeof prior.health === 'number' ? prior.health : 50),
+                psyche: clampVital(psyche, prior && typeof prior.psyche === 'number' ? prior.psyche : 50),
+                stats: {
+                    strength: clampStat(stats && stats.strength, priorStats ? priorStats.strength : 10),
+                    agility: clampStat(stats && stats.agility, priorStats ? priorStats.agility : 10),
+                    intelligence: clampStat(stats && stats.intelligence, priorStats ? priorStats.intelligence : 10)
+                },
+                effects: Array.isArray(effects) ? effects : (prior && Array.isArray(prior.effects) ? prior.effects : [])
+            };
         });
         return { npcs, renames };
     }
@@ -22423,7 +22947,17 @@ ${chunkText}`;
         // not have depicted — to correctly decide who's actually still present.
         const map = revealActiveQuestNodes(applyPlayerChosenDestination(applyConfirmedTravel(reconcileMap(parsed.location, currentState), precedingNarrator, isOpeningTurn), pendingMapDestinationRef.current), quests);
         const currentLocationName = (map.nodes.find(n => n.id === map.currentId) || {}).name || null;
-        const { npcs, renames: npcRenames } = reconcileNpcs(parsed.npcs, currentState.npcs, currentLocationName);
+        // Opening turn only (see startingPartySize / OPENING PARTY in
+        // buildStateAndEventsSystemPrompt) — these names aren't in `party` yet,
+        // the client only adds them there once handleStart sees this result, so
+        // reconcileNpcs is told about them explicitly here too, or their
+        // health/psyche/stats/effects above would be stripped like any ordinary
+        // NPC's would be.
+        const startingPartyMembers = isOpeningTurn && Array.isArray(parsed.startingPartyMembers)
+            ? parsed.startingPartyMembers.filter(n => typeof n === 'string' && n.trim()).map(n => n.trim())
+            : [];
+        const startingPartyKeys = startingPartyMembers.map(n => n.trim().toLowerCase());
+        const { npcs, renames: npcRenames } = reconcileNpcs(parsed.npcs, currentState.npcs, [...party, ...startingPartyKeys], currentLocationName);
         const state = {
             time: parsed.time || currentState.time,
             health: clampVital(parsed.health, currentState.health),
@@ -22518,7 +23052,7 @@ ${chunkText}`;
                 rarity: rollItemRarity()
             }))
         }));
-        return { state, surpriseItems, reputationDeltas, factionReputationDeltas, npcRenames, kindnessCooldownNpcs, suggestions, questOffers, rewardOffers, travelOffer, combatEncounter, itemOffers };
+        return { state, surpriseItems, reputationDeltas, factionReputationDeltas, npcRenames, kindnessCooldownNpcs, suggestions, questOffers, rewardOffers, travelOffer, combatEncounter, itemOffers, startingPartyMembers };
     }
     // Returns null when nothing in the story could revive the hero (also the
     // safe fallback on any parsing/network failure — see tryResurrection,
@@ -22694,6 +23228,80 @@ Rules:
             return next;
         });
     }
+    // Same relocation as migrateNpcReputations just above, for the exact same
+    // reason, applied to `party` instead: it's also just a set of name-keys
+    // (see normalizeParty), so a renamed companion needs their key moved too
+    // or they'd silently fall out of the roster the moment their placeholder
+    // name stops matching anything.
+    function migratePartyKeys(renames) {
+        if (!renames || renames.length === 0)
+            return;
+        setParty(prev => {
+            let next = prev;
+            for (const { from, to } of renames) {
+                const oldKey = typeof from === 'string' ? from.trim().toLowerCase() : '';
+                const newKey = typeof to === 'string' ? to.trim().toLowerCase() : '';
+                if (!oldKey || !newKey || oldKey === newKey)
+                    continue;
+                const idx = next.indexOf(oldKey);
+                if (idx === -1)
+                    continue;
+                if (next === prev)
+                    next = [...prev];
+                if (next.includes(newKey))
+                    next.splice(idx, 1);
+                else
+                    next[idx] = newKey;
+            }
+            return next;
+        });
+    }
+    // Small shared helper for migratePartyGearKeys just below: moves one
+    // renamed character's entry from their old normalized key to their new
+    // one within a single name-keyed map — the same relocation
+    // migrateNpcReputations does inline above, factored out here only
+    // because migratePartyGearKeys needs to run it twice (partyInventories,
+    // then partyEquipment).
+    function relocateKeyedEntry(map, oldKey, newKey) {
+        if (!oldKey || !newKey || oldKey === newKey || !(oldKey in map) || newKey in map)
+            return map;
+        const next = { ...map };
+        next[newKey] = next[oldKey];
+        delete next[oldKey];
+        return next;
+    }
+    // Same relocation as migrateNpcReputations/migratePartyKeys above,
+    // applied to the two party-gear maps (partyInventories/partyEquipment —
+    // see giveItemToPartyMember/equipPartyItemInSlot): both are also keyed
+    // by normalized name, so a renamed companion needs their key moved in
+    // both, or a turn's worth of given/equipped items would silently orphan
+    // under their old name.
+    function migratePartyGearKeys(renames) {
+        if (!renames || renames.length === 0)
+            return;
+        setPartyInventories(prev => {
+            let next = prev;
+            for (const { from, to } of renames) {
+                const oldKey = typeof from === 'string' ? from.trim().toLowerCase() : '';
+                const newKey = typeof to === 'string' ? to.trim().toLowerCase() : '';
+                const relocated = relocateKeyedEntry(next, oldKey, newKey);
+                if (relocated !== next)
+                    next = relocated;
+            }
+            return next;
+        });
+        setPartyEquipment(prev => {
+            let next = prev;
+            for (const { from, to } of renames) {
+                const oldKey = typeof from === 'string' ? from.trim().toLowerCase() : '';
+                const newKey = typeof to === 'string' ? to.trim().toLowerCase() : '';
+                const relocated = relocateKeyedEntry(next, oldKey, newKey);
+                if (relocated !== next)
+                    next = relocated;
+            }
+            return next;
+        });
+    }
     // Regenerating a turn re-derives gameState/messages entirely fresh (both
     // get fully replaced each turn, so a second attempt naturally "forgets"
     // the first) — but npcReputations only ever accumulates via +/- deltas
@@ -22818,9 +23426,9 @@ Rules:
             ...currentState,
             map: revealActiveQuestNodes(applyConfirmedTravel(currentState.map, precedingNarrator, isOpeningTurn), currentState.quests)
         },
-        surpriseItems: [], reputationDeltas: {}, npcRenames: [], kindnessCooldownNpcs: [],
+        surpriseItems: [], reputationDeltas: {}, factionReputationDeltas: {}, npcRenames: [], kindnessCooldownNpcs: [],
         suggestions: FALLBACK_SUGGESTIONS[uiLang] || FALLBACK_SUGGESTIONS.ru,
-        questOffers: [], rewardOffers: [], travelOffer: null, combatEncounter: null, itemOffers: []
+        questOffers: [], rewardOffers: [], travelOffer: null, combatEncounter: null, itemOffers: [], startingPartyMembers: []
     });
     // Only two calls per turn now: the narrative itself, then secrets and the
     // combined state/events extraction in parallel (both only need the
@@ -22872,10 +23480,12 @@ Rules:
             rewardOffers: combined.rewardOffers,
             travelOffer: combined.travelOffer,
             reputationDeltas: combined.reputationDeltas || {},
+            factionReputationDeltas: combined.factionReputationDeltas || {},
             npcRenames: combined.npcRenames || [],
             kindnessCooldownNpcs: combined.kindnessCooldownNpcs || [],
             turnIndex,
             combatEncounter: combined.combatEncounter,
+            startingPartyMembers: combined.startingPartyMembers || [],
             tokenUsage
         };
     }
@@ -23251,11 +23861,12 @@ Rules:
         saveGame(messages, nextState, itemRarities, equipment, itemWeights, nextNpcReputations);
         setGiftTargetNpc(null);
     }
-    // Shared by giftItemToNpc and giftCurrencyToNpc below: the same automatic
-    // FACTION_NPC_RIPPLE_RATIO ripple reconcileReputationHits applies to a
-    // reputationHit, extended to gifts too — helping an individual is helping
-    // an individual whichever form the gesture takes, and a tagged member's
-    // faction was already meant to feel every one of those a little.
+    // Shared by giftItemToNpc above and giftCurrencyToNpc below: the same
+    // automatic FACTION_NPC_RIPPLE_RATIO ripple reconcileReputationHits
+    // applies to a reputationHit, extended to gifts too — helping an
+    // individual is helping an individual whichever form the gesture takes,
+    // and a tagged member's faction was already meant to feel every one of
+    // those a little.
     function rippleGiftToFaction(npcName, delta) {
         const faction = findNpcFaction(npcName, gameState.npcs);
         if (!faction)
@@ -23315,6 +23926,127 @@ Rules:
         else {
             giftItemToNpc(giftTargetNpc, payload.index);
         }
+    }
+    // ---- PARTY / GROUP HANDLERS ----
+    // Recruiting and dismissing are direct player actions (no model round trip
+    // needed to decide them — reputation already gates who's eligible), but
+    // each one still leaves a one-line note in pendingPartyEventsRef so the
+    // very next narrative call (see gearContext in buildNarrativeSystemPrompt)
+    // opens the scene already reflecting the new roster instead of the story
+    // catching up a turn late. Confirmed via RecruitModal, which is why this
+    // never re-checks reputation itself — CharacterSheet already gated the
+    // recruit link on it — but it still re-checks capacity/duplicates, since
+    // the modal can be sitting open from a moment when the roster was smaller.
+    function recruitToParty(npcName) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        setRecruitTargetNpc(null);
+        if (!key || party.includes(key) || party.length >= MAX_PARTY_SIZE)
+            return;
+        const nextParty = [...party, key];
+        setParty(nextParty);
+        pendingPartyEventsRef.current = [...pendingPartyEventsRef.current, `invited ${npcName} to join them as a traveling companion, and they agreed`];
+        saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, nextParty);
+    }
+    function dismissFromParty(npcName) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        if (!key)
+            return;
+        const nextParty = party.filter(k => k !== key);
+        setParty(nextParty);
+        pendingPartyEventsRef.current = [...pendingPartyEventsRef.current, `asked ${npcName} to part ways for now, and they went off on their own`];
+        saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, nextParty);
+        // Deliberately NOT touched here: partyInventories/partyEquipment for
+        // this key are left exactly as they are, same as dismissing already
+        // leaves an NPC's own note/inventory alone (see the comment on
+        // PARTY_REPUTATION_THRESHOLD above) — a dismissed companion keeps
+        // whatever gear they were carrying, so re-recruiting them later picks
+        // back up right where it left off instead of resetting their loadout.
+    }
+    // ---- PARTY GEAR HANDLERS ----
+    // Give/take-back mirrors giftItemToNpc's own item-by-array-index handling
+    // exactly (see it above) — the difference is purely mechanical: no
+    // reputation change, and the item moves into/out of partyInventories
+    // rather than disappearing from the hero's inventory for good. Equip/
+    // unequip mirrors equipItemInSlot/unequipSlot just as closely, just
+    // reading/writing partyEquipment[key] instead of the hero's own
+    // top-level `equipment` state. All four take the npc's display name
+    // (not the pre-normalized key) for the same reason giftItemToNpc/
+    // recruitToParty/dismissFromParty above do — every caller already has
+    // the name on hand (n.name), so normalizing once in here is one less
+    // thing every call site needs to get right.
+    function giveItemToPartyMember(npcName, index) {
+        const item = gameState.inventory[index];
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        if (!item || !key) {
+            setPartyGiveModalOpen(false);
+            return;
+        }
+        const nextInventory = gameState.inventory.filter((_, i) => i !== index);
+        const nextState = { ...gameState, inventory: nextInventory };
+        const nextPartyInventories = { ...partyInventories, [key]: [...(partyInventories[key] || []), item] };
+        setGameState(nextState);
+        setPartyInventories(nextPartyInventories);
+        saveGame(messages, nextState, itemRarities, equipment, itemWeights, npcReputations, party, nextPartyInventories);
+        setPartyGiveModalOpen(false);
+    }
+    function takeItemFromPartyMember(npcName, index) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        const memberInventory = partyInventories[key] || [];
+        const item = memberInventory[index];
+        if (!item || !key)
+            return;
+        const nextMemberInventory = memberInventory.filter((_, i) => i !== index);
+        const nextPartyInventories = { ...partyInventories, [key]: nextMemberInventory };
+        // If no other copy of this exact name is left in their pool, clear any
+        // equipment slot that was pointing to it — same exact-name-match
+        // reconciliation the hero's own equipment gets from the INVENTORY
+        // UPKEEP EFFECTS further down, just applied immediately here rather
+        // than via an effect, since this is the only way a party item can ever
+        // disappear (nothing else — certainly not the narrative model — ever
+        // touches partyInventories/partyEquipment).
+        const memberEquipment = partyEquipment[key] || EMPTY_EQUIPMENT;
+        const stillPresent = name => nextMemberInventory.some(it => it.name === name);
+        let equipmentChanged = false;
+        const nextMemberEquipment = { ...memberEquipment };
+        for (const slotKey of Object.keys(nextMemberEquipment)) {
+            if (nextMemberEquipment[slotKey] && !stillPresent(nextMemberEquipment[slotKey])) {
+                nextMemberEquipment[slotKey] = null;
+                equipmentChanged = true;
+            }
+        }
+        const nextPartyEquipment = equipmentChanged ? { ...partyEquipment, [key]: nextMemberEquipment } : partyEquipment;
+        const nextInventory = [...gameState.inventory, item];
+        const nextState = { ...gameState, inventory: nextInventory };
+        setGameState(nextState);
+        setPartyInventories(nextPartyInventories);
+        if (equipmentChanged)
+            setPartyEquipment(nextPartyEquipment);
+        saveGame(messages, nextState, itemRarities, equipment, itemWeights, npcReputations, party, nextPartyInventories, nextPartyEquipment);
+    }
+    function equipPartyItemInSlot(npcName, slotKey, itemName) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        if (!key)
+            return;
+        const memberInventory = partyInventories[key] || [];
+        const item = memberInventory.find(it => it.name === itemName);
+        const memberEquipment = partyEquipment[key] || EMPTY_EQUIPMENT;
+        const nextMemberEquipment = { ...memberEquipment, [slotKey]: itemName };
+        // Same two-handed rule as the hero's own equipItemInSlot: a two-handed
+        // weapon takes over both hands.
+        if (slotKey === 'weaponRight' && item && item.twoHanded)
+            nextMemberEquipment.weaponLeft = null;
+        const nextPartyEquipment = { ...partyEquipment, [key]: nextMemberEquipment };
+        setPartyEquipment(nextPartyEquipment);
+        saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, party, partyInventories, nextPartyEquipment);
+    }
+    function unequipPartySlot(npcName, slotKey) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        if (!key)
+            return;
+        const memberEquipment = partyEquipment[key] || EMPTY_EQUIPMENT;
+        const nextPartyEquipment = { ...partyEquipment, [key]: { ...memberEquipment, [slotKey]: null } };
+        setPartyEquipment(nextPartyEquipment);
+        saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, party, partyInventories, nextPartyEquipment);
     }
     // ---- COMBAT HANDLERS ----
     function startCombat(narratorIndex) {
@@ -23847,7 +24579,33 @@ Rules:
             applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
             migrateNpcReputations(result.npcRenames);
             migrateNpcKindnessCooldowns(result.npcRenames);
-            saveGame(openingMessages, result.state, startingRarities, startingEquipment);
+            migratePartyKeys(result.npcRenames);
+            migratePartyGearKeys(result.npcRenames);
+            // Starting companions requested on the setup screen (see
+            // startingPartySize and the "🤝 Группа" picker below) — the model
+            // just introduced them by name in the opening scene, already
+            // carrying health/psyche/stats (see OPENING PARTY in
+            // buildStateAndEventsSystemPrompt). Resolve those names against the
+            // npcs actually returned (defensively, in case one was dropped or
+            // misspelled) and start the party and its reputation right away, at
+            // the same floor an ordinary mid-story recruit requires — computed
+            // as concrete values, not through applyReputationDeltas/setParty's
+            // usual functional updates, since saveGame right below needs the
+            // actual next value in hand rather than a pending one, precisely
+            // because there's no second turn yet to quietly catch a stale save
+            // up the way there normally would be.
+            const startingPartyKeys = (result.startingPartyMembers || [])
+                .map(n => n.trim().toLowerCase())
+                .filter(key => result.state.npcs.some(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key))
+                .slice(0, MAX_PARTY_SIZE);
+            const startingNpcReputations = startingPartyKeys.length > 0
+                ? { ...npcReputations, ...Object.fromEntries(startingPartyKeys.map(key => [key, PARTY_REPUTATION_THRESHOLD])) }
+                : npcReputations;
+            if (startingPartyKeys.length > 0) {
+                setParty(startingPartyKeys);
+                setNpcReputations(startingNpcReputations);
+            }
+            saveGame(openingMessages, result.state, startingRarities, startingEquipment, itemWeights, startingNpcReputations, startingPartyKeys);
             updateNarrativeSummary(openingMessages, result.state).catch(() => { });
         }
         catch (e) {
@@ -23897,6 +24655,8 @@ Rules:
             applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
             migrateNpcReputations(result.npcRenames);
             migrateNpcKindnessCooldowns(result.npcRenames);
+            migratePartyKeys(result.npcRenames);
+            migratePartyGearKeys(result.npcRenames);
             saveGame(updatedMessages, result.state);
             updateNarrativeSummary(updatedMessages, result.state).catch(() => { });
         }
@@ -24055,6 +24815,8 @@ Rules:
             applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
             migrateNpcReputations(result.npcRenames);
             migrateNpcKindnessCooldowns(result.npcRenames);
+            migratePartyKeys(result.npcRenames);
+            migratePartyGearKeys(result.npcRenames);
             saveGame(updatedMessages, result.state);
         }
         catch (e) {
@@ -24106,6 +24868,8 @@ Rules:
             applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
             migrateNpcReputations(result.npcRenames);
             migrateNpcKindnessCooldowns(result.npcRenames);
+            migratePartyKeys(result.npcRenames);
+            migratePartyGearKeys(result.npcRenames);
             saveGame(updatedMessages, result.state);
         }
         catch (e) {
@@ -24129,6 +24893,9 @@ Rules:
             npcKindnessCooldowns,
             factionReputations,
             equipment,
+            party,
+            partyInventories,
+            partyEquipment,
             narrativeSummary: narrativeSummaryRef.current,
             summarizedUpTo: summarizedUpToRef.current
         };
@@ -24214,13 +24981,27 @@ Rules:
         setWorldSetting('');
         setHeroName('');
         setHeroConcept('');
+        setStartingPartySize(0);
+        setStartingPartyPickerOpen(false);
         setMessages([]);
         setGameState(EMPTY_STATE);
         setItemRarities({});
         setItemWeights({});
         setNpcReputations({});
+        // Not just mirroring npcReputations' own reset — a stale cooldown
+        // entry surviving into a new game (turnIndex restarting at 1) could
+        // otherwise block that name's very first kindness gain for several
+        // turns, since the cooldown check has no way to know a new game began.
+        setNpcKindnessCooldowns({});
         setFactionReputations({});
         setEquipment(EMPTY_EQUIPMENT);
+        setParty([]);
+        setPartyInventories({});
+        setPartyEquipment({});
+        setGroupModalOpen(false);
+        setRecruitTargetNpc(null);
+        setPartyGearTarget(null);
+        setPartyGiveModalOpen(false);
         narrativeSummaryRef.current = '';
         summarizedUpToRef.current = 0;
         setInput('');
@@ -24338,6 +25119,12 @@ Rules:
                         React.createElement("div", null,
                             React.createElement("label", { className: "field-label field-label-nowrap" }, t('heroConceptLabel')),
                             React.createElement("input", { value: heroConcept, onChange: e => setHeroConcept(e.target.value), placeholder: t('heroConceptPlaceholder'), className: "text-field" }))),
+                    React.createElement("div", { className: "preset-row" },
+                        React.createElement("button", { onClick: () => setStartingPartyPickerOpen(o => !o), className: "chip-btn", type: "button" },
+                            "\uD83E\uDD1D ",
+                            startingPartySize > 0 ? `${t('startingPartyButton')}: ${startingPartySize}` : t('startingPartyButton')),
+                        startingPartyPickerOpen && Array.from({ length: MAX_PARTY_SIZE + 1 }, (_, n) => n).map(n => (React.createElement("button", { key: n, onClick: () => { setStartingPartySize(n); setStartingPartyPickerOpen(false); }, className: 'item-choice-btn' + (startingPartySize === n ? ' item-choice-active-take' : ''), type: "button" }, n === 0 ? t('startingPartyNoneOption') : n)))),
+                    startingPartyPickerOpen && React.createElement("p", { className: "hint-text" }, t('startingPartyHint')),
                     error && React.createElement("div", { className: "error-text error-text-margin" }, error),
                     React.createElement("button", { onClick: handleStart, disabled: loading, className: "btn btn-primary btn-large" }, loading ? (React.createElement(React.Fragment, null,
                         React.createElement(Spinner, { size: 18 }),
@@ -24366,6 +25153,7 @@ Rules:
                         { label: t('equipmentMenuLabel'), onClick: () => setEquipmentModalOpen(true) },
                         { label: t('mapMenuLabel'), onClick: () => setMapModalOpen(true) },
                         { label: t('questsMenuLabel'), onClick: () => setQuestJournalOpen(true) },
+                        { label: t('groupMenuLabel'), onClick: () => setGroupModalOpen(true) },
                         { label: t('sheetToggleButton'), onClick: () => setSheetOpen(true), mobileOnly: true },
                         { label: t('cloudLink'), onClick: () => setCloudModalOpen(true) },
                         { label: t('settingsLink'), onClick: () => setSettingsOpen(true) },
@@ -24443,14 +25231,14 @@ Rules:
                             React.createElement("button", { onClick: handleSend, disabled: loading || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
             React.createElement("div", { className: "sidebar" },
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onSelectItem: setItemDetailIndex, t: t }))),
+                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onSelectItem: setItemDetailIndex, t: t }))),
         sheetOpen && (React.createElement("div", { className: "sheet-overlay" },
             React.createElement("div", { className: "sheet-overlay-backdrop", onClick: () => setSheetOpen(false) }),
             React.createElement("div", { className: "sheet-overlay-panel" },
                 React.createElement("div", { className: "sheet-overlay-header" },
                     React.createElement("p", { className: "title-display title-display-small" }, t('sheetOverlayTitle')),
                     React.createElement("button", { onClick: () => setSheetOpen(false), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onSelectItem: setItemDetailIndex, t: t })))),
+                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onSelectItem: setItemDetailIndex, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, pickerSlot: equipPickerSlot, weaponLeftDisabled: isWeaponLeftDisabled(), onOpenPicker: openEquipPicker, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
@@ -24464,6 +25252,10 @@ Rules:
         mapModalOpen && (React.createElement(MapModal, { map: gameState.map, quests: gameState.quests, factionReputations: factionReputations, onClose: () => setMapModalOpen(false), onRequestTravel: requestMapTravel, onCancelTravel: cancelMapTravel, pendingMapTravel: pendingMapTravel, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGift, onCancel: () => setGiftTargetNpc(null), t: t })),
+        recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
+        groupModalOpen && (React.createElement(GroupModal, { party: party, npcs: gameState.npcs, onDismiss: dismissFromParty, onOpenGear: setPartyGearTarget, onClose: () => setGroupModalOpen(false), t: t })),
+        partyGearTarget && (React.createElement(PartyGearModal, { npcName: partyGearTarget, inventory: partyInventories[partyGearKey] || [], equipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, itemRarities: itemRarities, onEquip: (slotKey, itemName) => equipPartyItemInSlot(partyGearTarget, slotKey, itemName), onUnequip: slotKey => unequipPartySlot(partyGearTarget, slotKey), onGiveItem: () => setPartyGiveModalOpen(true), onTakeBack: index => takeItemFromPartyMember(partyGearTarget, index), onClose: () => { setPartyGearTarget(null); setPartyGiveModalOpen(false); }, t: t })),
+        partyGiveModalOpen && partyGearTarget && (React.createElement(GivePartyItemModal, { npcName: partyGearTarget, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, onConfirm: index => giveItemToPartyMember(partyGearTarget, index), onCancel: () => setPartyGiveModalOpen(false), t: t })),
         restartConfirmOpen && React.createElement(RestartConfirmModal, { onConfirm: confirmRestart, onCancel: () => setRestartConfirmOpen(false), t: t }),
         regenerateTarget !== null && (React.createElement(RegenerateConfirmModal, { withLoss: regenerateTarget !== totalTurns, onConfirm: () => regenerateTurn(regenerateTarget), onCancel: () => setRegenerateTarget(null), t: t })),
         editWarningTarget !== null && (React.createElement(EditConfirmModal, { withLoss: editWarningTarget !== totalTurns, dontShowAgain: editWarningDontShowAgain, onDontShowAgainChange: setEditWarningDontShowAgain, onConfirm: confirmEditWarning, onCancel: cancelEditWarning, t: t }))));
@@ -24611,6 +25403,12 @@ const APP_STYLES = `
   .sheet-quest-failed { color: var(--red-400); }
 
   .quest-journal-card { max-width: 30rem; }
+  .group-card { max-width: 30rem; }
+  .group-capacity { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--stone-400); margin: 0 0 0.9rem; }
+  .group-member { padding: 0.75rem 0; border-bottom: 1px solid var(--stone-800); }
+  .group-member:last-child { border-bottom: none; }
+  .group-member-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .group-member-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0; }
   .quest-journal-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
   .quest-journal-header .modal-title { margin: 0; }
   .quest-sort-btn { padding: 0.4rem 0.7rem; font-size: 0.68rem; flex-shrink: 0; white-space: nowrap; }
@@ -24640,12 +25438,16 @@ const APP_STYLES = `
   .sheet-npc-dot-present { background: var(--emerald-600); box-shadow: 0 0 5px var(--emerald-600); }
   .sheet-npc-dot-away { background: var(--stone-600); }
   .sheet-gift-link { display: block; margin: 0.2rem 0 0.4rem; }
+  .sheet-recruit-link { display: block; margin: 0.2rem 0 0.4rem; }
   .gift-item-list { max-height: 50vh; overflow-y: auto; margin-bottom: 0.25rem; }
   .gift-confirm-item { font-size: 1rem; text-align: center; margin: 0 0 1rem; }
   .gift-currency-option { border-bottom: 1px solid var(--stone-800); padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
   .gift-currency-row { display: flex; gap: 0.5rem; align-items: stretch; margin-bottom: 0.5rem; }
   .gift-currency-input { flex: 1; }
   .gift-currency-max-btn { flex-shrink: 0; }
+  .gift-confirm-actions { display: flex; justify-content: center; gap: 1rem; margin: 1.25rem 0 0; }
+  .gift-confirm-btn { width: 3rem; height: 3rem; border-radius: 6px; border: 1px solid var(--stone-700); cursor: pointer; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; }
+  .gift-confirm-btn:hover { opacity: 0.85; }
   .combat-trigger-btn { margin-top: 0.85rem; }
   .combat-card { max-width: 34rem; }
   .combat-arena { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
@@ -24784,6 +25586,7 @@ const APP_STYLES = `
   .sheet-faction-rank { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--stone-400); margin-left: 0.4rem; }
   .sheet-faction-members { margin-top: 0.4rem; padding: 0.4rem 0 0 1.4rem; border-top: 1px solid var(--stone-800); cursor: default; }
   .sheet-faction-member { display: flex; align-items: center; justify-content: space-between; padding: 0.15rem 0; }
+  .sheet-set-indicator { color: #22d3ee; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; }
 
   .equipment-card { max-width: 24rem; }
   .equipment-card .modal-title { text-align: center; }
@@ -24846,7 +25649,6 @@ const APP_STYLES = `
   .equip-slot-defense-badge { position: absolute; bottom: -5px; right: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid var(--amber-600); color: var(--amber-300); font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
   .equip-slot-damage-badge { position: absolute; bottom: -5px; right: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid var(--red-600); color: var(--red-400); font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
   .equip-slot-set-badge { position: absolute; top: -5px; left: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid #22d3ee; color: #22d3ee; font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
-  .sheet-set-indicator { color: #22d3ee; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; }
   .equip-slot-btn:hover:not(:disabled) { border-color: var(--amber-500); }
   .equip-slot-btn-filled { border-color: var(--amber-500); background: var(--stone-900); }
   .equip-slot-btn-disabled { border-color: var(--stone-700); background: var(--stone-950); cursor: not-allowed; opacity: 0.5; }
