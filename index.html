@@ -17397,6 +17397,7 @@ const TRANSLATIONS = {
         mapLegendHero: 'Ты здесь',
         mapLegendQuest: 'Задание',
         mapLegendRoute: 'Маршрут',
+        mapLegendToggle: 'Обозначения',
         mapHint: 'Тяни карту, своди/разводи пальцы или крути колёсико. Нажми на значок — покажется описание.',
         mapEmptyText: 'Карта заполнится, как только история начнёт называть места.',
         mapFogLabel: 'Неисследовано',
@@ -17451,6 +17452,8 @@ const TRANSLATIONS = {
         inventoryFilterLabel: 'Фильтр',
         inventoryFilterAll: 'Все',
         inventoryFilterEmpty: 'Нет предметов такого типа.',
+        inventoryOpenButton: 'Открыть сумку',
+        inventorySelectHint: 'Выберите предмет',
         itemSlotWeapon: 'Оружие',
         itemSlotArmor: 'Доспехи',
         itemSlotHelmet: 'Шлемы',
@@ -17615,6 +17618,7 @@ const TRANSLATIONS = {
         // -- Equipment modal --
         equipmentButton: 'Снаряжение',
         equipmentModalTitle: 'Снаряжение',
+        combatStatsHeading: 'Боевые характеристики',
         equipCloak: 'Плащ',
         equipBackpack: 'Рюкзак',
         equipHelmet: 'Головной убор',
@@ -17652,8 +17656,10 @@ const TRANSLATIONS = {
         factionRankAlly: 'Союзник',
         factionRankHero: 'Герой фракции',
         setBonusLabel: 'Бонус комплекта',
-        mapLegendResentfulTerritory: 'Обиженная территория',
-        mapLegendHostileTerritory: 'Враждебная территория',
+        mapLegendResentfulTerritory: 'Территория разгневанной фракции',
+        mapLegendHostileTerritory: 'Территория враждебной фракции',
+        mapLegendFriendlyTerritory: 'Территория дружественной фракции',
+        mapLegendAlliedTerritory: 'Территория союзной фракции',
         mapLegendDanger: 'Возможна опасность',
         mapDangerLabel: 'Возможна опасность',
         // -- Suggestions & regenerate --
@@ -17668,6 +17674,7 @@ const TRANSLATIONS = {
         itemTakeAria: 'Взять',
         itemDeclineAria: 'Оставить',
         itemChoiceConfirmButton: 'Подтвердить',
+        itemOfferCostInsufficientHint: 'Не хватает золота',
         // -- Editing a turn --
         editAria: 'Редактировать',
         saveButton: 'Сохранить',
@@ -17783,6 +17790,7 @@ const TRANSLATIONS = {
         mapLegendHero: 'You',
         mapLegendQuest: 'Quest',
         mapLegendRoute: 'Route',
+        mapLegendToggle: 'Legend',
         mapHint: 'Drag to pan, pinch or scroll to zoom. Tap a marker for its description.',
         mapEmptyText: 'The map fills in as the story starts naming places.',
         mapFogLabel: 'Unexplored',
@@ -17837,6 +17845,8 @@ const TRANSLATIONS = {
         inventoryFilterLabel: 'Filter',
         inventoryFilterAll: 'All',
         inventoryFilterEmpty: 'No items of this type.',
+        inventoryOpenButton: 'Open bag',
+        inventorySelectHint: 'Select an item',
         itemSlotWeapon: 'Weapons',
         itemSlotArmor: 'Armor',
         itemSlotHelmet: 'Helmets',
@@ -18001,6 +18011,7 @@ const TRANSLATIONS = {
         // -- Equipment modal --
         equipmentButton: 'Equipment',
         equipmentModalTitle: 'Equipment',
+        combatStatsHeading: 'Combat stats',
         equipCloak: 'Cloak',
         equipBackpack: 'Backpack',
         equipHelmet: 'Headwear',
@@ -18038,8 +18049,10 @@ const TRANSLATIONS = {
         factionRankAlly: 'Ally',
         factionRankHero: 'Faction Hero',
         setBonusLabel: 'Set bonus',
-        mapLegendResentfulTerritory: 'Resentful territory',
-        mapLegendHostileTerritory: 'Hostile territory',
+        mapLegendResentfulTerritory: 'Territory of an angered faction',
+        mapLegendHostileTerritory: 'Territory of a hostile faction',
+        mapLegendFriendlyTerritory: 'Territory of a friendly faction',
+        mapLegendAlliedTerritory: 'Territory of an allied faction',
         mapLegendDanger: 'Possible danger',
         mapDangerLabel: 'Possible danger',
         // -- Suggestions & regenerate --
@@ -18054,6 +18067,7 @@ const TRANSLATIONS = {
         itemTakeAria: 'Take',
         itemDeclineAria: 'Leave',
         itemChoiceConfirmButton: 'Confirm',
+        itemOfferCostInsufficientHint: 'Not enough gold',
         // -- Editing a turn --
         editAria: 'Edit',
         saveButton: 'Save',
@@ -19274,6 +19288,20 @@ function factionStandingLabelKey(value) {
         return 'factionRankAlly';
     return 'factionRankHero';
 }
+// Cosmetic counterparts to isFactionHostile/isFactionResentful, for the
+// friendly half of the scale — same idea as factionStandingLabelKey just
+// above: purely a display concern (which ring, if any, a map node gets),
+// not a hook into any narrative-behavior rule. The prompt only forces a
+// specific tone when reputation is bad (see territoryResentfulRule /
+// territoryHostileRule) — a good relationship is left to the narrator's
+// own judgment rather than scripted, so there's no positive-side mirror of
+// those two rules, only of the map ring.
+function isFactionFriendly(value) {
+    return typeof value === 'number' && value >= FACTION_RESPECTED_REPUTATION_THRESHOLD && value < FACTION_ALLY_REPUTATION_THRESHOLD;
+}
+function isFactionAllied(value) {
+    return typeof value === 'number' && value >= FACTION_ALLY_REPUTATION_THRESHOLD;
+}
 // ==============================================================================
 // PARTY / GROUP — companion recruitment and roster
 // ==============================================================================
@@ -19340,6 +19368,34 @@ const EQUIPMENT_SLOT_CONFIG = [
     { key: 'ringRight', matchSlot: 'ring', icon: '💍', image: EQUIP_ICON_RING, labelKey: 'equipRingRight' }
 ];
 const EMPTY_EQUIPMENT = EQUIPMENT_SLOT_CONFIG.filter(slot => !slot.spacer).reduce((acc, slot) => { acc[slot.key] = null; return acc; }, {});
+// Per-item-TYPE icon for the inventory grid (InventoryModal) — distinct
+// from EQUIPMENT_SLOT_CONFIG above, which is keyed by paper-doll SLOT
+// (left/right ring, left/right weapon hand) and can list the same slot
+// type twice. Here we only need one representative image per item.slot,
+// since a grid cell shows an item sitting in the bag, not a body slot.
+// Slots with no dedicated artwork (consumables, quest items, unclassified
+// "none" items) fall back to a plain emoji — this is exactly the "у
+// расходников ещё нет [картинок], там просто смайлики" case.
+const INVENTORY_SLOT_IMAGE = {
+    weapon: EQUIP_ICON_WEAPON_RIGHT, armor: EQUIP_ICON_ARMOR, helmet: EQUIP_ICON_HELMET,
+    amulet: EQUIP_ICON_AMULET, gloves: EQUIP_ICON_GLOVES, boots: EQUIP_ICON_BOOTS,
+    ring: EQUIP_ICON_RING, cloak: EQUIP_ICON_CLOAK, backpack: EQUIP_ICON_BACKPACK
+};
+const INVENTORY_SLOT_EMOJI = { consumable: '🧪', none: '📦' };
+// Returns { image } or { emoji } — never both — for a single inventory
+// item, so the grid cell always knows exactly one way to render itself.
+// Shield-flagged weapon items (see isShieldItemName) get their own emoji
+// rather than the generic sword image, matching the paper-doll's own
+// override (see renderWeaponSlotIcon).
+function getInventoryItemIcon(item) {
+    if (item.slot === 'weapon' && (item.shield === true || (item.shield === undefined && isShieldItemName(item.name)))) {
+        return { emoji: '🛡️' };
+    }
+    const image = INVENTORY_SLOT_IMAGE[item.slot];
+    if (image)
+        return { image };
+    return { emoji: INVENTORY_SLOT_EMOJI[item.slot] || '❔' };
+}
 function normalizeEquipment(raw) {
     if (!raw || typeof raw !== 'object')
         return { ...EMPTY_EQUIPMENT };
@@ -19872,6 +19928,47 @@ function getSetBonusForSlot(slotKey, activeSets) {
         size: info.size
     };
 }
+// Sums defense across every equipped ARMOR slot once each (helmet, armor,
+// gloves, boots) — a single overall rating for the equipment screen's
+// stats panel (see EquipmentModal). Deliberately different from combat's
+// own getPlayerDefenseForPart (inside App()), which sums per BODY PART and
+// so double-counts a slot that protects two parts at once (gloves cover
+// both arms, boots both legs) — right for "how much does a hit to this arm
+// lose," wrong for "how armored is this build overall." Built on
+// getArmorDefenseForSlot/getSetBonusForSlot, the same single sources of
+// truth the per-slot equip badges already use, so this can never drift
+// from what the paper doll itself shows.
+function computeTotalArmorDefense(equipment, inventory, itemRarities) {
+    const activeSets = computeActiveEquipmentSets(equipment, inventory, itemRarities);
+    let total = 0;
+    for (const slotKey of Object.keys(ARMOR_SLOT_PROTECTION)) {
+        const itemName = equipment[slotKey];
+        if (!itemName)
+            continue;
+        const rarity = findItemRarity(itemName, itemRarities) || 'common';
+        total += (getArmorDefenseForSlot(slotKey, rarity) || 0) + getSetBonusForSlot(slotKey, activeSets).defense;
+    }
+    return total;
+}
+// Total damage the hero's current loadout swings for — the same tally as
+// App()'s own getPlayerWeaponInfo (both weapon slots summed, doubled for a
+// two-hander, UNARMED_DAMAGE as the bare-fists fallback), rebuilt as a
+// pure top-level function so the equipment screen's stats panel can read
+// it without reaching into App()'s closures. Built on
+// getWeaponDamageForSlot, the same single source of truth the per-slot
+// equip badges already use.
+function computeTotalWeaponDamage(equipment, inventory, itemRarities) {
+    const weaponNames = [equipment.weaponRight, equipment.weaponLeft].filter(Boolean);
+    if (weaponNames.length === 0)
+        return UNARMED_DAMAGE;
+    let total = 0;
+    for (const name of weaponNames) {
+        const item = inventory.find(it => it.name === name);
+        const rarity = findItemRarity(name, itemRarities) || 'common';
+        total += getWeaponDamageForSlot('weapon', rarity, item && item.twoHanded);
+    }
+    return total;
+}
 function clampPercent(n) {
     return Math.max(COMBAT_TUNING.minHitChance, Math.min(COMBAT_TUNING.maxHitChance, n));
 }
@@ -20281,8 +20378,14 @@ function ActionBlock({ actions, t, editable, onEdit }) {
 // which drives a CSS transition (item-offer-row-exit) that slides the row
 // up and fades it out — the row unmounts from the player's view the moment
 // itemResolutions is committed and the item lands in inventory, rather than
-// lingering inline for the rest of the turn.
-function ItemOffers({ narratorMessage, interactive, onToggle, t }) {
+// lingering inline for the rest of the turn. OFFER_EXIT_ANIM_MS mirrors the
+// slowest property in that CSS transition (max-height/transform, 0.6s) with
+// a small margin, so `exiting` is only cleared once the animation has
+// actually finished — that in turn lets the whole bordered panel below
+// unmount cleanly once nothing is left in it, instead of leaving its
+// border/padding behind as an empty strip after the last row flies off.
+const OFFER_EXIT_ANIM_MS = 650;
+function ItemOffers({ narratorMessage, interactive, currency, onToggle, t }) {
     const [pending, setPending] = useState({});
     const [exiting, setExiting] = useState({});
     // narratorMessage.itemOffers keeps the same array reference across
@@ -20298,6 +20401,11 @@ function ItemOffers({ narratorMessage, interactive, onToggle, t }) {
     if (!narratorMessage.itemOffers || narratorMessage.itemOffers.length === 0)
         return null;
     const resolutions = narratorMessage.itemResolutions || {};
+    // Nothing left to decide and nothing still mid-exit-animation — unmount
+    // the whole panel rather than leaving an empty bordered strip behind.
+    const anyRowVisible = narratorMessage.itemOffers.some(group => group.items.some(item => resolutions[item.id] === undefined || exiting[item.id]));
+    if (!anyRowVisible)
+        return null;
     function stage(groupId, itemId, selectionMode, takeValue) {
         if (selectionMode === 'single') {
             const group = narratorMessage.itemOffers.find(g => g.groupId === groupId);
@@ -20313,6 +20421,15 @@ function ItemOffers({ narratorMessage, interactive, onToggle, t }) {
             setPending(prev => ({ ...prev, [itemId]: takeValue }));
         }
     }
+    function clearExiting(ids) {
+        window.setTimeout(() => {
+            setExiting(prev => {
+                const next = { ...prev };
+                ids.forEach(id => { delete next[id]; });
+                return next;
+            });
+        }, OFFER_EXIT_ANIM_MS);
+    }
     function confirm(groupId, itemId, selectionMode) {
         const takeValue = pending[itemId];
         if (takeValue === undefined)
@@ -20323,15 +20440,17 @@ function ItemOffers({ narratorMessage, interactive, onToggle, t }) {
             // toggleItemSelection) — animate the whole group away together
             // instead of leaving the declined siblings to vanish abruptly.
             const group = narratorMessage.itemOffers.find(g => g.groupId === groupId);
+            const ids = group ? group.items.map(it => it.id) : [itemId];
             setExiting(prev => {
                 const next = { ...prev };
-                if (group)
-                    group.items.forEach(it => { next[it.id] = true; });
+                ids.forEach(id => { next[id] = true; });
                 return next;
             });
+            clearExiting(ids);
         }
         else {
             setExiting(prev => ({ ...prev, [itemId]: true }));
+            clearExiting([itemId]);
         }
     }
     return (React.createElement("div", { className: "item-offers" }, narratorMessage.itemOffers.map(group => (React.createElement("div", { key: group.groupId, className: "item-offer-group" }, group.items.map(item => {
@@ -20339,22 +20458,37 @@ function ItemOffers({ narratorMessage, interactive, onToggle, t }) {
         if (resolution !== undefined && !exiting[item.id])
             return null;
         const staged = pending[item.id];
+        // A priced offer (item.cost set) — a paid room, a fare, a
+        // service bought on the spot — is otherwise identical to an
+        // ordinary free item offer: same two-step ✓/✗-then-Confirm
+        // flow, same row. The only differences are the price shown
+        // next to the label and the ✓ button refusing to stage when
+        // the hero can't actually afford it (mirrors GiftItemModal's
+        // own amount-vs-currency guard).
+        const unaffordable = !!item.cost && typeof currency === 'number' && item.cost > currency;
         return (React.createElement("div", { key: item.id, className: 'item-offer-row-wrap' + (exiting[item.id] ? ' item-offer-row-exit' : '') },
             React.createElement("div", { className: "item-offer-row" },
                 React.createElement("span", { className: "item-offer-label", style: item.rarity ? { color: rarityColor(item.rarity) } : undefined },
                     "[",
                     item.label,
-                    "]"),
+                    "]",
+                    item.cost ? React.createElement("span", { className: 'item-offer-cost' + (unaffordable ? ' item-offer-cost-insufficient' : '') },
+                        " \u2212",
+                        item.cost,
+                        " \uD83E\uDE99") : null),
                 React.createElement("div", { className: "item-offer-choice" },
-                    React.createElement("button", { onClick: () => stage(group.groupId, item.id, group.selectionMode, true), className: 'item-choice-btn' + (staged === true ? ' item-choice-active-take' : ''), disabled: !interactive, "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
+                    React.createElement("button", { onClick: () => stage(group.groupId, item.id, group.selectionMode, true), className: 'item-choice-btn' + (staged === true ? ' item-choice-active-take' : ''), disabled: !interactive || unaffordable, "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
                     React.createElement("button", { onClick: () => stage(group.groupId, item.id, group.selectionMode, false), className: 'item-choice-btn' + (staged === false ? ' item-choice-active-decline' : ''), disabled: !interactive, "aria-label": t('itemDeclineAria'), type: "button" }, "\u2717"))),
+            unaffordable && React.createElement("p", { className: "item-offer-insufficient-hint" }, t('itemOfferCostInsufficientHint')),
             React.createElement("button", { onClick: () => confirm(group.groupId, item.id, group.selectionMode), className: "item-choice-confirm-btn", disabled: !interactive || staged === undefined, type: "button" }, t('itemChoiceConfirmButton'))));
     }))))));
 }
-// Mirrors ItemOffers structurally — same row, same ✓/✗ buttons — for the
-// one moment where the scene invites the hero to travel somewhere right
-// now. The label carries a trailing arrow to read as a direction/action
-// ("[Tavern] →") rather than an item to pick up.
+// Renders two related widgets under one shared visual style: a new-quest
+// offer (with an optional advance, its own independent ✓/✗ that only shows
+// once the quest itself is accepted) and a reward offer for a quest already
+// completed. Always rendered when present, regardless of the
+// item-interaction setting — see the rationale on getUnresolvedQuestOffers.
+//
 // Same two-step resolution as ItemOffers: ✓/✗ only stages a pending choice,
 // a "Confirm" button beneath actually commits it. A quest/advance/reward
 // sub-choice collapses on its own once confirmed (item-offer-row-wrap), and
@@ -20379,8 +20513,39 @@ function QuestOffers({ narratorMessage, interactive, onToggleQuest, onToggleAdva
     const questRes = narratorMessage.questOfferResolutions || {};
     const advanceRes = narratorMessage.advanceResolutions || {};
     const rewardRes = narratorMessage.rewardResolutions || {};
+    // Same "nothing left to show" guard as ItemOffers (see OFFER_EXIT_ANIM_MS)
+    // — once every quest/reward card is fully resolved and none is still
+    // mid-exit-animation, unmount the whole panel instead of leaving its
+    // border/padding behind as an empty strip.
+    const anyQuestVisible = hasQuests && narratorMessage.questOffers.some(offer => {
+        const resolution = questRes[offer.id];
+        const advanceNeeded = !!offer.advance && resolution === true;
+        const fullyResolved = resolution !== undefined && (!advanceNeeded || advanceRes[offer.id] !== undefined);
+        return !fullyResolved || cardExiting[offer.id];
+    });
+    const anyRewardVisible = hasRewards && narratorMessage.rewardOffers.some(offer => rewardRes[offer.id] === undefined || cardExiting[offer.id]);
+    if (!anyQuestVisible && !anyRewardVisible)
+        return null;
     function stage(key, value) {
         setPending(prev => ({ ...prev, [key]: value }));
+    }
+    function clearRowExiting(key) {
+        window.setTimeout(() => {
+            setRowExiting(prev => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+            });
+        }, OFFER_EXIT_ANIM_MS);
+    }
+    function clearCardExiting(id) {
+        window.setTimeout(() => {
+            setCardExiting(prev => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
+        }, OFFER_EXIT_ANIM_MS);
     }
     function confirmQuest(offer) {
         const key = 'q:' + offer.id;
@@ -20392,11 +20557,13 @@ function QuestOffers({ narratorMessage, interactive, onToggleQuest, onToggleAdva
             // Accepted, and there's an advance question still to come — collapse
             // just this accept/decline row, keep the card for the advance choice.
             setRowExiting(prev => ({ ...prev, [key]: true }));
+            clearRowExiting(key);
         }
         else {
             // Declined, or accepted with nothing further to decide — nothing
             // left to show, so the whole card slides away.
             setCardExiting(prev => ({ ...prev, [offer.id]: true }));
+            clearCardExiting(offer.id);
         }
     }
     function confirmAdvance(offer) {
@@ -20406,6 +20573,7 @@ function QuestOffers({ narratorMessage, interactive, onToggleQuest, onToggleAdva
             return;
         onToggleAdvance(offer.id, value);
         setCardExiting(prev => ({ ...prev, [offer.id]: true }));
+        clearCardExiting(offer.id);
     }
     function confirmReward(offer) {
         const key = 'r:' + offer.id;
@@ -20414,6 +20582,7 @@ function QuestOffers({ narratorMessage, interactive, onToggleQuest, onToggleAdva
             return;
         onToggleReward(offer.id, value);
         setCardExiting(prev => ({ ...prev, [offer.id]: true }));
+        clearCardExiting(offer.id);
     }
     return (React.createElement("div", { className: "quest-offers" },
         hasQuests && narratorMessage.questOffers.map(offer => {
@@ -20467,29 +20636,52 @@ function QuestOffers({ narratorMessage, interactive, onToggleQuest, onToggleAdva
                 React.createElement("button", { onClick: () => confirmReward(offer), className: "item-choice-confirm-btn", disabled: !interactive || staged === undefined, type: "button" }, t('itemChoiceConfirmButton'))));
         })));
 }
+// Two-step resolution, same as ItemOffers (see OFFER_EXIT_ANIM_MS above):
+// tapping ✓/✗ only stages a pending choice, a separate "Confirm" button
+// beneath is what actually commits it — and confirming flags the row as
+// exiting, which drives the same item-offer-row-exit CSS transition
+// (slides the row up, fades it out) before it disappears. Deciding to
+// travel — or deciding to stay — is the whole action for this turn (see
+// toggleTravelOffer, which schedules the actual next-turn call once this
+// animation has had time to finish), so the ✓/✗/Confirm controls are
+// disabled the moment `exiting` flips true: nothing is left to decide, and
+// a second click here must not schedule a second auto-continue.
 function TravelOffer({ narratorMessage, interactive, onToggle, t }) {
+    const [pending, setPending] = useState(undefined);
+    const [exiting, setExiting] = useState(false);
+    useEffect(() => {
+        setPending(undefined);
+        setExiting(false);
+    }, [narratorMessage.travelOffer]);
     if (!narratorMessage.travelOffer)
         return null;
     const offer = narratorMessage.travelOffer;
     const resolution = narratorMessage.travelOfferResolution;
+    if (resolution !== undefined && !exiting)
+        return null;
+    function confirm() {
+        if (pending === undefined || exiting)
+            return;
+        setExiting(true);
+        window.setTimeout(() => setExiting(false), OFFER_EXIT_ANIM_MS);
+        onToggle(pending);
+    }
     return (React.createElement("div", { className: "item-offers" },
         React.createElement("div", { className: "item-offer-group" },
-            React.createElement("div", { className: "item-offer-row" },
-                React.createElement("span", { className: "item-offer-label" },
-                    "[",
-                    offer.label,
-                    "] ",
-                    React.createElement("span", { className: "travel-offer-arrow", "aria-hidden": "true" }, "\u2192")),
-                React.createElement("div", { className: "item-offer-choice" },
-                    React.createElement("button", { onClick: () => onToggle(true), className: 'item-choice-btn' + (resolution === true ? ' item-choice-active-take' : ''), disabled: !interactive, "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
-                    React.createElement("button", { onClick: () => onToggle(false), className: 'item-choice-btn' + (resolution === false ? ' item-choice-active-decline' : ''), disabled: !interactive, "aria-label": t('itemDeclineAria'), type: "button" }, "\u2717"))))));
+            React.createElement("div", { className: 'item-offer-row-wrap' + (exiting ? ' item-offer-row-exit' : '') },
+                React.createElement("div", { className: "item-offer-row" },
+                    React.createElement("span", { className: "item-offer-label" },
+                        "[",
+                        offer.label,
+                        "] ",
+                        React.createElement("span", { className: "travel-offer-arrow", "aria-hidden": "true" }, "\u2192")),
+                    React.createElement("div", { className: "item-offer-choice" },
+                        React.createElement("button", { onClick: () => setPending(true), className: 'item-choice-btn' + (pending === true ? ' item-choice-active-take' : ''), disabled: !interactive || exiting, "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
+                        React.createElement("button", { onClick: () => setPending(false), className: 'item-choice-btn' + (pending === false ? ' item-choice-active-decline' : ''), disabled: !interactive || exiting, "aria-label": t('itemDeclineAria'), type: "button" }, "\u2717"))),
+                React.createElement("button", { onClick: confirm, className: "item-choice-confirm-btn", disabled: !interactive || exiting || pending === undefined, type: "button" }, t('itemChoiceConfirmButton'))))));
 }
-// quest offer (with an optional advance, its own independent ✓/✗ that only
-// shows once the quest itself is accepted) and a reward offer for a quest
-// already completed. Always rendered when present, regardless of the
-// item-interaction setting — see the rationale on getUnresolvedQuestOffers.
 // ---- Character sheet ----
-function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, itemWeights, equipment, npcReputations, factionReputations, party, inventorySort, onInventorySortChange, inventoryFilter, onInventoryFilterChange, onOpenEquipment, onOpenQuests, onSelectItem, onGiftNpc, onRecruitNpc, t }) {
+function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, itemWeights, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onGiftNpc, onRecruitNpc, t }) {
     const isEmpty = !gameState.time &&
         gameState.effects.length === 0 &&
         gameState.inventory.length === 0 &&
@@ -20529,32 +20721,6 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
     // parts hide. Keyed by lowercased name rather than index so a toggle
     // survives the list re-sorting or gaining/losing entries between renders.
     const [expandedNpcs, setExpandedNpcs] = useState(() => new Set());
-    const presentSlotTypes = Array.from(new Set(inventoryGroups.map(g => g.item.slot)))
-        .filter(slot => ITEM_SLOT_LABEL_KEYS[slot]);
-    // Quest-tagged is a virtual filter, independent of the real slot filters
-    // above — an item keeps its actual slot (weapon/armor/…) at all times, so
-    // filtering "by quest" means filtering by questId presence instead.
-    const hasQuestTaggedItems = inventoryGroups.some(g => g.item.questId);
-    const visibleGroups = inventoryGroups.filter(g => {
-        if (inventoryFilter === 'all')
-            return true;
-        if (inventoryFilter === 'questTagged')
-            return !!g.item.questId;
-        return g.item.slot === inventoryFilter;
-    });
-    const sortedGroups = [...visibleGroups].sort((a, b) => {
-        if (inventorySort === 'weight') {
-            return findItemWeight(b.item.name, itemWeights) - findItemWeight(a.item.name, itemWeights);
-        }
-        if (inventorySort === 'rarity') {
-            const rarityIndex = key => RARITY_TIERS.findIndex(tier => tier.key === key);
-            return rarityIndex(findItemRarity(b.item.name, itemRarities) || 'common') - rarityIndex(findItemRarity(a.item.name, itemRarities) || 'common');
-        }
-        if (inventorySort === 'name') {
-            return a.item.name.localeCompare(b.item.name);
-        }
-        return 0;
-    });
     return (React.createElement("div", { className: "sheet" },
         React.createElement("div", { className: "sheet-hero" },
             React.createElement("p", { className: "sheet-hero-name" }, heroName || t('heroFallback')),
@@ -20617,44 +20783,12 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                 React.createElement("div", { className: "weight-bar-track" },
                     React.createElement("div", { className: 'weight-bar-fill' + (isOverweight ? ' weight-bar-over' : ''), style: { width: Math.min(100, (totalWeight / Math.max(1, carryCapacity)) * 100) + '%' } })),
                 isOverweight && React.createElement("p", { className: "hint-text warning-text" }, t('overweightWarning')),
-                inventoryGroups.length > 1 && (React.createElement("div", { className: "sheet-inventory-controls" },
-                    React.createElement(InlineSelect, { label: t('inventorySortLabel'), value: inventorySort, onChange: onInventorySortChange, options: [
-                            { value: 'default', label: t('inventorySortDefault') },
-                            { value: 'weight', label: t('inventorySortWeight') },
-                            { value: 'rarity', label: t('inventorySortRarity') },
-                            { value: 'name', label: t('inventorySortName') }
-                        ] }),
-                    (presentSlotTypes.length > 1 || (presentSlotTypes.length >= 1 && hasQuestTaggedItems)) && (React.createElement(InlineSelect, { label: t('inventoryFilterLabel'), value: inventoryFilter, onChange: onInventoryFilterChange, options: [
-                            { value: 'all', label: t('inventoryFilterAll') },
-                            ...presentSlotTypes.map(slot => ({ value: slot, label: t(ITEM_SLOT_LABEL_KEYS[slot]) })),
-                            ...(hasQuestTaggedItems ? [{ value: 'questTagged', label: t('itemSlotQuest') }] : [])
-                        ] })))),
-                sortedGroups.length === 0 && (React.createElement("p", { className: "sheet-empty" }, t('inventoryFilterEmpty'))),
-                sortedGroups.map((group, gi) => {
-                    const { item, firstIndex, count } = group;
-                    const rarity = findItemRarity(item.name, itemRarities);
-                    const isEquipped = equippedNames.has(item.name);
-                    const weight = findItemWeight(item.name, itemWeights);
-                    const armorDefense = getArmorDefenseForSlot(item.slot, rarity || 'common');
-                    const weaponDamage = getWeaponDamageForSlot(item.slot, rarity || 'common', item.twoHanded);
-                    const blockChance = getBlockChanceForItem(item, rarity || 'common');
-                    const statBadge = buildStatBadge(armorDefense, weaponDamage, blockChance);
-                    const isQuestActive = isActiveQuestItem(item, gameState.quests);
-                    return (React.createElement("p", { key: gi, className: "sheet-list-item sheet-list-item-clickable", style: { color: isQuestActive ? 'var(--amber-400)' : (rarity ? rarityColor(rarity) : undefined) }, onClick: () => onSelectItem && onSelectItem(firstIndex) },
-                        isQuestActive ? '📜 ' : '',
-                        "[",
-                        item.name,
-                        weaponHandTag(item.slot, item.twoHanded, t) ? ' ' + weaponHandTag(item.slot, item.twoHanded, t) : '',
-                        "]",
-                        isEquipped ? ' ✓' : '',
-                        React.createElement("span", { className: "sheet-item-meta" },
-                            " \u00B7 ",
-                            weight,
-                            " ",
-                            t('weightUnit'),
-                            statBadge ? ' · ' + statBadge : '',
-                            count > 1 ? ' ×' + count : '')));
-                }))))),
+                onOpenInventory && (React.createElement("button", { onClick: onOpenInventory, className: "btn btn-ghost sheet-inventory-open-btn", type: "button" },
+                    "\uD83C\uDF92 ",
+                    t('inventoryOpenButton'),
+                    " (",
+                    inventoryGroups.reduce((sum, g) => sum + g.count, 0),
+                    ")")))))),
         gameState.quests.length > 0 && (React.createElement("div", { className: "sheet-section" },
             React.createElement("div", { className: "sheet-section-header" },
                 React.createElement("p", { className: "sheet-heading" }, t('questsHeading')),
@@ -21298,44 +21432,97 @@ function EquipSlotPicker({ equippedName, equippedItem, currentStats, candidates,
         }),
         selectable.length === 0 && !equippedName && (React.createElement("p", { className: "equip-picker-empty" }, t('equipNoneAvailable')))));
 }
-function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, isSlotDisabled, onOpenPicker, onEquip, onUnequip, onClose, t }) {
+function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, pickerSlot, isSlotDisabled, onOpenPicker, onEquip, onUnequip, onClose, t }) {
     const activeSets = computeActiveEquipmentSets(equipment, gameState.inventory, itemRarities);
+    // Equipment-screen stats panel totals — see computeTotalArmorDefense/
+    // computeTotalWeaponDamage (single sources of truth shared with the
+    // per-slot equip badges) and computeDefenseAvailability (shared with
+    // combat's own block-chance gating), so these numbers can never drift
+    // from what the rest of the game actually uses them for.
+    const totalDefense = computeTotalArmorDefense(equipment, gameState.inventory, itemRarities);
+    const totalDamage = computeTotalWeaponDamage(equipment, gameState.inventory, itemRarities);
+    const totalBlockChance = computeDefenseAvailability(equipment, gameState.inventory, itemWeights, itemRarities).blockChance || 0;
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
-        React.createElement("div", { className: "modal-card equipment-card" },
+        React.createElement("div", { className: "modal-card equipment-card equipment-card-wide" },
             React.createElement("h2", { className: "modal-title" }, t('equipmentModalTitle')),
-            React.createElement("div", { className: "equipment-grid" }, EQUIPMENT_SLOT_CONFIG.map(slot => {
-                if (slot.spacer) {
-                    return React.createElement("div", { key: slot.key, className: "equip-slot-wrap equip-slot-spacer", "aria-hidden": "true" });
-                }
-                const disabled = isSlotDisabled(slot.key);
-                const equippedName = disabled ? null : equipment[slot.key];
-                const rarity = equippedName ? findItemRarity(equippedName, itemRarities) : null;
-                const setBonus = equippedName ? getSetBonusForSlot(slot.key, activeSets) : { defense: 0, size: 0 };
-                const baseArmorDefense = equippedName ? getArmorDefenseForSlot(slot.matchSlot, rarity || 'common') : null;
-                const armorDefense = baseArmorDefense !== null ? baseArmorDefense + setBonus.defense : null;
-                const equippedItem = equippedName ? gameState.inventory.find(it => it.name === equippedName && it.slot === slot.matchSlot) : null;
-                const weaponDamage = equippedName ? getWeaponDamageForSlot(slot.matchSlot, rarity || 'common', equippedItem && equippedItem.twoHanded) : null;
-                const blockChance = equippedItem ? getBlockChanceForItem(equippedItem, rarity || 'common') : null;
-                // Any weapon — one- or two-handed — is a candidate for either
-                // hand independently: a two-handed weapon takes over whichever
-                // side it's NOT equipped into (see isSlotDisabled above).
-                const candidates = gameState.inventory.filter(it => it.slot === slot.matchSlot);
-                return (React.createElement("div", { key: slot.key, className: "equip-slot-wrap" },
-                    React.createElement("button", { onClick: () => onOpenPicker(slot.key), className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : (equippedName ? ' equip-slot-btn-filled' : ' equip-slot-btn-empty')), type: "button", disabled: disabled, "aria-label": t(slot.labelKey) },
-                        renderWeaponSlotIcon(slot, disabled, equippedItem) || (disabled ? (React.createElement("span", { className: "equip-slot-icon" }, "\uD83D\uDEAB")) : slot.image ? (React.createElement("img", { className: "equip-slot-icon-img", src: slot.image, alt: "" })) : (React.createElement("span", { className: "equip-slot-icon" }, slot.icon))),
-                        armorDefense !== null && (React.createElement("span", { className: "equip-slot-defense-badge", "aria-label": t('itemDefenseLabel') }, armorDefense)),
-                        weaponDamage !== null && (React.createElement("span", { className: "equip-slot-damage-badge", "aria-label": t('itemDamageLabel') }, weaponDamage)),
-                        blockChance !== null && (React.createElement("span", { className: "equip-slot-block-badge", "aria-label": t('itemBlockLabel') },
-                            blockChance,
-                            "%")),
-                        setBonus.size >= 2 && (React.createElement("span", { className: "equip-slot-set-badge", "aria-label": t('setBonusLabel'), title: t('setBonusLabel') },
-                            "\uD83D\uDD17",
-                            setBonus.size))),
-                    React.createElement("p", { className: "equip-slot-label" }, t(slot.labelKey)),
-                    React.createElement("p", { className: "equip-slot-item-name", style: equippedName ? { color: isActiveQuestItem(equippedItem, gameState.quests) ? 'var(--amber-400)' : (rarity ? rarityColor(rarity) : undefined) } : undefined }, equippedName ? (isActiveQuestItem(equippedItem, gameState.quests) ? '📜 ' : '') + '[' + equippedName + (equippedItem && weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) ? ' ' + weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) : '') + ']' : (disabled ? t('equipTwoHandedOccupied') : '\u00A0')),
-                    pickerSlot === slot.key && !disabled && (React.createElement(EquipSlotPicker, { equippedName: equipment[slot.key], equippedItem: equippedItem, currentStats: { armorDefense, weaponDamage, blockChance }, candidates: candidates, itemRarities: itemRarities, onEquip: name => onEquip(slot.key, name), onUnequip: () => onUnequip(slot.key), t: t }))));
-            })),
+            React.createElement("div", { className: "equipment-modal-body" },
+                React.createElement("div", { className: "equipment-grid equipment-grid-sized" }, EQUIPMENT_SLOT_CONFIG.map(slot => {
+                    if (slot.spacer) {
+                        return React.createElement("div", { key: slot.key, className: "equip-slot-wrap equip-slot-spacer", "aria-hidden": "true" });
+                    }
+                    const disabled = isSlotDisabled(slot.key);
+                    const equippedName = disabled ? null : equipment[slot.key];
+                    const rarity = equippedName ? findItemRarity(equippedName, itemRarities) : null;
+                    const setBonus = equippedName ? getSetBonusForSlot(slot.key, activeSets) : { defense: 0, size: 0 };
+                    const baseArmorDefense = equippedName ? getArmorDefenseForSlot(slot.matchSlot, rarity || 'common') : null;
+                    const armorDefense = baseArmorDefense !== null ? baseArmorDefense + setBonus.defense : null;
+                    const equippedItem = equippedName ? gameState.inventory.find(it => it.name === equippedName && it.slot === slot.matchSlot) : null;
+                    const weaponDamage = equippedName ? getWeaponDamageForSlot(slot.matchSlot, rarity || 'common', equippedItem && equippedItem.twoHanded) : null;
+                    const blockChance = equippedItem ? getBlockChanceForItem(equippedItem, rarity || 'common') : null;
+                    // Any weapon — one- or two-handed — is a candidate for either
+                    // hand independently: a two-handed weapon takes over whichever
+                    // side it's NOT equipped into (see isSlotDisabled above).
+                    const candidates = gameState.inventory.filter(it => it.slot === slot.matchSlot);
+                    return (React.createElement("div", { key: slot.key, className: "equip-slot-wrap" },
+                        React.createElement("button", { onClick: () => onOpenPicker(slot.key), className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : (equippedName ? ' equip-slot-btn-filled' : ' equip-slot-btn-empty')), type: "button", disabled: disabled, "aria-label": t(slot.labelKey) },
+                            renderWeaponSlotIcon(slot, disabled, equippedItem) || (disabled ? (React.createElement("span", { className: "equip-slot-icon" }, "\uD83D\uDEAB")) : slot.image ? (React.createElement("img", { className: "equip-slot-icon-img", src: slot.image, alt: "" })) : (React.createElement("span", { className: "equip-slot-icon" }, slot.icon))),
+                            armorDefense !== null && (React.createElement("span", { className: "equip-slot-defense-badge", "aria-label": t('itemDefenseLabel') }, armorDefense)),
+                            weaponDamage !== null && (React.createElement("span", { className: "equip-slot-damage-badge", "aria-label": t('itemDamageLabel') }, weaponDamage)),
+                            blockChance !== null && (React.createElement("span", { className: "equip-slot-block-badge", "aria-label": t('itemBlockLabel') },
+                                blockChance,
+                                "%")),
+                            setBonus.size >= 2 && (React.createElement("span", { className: "equip-slot-set-badge", "aria-label": t('setBonusLabel'), title: t('setBonusLabel') },
+                                "\uD83D\uDD17",
+                                setBonus.size))),
+                        React.createElement("p", { className: "equip-slot-label" }, t(slot.labelKey)),
+                        React.createElement("p", { className: "equip-slot-item-name", style: equippedName ? { color: isActiveQuestItem(equippedItem, gameState.quests) ? 'var(--amber-400)' : (rarity ? rarityColor(rarity) : undefined) } : undefined }, equippedName ? (isActiveQuestItem(equippedItem, gameState.quests) ? '📜 ' : '') + '[' + equippedName + (equippedItem && weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) ? ' ' + weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) : '') + ']' : (disabled ? t('equipTwoHandedOccupied') : '\u00A0')),
+                        pickerSlot === slot.key && !disabled && (React.createElement(EquipSlotPicker, { equippedName: equipment[slot.key], equippedItem: equippedItem, currentStats: { armorDefense, weaponDamage, blockChance }, candidates: candidates, itemRarities: itemRarities, onEquip: name => onEquip(slot.key, name), onUnequip: () => onUnequip(slot.key), t: t }))));
+                })),
+                React.createElement("div", { className: "equipment-stats-panel" },
+                    React.createElement("div", { className: "sheet-vitals" },
+                        React.createElement("div", { className: "sheet-vital-row" },
+                            React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
+                            React.createElement("span", { className: "sheet-vital-value" },
+                                gameState.health,
+                                "/",
+                                gameState.maxHealth)),
+                        React.createElement("div", { className: "sheet-vital-row" },
+                            React.createElement("span", { className: "sheet-stat-label" }, t('psycheLabel')),
+                            React.createElement("span", { className: "sheet-vital-value" },
+                                gameState.psyche,
+                                "/",
+                                gameState.maxPsyche))),
+                    React.createElement("div", { className: "sheet-section equipment-stats-section" },
+                        React.createElement("p", { className: "sheet-heading" }, t('statsHeading')),
+                        React.createElement("div", { className: "sheet-stat-row" },
+                            React.createElement("span", { className: "sheet-stat-label" }, t('strengthLabel')),
+                            React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.strength)),
+                        React.createElement("div", { className: "sheet-stat-row" },
+                            React.createElement("span", { className: "sheet-stat-label" }, t('agilityLabel')),
+                            React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.agility)),
+                        React.createElement("div", { className: "sheet-stat-row" },
+                            React.createElement("span", { className: "sheet-stat-label" }, t('intelligenceLabel')),
+                            React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.intelligence))),
+                    React.createElement("div", { className: "sheet-section equipment-stats-section" },
+                        React.createElement("p", { className: "sheet-heading" }, t('combatStatsHeading')),
+                        React.createElement("div", { className: "sheet-stat-row" },
+                            React.createElement("span", { className: "sheet-stat-label" },
+                                "\uD83D\uDEE1\uFE0F ",
+                                t('itemDefenseLabel')),
+                            React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, totalDefense)),
+                        React.createElement("div", { className: "sheet-stat-row" },
+                            React.createElement("span", { className: "sheet-stat-label" },
+                                "\u2694\uFE0F ",
+                                t('itemDamageLabel')),
+                            React.createElement("span", { className: "sheet-stat-value equipment-stat-damage" }, totalDamage)),
+                        React.createElement("div", { className: "sheet-stat-row" },
+                            React.createElement("span", { className: "sheet-stat-label" },
+                                "\uD83D\uDEE1\uFE0F ",
+                                t('itemBlockLabel')),
+                            React.createElement("span", { className: "sheet-stat-value equipment-stat-block" },
+                                totalBlockChance,
+                                "%"))))),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
@@ -21416,6 +21603,141 @@ function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equi
                 isEquippable && !isEquipped && React.createElement("button", { onClick: onEquip, className: "btn btn-primary", type: "button" }, t('equipItemButton')),
                 isEquipped && React.createElement("button", { onClick: onUnequip, className: "btn btn-ghost", type: "button" }, t('unequipButton')),
                 React.createElement("button", { onClick: onDrop, className: "btn btn-danger", type: "button" }, t('dropItemButton'))))));
+}
+// Full-bag view: a dedicated grid window (gold + weight up top, a scrollable
+// 5-per-row icon grid in the middle, one selected item's name at the
+// bottom, then two action buttons) rather than the sheet's plain text
+// list. Selection is tracked by item NAME (not array index): the index of
+// a group's first matching entry shifts every time something earlier in
+// the array is consumed/dropped, but the name stays stable across
+// re-renders, so a re-render right after using/dropping something doesn't
+// silently point the buttons at the wrong stack.
+function InventoryModal({ gameState, itemRarities, itemWeights, equipment, inventorySort, onInventorySortChange, inventoryFilter, onInventoryFilterChange, onUse, onEquip, onUnequip, onDrop, onClose, t }) {
+    const [selectedName, setSelectedName] = useState(null);
+    const equippedNames = new Set(equipment ? Object.values(equipment).filter(Boolean) : []);
+    const totalWeight = computeTotalWeight(gameState.inventory, itemWeights || {});
+    const carryCapacity = computeCarryCapacity(gameState.stats.strength, equipment, itemRarities);
+    const isOverweight = totalWeight > carryCapacity;
+    // Same grouping/sort/filter rules as the sheet's own inline list (see
+    // CharacterSheet) — kept in sync deliberately so switching between the
+    // sidebar summary and this full window never shows a different order.
+    const inventoryGroups = groupInventoryByName(gameState.inventory);
+    const presentSlotTypes = Array.from(new Set(inventoryGroups.map(g => g.item.slot)))
+        .filter(slot => ITEM_SLOT_LABEL_KEYS[slot]);
+    const hasQuestTaggedItems = inventoryGroups.some(g => g.item.questId);
+    const visibleGroups = inventoryGroups.filter(g => {
+        if (inventoryFilter === 'all')
+            return true;
+        if (inventoryFilter === 'questTagged')
+            return !!g.item.questId;
+        return g.item.slot === inventoryFilter;
+    });
+    const sortedGroups = [...visibleGroups].sort((a, b) => {
+        if (inventorySort === 'weight') {
+            return findItemWeight(b.item.name, itemWeights) - findItemWeight(a.item.name, itemWeights);
+        }
+        if (inventorySort === 'rarity') {
+            const rarityIndex = key => RARITY_TIERS.findIndex(tier => tier.key === key);
+            return rarityIndex(findItemRarity(b.item.name, itemRarities) || 'common') - rarityIndex(findItemRarity(a.item.name, itemRarities) || 'common');
+        }
+        if (inventorySort === 'name') {
+            return a.item.name.localeCompare(b.item.name);
+        }
+        return 0;
+    });
+    const selectedGroup = selectedName ? sortedGroups.find(g => g.item.name === selectedName) : null;
+    const selectedItem = selectedGroup ? selectedGroup.item : null;
+    const selectedIsEquipped = selectedItem ? equippedNames.has(selectedItem.name) : false;
+    const selectedIsConsumable = selectedItem && selectedItem.slot === 'consumable';
+    const selectedIsEquippable = selectedItem && selectedItem.slot !== 'none' && selectedItem.slot !== 'consumable';
+    // The single "hand" button always does the one sensible thing for
+    // whatever's selected — consume a potion, equip a bare item, unequip a
+    // worn one — rather than making the player pick from Use/Equip/Unequip
+    // like the old per-item detail popup did.
+    function primaryAction() {
+        if (!selectedGroup)
+            return;
+        if (selectedIsConsumable)
+            onUse(selectedGroup.firstIndex);
+        else if (selectedIsEquippable && selectedIsEquipped)
+            onUnequip(selectedGroup.firstIndex);
+        else if (selectedIsEquippable)
+            onEquip(selectedGroup.firstIndex);
+    }
+    function primaryActionLabel() {
+        if (selectedIsConsumable)
+            return t('useItemButton');
+        if (selectedIsEquippable && selectedIsEquipped)
+            return t('unequipButton');
+        return t('equipItemButton');
+    }
+    const primaryActionDisabled = !selectedGroup || !(selectedIsConsumable || selectedIsEquippable);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onClose(); } },
+        React.createElement("div", { className: "modal-card inventory-modal-card" },
+            React.createElement("div", { className: "inventory-modal-header" },
+                React.createElement("p", { className: "modal-title inventory-modal-title" }, t('inventoryHeading')),
+                React.createElement("div", { className: "inventory-modal-gold" },
+                    "\uD83E\uDE99 ",
+                    React.createElement("span", null, gameState.currency)),
+                React.createElement("button", { onClick: onClose, className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
+            React.createElement("div", { className: "inventory-modal-subheader" },
+                React.createElement("div", { className: "sheet-weight-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('weightLabel')),
+                    React.createElement("span", { className: 'sheet-weight-value' + (isOverweight ? ' sheet-weight-over' : '') },
+                        totalWeight,
+                        " / ",
+                        carryCapacity,
+                        " ",
+                        t('weightUnit'))),
+                React.createElement("div", { className: "weight-bar-track" },
+                    React.createElement("div", { className: 'weight-bar-fill' + (isOverweight ? ' weight-bar-over' : ''), style: { width: Math.min(100, (totalWeight / Math.max(1, carryCapacity)) * 100) + '%' } })),
+                isOverweight && React.createElement("p", { className: "hint-text warning-text" }, t('overweightWarning')),
+                inventoryGroups.length > 1 && (React.createElement("div", { className: "sheet-inventory-controls inventory-modal-controls" },
+                    React.createElement(InlineSelect, { label: t('inventorySortLabel'), value: inventorySort, onChange: onInventorySortChange, options: [
+                            { value: 'default', label: t('inventorySortDefault') },
+                            { value: 'weight', label: t('inventorySortWeight') },
+                            { value: 'rarity', label: t('inventorySortRarity') },
+                            { value: 'name', label: t('inventorySortName') }
+                        ] }),
+                    (presentSlotTypes.length > 1 || (presentSlotTypes.length >= 1 && hasQuestTaggedItems)) && (React.createElement(InlineSelect, { label: t('inventoryFilterLabel'), value: inventoryFilter, onChange: onInventoryFilterChange, options: [
+                            { value: 'all', label: t('inventoryFilterAll') },
+                            ...presentSlotTypes.map(slot => ({ value: slot, label: t(ITEM_SLOT_LABEL_KEYS[slot]) })),
+                            ...(hasQuestTaggedItems ? [{ value: 'questTagged', label: t('itemSlotQuest') }] : [])
+                        ] }))))),
+            React.createElement("div", { className: "inventory-modal-grid-wrap" },
+                sortedGroups.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('inventoryFilterEmpty')),
+                sortedGroups.length > 0 && (React.createElement("div", { className: "inventory-modal-grid" }, sortedGroups.map((group, gi) => {
+                    const { item, count } = group;
+                    const rarity = findItemRarity(item.name, itemRarities);
+                    const isEquipped = equippedNames.has(item.name);
+                    const isQuestActive = isActiveQuestItem(item, gameState.quests);
+                    const icon = getInventoryItemIcon(item);
+                    const isSelected = selectedName === item.name;
+                    return (React.createElement("button", { key: gi, type: "button", className: 'inventory-cell' + (isSelected ? ' inventory-cell-selected' : '') + (isEquipped ? ' inventory-cell-equipped' : ''), style: { borderColor: rarity ? rarityColor(rarity) : undefined }, onClick: () => setSelectedName(isSelected ? null : item.name), title: item.name },
+                        icon.image
+                            ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
+                            : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji),
+                        isQuestActive && React.createElement("span", { className: "inventory-cell-quest-badge", "aria-label": t('itemTypeQuest') }, "\uD83D\uDCDC"),
+                        isEquipped && React.createElement("span", { className: "inventory-cell-equipped-badge", "aria-hidden": "true" }, "\u2713"),
+                        count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
+                            "\u00D7",
+                            count)));
+                })))),
+            React.createElement("div", { className: "inventory-modal-selected-bar" }, selectedItem
+                ? React.createElement("span", { style: { color: isActiveQuestItem(selectedItem, gameState.quests) ? 'var(--amber-400)' : (findItemRarity(selectedItem.name, itemRarities) ? rarityColor(findItemRarity(selectedItem.name, itemRarities)) : undefined) } },
+                    selectedGroup.count > 1 ? selectedGroup.count + ' ' : '',
+                    selectedItem.name,
+                    weaponHandTag(selectedItem.slot, selectedItem.twoHanded, t) ? ' ' + weaponHandTag(selectedItem.slot, selectedItem.twoHanded, t) : '',
+                    selectedIsEquipped ? ' ✓' : '')
+                : React.createElement("span", { className: "inventory-modal-selected-hint" }, t('inventorySelectHint'))),
+            React.createElement("div", { className: "inventory-modal-actions" },
+                React.createElement("button", { onClick: primaryAction, disabled: primaryActionDisabled, className: "btn btn-primary inventory-action-btn", type: "button" },
+                    "\u270B ",
+                    primaryActionLabel()),
+                React.createElement("button", { onClick: () => selectedGroup && onDrop(selectedGroup.firstIndex), disabled: !selectedGroup, className: "btn btn-danger inventory-action-btn", type: "button" },
+                    "\uD83D\uDDD1\uFE0F ",
+                    t('dropItemButton'))))));
 }
 function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -21575,7 +21897,7 @@ function DeathModal({ resurrectionChecking, resurrectionDenied, onClose, onGoBac
 // remove anything here — it just hands off to DropConfirmModal below, so a
 // stray tap can never lose an item without a second, explicit confirmation.
 // ---- Map ----
-const MAP_CELL = 92;
+const MAP_CELL = 130;
 // How far a node is allowed to wobble off its exact grid intersection, in
 // pixels — and how strongly a road between two nodes is allowed to bow into
 // a curve, as a fraction of that road's own length. Both are derived from a
@@ -21646,6 +21968,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     const heroArrowRef = useRef(null);
     const questArrowRefs = useRef(new Map());
     const [openNodeId, setOpenNodeId] = useState(null);
+    const [legendOpen, setLegendOpen] = useState(false);
     const currentNode = map.nodes.find(n => n.id === map.currentId);
     // Which vertical layer the map is currently showing — independent of pan/
     // zoom (those are imperative DOM, this is real React state since it drives
@@ -21785,6 +22108,20 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     }, [map.currentId]);
     const nodeById = id => map.nodes.find(n => n.id === id);
     const edgeKey = (a, b) => [a, b].sort().join('|');
+    // curvedEdgePath bows its curve to one side or the other depending on the
+    // *order* of the two points handed to it (the perpendicular it bends
+    // along flips sign if x1/y1 and x2/y2 are swapped) — so a road drawn
+    // node-A→node-B and a route highlight drawn hero→destination would bow
+    // to opposite sides whenever the hero happens to be the second node in
+    // that pair, making the highlight look like a separate, parallel line
+    // instead of sitting right on top of the road. Always feeding the two
+    // endpoints in the same canonical order (sorted by id, matching edgeKey)
+    // guarantees both the road and any highlight over it bend identically.
+    const edgePathBetween = (nodeA, nodeB) => {
+        const [first, second] = nodeA.id <= nodeB.id ? [nodeA, nodeB] : [nodeB, nodeA];
+        const p1 = mapNodePixel(first), p2 = mapNodePixel(second);
+        return curvedEdgePath(p1.x, p1.y, p2.x, p2.y, edgeKey(first.id, second.id));
+    };
     const walkedKeys = new Set(map.visitedEdges.map(([a, b]) => edgeKey(a, b)));
     const drawnEdges = new Set();
     const lines = [];
@@ -21806,8 +22143,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
             if ((other.layer || 0) !== viewLayer)
                 return;
             const walked = walkedKeys.has(key);
-            const p1 = mapNodePixel(n), p2 = mapNodePixel(other);
-            lines.push(React.createElement("path", { key: key, d: curvedEdgePath(p1.x, p1.y, p2.x, p2.y, key), fill: "none", className: walked ? 'map-edge map-edge-walked' : 'map-edge' }));
+            lines.push(React.createElement("path", { key: key, d: edgePathBetween(n, other), fill: "none", className: walked ? 'map-edge map-edge-walked' : 'map-edge' }));
         });
     });
     const openNode = openNodeId ? nodeById(openNodeId) : null;
@@ -21891,15 +22227,11 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     // via a vertical connection), and drawing a line toward a node that
     // isn't even rendered on this sheet would just be a stray path.
     const routeTargetVisible = routeTargetNode && (routeTargetNode.layer || 0) === viewLayer ? routeTargetNode : null;
-    const routeFromPixel = currentNode ? mapNodePixel(currentNode) : { x: 0, y: 0 };
-    const routeToPixel = routeTargetVisible ? mapNodePixel(routeTargetVisible) : { x: 0, y: 0 };
-    const routeFromX = routeFromPixel.x, routeFromY = routeFromPixel.y;
-    const routeToX = routeToPixel.x, routeToY = routeToPixel.y;
-    // Same key as the underlying road's own <path> above, so the highlight
-    // (and the dot that travels along it) bows along the exact same curve
-    // instead of cutting a straight line across it.
-    const routeKey = currentNode && routeTargetVisible ? edgeKey(currentNode.id, routeTargetVisible.id) : null;
-    const routePathD = routeKey ? curvedEdgePath(routeFromX, routeFromY, routeToX, routeToY, routeKey) : '';
+    // Built with the same canonical-order helper as the road's own <path>
+    // above, so the highlight (and the dot that travels along it) sits
+    // exactly on top of that road's curve instead of bowing to the opposite
+    // side whenever the hero happens to be the second node of the pair.
+    const routePathD = currentNode && routeTargetVisible ? edgePathBetween(currentNode, routeTargetVisible) : '';
     // A soft radial-gradient blob glides along the straight line from the
     // hero to the queued (or previewed) destination, fading in near the
     // start and out near the end — the same gentle glow-and-fade language
@@ -21918,25 +22250,36 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
             onClose(); } },
         React.createElement("div", { className: "modal-card map-card" },
             React.createElement("h2", { className: "modal-title" }, t('mapModalTitle')),
-            React.createElement("div", { className: "map-legend" },
-                React.createElement("span", { className: "map-legend-item" },
-                    React.createElement("span", { className: "map-dot map-dot-hero" }),
-                    t('mapLegendHero')),
-                React.createElement("span", { className: "map-legend-item" },
-                    React.createElement("span", { className: "map-dot map-dot-quest" }),
-                    t('mapLegendQuest')),
-                React.createElement("span", { className: "map-legend-item" },
-                    React.createElement("span", { className: "map-dash" }),
-                    t('mapLegendRoute')),
-                React.createElement("span", { className: "map-legend-item" },
-                    React.createElement("span", { className: "map-legend-ring map-legend-ring-resentful" }),
-                    t('mapLegendResentfulTerritory')),
-                React.createElement("span", { className: "map-legend-item" },
-                    React.createElement("span", { className: "map-legend-ring map-legend-ring-hostile" }),
-                    t('mapLegendHostileTerritory')),
-                React.createElement("span", { className: "map-legend-item" },
-                    React.createElement("span", { className: "map-node-danger-badge map-legend-danger-badge", "aria-hidden": "true" }, "!"),
-                    t('mapLegendDanger'))),
+            React.createElement("button", { type: "button", className: 'map-legend-toggle' + (legendOpen ? ' map-legend-toggle-open' : ''), onClick: () => setLegendOpen(v => !v), "aria-expanded": legendOpen },
+                React.createElement("span", { className: "map-legend-toggle-arrow", "aria-hidden": "true" }, "\u25B8"),
+                t('mapLegendToggle')),
+            React.createElement("div", { className: 'map-legend-collapse' + (legendOpen ? ' map-legend-collapse-open' : '') },
+                React.createElement("div", { className: "map-legend-collapse-inner" },
+                    React.createElement("div", { className: "map-legend" },
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-dot map-dot-hero" }),
+                            t('mapLegendHero')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-dot map-dot-quest" }),
+                            t('mapLegendQuest')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-dash" }),
+                            t('mapLegendRoute')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-legend-ring map-legend-ring-resentful" }),
+                            t('mapLegendResentfulTerritory')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-legend-ring map-legend-ring-hostile" }),
+                            t('mapLegendHostileTerritory')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-legend-ring map-legend-ring-friendly" }),
+                            t('mapLegendFriendlyTerritory')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-legend-ring map-legend-ring-allied" }),
+                            t('mapLegendAlliedTerritory')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-node-danger-badge map-legend-danger-badge", "aria-hidden": "true" }, "!"),
+                            t('mapLegendDanger'))))),
             React.createElement("div", { className: "map-viewport", ref: viewportRef },
                 React.createElement("div", { className: "map-world", ref: worldRef },
                     React.createElement("svg", { className: "map-svg" },
@@ -21949,16 +22292,20 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                         const p = mapNodePixel(n);
                         // Territory coloring: purely a read of this node's own
                         // "faction" against factionReputations, same thresholds as
-                        // everywhere else (isFactionHostile/isFactionResentful) — a
-                        // location with no faction, or one the hero hasn't soured
-                        // with, never gets a ring. Skipped for the hero's own node
+                        // everywhere else (isFactionHostile/isFactionResentful and
+                        // their cosmetic-only counterparts isFactionFriendly/
+                        // isFactionAllied) — a location with no faction, or one the
+                        // hero has a merely neutral/acquaintance standing with,
+                        // never gets a ring. Skipped for the hero's own node
                         // (isCurrent already renders as a plain dot, not a
                         // bordered circle, and standing there is already surfaced
                         // via the character sheet's "current territory" line).
                         const territoryRep = n.faction ? findFactionReputation(n.faction, factionReputations || {}) : null;
                         const territoryHostile = !isCurrent && n.faction && isFactionHostile(territoryRep);
                         const territoryResentful = !isCurrent && n.faction && isFactionResentful(territoryRep);
-                        return (React.createElement("div", { key: n.id, className: "map-node", style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => setOpenNodeId(open ? null : n.id), onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
+                        const territoryFriendly = !isCurrent && n.faction && isFactionFriendly(territoryRep);
+                        const territoryAllied = !isCurrent && n.faction && isFactionAllied(territoryRep);
+                        return (React.createElement("div", { key: n.id, className: 'map-node' + (open ? ' map-node-open' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => setOpenNodeId(open ? null : n.id), onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setOpenNodeId(open ? null : n.id);
                             } } },
@@ -21969,7 +22316,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                                 !isCurrent && quest && React.createElement("span", { className: "map-node-radar map-node-radar-quest" },
                                     React.createElement("span", null),
                                     React.createElement("span", null)),
-                                React.createElement("span", { className: 'map-node-icon' + (isCurrent ? ' map-node-icon-hero' : quest ? ' map-node-icon-quest' : '') + (territoryHostile ? ' map-node-icon-hostile-territory' : territoryResentful ? ' map-node-icon-resentful-territory' : ''), title: n.faction || undefined }, isCurrent ? '' : (MAP_KIND_ICONS[n.kind] || '📍')),
+                                React.createElement("span", { className: 'map-node-icon' + (isCurrent ? ' map-node-icon-hero' : quest ? ' map-node-icon-quest' : '') + (territoryHostile ? ' map-node-icon-hostile-territory' : territoryResentful ? ' map-node-icon-resentful-territory' : territoryAllied ? ' map-node-icon-allied-territory' : territoryFriendly ? ' map-node-icon-friendly-territory' : ''), title: n.faction || undefined }, isCurrent ? '' : (MAP_KIND_ICONS[n.kind] || '📍')),
                                 n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!")),
                             React.createElement("span", { className: 'map-node-label' + (isCurrent ? ' map-node-label-hero' : '') }, n.name),
                             open && (n.description || n.danger || isMapNodeCleared(n)) && (React.createElement("div", { className: "map-node-desc", onClick: e => e.stopPropagation() },
@@ -21982,7 +22329,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                     map.nodes.filter(n => !n.discovered && (n.layer || 0) === viewLayer).map(n => {
                         const open = openNodeId === n.id;
                         const p = mapNodePixel(n);
-                        return (React.createElement("div", { key: n.id, className: "map-node map-node-fog", style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => setOpenNodeId(open ? null : n.id), onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
+                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => setOpenNodeId(open ? null : n.id), onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setOpenNodeId(open ? null : n.id);
                             } } },
@@ -22378,6 +22725,7 @@ function App() {
     // only the array position actually identifies which one was tapped.
     const [itemDetailIndex, setItemDetailIndex] = useState(null);
     const [dropConfirmIndex, setDropConfirmIndex] = useState(null);
+    const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
     const [giftTargetNpc, setGiftTargetNpc] = useState(null);
     const [recruitTargetNpc, setRecruitTargetNpc] = useState(null);
     // Which party member's gear screen (see PartyGearModal) is open, by
@@ -23095,7 +23443,7 @@ ${JSON.stringify(state)}${partySection}` };
         let ruleNum = 9;
         const itemRuleNum = itemInteractionEnabled ? ++ruleNum : null;
         const itemRule = itemInteractionEnabled
-            ? `\n${itemRuleNum}. If the scene naturally offers the hero one or more takeable items (an object found, something a character offers, a choice between alternatives like weapons or garments), introduce it and then STOP there — end the scene at the offer (e.g. a character gesturing at it, asking if the hero wants it). Do not resolve whether the hero takes it, and do not mention that item again for the rest of this response. The outcome will be handled next turn based on the player's choice.`
+            ? `\n${itemRuleNum}. If the scene naturally offers the hero one or more takeable items (an object found, something a character offers, a choice between alternatives like weapons or garments), introduce it and then STOP there — end the scene at the offer (e.g. a character gesturing at it, asking if the hero wants it). Do not resolve whether the hero takes it, and do not mention that item again for the rest of this response. The outcome will be handled next turn based on the player's choice. If a character is charging the hero for it — a price for goods, a rate for a room, a fare, a bribe demanded — have them state the exact number out loud as part of the offer (e.g. "ten gold a night"), then stop at that same offer exactly as above; do not narrate the hero paying or the money changing hands yet, that's resolved the same way as taking the item itself.`
             : '';
         const questRuleNum = ++ruleNum;
         const questRule = `\n${questRuleNum}. If a character offers the hero a quest, task, or job, the giver MUST state a concrete, specific reward as part of the offer, in the same breath as the task itself — a sum of money, a named item, a favor, protection, information, or some other tangible thing, spelled out in the dialogue (e.g. "do this and I'll pay you 20 silver," not "you won't regret it" or "I'll make it worth your while"). Never have a character propose a task while leaving the reward vague, unstated, or merely implied — if the scene calls for an offer at all, invent a concrete reward fitting the character and situation and have them say it outright. Once that concrete offer is made, introduce it narratively and then STOP there, the same way an item offer works: end the scene at the offer, without confirming whether the hero accepts, and without resolving any advance payment mentioned. Likewise, if a character is handing over the reward for one of the hero's ACTIVE QUESTS (listed below, if any) now that it's resolved, introduce that moment and STOP there too — whether the hero accepts or declines the reward is handled separately, not decided in the prose. Lines marked "[QUEST DECISIONS FROM PREVIOUS TURN]:" tell you what the hero decided about a quest, its advance, or a reward last turn — reflect that naturally without dwelling on it.`;
@@ -23307,7 +23655,7 @@ Respond with ONLY this hidden information (or the single word "(none)"), written
                 : `\n\nTHIS LOCATION'S REMAINING FINDABLE ITEMS: "${currentMapNode.name}" has ${currentMapNode.itemCapacity - currentMapNode.itemsFound} more item${currentMapNode.itemCapacity - currentMapNode.itemsFound === 1 ? '' : 's'} left to turn up here before it's picked clean (${currentMapNode.itemsFound}/${currentMapNode.itemCapacity} already found). Don't have the scene surface more than that many further "itemOffers" from searching, containers, hidden caches, or the environment at this spot — pace discoveries so the location doesn't run dry too fast. This budget only covers ordinary finds: it doesn't limit ordinary commerce, a character freely giving something of their own, or an item that's a specific active quest's actual objective (its own "questId" set), which is scripted and never draws from this count.`)
             : '';
         const itemOffersSchemaField = itemInteractionEnabled
-            ? `, "itemOffers": [{"groupId": "short_id", "selectionMode": "single", "items": [{"id": "short_id", "label": "item name as it appears in the scene, in the scene's own language", "slot": "weapon", "twoHanded": false, "shield": false, "questId": "quest_id"}]}]`
+            ? `, "itemOffers": [{"groupId": "short_id", "selectionMode": "single", "items": [{"id": "short_id", "label": "item name as it appears in the scene, in the scene's own language", "slot": "weapon", "twoHanded": false, "shield": false, "questId": "quest_id", "cost": 10}]}]`
             : '';
         // Companion count requested on the setup screen (see startingPartySize /
         // the OPENING SCENE STARTING COMPANIONS rule in
@@ -23327,7 +23675,7 @@ Respond with ONLY this hidden information (or the single word "(none)"), written
             ? `
 
 === EVENT: ITEM OFFERS ===
-"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is single-use (potion, food, scroll). "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise.`
+"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is single-use (potion, food, scroll). "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for this specifically, right now, as an open choice they still have to accept or decline (a merchant naming a price for goods, an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Omit it entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`
             : '';
         // "suggestions" is deliberately the FIRST key in the schema below, not
         // last. This whole JSON blob can run long once npcs/inventory/quests
@@ -23358,7 +23706,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no te
 Nothing else belongs in "stats" — no other attributes, skills, or invented characteristics.
 Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded" and "shield". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is anything single-use (a potion, food, a scroll). "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon.
 Only include an item in "inventory" if the scene explicitly settles the hero as now possessing it — already carried over from before, explicitly handed over and accepted, explicitly picked up, or (opening scene only) established as starting kit. An item that was merely offered, noticed, or nearby but not yet resolved does NOT belong in "inventory" yet — leave it out rather than assuming the hero took it.
-"currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity — a payment received, a price paid, money found and picked up, a bribe or toll, winnings or a loss from a wager, an outright theft. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. "reason" is a short, dry phrase for what happened (e.g. "sold the pelts", "paid for a room"), omitted along with the rest of the field when amount is 0.
+"currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity, ALREADY settled and done — a payment received, a price paid, money found and picked up, a bribe or toll, winnings or a loss from a wager, an outright theft. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. Do NOT use this field for a price a character has just named as something the hero can still accept or decline (a merchant's asking price, an innkeeper's rate, a fare, a demanded bribe not yet handed over) — that belongs in a priced "itemOffers" entry instead (see its "cost" field above), so the app only ever charges the hero once they actually confirm. "reason" is a short, dry phrase for what happened (e.g. "sold the pelts", "paid the ferryman"), omitted along with the rest of the field when amount is 0.
 "npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
 Every character named above under CURRENT PARTY is a traveling companion, not just an ordinary tracked NPC — treat their entry in "npcs" differently in two ways. First, they MUST appear in "npcs" every single turn without exception, even a turn where they didn't speak or act — never drop a party member from this list the way an ordinary NPC can be dropped once no longer relevant — and their "presentNow" must be true unless the scene just played explicitly, deliberately separated them from the hero. Second, for a party member ONLY — never for any other character — also include "health", "maxHealth", "psyche", "maxPsyche", "stats" (an object with "strength", "agility", "intelligence"), and "effects" in their entry, using the exact same 1-1000/1-1000/1-100 scales, calibration, and judgment described above for the hero's own fields of the same name: a companion can be hurt, exhausted, healed, or emboldened by the scene just played exactly like the hero can, while "maxHealth"/"maxPsyche" stay stable the same restrained way the hero's own do. The very first turn a character has these fields (the turn they're recruited), judge them fresh from how the scene and story have portrayed that character so far; on every later turn, carry them forward and adjust only as much as this scene's events actually warrant, the same restrained way the hero's own vitals move turn to turn — never reset them arbitrarily. Omit all six of these fields entirely for every character who is not currently a party member.${openingPartyInstruction}
 "quests" tracks the active list above (by their given id) and feeds a quest journal, so keep entries short and factual, like a log, not narrated prose. "status" is set ONLY when the scene clearly shows that quest now resolved: "completed" if the hero achieved what it asked, "failed" if it's now impossible or was abandoned for good — omit "status" entirely if it's still simply ongoing (don't repeat "active" for everything). "progress" is a SEPARATE, optional one-line note — telegraphic, dry, a few words to one short sentence, no more (e.g. "Learned the gate is guarded at night", "Reached the abandoned mill") — include it ONLY when the scene meaningfully moved that specific quest forward (a lead found, a step completed, a setback); omit it on turns where the quest wasn't meaningfully touched, and never restate the objective itself or pad it with atmosphere. Skip a quest's entry entirely (both fields) if nothing about it changed this turn. NEVER invent a new quest here or use an id that isn't in the active list; new quests go in "newQuestOffers" below instead.
@@ -24078,6 +24426,11 @@ ${chunkText}`;
                 twoHanded: item.slot === 'weapon' && item.twoHanded === true,
                 shield: item.slot === 'weapon' && item.shield === true,
                 questId: typeof item.questId === 'string' && item.questId.trim() ? item.questId.trim() : null,
+                // A priced offer — a paid room, a merchant's asking price, a fare —
+                // only the app deducts this, and only once the player actually
+                // confirms (see ItemOffers/toggleItemSelection); never trust
+                // anything but a genuine positive number here.
+                cost: Number.isFinite(item.cost) && item.cost > 0 ? Math.round(item.cost) : null,
                 rarity: rollItemRarity()
             }))
         }));
@@ -24552,15 +24905,22 @@ Rules:
         const lines = [];
         for (const group of precedingNarrator.itemOffers) {
             for (const item of group.items) {
-                lines.push(`${item.label}: ${resolutions[item.id] ? 'taken' : 'declined'}`);
+                const taken = !!resolutions[item.id];
+                // For a priced offer, spell out that the app already deducted the
+                // cost the instant it was confirmed — so the next scene's prose
+                // can move on (a room already paid for, a fare already handed
+                // over) instead of narrating the payment a second time.
+                const costTag = item.cost ? (taken ? ` (already paid ${item.cost})` : ` (priced at ${item.cost}, not paid)`) : '';
+                lines.push(`${item.label}${costTag}: ${taken ? 'taken' : 'declined'}`);
             }
         }
         return lines.length ? '[ITEM DECISIONS FROM PREVIOUS TURN]: ' + lines.join('; ') : '';
     }
-    function getUnresolvedItemOffers() {
+    function getUnresolvedItemOffers(msgs) {
         if (!itemInteractionEnabled)
             return [];
-        const last = messages[messages.length - 1];
+        const list = msgs || messages;
+        const last = list[list.length - 1];
         if (!last || last.role !== 'narrator' || !last.itemOffers || last.itemOffers.length === 0)
             return [];
         const resolutions = last.itemResolutions || {};
@@ -24580,6 +24940,12 @@ Rules:
             const sourceGroup = narratorMsg.itemOffers.find(g => g.groupId === groupId);
             takenItem = sourceGroup && sourceGroup.items.find(it => it.id === itemId);
         }
+        // A priced offer (takenItem.cost set, e.g. a paid room or a hired ride)
+        // can't be confirmed past what the hero can actually afford — the ✓
+        // button is already disabled for this in ItemOffers, this is just the
+        // same guard enforced here too in case of a stale click.
+        if (takenItem && takenItem.cost && takenItem.cost > gameState.currency)
+            return;
         const nextMessages = messages.map((m, i) => {
             if (i !== narratorIndex)
                 return m;
@@ -24604,7 +24970,8 @@ Rules:
         let nextState = gameState;
         let nextItemRarities = itemRarities;
         if (takenItem) {
-            nextState = { ...gameState, inventory: [...gameState.inventory, { name: takenItem.label, slot: takenItem.slot, twoHanded: takenItem.twoHanded, shield: takenItem.shield, questId: takenItem.questId || null }] };
+            const cost = takenItem.cost && takenItem.cost > 0 ? takenItem.cost : 0;
+            nextState = { ...gameState, inventory: [...gameState.inventory, { name: takenItem.label, slot: takenItem.slot, twoHanded: takenItem.twoHanded, shield: takenItem.shield, questId: takenItem.questId || null }], currency: Math.max(0, gameState.currency - cost) };
             setGameState(nextState);
             if (takenItem.rarity) {
                 const key = takenItem.label.trim().toLowerCase();
@@ -24619,8 +24986,9 @@ Rules:
     // on the item-pickup convenience toggle. An advance only counts as
     // unresolved once its quest was actually accepted; declining the quest
     // makes the advance moot rather than something that blocks sending.
-    function getUnresolvedQuestOffers() {
-        const last = messages[messages.length - 1];
+    function getUnresolvedQuestOffers(msgs) {
+        const list = msgs || messages;
+        const last = list[list.length - 1];
         if (!last || last.role !== 'narrator')
             return [];
         const unresolved = [];
@@ -24649,8 +25017,9 @@ Rules:
     // Mirrors getUnresolvedQuestOffers — a travel offer is enough of a
     // commitment (it decides where the hero ends up) that it needs an
     // explicit choice before another action can be sent, same as a quest.
-    function getUnresolvedTravelOffer() {
-        const last = messages[messages.length - 1];
+    function getUnresolvedTravelOffer(msgs) {
+        const list = msgs || messages;
+        const last = list[list.length - 1];
         if (!last || last.role !== 'narrator' || !last.travelOffer)
             return [];
         if (last.travelOfferResolution !== undefined)
@@ -24661,16 +25030,28 @@ Rules:
     // hero directly — that's applyConfirmedTravel, reading this resolution
     // back next turn — just records the choice and notes it for the
     // narrator's context on the next turn (see pendingTravelEventRef), the
-    // same way toggleQuestOffer works for quests.
+    // same way toggleQuestOffer works for quests. Either choice IS the action
+    // for this turn — same auto-continue idea as combat's endCombatAndClose —
+    // so once TravelOffer's own fly-away animation (OFFER_EXIT_ANIM_MS) has
+    // had time to play out, this sends a text-less player action straight
+    // away instead of waiting on typed input or a suggestion chip. The
+    // just-built updatedMessages is passed through to sendBatch explicitly
+    // (mirroring endCombatAndClose) so that delayed call — running from a
+    // closure captured back at click time — checks against the resolution
+    // just committed here instead of a stale pre-resolution snapshot.
     function toggleTravelOffer(narratorIndex, accept) {
         const narratorMsg = messages[narratorIndex];
         const offer = narratorMsg && narratorMsg.travelOffer;
-        setMessages(prev => prev.map((m, i) => (i === narratorIndex ? { ...m, travelOfferResolution: accept } : m)));
-        if (offer) {
-            const note = (accept ? 'decided to travel to "' : 'decided not to travel to "') + offer.label + '"' + (accept ? '' : ' and stayed put');
-            if (!pendingTravelEventRef.current.includes(note))
-                pendingTravelEventRef.current = [...pendingTravelEventRef.current, note];
-        }
+        if (!offer)
+            return;
+        const updatedMessages = messages.map((m, i) => (i === narratorIndex ? { ...m, travelOfferResolution: accept } : m));
+        setMessages(updatedMessages);
+        const note = (accept ? 'decided to travel to "' : 'decided not to travel to "') + offer.label + '"' + (accept ? '' : ' and stayed put');
+        if (!pendingTravelEventRef.current.includes(note))
+            pendingTravelEventRef.current = [...pendingTravelEventRef.current, note];
+        window.setTimeout(() => {
+            sendBatch([{ role: 'player', text: '' }], updatedMessages, gameState);
+        }, OFFER_EXIT_ANIM_MS);
     }
     // Queues a player-picked trip to an adjacent, already-discovered map node
     // (see MapModal — the travel button there only ever appears for a node
@@ -25876,7 +26257,7 @@ Rules:
     // itself.
     async function sendBatch(newActionMessages, baseMessages, baseState) {
         const base = baseMessages || messages;
-        const unresolved = [...getUnresolvedItemOffers(), ...getUnresolvedQuestOffers(), ...getUnresolvedTravelOffer()];
+        const unresolved = [...getUnresolvedItemOffers(base), ...getUnresolvedQuestOffers(base), ...getUnresolvedTravelOffer(base)];
         if (unresolved.length > 0) {
             setError(t('resolveItemsErrorPrefix') + '«' + unresolved[0].label + '»');
             return;
@@ -26409,6 +26790,12 @@ Rules:
     // usual suggestion chips during this window, and outcome resolution
     // (see endCombatAndClose) is what starts the next turn, not a choice.
     const combatPending = !!(currentTurn && currentTurn.narrator.combatEncounter && !currentTurn.narrator.combatResolved);
+    // True whenever this turn carries a travel offer, decided or not — the
+    // ✓/✗/Confirm widget stands in for the usual suggestion chips the whole
+    // time it's on screen, same reasoning as combatPending above: confirming
+    // the trip (see toggleTravelOffer) is itself what starts the next turn,
+    // so there's never a moment here where picking a suggestion chip applies.
+    const travelOfferPending = !!(currentTurn && currentTurn.narrator.travelOffer);
     return (React.createElement("div", { className: "screen-play" },
         React.createElement("style", null, APP_STYLES),
         React.createElement("div", { className: "play-header" },
@@ -26466,10 +26853,10 @@ Rules:
                             isLatestTurn && !anyEditActive && combatPending && !combatModalOpen && (React.createElement("button", { onClick: () => startCombat(currentTurn.narratorIndex), className: "btn btn-primary combat-trigger-btn", type: "button" },
                                 "\u2694 ",
                                 t('combatButtonLabel'))),
-                            itemInteractionEnabled && (React.createElement(ItemOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggle: (groupId, itemId, mode, val) => toggleItemSelection(currentTurn.narratorIndex, groupId, itemId, mode, val), t: t })),
+                            itemInteractionEnabled && (React.createElement(ItemOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, currency: gameState.currency, onToggle: (groupId, itemId, mode, val) => toggleItemSelection(currentTurn.narratorIndex, groupId, itemId, mode, val), t: t })),
                             React.createElement(QuestOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggleQuest: (offerId, val) => toggleQuestOffer(currentTurn.narratorIndex, offerId, val), onToggleAdvance: (offerId, val) => toggleAdvanceOffer(currentTurn.narratorIndex, offerId, val), onToggleReward: (offerId, val) => toggleRewardOffer(currentTurn.narratorIndex, offerId, val), t: t }),
                             React.createElement(TravelOffer, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggle: val => toggleTravelOffer(currentTurn.narratorIndex, val), t: t }),
-                            isLatestTurn && !anyEditActive && !combatPending && currentTurn.narrator.suggestions && currentTurn.narrator.suggestions.length > 0 && (React.createElement("div", { className: "suggestions-row" },
+                            isLatestTurn && !anyEditActive && !combatPending && !travelOfferPending && currentTurn.narrator.suggestions && currentTurn.narrator.suggestions.length > 0 && (React.createElement("div", { className: "suggestions-row" },
                                 React.createElement("p", { className: "suggestions-label" }, t('suggestionsLabel')),
                                 currentTurn.narrator.suggestions.map((s, si) => (React.createElement("button", { key: si, onClick: () => useSuggestion(s), className: "suggestion-chip", type: "button" }, s))))),
                             !anyEditActive && (React.createElement("button", { onClick: () => setRegenerateTarget(currentTurnIndex), className: "regenerate-btn", type: "button" },
@@ -26502,19 +26889,20 @@ Rules:
                             React.createElement("button", { onClick: handleSend, disabled: loading || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
             React.createElement("div", { className: "sidebar" },
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onSelectItem: setItemDetailIndex, t: t }))),
+                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, t: t }))),
         sheetOpen && (React.createElement("div", { className: "sheet-overlay" },
             React.createElement("div", { className: "sheet-overlay-backdrop", onClick: () => setSheetOpen(false) }),
             React.createElement("div", { className: "sheet-overlay-panel" },
                 React.createElement("div", { className: "sheet-overlay-header" },
                     React.createElement("p", { className: "title-display title-display-small" }, t('sheetOverlayTitle')),
                     React.createElement("button", { onClick: () => setSheetOpen(false), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onSelectItem: setItemDetailIndex, t: t })))),
+                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
-        equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
+        equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, itemWeights: itemWeights, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
         combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, defenseAvailability: computeDefenseAvailability(equipment, gameState.inventory, itemWeights, itemRarities), onAttack: resolvePlayerAttack, onDefend: resolveDefense, onFlee: resolveFleeAttempt, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
+        inventoryModalOpen && (React.createElement(InventoryModal, { gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onUse: useConsumable, onEquip: equipItemFromDetail, onUnequip: unequipItemFromDetail, onDrop: (index) => setDropConfirmIndex(index), onClose: () => setInventoryModalOpen(false), t: t })),
         itemDetailIndex !== null && (React.createElement(ItemDetailModal, { itemIndex: itemDetailIndex, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, onDrop: () => { setDropConfirmIndex(itemDetailIndex); setItemDetailIndex(null); }, onUse: () => useConsumable(itemDetailIndex), onEquip: () => equipItemFromDetail(itemDetailIndex), onUnequip: () => unequipItemFromDetail(itemDetailIndex), onClose: () => setItemDetailIndex(null), t: t })),
         dropConfirmIndex !== null && (React.createElement(DropConfirmModal, { itemName: (gameState.inventory[dropConfirmIndex] || {}).name || '', onConfirm: () => dropItem(dropConfirmIndex), onCancel: () => setDropConfirmIndex(null), t: t })),
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
@@ -26550,7 +26938,7 @@ const APP_STYLES = `
     --stone-600: #57534e; --stone-500: #78716c; --stone-400: #a8a29e;
     --amber-50: #fffbeb; --amber-100: #fef3c7; --amber-200: #fde68a; --amber-300: #fcd34d;
     --amber-400: #fbbf24; --amber-500: #f59e0b; --amber-600: #d97706; --amber-700: #b45309;
-    --amber-800: #92400e; --amber-900: #78350f; --red-400: #f87171; --red-600: #dc2626; --red-700: #b91c1c; --emerald-600: #059669; --orange-500: #f97316; --orange-700: #c2410c;
+    --amber-800: #92400e; --amber-900: #78350f; --red-400: #f87171; --red-600: #dc2626; --red-700: #b91c1c; --emerald-600: #059669; --emerald-400: #34d399; --sky-400: #38bdf8; --orange-500: #f97316; --orange-700: #c2410c;
   }
   .title-display { color: var(--amber-100); letter-spacing: 0.05em; font-weight: 600; margin: 0; font-size: 2.25rem; }
   .title-display-small { font-size: 1.1rem; }
@@ -26660,6 +27048,9 @@ const APP_STYLES = `
   .item-offer-group:last-child { margin-bottom: 0; }
   .item-offer-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.35rem 0; }
   .item-offer-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; color: var(--amber-300); }
+  .item-offer-cost { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--stone-400); }
+  .item-offer-cost-insufficient { color: var(--red-400); }
+  .item-offer-insufficient-hint { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--red-400); margin: -0.1rem 0 0.3rem; }
   .travel-offer-arrow { color: var(--stone-400); }
   .item-offer-choice { display: flex; gap: 0.35rem; }
   .item-choice-btn { width: 2rem; height: 2rem; border-radius: 4px; border: 1px solid var(--stone-700); background: var(--stone-950); color: var(--stone-500); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
@@ -26803,9 +27194,9 @@ const APP_STYLES = `
   .pending-note-chip button { background: none; border: none; color: #8a76b5; cursor: pointer; flex-shrink: 0; }
   .pending-note-chip button:hover { color: #cbbfe0; }
   .editing-banner-chip { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--stone-950); border: 1px solid var(--amber-700); border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--amber-500); }
-  .cloud-slot-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--stone-950); border: 1px solid var(--stone-700); border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--amber-100); }
-  .cloud-slot-info { display: flex; flex-direction: column; gap: 0.15rem; }
-  .cloud-slot-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+  .cloud-slot-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: var(--stone-950); border: 1px solid var(--stone-700); border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--amber-100); }
+  .cloud-slot-info { display: flex; flex-direction: column; gap: 0.15rem; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .cloud-slot-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; flex-shrink: 0; margin-left: auto; }
   .editing-banner-chip button { background: none; border: none; color: var(--amber-600); cursor: pointer; flex-shrink: 0; }
   .editing-banner-chip button:hover { color: var(--amber-300); }
   .checkbox-row { display: flex; align-items: center; gap: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--stone-400); margin: 0.25rem 0 1rem; cursor: pointer; }
@@ -26873,10 +27264,80 @@ const APP_STYLES = `
   .sheet-faction-members { margin-top: 0.4rem; padding: 0.4rem 0 0 1.4rem; border-top: 1px solid var(--stone-800); cursor: default; }
   .sheet-faction-member { display: flex; align-items: center; justify-content: space-between; padding: 0.15rem 0; }
   .sheet-set-indicator { color: #22d3ee; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; }
+  .sheet-inventory-open-btn { width: 100%; margin-top: 0.5rem; padding: 0.5rem 0.6rem; font-size: 0.75rem; }
+
+  /* ---- Inventory bag window (InventoryModal) ---- */
+  .inventory-modal-card { max-width: 26rem; display: flex; flex-direction: column; padding: 1.1rem; max-height: 90vh; }
+  .inventory-modal-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+  .inventory-modal-title { margin: 0; flex: 1; font-size: 1.3rem; }
+  .inventory-modal-gold { display: flex; align-items: center; gap: 0.3rem; font-family: 'IBM Plex Mono', monospace; color: var(--amber-200); font-weight: 600; font-size: 0.95rem; background: var(--stone-950); border: 1px solid var(--stone-700); border-radius: 999px; padding: 0.25rem 0.7rem; }
+  .inventory-modal-subheader { margin-bottom: 0.7rem; }
+  .inventory-modal-controls { margin: 0.4rem 0 0; }
+  .inventory-modal-grid-wrap { flex: 1; min-height: 0; }
+  .inventory-modal-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;
+    max-height: 22rem; overflow-y: auto; padding: 0.6rem 0.5rem 0.6rem 0.1rem;
+    background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px;
+    scrollbar-width: thin; scrollbar-color: var(--amber-700) var(--stone-900);
+  }
+  .inventory-modal-grid::-webkit-scrollbar { width: 10px; }
+  .inventory-modal-grid::-webkit-scrollbar-track { background: var(--stone-900); border-radius: 999px; }
+  .inventory-modal-grid::-webkit-scrollbar-thumb { background: var(--amber-700); border-radius: 999px; border: 2px solid var(--stone-900); }
+  .inventory-modal-grid::-webkit-scrollbar-thumb:hover { background: var(--amber-600); }
+  .inventory-cell {
+    position: relative; aspect-ratio: 1 / 1; width: 100%; background: var(--stone-900);
+    border: 2px solid var(--stone-700); border-radius: 6px; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; padding: 0.3rem;
+  }
+  .inventory-cell:hover { border-color: var(--amber-600); }
+  .inventory-cell-selected { border-color: var(--amber-400); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35); background: var(--stone-800); }
+  .inventory-cell-equipped { border-style: solid; }
+  .inventory-cell-img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .inventory-cell-emoji { font-size: 1.8rem; line-height: 1; }
+  .inventory-cell-quest-badge { position: absolute; top: -6px; left: -6px; font-size: 0.75rem; filter: drop-shadow(0 0 2px black); }
+  .inventory-cell-equipped-badge { position: absolute; top: -5px; right: -5px; min-width: 1.05rem; height: 1.05rem; border-radius: 999px; background: var(--emerald-600); color: var(--stone-950); font-size: 0.62rem; line-height: 1.05rem; text-align: center; font-weight: 700; }
+  .inventory-cell-count-badge { position: absolute; bottom: -4px; right: -4px; min-width: 1.15rem; height: 1.05rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-950); border: 1px solid var(--amber-600); color: var(--amber-200); font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; line-height: 1rem; text-align: center; }
+  .inventory-modal-selected-bar { margin-top: 0.7rem; padding: 0.55rem 0.7rem; background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px; font-size: 0.85rem; min-height: 1.3rem; color: #d6d3d1; text-align: center; }
+  .inventory-modal-selected-hint { color: var(--stone-600); font-size: 0.8rem; }
+  .inventory-modal-actions { display: flex; gap: 0.6rem; margin-top: 0.7rem; }
+  .inventory-action-btn { flex: 1; padding: 0.7rem 0.5rem; font-size: 0.9rem; }
+  .inventory-action-btn:disabled { opacity: 0.45; }
 
   .equipment-card { max-width: 24rem; }
   .equipment-card .modal-title { text-align: center; }
+  /* Modifier ONLY on the hero's own EquipmentModal (PartyGearModal reuses
+     bare .equipment-card at its original 24rem, untouched) — wide enough
+     for the icon grid plus the new stats panel side by side; on a narrow
+     phone .equipment-modal-body below just wraps them to stacked rows
+     instead, so this cap only matters once there's room to use it. */
+  .equipment-card-wide { max-width: 30rem; }
+  .equipment-modal-body { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+  /* Same grid, sized so its 3 fixed 4rem icon columns (see .equip-slot-btn)
+     get a stable column instead of stretching loose across the whole
+     card — shrinks on a narrow phone but never below its own icons'
+     footprint, so .equipment-modal-body's wrap is what handles tight
+     widths rather than this clipping. */
+  .equipment-grid-sized { flex: 0 1 14.5rem; min-width: 13.5rem; }
+  .equipment-stats-panel { flex: 1 1 9rem; min-width: 9rem; }
+  .sheet-section.equipment-stats-section { padding-top: 0.75rem; margin-top: 0.75rem; }
+  /* Match the per-slot equip badge colors (.equip-slot-defense-badge/
+     -damage-badge/-block-badge below) so the summary panel's totals read
+     as the same stat at a glance. */
+  .equipment-stat-defense { color: var(--amber-300); }
+  .equipment-stat-damage { color: var(--red-400); }
+  .equipment-stat-block { color: var(--sky-400); }
   .map-card { max-width: 40rem; }
+  .map-legend-toggle { display: inline-flex; align-items: center; gap: 0.35rem; background: none; border: none; padding: 0; margin: 0 0 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--stone-400); cursor: pointer; }
+  .map-legend-toggle:hover { color: var(--amber-400); }
+  .map-legend-toggle-arrow { display: inline-block; transition: transform 0.2s ease; }
+  .map-legend-toggle-open .map-legend-toggle-arrow { transform: rotate(90deg); }
+  /* Animating grid-template-rows from 0fr to 1fr lets this expand/collapse
+     to its real content height smoothly, without measuring anything in JS
+     and without the "jump" a max-height guess would cause. The inner div's
+     overflow:hidden is what actually clips it mid-transition. */
+  .map-legend-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.25s ease; }
+  .map-legend-collapse-open { grid-template-rows: 1fr; }
+  .map-legend-collapse-inner { overflow: hidden; }
   .map-legend { display: flex; gap: 0.9rem; flex-wrap: wrap; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--stone-400); margin: 0 0 0.6rem; }
   .map-legend-item { display: flex; align-items: center; gap: 0.35rem; }
   .map-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -26886,8 +27347,12 @@ const APP_STYLES = `
   .map-legend-ring { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: transparent; border: 2px solid; }
   .map-legend-ring-resentful { border-color: var(--orange-500); }
   .map-legend-ring-hostile { border-color: var(--red-400); }
+  .map-legend-ring-friendly { border-color: var(--emerald-400); }
+  .map-legend-ring-allied { border-color: var(--sky-400); }
   .map-node-icon-resentful-territory { border-color: var(--orange-500); border-width: 2px; }
   .map-node-icon-hostile-territory { border-color: var(--red-400); border-width: 2px; box-shadow: 0 0 6px rgba(248, 113, 113, 0.55); }
+  .map-node-icon-friendly-territory { border-color: var(--emerald-400); border-width: 2px; }
+  .map-node-icon-allied-territory { border-color: var(--sky-400); border-width: 2px; box-shadow: 0 0 6px rgba(56, 189, 248, 0.55); }
   .map-viewport { position: relative; height: 280px; background: var(--stone-950); border: 1px solid var(--stone-700); border-radius: 3px; overflow: hidden; touch-action: none; cursor: grab; }
   .map-recenter-btn { position: absolute; right: 0.6rem; bottom: 0.6rem; width: 2.1rem; height: 2.1rem; border-radius: 50%; background: var(--stone-900); border: 1px solid var(--stone-700); color: var(--amber-500); font-size: 1rem; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; padding: 0; }
   .map-recenter-btn:hover { border-color: var(--amber-700); background: var(--stone-800); }
@@ -26910,6 +27375,7 @@ const APP_STYLES = `
   .map-route-wave-dot { fill: url(#mapRouteWaveGradient); opacity: 0; transform-box: fill-box; transform-origin: center; animation: map-route-wave-fade 1.7s ease-out infinite; }
   @keyframes map-route-wave-fade { 0% { opacity: 0; transform: scale(0.5); } 18% { opacity: 0.95; transform: scale(1); } 78% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 0; transform: scale(1.35); } }
   .map-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+  .map-node-open { z-index: 6; }
   .map-node-icon-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
   .map-node-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--stone-800); border: 1px solid var(--stone-600); font-size: 15px; }
   .map-node-icon-hero { width: 10px; height: 10px; background: var(--emerald-600); border: none; }
@@ -26917,8 +27383,8 @@ const APP_STYLES = `
   .map-node-icon-fog { background: var(--stone-900); border: 1px dashed var(--stone-600); color: var(--stone-500); font-family: 'IBM Plex Mono', monospace; }
   .map-node-fog { opacity: 0.7; cursor: pointer; }
   .map-node-fog:hover, .map-node-fog:focus-visible { opacity: 1; }
-  .map-node-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: var(--stone-400); white-space: nowrap; }
-  .map-node-label-hero { color: var(--amber-100); font-weight: 500; }
+  .map-node-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: var(--stone-400); white-space: nowrap; background: rgba(28, 25, 23, 0.82); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.05rem 0.3rem; line-height: 1.3; }
+  .map-node-label-hero { color: var(--amber-100); font-weight: 500; border-color: var(--amber-800); }
   .map-node-desc { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; width: 152px; max-height: 9rem; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; font-family: 'EB Garamond', serif; font-style: italic; font-size: 0.72rem; line-height: 1.3; color: var(--stone-400); background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.4rem 0.5rem; text-align: left; z-index: 5; }
   .map-node-desc p { margin: 0 0 0.4rem; }
   .map-node-desc p:last-child { margin-bottom: 0; }
