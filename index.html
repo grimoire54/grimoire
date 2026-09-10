@@ -17281,7 +17281,7 @@ const { useState, useRef, useEffect } = React;
 // 7. FACTION REPUTATION
 // 8. PARTY / GROUP              — companion recruitment and roster
 // 9. EQUIPMENT SLOTS            — config & normalization
-// 10. COMBAT                    — body parts, targeting, resolution
+// 10. COMBAT                    — body parts, targeting, resolution, action checks
 // 11. PURE HELPERS              — no closures over App state
 // 12. PRESENTATIONAL COMPONENTS — grouped by feature (sheet/equipment/combat/…)
 // 13. App()                     — state, effects, every handler, then render
@@ -17489,6 +17489,7 @@ const TRANSLATIONS = {
         itemEquippedNote: 'Сейчас надето / используется',
         useItemButton: 'Использовать',
         equipItemButton: 'Экипировать',
+        replaceItemButton: 'Заменить',
         dropItemButton: 'Выбросить',
         dropConfirmTitle: 'Выбросить предмет?',
         dropConfirmText: 'Предмет будет потерян безвозвратно. Точно выбросить:',
@@ -17499,6 +17500,13 @@ const TRANSLATIONS = {
         // -- Combat --
         combatButtonLabel: 'Бой',
         combatModalTitle: 'Бой',
+        stealthKillPromptLabel: 'Скрытое убийство',
+        stealthKillAttemptAria: 'Попытаться',
+        stealthKillDeclineAria: 'Не рисковать',
+        stealthKillResolvingLabel: 'Атака…',
+        stealthKillSuccessLogText: 'Скрытая атака попадает точно — противник погибает, так и не успев среагировать',
+        stealthKillDamageLogText: 'Скрытая атака ранит противника, но не убивает — тот успевает опомниться и обернуться к тебе',
+        stealthKillMissLogText: 'Скрытая атака срывается — противник замечает тебя прежде, чем ты успеваешь ударить',
         bodyPartHead: 'Голова',
         bodyPartTorso: 'Торс',
         bodyPartLeftArm: 'Левая рука',
@@ -17621,7 +17629,8 @@ const TRANSLATIONS = {
         // -- Equipment modal --
         equipmentButton: 'Снаряжение',
         equipmentModalTitle: 'Снаряжение',
-        combatStatsHeading: 'Боевые характеристики',
+        equipmentStatsHeading: 'Параметры персонажа',
+        equipmentGearHeading: 'Параметры снаряжения',
         equipCloak: 'Плащ',
         equipBackpack: 'Рюкзак',
         equipHelmet: 'Головной убор',
@@ -17885,6 +17894,7 @@ const TRANSLATIONS = {
         itemEquippedNote: 'Currently equipped / in use',
         useItemButton: 'Use',
         equipItemButton: 'Equip',
+        replaceItemButton: 'Replace',
         dropItemButton: 'Drop',
         dropConfirmTitle: 'Drop this item?',
         dropConfirmText: "The item will be lost for good. Drop it:",
@@ -17895,6 +17905,13 @@ const TRANSLATIONS = {
         // -- Combat --
         combatButtonLabel: 'Fight',
         combatModalTitle: 'Combat',
+        stealthKillPromptLabel: 'Stealth kill',
+        stealthKillAttemptAria: 'Attempt',
+        stealthKillDeclineAria: "Don't risk it",
+        stealthKillResolvingLabel: 'Striking…',
+        stealthKillSuccessLogText: 'The stealth strike lands true — the enemy dies before they can even react',
+        stealthKillDamageLogText: "The stealth strike wounds the enemy but doesn't kill them — they recover and turn on you",
+        stealthKillMissLogText: 'The stealth strike fails — the enemy notices you before you can land the blow',
         bodyPartHead: 'Head',
         bodyPartTorso: 'Torso',
         bodyPartLeftArm: 'Left arm',
@@ -18017,7 +18034,8 @@ const TRANSLATIONS = {
         // -- Equipment modal --
         equipmentButton: 'Equipment',
         equipmentModalTitle: 'Equipment',
-        combatStatsHeading: 'Combat stats',
+        equipmentStatsHeading: 'Character parameters',
+        equipmentGearHeading: 'Equipment parameters',
         equipCloak: 'Cloak',
         equipBackpack: 'Backpack',
         equipHelmet: 'Headwear',
@@ -18721,6 +18739,18 @@ function rarityColor(key) {
     const tier = RARITY_TIERS.find(tr => tr.key === key);
     return tier ? tier.color : null;
 }
+// Item icon frames are always gold now (see the --amber-500 border on
+// .inventory-cell / .item-detail-icon-wrap / .equip-slot-btn-filled) —
+// rarity is read off the glow behind the icon instead: a circular gradient
+// in the rarity's own color, strongest right under the artwork and fully
+// faded out before it reaches the frame, so the gold border itself never
+// gets tinted by it.
+function rarityBackground(key) {
+    const color = rarityColor(key);
+    if (!color)
+        return undefined;
+    return `radial-gradient(circle at center, ${color}f2 0%, ${color}99 28%, ${color}40 52%, ${color}00 78%), var(--stone-900)`;
+}
 // The state-tracking model re-derives the inventory as plain prose-based
 // strings each turn (see generateStateAndEvents) rather than referencing the original
 // offer's exact id/label, so a taken item's rarity (recorded by label, see
@@ -19404,6 +19434,38 @@ const EQUIPMENT_SLOT_CONFIG = [
     { key: 'ringRight', matchSlot: 'ring', icon: '💍', image: EQUIP_ICON_RING, labelKey: 'equipRingRight' }
 ];
 const EMPTY_EQUIPMENT = EQUIPMENT_SLOT_CONFIG.filter(slot => !slot.spacer).reduce((acc, slot) => { acc[slot.key] = null; return acc; }, {});
+// Candidate list for a single equip slot (weaponLeft/weaponRight,
+// ringLeft/ringRight, ...) — items stay in gameState.inventory whether or
+// not they're currently worn, so a plain `inventory.filter(slot match)`
+// would offer the exact same physical item as a "swap" option in BOTH
+// paired slots at once even though only one copy exists. Here we first
+// tally how many units of each name are already committed to OTHER slots
+// that share this matchSlot family (excluding the slot being edited, so
+// that slot's own equipped item still passes through and can be shown/
+// unequipped as usual), then walk the inventory and skip that many units
+// per name — leaving only the units that are actually free to equip here.
+function getEquipSlotCandidates(inventory, equipment, matchSlot, currentSlotKey) {
+    const committedElsewhere = {};
+    EQUIPMENT_SLOT_CONFIG.forEach(slot => {
+        if (slot.spacer || slot.matchSlot !== matchSlot || slot.key === currentSlotKey)
+            return;
+        const name = equipment ? equipment[slot.key] : null;
+        if (name)
+            committedElsewhere[name] = (committedElsewhere[name] || 0) + 1;
+    });
+    const remaining = { ...committedElsewhere };
+    const result = [];
+    inventory.forEach(it => {
+        if (it.slot !== matchSlot)
+            return;
+        if (remaining[it.name] > 0) {
+            remaining[it.name] -= 1;
+            return;
+        }
+        result.push(it);
+    });
+    return result;
+}
 // Per-item-TYPE icon for the inventory grid (InventoryModal) — distinct
 // from EQUIPMENT_SLOT_CONFIG above, which is keyed by paper-doll SLOT
 // (left/right ring, left/right weapon hand) and can list the same slot
@@ -19413,19 +19475,23 @@ const EMPTY_EQUIPMENT = EQUIPMENT_SLOT_CONFIG.filter(slot => !slot.spacer).reduc
 // "none" items) fall back to a plain emoji — this is exactly the "у
 // расходников ещё нет [картинок], там просто смайлики" case.
 const INVENTORY_SLOT_IMAGE = {
-    weapon: EQUIP_ICON_WEAPON_RIGHT, armor: EQUIP_ICON_ARMOR, helmet: EQUIP_ICON_HELMET,
+    // Despite their names, EQUIP_ICON_WEAPON_LEFT is the sword artwork and
+    // EQUIP_ICON_WEAPON_RIGHT is the shield artwork (see renderWeaponSlotIcon,
+    // which already relies on that swap) — weapon here means the sword one.
+    weapon: EQUIP_ICON_WEAPON_LEFT, armor: EQUIP_ICON_ARMOR, helmet: EQUIP_ICON_HELMET,
     amulet: EQUIP_ICON_AMULET, gloves: EQUIP_ICON_GLOVES, boots: EQUIP_ICON_BOOTS,
     ring: EQUIP_ICON_RING, cloak: EQUIP_ICON_CLOAK, backpack: EQUIP_ICON_BACKPACK
 };
 const INVENTORY_SLOT_EMOJI = { consumable: '🧪', none: '📦' };
 // Returns { image } or { emoji } — never both — for a single inventory
 // item, so the grid cell always knows exactly one way to render itself.
-// Shield-flagged weapon items (see isShieldItemName) get their own emoji
-// rather than the generic sword image, matching the paper-doll's own
-// override (see renderWeaponSlotIcon).
+// Shield-flagged weapon items (see isShieldItemName) get the actual shield
+// artwork (EQUIP_ICON_WEAPON_RIGHT — see the note above) instead of the
+// generic sword image, matching the paper-doll's own override (see
+// renderWeaponSlotIcon).
 function getInventoryItemIcon(item) {
     if (item.slot === 'weapon' && (item.shield === true || (item.shield === undefined && isShieldItemName(item.name)))) {
-        return { emoji: '🛡️' };
+        return { image: EQUIP_ICON_WEAPON_RIGHT };
     }
     const image = INVENTORY_SLOT_IMAGE[item.slot];
     if (image)
@@ -19538,7 +19604,17 @@ const COMBAT_TUNING = {
     fleeBase: 55, // base % chance to flee an "ordinary" opponent
     fleeDifficultyScale: 1.5, // % penalty per point enemy power+precision exceeds baseline (combined)
     fleeHpDifficultyScale: 0.8, // % penalty per 10 (narrative-scale) HP the enemy's pool exceeds the ordinary baseline (50)
-    fleeAgilityScale: 1.0 // % bonus per point of hero agility above baseline
+    fleeAgilityScale: 1.0, // % bonus per point of hero agility above baseline
+    // Stealth kill (see rollStealthKillOutcome): three-way roll for an ambush
+    // attempt — instant kill, damage-only (normal combat follows, enemy
+    // already wounded), or a clean miss (normal combat follows, enemy at full
+    // HP). Kill chance rises and miss chance falls with agility above
+    // baseline; whatever's left over is the damage-only band.
+    stealthKillBaseChance: 35, // % instant-kill chance vs. an "ordinary" (baseline agility) target
+    stealthKillAgilityScale: 2.5, // % shift in kill chance per point of hero agility above baseline
+    stealthMissBaseChance: 25, // % chance the ambush lands no damage at all
+    stealthMissAgilityScale: 1.8, // higher agility reduces this
+    stealthDamageFraction: 0.6 // fraction of a normal hit's damage a non-lethal stealth strike still deals
 };
 // Weapon damage is deliberately the dominant factor in a hit (see
 // computeWeaponDamage) — strength only nudges it. Numbers are per hit,
@@ -19707,7 +19783,12 @@ function isWeaponSlotBlocked(slotKey, equipment, inventory) {
 // defends rather than damages — that it should read as a shield rather
 // than a sword on the paper doll, and an occupied-by-two-handed-weapon
 // hand (see isWeaponSlotBlocked) reads better as "no room for a shield
-// here" than the old generic "blocked" glyph. Matched against whole-word
+// here" than the old generic "blocked" glyph. weaponLeft's own default
+// placeholder (slot.image) is that same shield picture, on the assumption
+// an empty left hand is waiting for a shield — but once a one-handed
+// weapon actually sits there (dual-wielding, see equipItemInSlot's
+// same-copy guard), it should read as a sword like the right hand does,
+// not still show that shield placeholder. Matched against whole-word
 // tokens (see narrativeItemNameTokens above) so it doesn't fire on an
 // unrelated word that merely contains the same letters mid-word.
 // Structured items (see normalizeInventoryItem) now carry their own
@@ -19723,17 +19804,23 @@ function isShieldItemName(name) {
     return SHIELD_NAME_KEYWORDS.some(kw => tokens.some(tok => tok.startsWith(kw)));
 }
 // Returns the JSX for a weapon slot's icon when it should override the
-// default sword image (a shield equipped there, or the slot going dark
-// because a two-handed weapon fills the other hand) — null otherwise, so
-// the caller falls through to its normal image/emoji rendering unchanged.
+// default sword/shield placeholder (a shield equipped there, a one-handed
+// weapon dual-wielded into the left hand despite its shield placeholder, or
+// the slot going dark because a two-handed weapon fills the other hand) —
+// null otherwise, so the caller falls through to its normal image/emoji
+// rendering unchanged.
 function renderWeaponSlotIcon(slot, disabled, equippedItem) {
     if (slot.key !== 'weaponLeft' && slot.key !== 'weaponRight')
         return null;
     if (disabled) {
         return React.createElement("img", { className: "equip-slot-icon-img", src: EQUIP_ICON_WEAPON_RIGHT, alt: "" });
     }
-    if (equippedItem && (equippedItem.shield === true || (equippedItem.shield === undefined && isShieldItemName(equippedItem.name)))) {
+    const isShield = equippedItem && (equippedItem.shield === true || (equippedItem.shield === undefined && isShieldItemName(equippedItem.name)));
+    if (isShield) {
         return React.createElement("img", { className: "equip-slot-icon-img", src: EQUIP_ICON_WEAPON_RIGHT, alt: "" });
+    }
+    if (equippedItem && slot.key === 'weaponLeft') {
+        return React.createElement("img", { className: "equip-slot-icon-img", src: EQUIP_ICON_WEAPON_LEFT, alt: "" });
     }
     return null;
 }
@@ -20104,6 +20191,31 @@ function computeFleeChance(enemyPower, enemyPrecision, enemyTotalHp, playerAgili
     const agilityBonus = (playerAgility - COMBAT_TUNING.precisionBaseline) * COMBAT_TUNING.fleeAgilityScale;
     return clampPercent(COMBAT_TUNING.fleeBase - difficultyPenalty + agilityBonus);
 }
+// Resolves a stealth-kill attempt (see the "ambush" combat-encounter flag)
+// against the hero's agility into one of three outcomes: an instant kill, a
+// strike that only damages (normal combat follows, enemy already wounded),
+// or a clean miss (normal combat follows, enemy untouched, same as an
+// ordinary fresh encounter). Kill chance rises and miss chance falls with
+// agility above COMBAT_TUNING.precisionBaseline; whatever's left over after
+// both is the damage-only band. If kill+miss would otherwise eat the entire
+// roll at extreme agility values, both are scaled down proportionally so
+// there's always at least some chance of the damage-only outcome.
+function rollStealthKillOutcome(agility) {
+    const agilityDelta = agility - COMBAT_TUNING.precisionBaseline;
+    let killChance = clampPercent(COMBAT_TUNING.stealthKillBaseChance + agilityDelta * COMBAT_TUNING.stealthKillAgilityScale);
+    let missChance = clampPercent(COMBAT_TUNING.stealthMissBaseChance - agilityDelta * COMBAT_TUNING.stealthMissAgilityScale);
+    if (killChance + missChance > 90) {
+        const scale = 90 / (killChance + missChance);
+        killChance *= scale;
+        missChance *= scale;
+    }
+    const roll = Math.random() * 100;
+    if (roll < killChance)
+        return 'kill';
+    if (roll < killChance + missChance)
+        return 'miss';
+    return 'damage';
+}
 // The enemy's targeting "AI" for v1: a weighted random pick using the same
 // per-part hitChance figures as the difficulty table (bigger/easier targets
 // get aimed at more often), skipping parts already disabled unless every
@@ -20143,6 +20255,72 @@ const PRESETS = {
         { label: 'Derelict in deep space', text: 'A research vessel drifts at the edge of charted space. The crew vanished without a trace three weeks ago, and contact with Earth was lost at the same time.' },
         { label: 'Post-apocalypse', text: 'A world thirty years after the catastrophe: nature has swallowed the cities, and survivors share the ruins with whatever the ones who stayed behind have become.' }
     ]
+};
+// ---- ACTION CHECKS ----
+// A general-purpose hidden skill-check resolver for freeform narrative actions
+// (picking a lock, talking a guard down, deciphering an old script) — NOT the
+// turn-based body-part combat above, which already has its own resolution
+// (computeHitChance/computeWeaponDamage/computeDefenseChance/computeFleeChance)
+// and is never double-resolved by this system; callGameMaster skips this
+// entirely on the opening turn and while a combat encounter is still
+// unresolved (same condition the render layer uses for combatPending).
+//
+// The philosophy mirrors ENEMY_TIERS just above: the model only ever makes a
+// qualitative call — does this action even warrant a check, and how hard is
+// it — never a raw number (see buildActionCheckSystemPrompt/generateActionCheck
+// further down, inside App(), since only that half needs an API call). The
+// roll itself happens here, locally, completely outside the model's control —
+// which is the whole point: it's what lets buildNarrativeSystemPrompt hand
+// the narrator a FIXED outcome to write around, instead of leaving success or
+// failure up to its own say-so the way GAME MASTER RULE 4 does for
+// everything else.
+//
+// Unlike ENEMY_TIERS — a whole hidden stat block, where variety between two
+// "strong" enemies is the point — a difficulty is a single property of the
+// task that the fiction has already implied, so each label maps to one flat
+// DC rather than a rolled range; the randomness that matters belongs to the
+// roll against it, not to the target number itself. Anchored to the familiar
+// tabletop 5/10/15/20/25 DC ladder, already well-calibrated against a d20.
+const ACTION_CHECK_DIFFICULTY_TIERS = { trivial: 5, easy: 10, moderate: 15, hard: 20, extreme: 25 };
+// Every tunable number for the check itself lives here, mirroring
+// COMBAT_TUNING above.
+const ACTION_CHECK_TUNING = {
+    diceSides: 20, // one d20 — coarse enough that a single point of stat rarely flips the result by itself
+    statBaseline: 10, // matches COMBAT_TUNING.precisionBaseline / EMPTY_STATE.stats — an "ordinary" person's stat
+    statModifierDivisor: 4, // +1 to the roll per 4 points of the relevant stat above baseline (and the same going below it)
+    partialBand: 5, // a total up to this many points UNDER the difficulty still counts as a partial success, not an outright failure
+    criticalBand: 10 // a total this many points OVER the difficulty counts as a critical success outright
+};
+// Resolves one check. A natural 1 or a natural max roll nudges the base
+// result one band further in the obvious direction — bad or great luck
+// matters, but never enough on its own to hand a highly-skilled attempt a
+// flat failure, or a hopeless one a flat success; it can only move the
+// needle one step from wherever the hero's actual stat already put it.
+function rollActionCheck(statValue, difficultyKey) {
+    const difficulty = ACTION_CHECK_DIFFICULTY_TIERS[difficultyKey] || ACTION_CHECK_DIFFICULTY_TIERS.moderate;
+    const modifier = Math.round((statValue - ACTION_CHECK_TUNING.statBaseline) / ACTION_CHECK_TUNING.statModifierDivisor);
+    const roll = 1 + Math.floor(Math.random() * ACTION_CHECK_TUNING.diceSides);
+    const total = roll + modifier;
+    const margin = total - difficulty;
+    const bands = ['failure', 'partialSuccess', 'success', 'criticalSuccess'];
+    let bandIndex = margin >= ACTION_CHECK_TUNING.criticalBand ? 3 : margin >= 0 ? 2 : margin >= -ACTION_CHECK_TUNING.partialBand ? 1 : 0;
+    if (roll === 1)
+        bandIndex -= 1;
+    else if (roll === ACTION_CHECK_TUNING.diceSides)
+        bandIndex += 1;
+    const outcome = bandIndex < 0 ? 'criticalFailure' : bandIndex > 3 ? 'criticalSuccess' : bands[bandIndex];
+    return { difficultyKey, difficulty, modifier, roll, total, outcome };
+}
+// Narrative guidance per outcome band, folded into buildNarrativeSystemPrompt's
+// checkRule below — deliberately about WHAT HAPPENS, never about numbers,
+// dice, or stats, which the hero and every character in the scene must never
+// seem aware of.
+const ACTION_CHECK_OUTCOME_GUIDANCE = {
+    criticalFailure: 'the attempt fails badly — worse than a plain failure, something about it actively backfires (it breaks, makes noise, draws attention, or otherwise leaves the hero worse off than before they tried)',
+    failure: 'the attempt simply does not work — no progress toward what the hero was trying to do, but nothing beyond that',
+    partialSuccess: 'the attempt mostly works but not cleanly — it costs something, takes a toll, or only partly achieves what the hero wanted, and/or opens a new complication',
+    success: 'the attempt works, cleanly, as the hero intended',
+    criticalSuccess: 'the attempt works better than the hero had any right to expect — faster, cleaner, or with some small extra benefit on top'
 };
 // ==============================================================================
 // PURE HELPERS — no closures over App state
@@ -20518,6 +20696,40 @@ function ItemOffers({ narratorMessage, interactive, currency, onToggle, t }) {
             unaffordable && React.createElement("p", { className: "item-offer-insufficient-hint" }, t('itemOfferCostInsufficientHint')),
             React.createElement("button", { onClick: () => confirm(group.groupId, item.id, group.selectionMode), className: "item-choice-confirm-btn", disabled: !interactive || staged === undefined, type: "button" }, t('itemChoiceConfirmButton'))));
     }))))));
+}
+// Confirmation widget for an ambush attempt — same two-step ✓/✗-then-Confirm
+// shape as ItemOffers (stage a choice, then commit), reduced to a single
+// action instead of a list, and themed red for a lethal one instead of an
+// item pickup. ✓ stages "attempt the stealth kill"; ✗ stages "skip it, just
+// fight normally". Confirming plays a brief pulse (stealth-kill-resolving)
+// before handing off to onAttempt/onDecline, so the moment of commitment
+// actually reads as one rather than resolving instantly.
+const STEALTH_KILL_RESOLVE_MS = 650;
+function StealthKillOffer({ enemyName, interactive, onAttempt, onDecline, t }) {
+    const [staged, setStaged] = useState(undefined);
+    const [resolving, setResolving] = useState(false);
+    function confirm() {
+        if (staged === undefined || resolving)
+            return;
+        setResolving(true);
+        window.setTimeout(() => {
+            if (staged)
+                onAttempt();
+            else
+                onDecline();
+        }, STEALTH_KILL_RESOLVE_MS);
+    }
+    return (React.createElement("div", { className: 'stealth-kill-offer' + (resolving ? ' stealth-kill-resolving' : '') },
+        React.createElement("div", { className: "stealth-kill-row" },
+            React.createElement("span", { className: "stealth-kill-label" },
+                "\uD83D\uDDE1 ",
+                t('stealthKillPromptLabel'),
+                ": ",
+                enemyName),
+            React.createElement("div", { className: "stealth-kill-choice" },
+                React.createElement("button", { onClick: () => setStaged(true), className: 'stealth-kill-btn' + (staged === true ? ' stealth-kill-active-take' : ''), disabled: !interactive || resolving, "aria-label": t('stealthKillAttemptAria'), type: "button" }, "\u2713"),
+                React.createElement("button", { onClick: () => setStaged(false), className: 'stealth-kill-btn' + (staged === false ? ' stealth-kill-active-decline' : ''), disabled: !interactive || resolving, "aria-label": t('stealthKillDeclineAria'), type: "button" }, "\u2717"))),
+        React.createElement("button", { onClick: confirm, className: "stealth-kill-confirm-btn", disabled: !interactive || staged === undefined || resolving, type: "button" }, resolving ? t('stealthKillResolvingLabel') : t('itemChoiceConfirmButton'))));
 }
 // Renders two related widgets under one shared visual style: a new-quest
 // offer (with an optional advance, its own independent ✓/✗ that only shows
@@ -21308,7 +21520,7 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, onEquip, 
                 // side it's NOT equipped into (see isWeaponSlotBlocked above).
                 const candidates = inventory.filter(it => it.slot === slot.matchSlot);
                 return (React.createElement("div", { key: slot.key, className: "equip-slot-wrap" },
-                    React.createElement("button", { onClick: () => setPickerSlot(current => (current === slot.key ? null : slot.key)), className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : (equippedName ? ' equip-slot-btn-filled' : ' equip-slot-btn-empty')), type: "button", disabled: disabled, "aria-label": t(slot.labelKey) },
+                    React.createElement("button", { onClick: () => setPickerSlot(current => (current === slot.key ? null : slot.key)), className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : (equippedName ? ' equip-slot-btn-filled' : ' equip-slot-btn-empty')), style: equippedName && rarity ? { background: rarityBackground(rarity) } : undefined, type: "button", disabled: disabled, "aria-label": t(slot.labelKey), title: equippedName || undefined },
                         renderWeaponSlotIcon(slot, disabled, equippedItem) || (disabled ? (React.createElement("span", { className: "equip-slot-icon" }, "\uD83D\uDEAB")) : slot.image ? (React.createElement("img", { className: "equip-slot-icon-img", src: slot.image, alt: "" })) : (React.createElement("span", { className: "equip-slot-icon" }, slot.icon))),
                         armorDefense !== null && (React.createElement("span", { className: "equip-slot-defense-badge", "aria-label": t('itemDefenseLabel') }, armorDefense)),
                         weaponDamage !== null && (React.createElement("span", { className: "equip-slot-damage-badge", "aria-label": t('itemDamageLabel') }, weaponDamage)),
@@ -21318,8 +21530,6 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, onEquip, 
                         setBonus.size >= 2 && (React.createElement("span", { className: "equip-slot-set-badge", "aria-label": t('setBonusLabel'), title: t('setBonusLabel') },
                             "\uD83D\uDD17",
                             setBonus.size))),
-                    React.createElement("p", { className: "equip-slot-label" }, t(slot.labelKey)),
-                    React.createElement("p", { className: "equip-slot-item-name", style: equippedName && rarity ? { color: rarityColor(rarity) } : undefined }, equippedName ? '[' + equippedName + (equippedItem && weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) ? ' ' + weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) : '') + ']' : (disabled ? t('equipTwoHandedOccupied') : '\u00A0')),
                     pickerSlot === slot.key && !disabled && (React.createElement(EquipSlotPicker, { equippedName: equipment[slot.key], equippedItem: equippedItem, currentStats: { armorDefense, weaponDamage, blockChance }, candidates: candidates, itemRarities: itemRarities, onEquip: name => handleEquip(slot.key, name), onUnequip: () => handleUnequip(slot.key), t: t }))));
             })),
             React.createElement("div", { className: "sheet-section" },
@@ -21471,7 +21681,7 @@ function EquipSlotPicker({ equippedName, equippedItem, currentStats, candidates,
         }),
         selectable.length === 0 && !equippedName && (React.createElement("p", { className: "equip-picker-empty" }, t('equipNoneAvailable')))));
 }
-function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, pickerSlot, isSlotDisabled, onOpenPicker, onEquip, onUnequip, onClose, t }) {
+function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, pickerSlot, isSlotDisabled, onOpenPicker, onOpenItemDetail, onEquip, onUnequip, onClose, t }) {
     const activeSets = computeActiveEquipmentSets(equipment, gameState.inventory, itemRarities);
     // Equipment-screen stats panel totals — see computeTotalArmorDefense/
     // computeTotalWeaponDamage (single sources of truth shared with the
@@ -21517,9 +21727,18 @@ function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, picke
                         // Any weapon — one- or two-handed — is a candidate for either
                         // hand independently: a two-handed weapon takes over whichever
                         // side it's NOT equipped into (see isSlotDisabled above).
-                        const candidates = gameState.inventory.filter(it => it.slot === slot.matchSlot);
+                        const candidates = getEquipSlotCandidates(gameState.inventory, equipment, slot.matchSlot, slot.key);
                         return (React.createElement("div", { key: slot.key, className: "equip-slot-wrap" },
-                            React.createElement("button", { onClick: () => onOpenPicker(slot.key), className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : (equippedName ? ' equip-slot-btn-filled' : ' equip-slot-btn-empty')), type: "button", disabled: disabled, "aria-label": t(slot.labelKey) },
+                            React.createElement("button", { onClick: () => {
+                                    if (equippedName && equippedItem) {
+                                        if (pickerSlot === slot.key)
+                                            onOpenPicker(slot.key);
+                                        onOpenItemDetail(gameState.inventory.indexOf(equippedItem));
+                                    }
+                                    else {
+                                        onOpenPicker(slot.key);
+                                    }
+                                }, className: 'equip-slot-btn' + (disabled ? ' equip-slot-btn-disabled' : (equippedName ? ' equip-slot-btn-filled' : ' equip-slot-btn-empty')), style: equippedName && rarity ? { background: rarityBackground(rarity) } : undefined, type: "button", disabled: disabled, "aria-label": t(slot.labelKey), title: equippedName || undefined },
                                 renderWeaponSlotIcon(slot, disabled, equippedItem) || (disabled ? (React.createElement("span", { className: "equip-slot-icon" }, "\uD83D\uDEAB")) : slot.image ? (React.createElement("img", { className: "equip-slot-icon-img", src: slot.image, alt: "" })) : (React.createElement("span", { className: "equip-slot-icon" }, slot.icon))),
                                 armorDefense !== null && (React.createElement("span", { className: "equip-slot-defense-badge", "aria-label": t('itemDefenseLabel') }, armorDefense)),
                                 weaponDamage !== null && (React.createElement("span", { className: "equip-slot-damage-badge", "aria-label": t('itemDamageLabel') }, weaponDamage)),
@@ -21529,13 +21748,12 @@ function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, picke
                                 setBonus.size >= 2 && (React.createElement("span", { className: "equip-slot-set-badge", "aria-label": t('setBonusLabel'), title: t('setBonusLabel') },
                                     "\uD83D\uDD17",
                                     setBonus.size))),
-                            React.createElement("p", { className: "equip-slot-label" }, t(slot.labelKey)),
-                            React.createElement("p", { className: "equip-slot-item-name", style: equippedName ? { color: isActiveQuestItem(equippedItem, gameState.quests) ? 'var(--amber-400)' : (rarity ? rarityColor(rarity) : undefined) } : undefined }, equippedName ? (isActiveQuestItem(equippedItem, gameState.quests) ? '📜 ' : '') + '[' + equippedName + (equippedItem && weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) ? ' ' + weaponHandTag(equippedItem.slot, equippedItem.twoHanded, t) : '') + ']' : (disabled ? t('equipTwoHandedOccupied') : '\u00A0')),
                             pickerSlot === slot.key && !disabled && (React.createElement(EquipSlotPicker, { equippedName: equipment[slot.key], equippedItem: equippedItem, currentStats: { armorDefense, weaponDamage, blockChance }, candidates: candidates, itemRarities: itemRarities, onEquip: name => onEquip(slot.key, name), onUnequip: () => onUnequip(slot.key), t: t }))));
                     }))),
                 React.createElement("div", { className: "equipment-modal-page" },
                     React.createElement("div", { className: "equipment-stats-panel" },
-                        React.createElement("div", { className: "sheet-vitals" },
+                        React.createElement("p", { className: "sheet-heading" }, t('equipmentStatsHeading')),
+                        React.createElement("div", { className: "sheet-vitals equipment-stats-merged" },
                             React.createElement("div", { className: "sheet-vital-row" },
                                 React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
                                 React.createElement("span", { className: "sheet-vital-value" },
@@ -21547,9 +21765,7 @@ function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, picke
                                 React.createElement("span", { className: "sheet-vital-value" },
                                     gameState.psyche,
                                     "/",
-                                    gameState.maxPsyche))),
-                        React.createElement("div", { className: "sheet-section equipment-stats-section" },
-                            React.createElement("p", { className: "sheet-heading" }, t('statsHeading')),
+                                    gameState.maxPsyche)),
                             React.createElement("div", { className: "sheet-stat-row" },
                                 React.createElement("span", { className: "sheet-stat-label" }, t('strengthLabel')),
                                 React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.strength)),
@@ -21560,7 +21776,7 @@ function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, picke
                                 React.createElement("span", { className: "sheet-stat-label" }, t('intelligenceLabel')),
                                 React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.intelligence))),
                         React.createElement("div", { className: "sheet-section equipment-stats-section" },
-                            React.createElement("p", { className: "sheet-heading" }, t('combatStatsHeading')),
+                            React.createElement("p", { className: "sheet-heading" }, t('equipmentGearHeading')),
                             React.createElement("div", { className: "sheet-stat-row" },
                                 React.createElement("span", { className: "sheet-stat-label" },
                                     "\uD83D\uDEE1\uFE0F ",
@@ -21585,10 +21801,16 @@ function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, picke
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
 // ---- Item detail & drop ----
-function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equipment, onDrop, onUse, onEquip, onUnequip, onClose, t }) {
+function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equipment, onDrop, onUse, onEquip, onUnequip, onReplace, onClose, t }) {
     const item = gameState.inventory[itemIndex];
     if (!item)
         return null;
+    // "Replace" lets an already-equipped item be swapped for another
+    // same-slot item straight from the detail popup — reuses the exact same
+    // EquipSlotPicker (with its side-by-side stat diffs) that the Equipment
+    // screen's own slot buttons open, so the comparison view is identical
+    // whether you got here from the paper doll or from the inventory list.
+    const [showReplacePicker, setShowReplacePicker] = useState(false);
     const rarity = findItemRarity(item.name, itemRarities);
     const weight = findItemWeight(item.name, itemWeights);
     const isEquipped = equipment ? Object.values(equipment).some(v => v === item.name) : false;
@@ -21610,9 +21832,20 @@ function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equi
     const armorDefense = baseArmorDefense !== null ? baseArmorDefense + setBonus.defense : null;
     const weaponDamage = baseWeaponDamage;
     const blockChance = getBlockChanceForItem(item, rarity || 'common');
+    const icon = getInventoryItemIcon(item);
+    // Other items that could fill this same slot — matched on item.slot
+    // (the matchSlot category, e.g. 'weapon'/'armor'/'ring'), same filter
+    // EquipmentModal uses for its own per-slot candidate lists.
+    const replaceCandidates = isEquipped && equippedSlotKey
+        ? getEquipSlotCandidates(gameState.inventory, equipment, item.slot, equippedSlotKey)
+        : [];
+    const canReplace = isEquipped && !!equippedSlotKey;
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card" },
+            React.createElement("div", { className: "item-detail-icon-wrap", style: rarity ? { background: rarityBackground(rarity) } : undefined }, icon.image
+                ? React.createElement("img", { className: "item-detail-icon-img", src: icon.image, alt: "" })
+                : React.createElement("span", { className: "item-detail-icon-emoji", "aria-hidden": "true" }, icon.emoji)),
             React.createElement("h2", { className: "modal-title", style: { color: isQuestActive ? 'var(--amber-400)' : (rarity ? rarityColor(rarity) : undefined) } },
                 "[",
                 item.name,
@@ -21655,11 +21888,20 @@ function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equi
                     "\u00D7",
                     setBonus.size))),
             isEquipped && React.createElement("p", { className: "hint-text" }, t('itemEquippedNote')),
-            React.createElement("div", { className: "modal-actions" },
+            showReplacePicker && canReplace && (React.createElement("div", { className: "item-detail-replace-picker-anchor grim-slide-down" },
+                React.createElement(EquipSlotPicker, { equippedName: item.name, equippedItem: item, currentStats: { armorDefense, weaponDamage, blockChance }, candidates: replaceCandidates, itemRarities: itemRarities, 
+                    // Picking a replacement here should only close the inline
+                    // picker, not the whole item window (see bug report: the
+                    // detail modal used to disappear along with it) — the modal
+                    // itself stays open on whichever item this index still
+                    // points to, now updated to reflect the new equipment.
+                    onEquip: name => { setShowReplacePicker(false); onReplace(equippedSlotKey, name); }, onUnequip: () => { setShowReplacePicker(false); onUnequip(); }, t: t }))),
+            React.createElement("div", { className: "modal-actions item-detail-modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton')),
                 isConsumable && React.createElement("button", { onClick: onUse, className: "btn btn-primary", type: "button" }, t('useItemButton')),
                 isEquippable && !isEquipped && React.createElement("button", { onClick: onEquip, className: "btn btn-primary", type: "button" }, t('equipItemButton')),
                 isEquipped && React.createElement("button", { onClick: onUnequip, className: "btn btn-ghost", type: "button" }, t('unequipButton')),
+                canReplace && React.createElement("button", { onClick: () => setShowReplacePicker(s => !s), className: "btn btn-ghost", type: "button" }, t('replaceItemButton')),
                 React.createElement("button", { onClick: onDrop, className: "btn btn-danger", type: "button" }, t('dropItemButton'))))));
 }
 // Full-bag view: a dedicated grid window (gold + weight up top, a scrollable
@@ -21670,8 +21912,7 @@ function ItemDetailModal({ itemIndex, gameState, itemRarities, itemWeights, equi
 // the array is consumed/dropped, but the name stays stable across
 // re-renders, so a re-render right after using/dropping something doesn't
 // silently point the buttons at the wrong stack.
-function InventoryModal({ gameState, itemRarities, itemWeights, equipment, inventorySort, onInventorySortChange, inventoryFilter, onInventoryFilterChange, onUse, onEquip, onUnequip, onDrop, onClose, t }) {
-    const [selectedName, setSelectedName] = useState(null);
+function InventoryModal({ gameState, itemRarities, itemWeights, equipment, inventorySort, onInventorySortChange, inventoryFilter, onInventoryFilterChange, onOpenItemDetail, onClose, t }) {
     const equippedNames = new Set(equipment ? Object.values(equipment).filter(Boolean) : []);
     const totalWeight = computeTotalWeight(gameState.inventory, itemWeights || {});
     const carryCapacity = computeCarryCapacity(gameState.stats.strength, equipment, itemRarities);
@@ -21703,33 +21944,6 @@ function InventoryModal({ gameState, itemRarities, itemWeights, equipment, inven
         }
         return 0;
     });
-    const selectedGroup = selectedName ? sortedGroups.find(g => g.item.name === selectedName) : null;
-    const selectedItem = selectedGroup ? selectedGroup.item : null;
-    const selectedIsEquipped = selectedItem ? equippedNames.has(selectedItem.name) : false;
-    const selectedIsConsumable = selectedItem && selectedItem.slot === 'consumable';
-    const selectedIsEquippable = selectedItem && selectedItem.slot !== 'none' && selectedItem.slot !== 'consumable';
-    // The single "hand" button always does the one sensible thing for
-    // whatever's selected — consume a potion, equip a bare item, unequip a
-    // worn one — rather than making the player pick from Use/Equip/Unequip
-    // like the old per-item detail popup did.
-    function primaryAction() {
-        if (!selectedGroup)
-            return;
-        if (selectedIsConsumable)
-            onUse(selectedGroup.firstIndex);
-        else if (selectedIsEquippable && selectedIsEquipped)
-            onUnequip(selectedGroup.firstIndex);
-        else if (selectedIsEquippable)
-            onEquip(selectedGroup.firstIndex);
-    }
-    function primaryActionLabel() {
-        if (selectedIsConsumable)
-            return t('useItemButton');
-        if (selectedIsEquippable && selectedIsEquipped)
-            return t('unequipButton');
-        return t('equipItemButton');
-    }
-    const primaryActionDisabled = !selectedGroup || !(selectedIsConsumable || selectedIsEquippable);
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card inventory-modal-card" },
@@ -21771,8 +21985,7 @@ function InventoryModal({ gameState, itemRarities, itemWeights, equipment, inven
                     const isEquipped = equippedNames.has(item.name);
                     const isQuestActive = isActiveQuestItem(item, gameState.quests);
                     const icon = getInventoryItemIcon(item);
-                    const isSelected = selectedName === item.name;
-                    return (React.createElement("button", { key: gi, type: "button", className: 'inventory-cell' + (isSelected ? ' inventory-cell-selected' : '') + (isEquipped ? ' inventory-cell-equipped' : ''), style: { borderColor: rarity ? rarityColor(rarity) : undefined }, onClick: () => setSelectedName(isSelected ? null : item.name), title: item.name },
+                    return (React.createElement("button", { key: gi, type: "button", className: 'inventory-cell' + (isEquipped ? ' inventory-cell-equipped' : ''), style: rarity ? { background: rarityBackground(rarity) } : undefined, onClick: () => onOpenItemDetail(group.firstIndex), title: item.name },
                         icon.image
                             ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
                             : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji),
@@ -21781,21 +21994,7 @@ function InventoryModal({ gameState, itemRarities, itemWeights, equipment, inven
                         count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
                             "\u00D7",
                             count)));
-                })))),
-            React.createElement("div", { className: "inventory-modal-selected-bar" }, selectedItem
-                ? React.createElement("span", { style: { color: isActiveQuestItem(selectedItem, gameState.quests) ? 'var(--amber-400)' : (findItemRarity(selectedItem.name, itemRarities) ? rarityColor(findItemRarity(selectedItem.name, itemRarities)) : undefined) } },
-                    selectedGroup.count > 1 ? selectedGroup.count + ' ' : '',
-                    selectedItem.name,
-                    weaponHandTag(selectedItem.slot, selectedItem.twoHanded, t) ? ' ' + weaponHandTag(selectedItem.slot, selectedItem.twoHanded, t) : '',
-                    selectedIsEquipped ? ' ✓' : '')
-                : React.createElement("span", { className: "inventory-modal-selected-hint" }, t('inventorySelectHint'))),
-            React.createElement("div", { className: "inventory-modal-actions" },
-                React.createElement("button", { onClick: primaryAction, disabled: primaryActionDisabled, className: "btn btn-primary inventory-action-btn", type: "button" },
-                    "\u270B ",
-                    primaryActionLabel()),
-                React.createElement("button", { onClick: () => selectedGroup && onDrop(selectedGroup.firstIndex), disabled: !selectedGroup, className: "btn btn-danger inventory-action-btn", type: "button" },
-                    "\uD83D\uDDD1\uFE0F ",
-                    t('dropItemButton'))))));
+                })))))));
 }
 function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -23495,7 +23694,7 @@ THE PLAYER'S HERO: ${heroName}${heroConcept ? ', ' + heroConcept : ''}${summaryS
 CURRENT GAME STATE (take this into account and do not contradict it):
 ${JSON.stringify(state)}${partySection}` };
     }
-    function buildNarrativeSystemPrompt(state, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents) {
+    function buildNarrativeSystemPrompt(state, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck) {
         const { narrativeLanguage, context, partyMemberNames } = sharedContext(state);
         const isOpeningTurn = state === EMPTY_STATE;
         let ruleNum = 9;
@@ -23509,6 +23708,17 @@ ${JSON.stringify(state)}${partySection}` };
         const rewardHaggleRule = `\n${rewardHaggleRuleNum}. Pushing an NPC to raise a quest reward is a real risk, not a free retry. If a "[QUEST DECISIONS FROM PREVIOUS TURN]" line says the hero angered a giver by pushing too hard for a better reward, that giver is done — they've pulled the offer and want nothing further to do with that job; portray them as visibly irritated and firm about it, and never have them casually re-offer that same job or reward later. If the line instead says the hero pushed a giver into raising the reward to a specific new figure, that figure is already decided — simply reflect the giver agreeing to it in the scene, in whatever manner fits their personality (grudgingly, cheerfully, wearily, with a pointed sigh), without inventing a different number of your own. If the line says the hero pushed for a better reward but doesn't name a new figure, the giver is still weighing it — react in character without committing to a number; that will resolve on a later push or when the hero simply accepts what's on the table. A giver marked with "rewardNegotiable": false should hold the line without ever raising the number, no matter how the hero pushes, though they need not get angry about being asked.`;
         const travelRuleNum = ++ruleNum;
         const travelRule = `\n${travelRuleNum}. If a character proposes heading somewhere together right now, or the hero reaches a clear point of choice to travel to a specific named place (a path forking toward it, an invitation to go there, a door or route into a new area) — introduce that invitation and STOP there, the same way an item offer works: do not narrate the hero actually setting off, traveling, or arriving, and do not resolve whether they go. The outcome is handled separately, based on the player's choice. Lines marked "[TRAVEL DECISION FROM PREVIOUS TURN]:" tell you what the hero decided last turn — if they chose to go, narrate the journey and arrival naturally at the start of this scene; if they declined, reflect them staying put instead — without dwelling on it either way.`;
+        // actionCheck comes from generateActionCheck/rollActionCheck (see the
+        // ACTION CHECKS section, above the PURE HELPERS banner) — a hidden
+        // check already rolled, outside this call, against the hero's
+        // JUST-SUBMITTED action. When present, its outcome is a fixed fact the
+        // scene must be written around, not a new thing for the narrator to
+        // decide — see GAME MASTER RULE 4, which this rule overrides for this
+        // one action only.
+        const checkRuleNum = actionCheck ? ++ruleNum : null;
+        const checkRule = actionCheck
+            ? `\n${checkRuleNum}. HIDDEN ACTION CHECK: the hero's action this turn was just tested against a hidden ${actionCheck.stat} check — the mechanical result is already fixed, so write the scene so that ${ACTION_CHECK_OUTCOME_GUIDANCE[actionCheck.outcome]}. Get there through the scene itself, in whatever way fits the fiction — never softer or harsher than that result, and never let the attempt simply not happen. Never mention a check, a roll, a number, a stat, or anything mechanical; the hero and everyone else in the scene experience this as it naturally occurring, not as a game system at work. This takes priority over GAME MASTER RULE 4 for this one action only — its outcome is no longer undecided.`
+            : '';
         const equippedEntries = Object.values(equipment).filter(Boolean);
         const equippedWithRarity = equippedEntries.map(name => {
             const rarity = findItemRarity(name, itemRarities);
@@ -23589,7 +23799,7 @@ ${JSON.stringify(state)}${partySection}` };
             ? `\n${openingPartyRuleNum}. OPENING SCENE STARTING COMPANIONS: The hero begins this story already traveling with exactly ${startingPartySize} established companion${startingPartySize > 1 ? 's' : ''} — not strangers being met for the first time, but people who have already been journeying with the hero for some time. Introduce all ${startingPartySize} of them by name in this opening scene, each with a distinct personality and real presence (their own dialogue, initiative, a visible role as the scene opens), and let the existing bond between them and the hero come through naturally — an easy familiarity, an established rapport, shared history alluded to in passing — rather than writing a first meeting. Do not introduce more or fewer than exactly ${startingPartySize} such companions.`
             : '';
         const reactionRuleNum = ++ruleNum;
-        const reactionRule = `\n${reactionRuleNum}. NPC ITEM REACTIONS: The first time a character meets the hero this scene, or right after the context above notes the hero just equipped a new item, roll independently for roughly a 60% chance that one character present reacts — vividly, emotionally, in their own voice and personality, not as a throwaway line — to ONE item drawn from "HERO'S CURRENTLY EQUIPPED GEAR WITH KNOWN RARITY TIER" above. Only react to an item whose rarity tier is actually given there; if none of the hero's gear has a known tier, skip this reaction entirely. The reaction is a comment or exclamation, never an interrogation — a character may marvel, envy, mock, or admire out loud, but must NEVER ask the hero a question about the item, including where, how, or from whom they got it; if curiosity is called for, let it land as a remark rather than a question aimed at the hero. Calibrate the reaction's tone strictly to that item's tier (these are examples of the tone to hit, not lines to repeat verbatim — write a fresh reaction fitting the character each time):
+        const reactionRule = `\n${reactionRuleNum}. NPC ITEM REACTIONS: The first time a character meets the hero this scene, or right after the context above notes the hero just equipped a new item, roll independently for roughly a 60% chance that one character present reacts — vividly, emotionally, in their own voice and personality, not as a throwaway line — to ONE item drawn from "HERO'S CURRENTLY EQUIPPED GEAR WITH KNOWN RARITY TIER" above. Only react to an item whose rarity tier is actually given there; if none of the hero's gear has a known tier, skip this reaction entirely. Skip it as well whenever the character's first response to the hero is fear or hostility — someone startled, ambushed, threatened, fleeing, or drawing a weapon to fight the hero reacts to the THREAT the hero poses, not to admiring their gear; a frightened or hostile character's fight-or-flight response always comes first and is never interrupted, delayed, or undercut by an item reaction. The reaction is a comment or exclamation, never an interrogation — a character may marvel, envy, mock, or admire out loud, but must NEVER ask the hero a question about the item, including where, how, or from whom they got it; if curiosity is called for, let it land as a remark rather than a question aimed at the hero. Calibrate the reaction's tone strictly to that item's tier (these are examples of the tone to hit, not lines to repeat verbatim — write a fresh reaction fitting the character each time):
    - junk: dismissive and mocking, e.g. "wow, you really are broke, huh, haha"
    - common: neutral, mildly approving, e.g. "not the worst choice, it'll do"
    - uncommon: warm approval of a solid, familiar item, e.g. "ah, good old [item] — now that's solid"
@@ -23638,6 +23848,7 @@ IMMERSION RULES — STRICTLY MANDATORY, NO EXCEPTIONS:
 - Address the hero the way another character or the voice of this world would — by name, as a participant inside the events. Never use the word "player" within the narrative, and never address them as an outside chat user.
 - Never break the fourth wall: no comments about rules, mechanics, instructions, or limitations. If a hero's line is strange, unexpected, or unclear, react FROM INSIDE the world (the character is surprised, confused, asks again, the world resists) — never like an assistant explaining a problem to a user.
 - Never, under any circumstances, pause or stop the story to step outside the fiction and address the real person playing — e.g. asking whether they personally are doing okay, or any other direct, out-of-character check-in. Even for heavy or dark material, stay entirely in-world: let characters and the narrative itself carry the reaction, never a message from you to the player.
+- COMBAT AND AMBUSH HANDOFF: the moment a scene turns into a hostile physical fight involving the hero — an enemy attacking the hero, the hero attacking someone who will fight back, or the hero striking at an unaware target from ambush — stop the prose at that exact threshold: the blade coming up, the charge beginning, the hero closing the last step to strike. Never go one step further, under any circumstances. Do not describe a blow landing, damage, an injury, a death, a surrender, a victory, a defeat, or any other combat outcome — resolving a fight belongs entirely to the game's own combat system, never to this narration, no matter how minor the fight seems, how certain the outcome feels, or how anonymous the opponent is (an unnamed creature's death is never something this narration resolves either). The sole exception is when the context above already includes a "[COMBAT RESULT]" line for this encounter — that means the fight has already been mechanically resolved this turn, and continuing into its aftermath is expected, not forbidden.
 
 CHARACTER PERSONALITIES:
 Give every character in the scene a distinct, consistent personality that shapes how they act and speak — a soldier might be stern, blunt, and unyielding; a thief might be cunning and duplicitous; a merchant might be shrewd and transactional. Characters are not automatically friendly, helpful, or well-disposed toward the hero — they help, flatter, or cooperate only when their personality and the situation genuinely call for it, never as a default courtesy. Characters do not hand over items, favors, or help just because the hero asked or it would be convenient — that has to be earned within the fiction (a fair trade, trust built up over the story, real persuasion, an act that impresses or intimidates them). An entitled, rude, or demanding hero is more likely to be turned away, mocked, or told where to go than indulged. If the hero behaves badly toward a character, or if a character's nature calls for it, that character can react harshly — cursing at the hero, refusing to cooperate, or even attacking — rather than passively tolerating it. A character with the right disposition and opportunity may act on the hero's belongings too: an unscrupulous one might try to steal from the hero given the chance, while one who cares about the hero might use a medical item from the hero's own inventory to help them if the hero is badly hurt and has one. Characters are not emotionless functionaries: if the hero says or reveals something genuinely shocking, dangerous, or important (a death, a betrayal, a threat, a secret), whoever hears it reacts like a real person would in that moment — stunned silence, a sharp intake of breath, disbelief, fear, anger, a shaken voice, a flurry of urgent questions — before the scene moves on, rather than absorbing it calmly and continuing the conversation as if nothing happened.
@@ -23651,7 +23862,7 @@ GAME MASTER RULES:
 6. Introduce complications, conflicts, and unexpected turns; don't let the plot stall.
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
 8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands.
-9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.${itemRule}${questRule}${rewardHaggleRule}${travelRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${partyRule}
+9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.${itemRule}${questRule}${rewardHaggleRule}${travelRule}${checkRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${partyRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own — just the scene itself.`;
     }
@@ -23787,12 +23998,13 @@ Both arrays are usually empty — only include an entry when the scene clearly c
 If no such offer is present: "travelOffer": null. If present: "travelOffer": {"id": "short_id", "label": "destination name as it appears in the scene", "kind": "settlement"}. "label": if this matches a known location above, reuse that exact name; otherwise use the name as the scene itself calls it. "kind" is exactly one of "settlement", "wilderness", "dungeon", "landmark". "id": short, lowercase, ascii, unique slug.
 
 === EVENT: COMBAT ===
-"combat" detects whether the scene puts the hero into a hostile fight calling for turn-based combat right now — an enemy attacking the hero, or the hero clearly initiating violence against someone who will fight back — as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile enemies act together, represent them as a single combined opponent (e.g. "the bandits") with a tier reflecting the group as a whole — this system fights one named opponent at a time. If the scene shows a fight ending, being narrowly avoided, or resolved entirely in prose already, return {"combat": false} — this is only for a fight that is starting and still needs to be played out.
+"combat" detects whether the scene puts the hero into a hostile physical fight right now — an enemy attacking the hero, the hero clearly initiating violence against someone who will fight back, or the hero striking at an unaware target from ambush — calling for turn-based combat, as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile enemies act together, represent them as a single combined opponent (e.g. "the bandits") with a tier reflecting the group as a whole — this system fights one named opponent at a time. By design, the narrative is never supposed to carry the hero's own fight through to a blow, an injury, or any other outcome — it always cuts away right as the violence begins — so a fight the hero is actually part of should essentially never read as "resolved entirely in prose already." Only return {"combat": false} for violence that does NOT involve the hero as a combatant (a fight between other people that the hero merely witnesses or hears about from a distance) or when the context above already contains a "[COMBAT RESULT]" line for this exact encounter (meaning the game's own combat system already resolved it this turn, and the scene you're reading is its aftermath, not a fresh fight).
 If no fight is starting: "combat": {"combat": false}.
-If a fight is starting: "combat": {"combat": true, "enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}.
+If a fight is starting: "combat": {"combat": true, "enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"], "ambush": false}.
 "enemyName" must be in ${narrativeLanguage}, matching how the scene refers to them. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of this opponent's overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate this honestly against what the story has actually established about the opponent — do not soften it toward something the hero is likely to beat.
-"bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.${itemOffersSection}
+"bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
+"ambush" is true only when the hero is the one attacking, the target has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, and mutual/open hostility of any kind.${itemOffersSection}
 
 === SUGGESTIONS ===
 "suggestions" always has exactly 3 short, concrete, varied possible next actions the hero could take next — each no more than a short sentence. Always exactly 3, no matter what: even if the scene ends on an offered item, a question, or any other pause awaiting the player's choice — that pending choice (if any) is handled through the event fields above, so your 3 suggestions should be things the hero could do next regardless of how that choice resolves (talk to someone present, examine something, move on, ask a question), not a restatement of the choice itself.
@@ -23822,7 +24034,7 @@ Rules:
 - "healthAfter" is an integer from 1 to 1000, using the same calibration as the hero's health elsewhere: someone freshly brought back from death is usually weak, generally well below the ordinary baseline of 50, unless the resurrection is especially potent.`;
     }
     // ---- NARRATIVE GENERATION ----
-    async function generateNarrative(historyMessages, currentState) {
+    async function generateNarrative(historyMessages, currentState, actionCheck) {
         // Always covers at least RECENT_TURN_WINDOW, but never less than
         // "everything since the last narrativeSummary fold-in" — see
         // SUMMARY_BATCH_SIZE: updateNarrativeSummary only runs every few turns
@@ -23851,7 +24063,7 @@ Rules:
         pendingTravelEventRef.current = [];
         const justPartyEvents = pendingPartyEventsRef.current;
         pendingPartyEventsRef.current = [];
-        const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents);
+        const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck);
         setStreamingText('');
         try {
             const text = await callGeminiStreaming(system, apiMessages, setStreamingText);
@@ -24474,7 +24686,12 @@ ${chunkText}`;
                 totalHp: rolled.totalHp,
                 power: rolled.power,
                 precision: rolled.precision,
-                bodyParts: normalizeEnemyBodyParts(combatRaw.bodyParts)
+                bodyParts: normalizeEnemyBodyParts(combatRaw.bodyParts),
+                // True only when the model flagged this as the hero striking an
+                // unaware target from ambush (see the "combat" field's schema notes)
+                // — drives whether the turn shows StealthKillOffer instead of the
+                // plain Fight button (see combatPending's render site).
+                ambush: combatRaw.ambush === true
             };
         }
         // --- item offers (was generateItemOffers) ---
@@ -24858,6 +25075,72 @@ Rules:
             throw e;
         }
     }
+    // A hidden classification call that runs BEFORE the narrative below, on
+    // every ordinary turn (not the opening turn, and not while a combat
+    // encounter is still unresolved — see the guard in callGameMaster; combat
+    // already has its own resolution, see computeHitChance/computeWeaponDamage
+    // above). It exists to answer exactly one question the narrative call must
+    // never be left to answer alone: does the hero's JUST-SUBMITTED action call
+    // for a real, uncertain test of their ability — and if so, how hard is it.
+    // The model only ever gives a qualitative verdict, the same philosophy as
+    // ENEMY_TIERS/rollActionCheck (see there for the full rationale); the
+    // actual roll happens locally afterward, completely outside this call, and
+    // its fixed result is what buildNarrativeSystemPrompt's checkRule then
+    // hands the narrator to write around.
+    function buildActionCheckSystemPrompt(state, actionText, precedingNarrator) {
+        const { narrativeLanguage } = sharedContext(state);
+        const sceneContext = precedingNarrator && precedingNarrator.text
+            ? `\n\nTHE SCENE THIS ACTION IS TAKING PLACE IN, right before it:\n${precedingNarrator.text}`
+            : '';
+        return `You are the hidden rules referee for a text role-playing game, working alongside (but never visible to) its narrator. You are not writing prose — you make one small, purely mechanical judgment call about a single action. Nothing you write here is ever shown to a player, in ${narrativeLanguage} or otherwise.
+
+HERO'S STATS (1-100, 10 is an ordinary untrained person; see below for which stat a given action tests): strength ${state.stats.strength}, agility ${state.stats.agility}, intelligence ${state.stats.intelligence}.${sceneContext}
+
+THE HERO'S ACTION THIS TURN: "${actionText}"
+
+Decide whether this specific action is the kind of thing a tabletop game master would ever call for a check on. Call for one ONLY when the outcome is genuinely uncertain AND failing would be meaningfully interesting (a real cost or complication) rather than just halting the story — the sort of moment where an audience watching wouldn't already know how it turns out. Do NOT call for one for: anything ordinary, safe, or all but certain to work (walking, looking around, talking normally, eating, drinking, simple everyday tasks); anything the scene or story has already effectively decided the outcome of; combat, since fighting has its own separate system; or purely social/emotional beats that don't hinge on a physical or mental capability as such. When in doubt, don't call for a check — most actions in a normal scene should not get one.
+
+If a check IS warranted, pick exactly one stat it tests:
+- strength: physical force, breaking, lifting, overpowering, enduring
+- agility: stealth, dexterity, reflexes, balance, evading, fine manual skill like lockpicking or trap disarming
+- intelligence: knowledge, reasoning, magic, perception, analysis, and — since this hero has no separate social stat — any effort that leans on wit, insight, or people-reading rather than raw force or dexterity
+
+And pick exactly one difficulty label, judging how hard THIS attempt is for someone attempting this specific action in this specific scene — not the hero's own odds of pulling it off, that part isn't your job:
+- trivial: something almost anyone could manage, even untrained, barring terrible luck
+- easy: a minor challenge; unreliable only for someone genuinely unskilled
+- moderate: a real test; a person of ordinary ability succeeds about as often as not
+- hard: demands real proficiency; an ordinary person will likely struggle
+- extreme: pushes the limits of what's humanly possible; only a true expert stands a real chance
+
+Respond with ONLY valid JSON and nothing else (no markdown, no text before or after):
+If no check is warranted: {"check": false}
+If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
+    }
+    async function generateActionCheck(actionText, currentState, precedingNarrator) {
+        if (!actionText || !actionText.trim())
+            return null;
+        try {
+            const raw = await withRateLimitRetry(() => callGemini(buildActionCheckSystemPrompt(currentState, actionText, precedingNarrator), [{ role: 'user', content: 'Judge this action now, following the rules exactly.' }]));
+            const parsed = extractJsonObject(raw);
+            if (!parsed || !parsed.check)
+                return null;
+            const stat = ['strength', 'agility', 'intelligence'].includes(parsed.stat) ? parsed.stat : null;
+            const difficultyKey = ACTION_CHECK_DIFFICULTY_TIERS[parsed.difficulty] ? parsed.difficulty : null;
+            if (!stat || !difficultyKey)
+                return null;
+            return { stat, ...rollActionCheck(currentState.stats[stat], difficultyKey) };
+        }
+        catch (e) {
+            // Fails silently and simply skips the check for this turn, exactly like
+            // generateSecrets/generateStateAndEvents fail back to their own empty
+            // defaults below — this call is a hidden enhancement layered on top of
+            // the narrative, never a blocker for it. When it comes back null, the
+            // narrator simply falls back to GAME MASTER RULE 4 alone, same as
+            // before this system existed.
+            console.error('[Grimoire] generateActionCheck failed, no check applied this turn:', e);
+            return null;
+        }
+    }
     // If the combined extraction call fails outright (unparsable JSON, a
     // dropped request even after withRateLimitRetry), we fall back to leaving
     // state as it was — EXCEPT for a confirmed travel offer. The player
@@ -24896,10 +25179,13 @@ Rules:
             questOffers: [], rewardOffers: [], travelOffer: null, combatEncounter: null, itemOffers: [], startingPartyMembers: []
         };
     };
-    // Only two calls per turn now: the narrative itself, then secrets and the
-    // combined state/events extraction in parallel (both only need the
-    // narrative text, not each other) — see generateStateAndEvents for what
-    // used to be five separate requests here.
+    // Three calls on an ordinary turn now: an optional action-check
+    // classification first (see generateActionCheck — skipped on the opening
+    // turn and while combat is unresolved, so plenty of turns still only make
+    // two), then the narrative itself, then secrets and the combined
+    // state/events extraction in parallel (both only need the narrative text,
+    // not each other) — see generateStateAndEvents for what used to be five
+    // separate requests here.
     async function callGameMaster(historyMessages, currentState, isOpeningTurn) {
         usageAccumulatorRef.current = { output: 0 };
         // buildTurns(historyMessages).length is how many complete turns already
@@ -24909,8 +25195,19 @@ Rules:
         // this identical number — which is what lets undoKindnessCooldowns below
         // reverse a kindness cooldown precisely, rather than guessing at it.
         const turnIndex = buildTurns(historyMessages).length + 1;
-        const narrative = await generateNarrative(historyMessages, currentState);
+        // Computed earlier than before (generateActionCheck wants it for scene
+        // context, and the combat-pending guard below needs it too) — its own
+        // value never depended on the narrative that's about to be generated, so
+        // moving it up changes nothing about what it finds.
         const precedingNarrator = [...historyMessages].reverse().find(m => m.role === 'narrator') || null;
+        // Skipped on the opening turn (nothing has been attempted yet) and while
+        // a combat encounter is still unresolved (same condition the render
+        // layer uses for combatPending) — combat already has its own resolution
+        // and must never be double-rolled by this separate system.
+        const combatStillPending = !!(precedingNarrator && precedingNarrator.combatEncounter && !precedingNarrator.combatResolved);
+        const lastPlayerMessage = (isOpeningTurn || combatStillPending) ? null : [...historyMessages].reverse().find(m => m.role === 'player');
+        const actionCheck = lastPlayerMessage ? await generateActionCheck(lastPlayerMessage.text, currentState, precedingNarrator) : null;
+        const narrative = await generateNarrative(historyMessages, currentState, actionCheck);
         const [secrets, combined] = await Promise.all([
             withRateLimitRetry(() => generateSecrets(narrative, currentState)).catch(e => {
                 console.error('[Grimoire] generateSecrets failed, secrets skipped this turn:', e);
@@ -25305,6 +25602,18 @@ Rules:
     }
     function equipItemInSlot(slotKey, itemName) {
         const item = gameState.inventory.find(it => it.name === itemName);
+        // A one-handed weapon already worn in the other hand can't fill this
+        // hand too unless a second copy actually exists in the bag — otherwise
+        // a single physical item would double-count its damage in both slots
+        // (see bug report: dual-wielding one copy of a one-handed weapon).
+        if (item && (slotKey === 'weaponRight' || slotKey === 'weaponLeft')) {
+            const otherHand = slotKey === 'weaponRight' ? 'weaponLeft' : 'weaponRight';
+            if (equipment[otherHand] === itemName) {
+                const ownedCount = gameState.inventory.filter(it => it.name === itemName).length;
+                if (ownedCount < 2)
+                    return;
+            }
+        }
         const next = { ...equipment, [slotKey]: itemName };
         // A two-handed weapon takes over both hands, whichever side it's put
         // in — clear the OTHER weapon slot so it isn't shown as equipped
@@ -25621,6 +25930,16 @@ Rules:
         const memberInventory = partyInventories[key] || [];
         const item = memberInventory.find(it => it.name === itemName);
         const memberEquipment = partyEquipment[key] || EMPTY_EQUIPMENT;
+        // Same one-copy-can't-fill-both-hands rule as the hero's own
+        // equipItemInSlot — see the bug report there for why.
+        if (item && (slotKey === 'weaponRight' || slotKey === 'weaponLeft')) {
+            const otherHand = slotKey === 'weaponRight' ? 'weaponLeft' : 'weaponRight';
+            if (memberEquipment[otherHand] === itemName) {
+                const ownedCount = memberInventory.filter(it => it.name === itemName).length;
+                if (ownedCount < 2)
+                    return;
+            }
+        }
         const nextMemberEquipment = { ...memberEquipment, [slotKey]: itemName };
         // Same two-handed rule as the hero's own equipItemInSlot: a two-handed
         // weapon takes over both hands, whichever side it's equipped into —
@@ -25668,6 +25987,68 @@ Rules:
             result: null,
             loot: null
         });
+        setCombatModalOpen(true);
+    }
+    // Alternative entry into combat when the encounter is flagged "ambush"
+    // (see the combat-encounter schema) and the player confirmed a stealth-
+    // kill attempt (see StealthKillOffer) rather than declining straight to an
+    // ordinary fight. Rolls the outcome against the hero's own agility (see
+    // rollStealthKillOutcome), then opens the SAME CombatModal startCombat
+    // uses, in one of three shapes:
+    //  - kill: every enemy part zeroed out and result already 'victory' — the
+    //    modal opens straight on the victory/loot screen, no fighting needed.
+    //  - damage: enemy opens already wounded on one random part, ordinary
+    //    turn-based combat follows from there (player still goes first).
+    //  - miss: enemy opens untouched, identical to a declined/ordinary fight
+    //    except for the log line noting the failed attempt.
+    // Player parts are always built fresh/undamaged — a stealth attempt never
+    // exposes the hero to a counter-hit, successful or not. Reusing startCombat's
+    // exact field shape (down to sourceNarratorIndex) means endCombatAndClose,
+    // the loot-generation effect, and quest-failure-on-kill all work completely
+    // unchanged regardless of which entry point opened this fight.
+    function attemptStealthKill(narratorIndex) {
+        const narratorMsg = messages[narratorIndex];
+        const encounter = narratorMsg && narratorMsg.combatEncounter;
+        if (!encounter)
+            return;
+        const enemyBodyParts = normalizeEnemyBodyParts(encounter.bodyParts);
+        const freshEnemyParts = buildCombatantParts(encounter.totalHp, enemyBodyParts);
+        const base = {
+            sourceNarratorIndex: narratorIndex,
+            enemyName: encounter.enemyName,
+            enemyDescription: encounter.enemyDescription,
+            enemyWeapon: encounter.weaponDescription || t('combatUnarmedEnemyLabel'),
+            enemyPower: encounter.power,
+            enemyPrecision: encounter.precision,
+            enemyTier: encounter.tier || 'average',
+            enemyTotalHp: encounter.totalHp,
+            playerParts: buildCombatantParts(gameState.health),
+            turn: 'player',
+            pendingEnemyAttack: null,
+            loot: null
+        };
+        const outcome = rollStealthKillOutcome(gameState.stats.agility);
+        if (outcome === 'kill') {
+            const deadParts = {};
+            for (const key of Object.keys(freshEnemyParts))
+                deadParts[key] = { ...freshEnemyParts[key], hp: 0, disabled: true };
+            setCombat({ ...base, enemyParts: deadParts, result: 'victory', log: [{ text: t('stealthKillSuccessLogText'), kind: 'vital' }] });
+        }
+        else if (outcome === 'damage') {
+            const weaponInfo = getPlayerWeaponInfo();
+            const rawDmg = computeWeaponDamage(weaponInfo.damage, gameState.stats.strength);
+            const dmg = Math.max(1, Math.round(rawDmg * COMBAT_TUNING.stealthDamageFraction));
+            const targetKey = pickEnemyTargetPart(freshEnemyParts);
+            const targetState = freshEnemyParts[targetKey];
+            // Never lands the kill here — an outright kill is only ever the 'kill'
+            // branch above, so this floors at 1 HP even on a big roll.
+            const newHp = Math.max(1, targetState.hp - dmg);
+            const woundedParts = { ...freshEnemyParts, [targetKey]: { ...targetState, hp: newHp } };
+            setCombat({ ...base, enemyParts: woundedParts, result: null, log: [{ text: t('stealthKillDamageLogText'), kind: 'hit' }] });
+        }
+        else {
+            setCombat({ ...base, enemyParts: freshEnemyParts, result: null, log: [{ text: t('stealthKillMissLogText'), kind: 'miss' }] });
+        }
         setCombatModalOpen(true);
     }
     // Fires exactly once per fight, the moment combat.result flips to
@@ -26968,9 +27349,9 @@ Rules:
                                     React.createElement("button", { onClick: saveEditingNarrator, disabled: !narratorEditDraft.trim(), className: "btn btn-primary", type: "button" }, t('saveButton'))))) : (React.createElement("div", { className: "narrator-text-row" },
                                 React.createElement("p", { className: "narrative-text" }, currentTurn.narrator.text),
                                 !anyEditActive && (React.createElement("button", { onClick: () => startEditingNarrator(currentTurn.narratorIndex, currentTurn.narrator.text), className: "edit-btn narrator-edit-btn", "aria-label": t('editAria'), type: "button" }, "\u270E")))),
-                            isLatestTurn && !anyEditActive && combatPending && !combatModalOpen && (React.createElement("button", { onClick: () => startCombat(currentTurn.narratorIndex), className: "btn btn-primary combat-trigger-btn", type: "button" },
+                            isLatestTurn && !anyEditActive && combatPending && !combatModalOpen && (currentTurn.narrator.combatEncounter.ambush ? (React.createElement(StealthKillOffer, { enemyName: currentTurn.narrator.combatEncounter.enemyName, interactive: isLatestTurn, onAttempt: () => attemptStealthKill(currentTurn.narratorIndex), onDecline: () => startCombat(currentTurn.narratorIndex), t: t })) : (React.createElement("button", { onClick: () => startCombat(currentTurn.narratorIndex), className: "btn btn-primary combat-trigger-btn", type: "button" },
                                 "\u2694 ",
-                                t('combatButtonLabel'))),
+                                t('combatButtonLabel')))),
                             itemInteractionEnabled && (React.createElement(ItemOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, currency: gameState.currency, onToggle: (groupId, itemId, mode, val) => toggleItemSelection(currentTurn.narratorIndex, groupId, itemId, mode, val), t: t })),
                             React.createElement(QuestOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggleQuest: (offerId, val) => toggleQuestOffer(currentTurn.narratorIndex, offerId, val), onToggleAdvance: (offerId, val) => toggleAdvanceOffer(currentTurn.narratorIndex, offerId, val), onToggleReward: (offerId, val) => toggleRewardOffer(currentTurn.narratorIndex, offerId, val), onHaggle: (offerId) => haggleQuestOffer(currentTurn.narratorIndex, offerId), t: t }),
                             React.createElement(TravelOffer, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggle: val => toggleTravelOffer(currentTurn.narratorIndex, val), t: t }),
@@ -27017,11 +27398,17 @@ Rules:
                 React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
-        equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, itemWeights: itemWeights, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
+        equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, itemWeights: itemWeights, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onOpenItemDetail: setItemDetailIndex, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
         combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, defenseAvailability: computeDefenseAvailability(equipment, gameState.inventory, itemWeights, itemRarities), onAttack: resolvePlayerAttack, onDefend: resolveDefense, onFlee: resolveFleeAttempt, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
-        inventoryModalOpen && (React.createElement(InventoryModal, { gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onUse: useConsumable, onEquip: equipItemFromDetail, onUnequip: unequipItemFromDetail, onDrop: (index) => setDropConfirmIndex(index), onClose: () => setInventoryModalOpen(false), t: t })),
-        itemDetailIndex !== null && (React.createElement(ItemDetailModal, { itemIndex: itemDetailIndex, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, onDrop: () => { setDropConfirmIndex(itemDetailIndex); setItemDetailIndex(null); }, onUse: () => useConsumable(itemDetailIndex), onEquip: () => equipItemFromDetail(itemDetailIndex), onUnequip: () => unequipItemFromDetail(itemDetailIndex), onClose: () => setItemDetailIndex(null), t: t })),
+        inventoryModalOpen && (React.createElement(InventoryModal, { gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: setItemDetailIndex, onClose: () => setInventoryModalOpen(false), t: t })),
+        itemDetailIndex !== null && (React.createElement(ItemDetailModal, { itemIndex: itemDetailIndex, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, onDrop: () => { setDropConfirmIndex(itemDetailIndex); setItemDetailIndex(null); }, onUse: () => useConsumable(itemDetailIndex), onEquip: () => equipItemFromDetail(itemDetailIndex), onUnequip: () => unequipItemFromDetail(itemDetailIndex), 
+            // Swaps the equipped item but keeps the detail window open on it
+            // (see bug report: it used to close the whole modal on replace) —
+            // equipItemInSlot only touches the `equipment` map, never the
+            // inventory array, so itemDetailIndex still points at the exact
+            // same item and the card just re-renders to reflect the change.
+            onReplace: (slotKey, itemName) => equipItemInSlot(slotKey, itemName), onClose: () => setItemDetailIndex(null), t: t })),
         dropConfirmIndex !== null && (React.createElement(DropConfirmModal, { itemName: (gameState.inventory[dropConfirmIndex] || {}).name || '', onConfirm: () => dropItem(dropConfirmIndex), onCancel: () => setDropConfirmIndex(null), t: t })),
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
@@ -27122,8 +27509,14 @@ const APP_STYLES = `
   .item-type-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--stone-500); margin: -0.75rem 0 1rem; }
   .item-quest-tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--stone-600); margin: -0.9rem 0 1rem; }
   .item-quest-tag-active { color: var(--amber-400); }
-  .modal-actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; }
-  .modal-actions .btn { flex: 1; }
+  .modal-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.25rem; }
+  .modal-actions .btn { flex: 1 1 auto; }
+  /* This modal can show up to 4 buttons at once (Close/Use-or-Equip/Unequip/
+     Replace/Drop) — on a narrow phone width they don't all fit on one line
+     and the last one was overflowing off the right edge of the card (see
+     bug report). Force an even 2-per-row grid instead of letting them
+     shrink past readability or spill out. */
+  .item-detail-modal-actions .btn { flex: 1 1 calc(50% - 0.25rem); min-width: 0; }
   .secrets-modal-text { font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; color: #cbbfe0; line-height: 1.65; white-space: pre-wrap; margin: 0; }
   .provider-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
   .provider-btn { flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; border-radius: 3px; padding: 0.6rem 0.4rem; border: 1px solid var(--stone-700); color: var(--stone-400); background: transparent; cursor: pointer; }
@@ -27248,6 +27641,20 @@ const APP_STYLES = `
   .gift-confirm-btn { width: 3rem; height: 3rem; border-radius: 6px; border: 1px solid var(--stone-700); cursor: pointer; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; }
   .gift-confirm-btn:hover { opacity: 0.85; }
   .combat-trigger-btn { margin-top: 0.85rem; padding: 0.4rem 0.9rem; font-size: 0.9rem; border-radius: 999px; }
+  .stealth-kill-offer { margin-top: 0.85rem; padding: 0.75rem; border: 1px solid var(--red-700); border-radius: 4px; background: var(--stone-900); display: flex; flex-direction: column; gap: 0.4rem; }
+  .stealth-kill-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+  .stealth-kill-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; color: var(--red-400); }
+  .stealth-kill-choice { display: flex; gap: 0.35rem; }
+  .stealth-kill-btn { width: 2rem; height: 2rem; border-radius: 4px; border: 1px solid var(--red-700); background: var(--stone-950); color: var(--red-400); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+  .stealth-kill-btn:hover:not(:disabled) { border-color: var(--red-400); }
+  .stealth-kill-active-take { background: var(--red-600); border-color: var(--red-600); color: var(--amber-50); }
+  .stealth-kill-active-decline { background: var(--stone-700); border-color: var(--stone-500); color: var(--amber-50); }
+  .stealth-kill-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+  .stealth-kill-confirm-btn { align-self: flex-end; padding: 0.3rem 0.9rem; border-radius: 4px; border: 1px solid var(--red-700); background: var(--red-700); color: var(--amber-50); font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; cursor: pointer; }
+  .stealth-kill-confirm-btn:hover:not(:disabled) { border-color: var(--red-400); background: var(--red-600); }
+  .stealth-kill-confirm-btn:disabled { cursor: not-allowed; opacity: 0.45; }
+  .stealth-kill-resolving { animation: grim-stealth-pulse 0.65s ease-in-out; }
+  @keyframes grim-stealth-pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); } 60% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); } }
   .combat-card { max-width: 34rem; }
   .combat-arena { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
   .combat-panel { flex: 1; min-width: 13rem; }
@@ -27409,10 +27816,10 @@ const APP_STYLES = `
   .inventory-modal-grid::-webkit-scrollbar-thumb:hover { background: var(--amber-600); }
   .inventory-cell {
     position: relative; aspect-ratio: 1 / 1; width: 100%; background: var(--stone-900);
-    border: 2px solid var(--stone-700); border-radius: 6px; display: flex; align-items: center;
+    border: 2px solid var(--amber-500); border-radius: 6px; display: flex; align-items: center;
     justify-content: center; cursor: pointer; padding: 0.3rem;
   }
-  .inventory-cell:hover { border-color: var(--amber-600); }
+  .inventory-cell:hover { border-color: var(--amber-400); }
   .inventory-cell-selected { border-color: var(--amber-400); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35); background: var(--stone-800); }
   .inventory-cell-equipped { border-style: solid; }
   .inventory-cell-img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
@@ -27420,6 +27827,9 @@ const APP_STYLES = `
   .inventory-cell-quest-badge { position: absolute; top: -6px; left: -6px; font-size: 0.75rem; filter: drop-shadow(0 0 2px black); }
   .inventory-cell-equipped-badge { position: absolute; top: -5px; right: -5px; min-width: 1.05rem; height: 1.05rem; border-radius: 999px; background: var(--emerald-600); color: var(--stone-950); font-size: 0.62rem; line-height: 1.05rem; text-align: center; font-weight: 700; }
   .inventory-cell-count-badge { position: absolute; bottom: -4px; right: -4px; min-width: 1.15rem; height: 1.05rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-950); border: 1px solid var(--amber-600); color: var(--amber-200); font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; line-height: 1rem; text-align: center; }
+  .item-detail-icon-wrap { width: 5rem; height: 5rem; margin: 0 auto 0.7rem; background: var(--stone-900); border: 2px solid var(--amber-500); border-radius: 6px; display: flex; align-items: center; justify-content: center; padding: 0.4rem; }
+  .item-detail-icon-img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .item-detail-icon-emoji { font-size: 2.4rem; line-height: 1; }
   .inventory-modal-selected-bar { margin-top: 0.7rem; padding: 0.55rem 0.7rem; background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px; font-size: 0.85rem; min-height: 1.3rem; color: #d6d3d1; text-align: center; }
   .inventory-modal-selected-hint { color: var(--stone-600); font-size: 0.8rem; }
   .inventory-modal-actions { display: flex; gap: 0.6rem; margin-top: 0.7rem; }
@@ -27450,6 +27860,7 @@ const APP_STYLES = `
   .equipment-grid-sized { flex: 0 0 auto; }
   .equipment-stats-panel { flex: 0 0 auto; width: 100%; }
   .sheet-section.equipment-stats-section { padding-top: 0.75rem; margin-top: 0.75rem; }
+  .equipment-stats-merged .sheet-stat-row:first-of-type { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--stone-800); }
   .equipment-page-dots { display: flex; justify-content: center; gap: 0.35rem; margin: 0.6rem 0 0; }
   .equipment-page-dot { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--stone-700); }
   .equipment-page-dot-active { background: var(--amber-500); }
@@ -27548,14 +27959,14 @@ const APP_STYLES = `
   .map-empty { font-family: 'EB Garamond', serif; font-style: italic; font-size: 0.85rem; color: var(--stone-500); text-align: center; margin: 0.6rem 0 0; }
   .equipment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem 0.6rem; }
   .equip-slot-wrap { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
-  .equip-slot-btn { position: relative; width: 4rem; height: 4rem; background: var(--stone-950); border: 2px solid var(--amber-800); border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+  .equip-slot-btn { position: relative; width: 4rem; height: 4rem; background: var(--stone-900); border: 2px solid var(--stone-700); border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0.3rem; }
   .equip-slot-defense-badge { position: absolute; bottom: -5px; right: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid var(--amber-600); color: var(--amber-300); font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
   .equip-slot-damage-badge { position: absolute; bottom: -5px; right: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid var(--red-600); color: var(--red-400); font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
   .equip-slot-block-badge { position: absolute; bottom: -5px; left: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid #38bdf8; color: #38bdf8; font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
   .equip-slot-set-badge { position: absolute; top: -5px; left: -5px; min-width: 1.1rem; height: 1.1rem; padding: 0 0.2rem; border-radius: 999px; background: var(--stone-900); border: 1px solid #22d3ee; color: #22d3ee; font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; line-height: 1.1rem; text-align: center; }
-  .equip-slot-btn:hover:not(:disabled) { border-color: var(--amber-500); }
-  .equip-slot-btn-filled { border-color: var(--amber-500); background: var(--stone-900); }
-  .equip-slot-btn-empty { border-color: var(--stone-600); }
+  .equip-slot-btn:hover:not(:disabled) { border-color: var(--amber-600); }
+  .equip-slot-btn-filled { border-color: var(--amber-500); background: var(--stone-900); border-style: solid; }
+  .equip-slot-btn-empty { border-color: var(--stone-700); }
   .equip-slot-btn-disabled { border-color: var(--stone-700); background: var(--stone-950); cursor: not-allowed; opacity: 0.5; }
   .equip-slot-icon { font-size: 1.9rem; line-height: 1; }
   .equip-slot-icon-img { width: 2.6rem; height: 2.6rem; object-fit: contain; image-rendering: pixelated; filter: grayscale(1) opacity(0.55); }
@@ -27563,8 +27974,18 @@ const APP_STYLES = `
   .equip-slot-icon-shield { font-size: 2.1rem; }
   .equip-slot-icon-shield-disabled { filter: grayscale(1) opacity(0.55); }
   .equip-slot-label { font-size: 0.65rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; margin: 0.35rem 0 0; }
-  .equip-slot-item-name { font-size: 0.7rem; margin: 0.15rem 0 0; line-height: 1.3; max-width: 4.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .equip-picker { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 0.4rem; z-index: 10; background: var(--stone-900); border: 1px solid var(--amber-700); border-radius: 4px; padding: 0.4rem; min-width: 11rem; width: max-content; max-width: min(14rem, calc(100vw - 1.5rem)); box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 0.2rem; }
+  /* ItemDetailModal's "Заменить" picker isn't hanging off a small slot
+     button, it's inline content in a full-width modal card — render it as
+     a normal static block instead of the floating dropdown above, and
+     let it span the card. */
+  .item-detail-replace-picker-anchor { position: static; width: 100%; margin-top: 0.6rem; overflow: hidden; }
+  .item-detail-replace-picker-anchor .equip-picker { position: static; top: auto; left: auto; transform: none; margin-top: 0; width: 100%; max-width: none; box-shadow: none; }
+  /* Picker used to just pop in instantly — ease it open the same way
+     grim-entry/grim-fade-in bring in other content elsewhere in the app. */
+  @keyframes grim-slide-down { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .grim-slide-down { animation: grim-slide-down 0.22s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .grim-slide-down { animation: none !important; } }
   /* Centered-under-the-slot (above) clips off the left/right edge of the
      screen for the grid's outer columns (see bug report) — anchor those
      to the slot's own edge instead of centering. Middle column keeps the
