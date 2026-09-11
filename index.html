@@ -17558,7 +17558,7 @@ const TRANSLATIONS = {
         combatFledTitle: 'Побег',
         combatFledText: 'Тебе удалось вырваться из боя. Урон и потери учтены в состоянии героя.',
         lootIntroText: 'Можно осмотреть побеждённого противника и забрать часть того, что при нём было.',
-        lootLoadingText: 'Осматриваешь тело…',
+        lootLoadingText: 'осмотр трофеев',
         lootEmptyText: 'При нём не нашлось ничего стоящего.',
         lootJunkTag: '[мусор]',
         lootContinueButton: 'Забрать и продолжить',
@@ -17612,6 +17612,17 @@ const TRANSLATIONS = {
         giftCurrencyMaxButton: 'Всё',
         giftCurrencyReputationHint: 'Отношение улучшится тем сильнее, чем бо́льшую долю своих денег ты отдашь.',
         giftConfirmAria: 'Подарить',
+        // -- Trade with NPC --
+        tradeItemLink: 'Торговать',
+        tradeModalTitle: 'Торговля',
+        tradeYouLabel: 'Ты',
+        tradeNpcEmptyText: 'У него нечего купить прямо сейчас.',
+        tradeHeroEmptyText: 'Тебе нечего продать.',
+        tradeNotForSale: 'не продаётся',
+        tradeBuyAria: 'Купить',
+        tradeSellAria: 'Продать',
+        tradeNotEnoughHeroCurrency: 'Не хватает денег',
+        tradeNotEnoughNpcCurrency: 'У него нет столько денег',
         // -- Group / party --
         groupMenuLabel: '🤝 Группа',
         groupModalTitle: 'Группа',
@@ -17963,7 +17974,7 @@ const TRANSLATIONS = {
         combatFledTitle: 'Escape',
         combatFledText: "You managed to break away from the fight. Damage and losses are reflected in the hero's condition.",
         lootIntroText: "You can search the defeated enemy and take some of what they were carrying.",
-        lootLoadingText: 'Searching the body…',
+        lootLoadingText: 'examining the spoils',
         lootEmptyText: 'There was nothing worth taking on them.',
         lootJunkTag: '[junk]',
         lootContinueButton: 'Take and continue',
@@ -18017,6 +18028,17 @@ const TRANSLATIONS = {
         giftCurrencyMaxButton: 'All',
         giftCurrencyReputationHint: 'Their opinion will improve more, the larger a share of your money you give away.',
         giftConfirmAria: 'Gift',
+        // -- Trade with NPC --
+        tradeItemLink: 'Trade',
+        tradeModalTitle: 'Trade',
+        tradeYouLabel: 'You',
+        tradeNpcEmptyText: 'Nothing here worth buying right now.',
+        tradeHeroEmptyText: 'You have nothing to sell.',
+        tradeNotForSale: 'not for sale',
+        tradeBuyAria: 'Buy',
+        tradeSellAria: 'Sell',
+        tradeNotEnoughHeroCurrency: 'Not enough money',
+        tradeNotEnoughNpcCurrency: "They don't have enough money",
         // -- Group / party --
         groupMenuLabel: '🤝 Group',
         groupModalTitle: 'Group',
@@ -18983,6 +19005,111 @@ function findItemRarity(itemName, itemRarities) {
     }
     return null;
 }
+// ---- TRADING WITH NPCS ----
+// Foundation pieces the trade window (CharacterSheet's per-NPC "Trade" link
+// + TradeModal, see App()) needs and nothing else in the file provides yet:
+// a coin value per item, a way to tell an ordinary NPC from a dedicated
+// merchant (and what they specialize in) from nothing but their freeform
+// role text, and a starting purse for whoever the hero is trading with.
+// Deliberately simple for a first pass — no per-item price roll/cache the
+// way rarity/weight get one, just a flat number per tier — easy to retune.
+const BASE_VALUE_BY_RARITY = { junk: 2, common: 6, uncommon: 16, rare: 40, unique: 90, epic: 180, mythic: 350 };
+function computeItemValue(itemName, itemRarities) {
+    const rarity = findItemRarity(itemName, itemRarities) || 'common';
+    return BASE_VALUE_BY_RARITY[rarity] || BASE_VALUE_BY_RARITY.common;
+}
+// Same best-effort keyword-matching approach as NARRATIVE_ITEM_SLOT_KEYWORDS
+// above, just guessing a PROFESSION from freeform role text instead of an
+// item type from a name. A role matching nothing here (guard, farmer,
+// beggar…) isn't a dedicated merchant at all — see inferNpcMerchantProfile,
+// which is also what tells an ordinary NPC from a merchant in the first
+// place. specialization is one of the item slot values, or null for a
+// confirmed trader with no particular specialty — deliberately the
+// shortest keyword list of the bunch, since a specialist should be the
+// common case and a mixed-goods generalist the rarer one.
+const NPC_MERCHANT_ROLE_KEYWORDS = [
+    ['weapon', [
+            'кузнец', 'оружейник', 'клинков',
+            'blacksmith', 'weaponsmith', 'swordsmith', 'gunsmith', 'armsdealer', 'fletcher'
+        ]],
+    ['armor', [
+            'латник', 'доспешник', 'бронник',
+            'armorer', 'armourer'
+        ]],
+    ['consumable', [
+            'зельевар', 'алхимик', 'аптекар', 'травник', 'знахар',
+            'alchemist', 'apothecary', 'herbalist'
+        ]],
+    ['amulet', [
+            'ювелир', 'златокузнец',
+            'jeweler', 'jeweller', 'goldsmith'
+        ]],
+    [null, [
+            'торговец', 'купец', 'лавочник', 'менял', 'коробейник', 'барыг',
+            'merchant', 'trader', 'shopkeeper', 'vendor', 'peddler', 'trafficker'
+        ]]
+];
+function inferNpcMerchantProfile(role) {
+    if (typeof role !== 'string' || !role.trim())
+        return null;
+    const tokens = narrativeItemNameTokens(role);
+    for (const [specialization, keywords] of NPC_MERCHANT_ROLE_KEYWORDS) {
+        if (keywords.some(kw => tokens.some(tok => tok.startsWith(kw))))
+            return { specialization };
+    }
+    return null;
+}
+// Which item slots a given specialization is happy to pay extra for.
+// consumable/none are deliberately left out of every group — mundane
+// enough that even a hyper-specialized weaponsmith just pays standard for
+// a potion instead of penalizing it (see computeSellMultiplier).
+const TRADE_SPECIALIZATION_SLOT_GROUPS = {
+    weapon: ['weapon'],
+    armor: ['armor', 'helmet', 'gloves', 'boots', 'cloak'],
+    amulet: ['amulet', 'ring'],
+    consumable: ['consumable']
+};
+// Drives the green-up/red-down/no arrow in TradeModal: >1 profitable to
+// sell here, 1 standard, <1 not worth it. Deliberately independent of
+// factionPriceMultiplier below (that one prices BUYING from an NPC off
+// reputation; this one prices SELLING to them off whether the goods fit
+// their trade) — the two are never multiplied together.
+const TRADE_SPECIALTY_SELL_BONUS = 1.4;
+const TRADE_OFF_SPECIALTY_SELL_PENALTY = 0.6;
+function computeSellMultiplier(itemSlot, merchantProfile) {
+    if (!merchantProfile || !merchantProfile.specialization)
+        return 1;
+    if (itemSlot === 'consumable' || itemSlot === 'none')
+        return 1;
+    const group = TRADE_SPECIALIZATION_SLOT_GROUPS[merchantProfile.specialization] || [];
+    return group.includes(itemSlot) ? TRADE_SPECIALTY_SELL_BONUS : TRADE_OFF_SPECIALTY_SELL_PENALTY;
+}
+// Buying back something the hero themselves sold this NPC a moment ago
+// (see sellItemToNpc in App(), which tags the item with buybackPrice on its
+// way into npcInventories) — a small markup over what they were paid,
+// never repriced off rarity/reputation like the rest of an NPC's stock, so
+// the number on screen always matches "what you got, plus a bit." Also the
+// one case where an ordinary (non-merchant) NPC will sell something
+// outside consumable/none — this specific item was never their own gear to
+// begin with, so TradeModal's usual locked-gear rule doesn't apply to it.
+const TRADE_BUYBACK_MARKUP = 1.15;
+function computeNpcBuyPrice(item, itemRarities, buyMultiplier) {
+    if (typeof item.buybackPrice === 'number')
+        return Math.max(1, Math.round(item.buybackPrice * TRADE_BUYBACK_MARKUP));
+    return Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * buyMultiplier));
+}
+// An NPC's purse — nothing in the state model tracks this (only the hero
+// has a currency field), so it's rolled once client-side, the same "roll
+// once and cache" idea as itemRarities/itemWeights, except lazily: only
+// when a trade window is actually opened with them (see openTrade in
+// App()), since unlike rarity this is never needed for anyone the player
+// never trades with.
+const NPC_MERCHANT_CURRENCY_RANGE = [40, 220];
+const NPC_ORDINARY_CURRENCY_RANGE = [0, 15];
+function rollNpcCurrency(isMerchant) {
+    const [min, max] = isMerchant ? NPC_MERCHANT_CURRENCY_RANGE : NPC_ORDINARY_CURRENCY_RANGE;
+    return min + Math.floor(Math.random() * (max - min + 1));
+}
 // Item weight system — a compressed approximation of real-world weight, not
 // a literal one. This is a loot-collecting RPG: if every dagger and ring
 // were weighted exactly like reality, hoarding interesting finds would be a
@@ -19561,6 +19688,38 @@ function normalizePartyEquipment(raw) {
         if (!normalizedKey)
             continue;
         next[normalizedKey] = normalizeEquipment(raw[key]);
+    }
+    return next;
+}
+// Same shape/purpose as normalizePartyInventories above, but for ANY NPC
+// the hero has traded with or who has been materialized for trade — not
+// just current party members — keyed the same normalized-name way. See the
+// NPC-inventory-from-narrative-belongings effect in App().
+function normalizeNpcInventories(raw) {
+    if (!raw || typeof raw !== 'object')
+        return {};
+    const next = {};
+    for (const key of Object.keys(raw)) {
+        const normalizedKey = key.trim().toLowerCase();
+        if (!normalizedKey)
+            continue;
+        const inventory = normalizeInventory(raw[key]);
+        if (inventory.length > 0)
+            next[normalizedKey] = inventory;
+    }
+    return next;
+}
+// An NPC's rolled purse (see rollNpcCurrency) — keyed the same way as
+// npcInventories, just a plain number per NPC instead of an item array.
+function normalizeNpcCurrencies(raw) {
+    if (!raw || typeof raw !== 'object')
+        return {};
+    const next = {};
+    for (const key of Object.keys(raw)) {
+        const normalizedKey = key.trim().toLowerCase();
+        const value = Number(raw[key]);
+        if (normalizedKey && Number.isFinite(value))
+            next[normalizedKey] = Math.max(0, Math.round(value));
     }
     return next;
 }
@@ -20952,7 +21111,7 @@ function TravelOffer({ narratorMessage, interactive, onToggle, t }) {
                 React.createElement("button", { onClick: confirm, className: "item-choice-confirm-btn", disabled: !interactive || exiting || pending === undefined, type: "button" }, t('itemChoiceConfirmButton'))))));
 }
 // ---- Character sheet ----
-function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, itemWeights, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onGiftNpc, onRecruitNpc, t }) {
+function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, itemWeights, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onGiftNpc, onRecruitNpc, onTradeNpc, t }) {
     const isEmpty = !gameState.time &&
         gameState.effects.length === 0 &&
         gameState.inventory.length === 0 &&
@@ -21124,6 +21283,16 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                 const npcKey = n.name.trim().toLowerCase();
                 const isPartyMember = Array.isArray(party) && party.includes(npcKey);
                 const canRecruit = isPresent && !isPartyMember && reputation >= PARTY_REPUTATION_THRESHOLD;
+                // Personal hostility/resentment already computed above (hostile/
+                // resentful); trading also closes if the NPC's own FACTION is
+                // hostile toward the hero, even when this individual isn't
+                // personally at either threshold yet — same territory-level
+                // check factionPriceMultiplier is meant to price, just applied
+                // as a hard gate here instead of a markup. A merely resentful
+                // (not hostile) faction still trades, just at a worse price.
+                const npcFactionRep = n.faction ? findFactionReputation(n.faction, factionReputations || {}) : FACTION_DEFAULT_REPUTATION;
+                const factionHostile = n.faction ? isFactionHostile(npcFactionRep) : false;
+                const canTrade = isPresent && !isDead && !isPartyMember && !hostile && !resentful && !factionHostile;
                 const isNpcExpanded = expandedNpcs.has(npcKey);
                 return (React.createElement("div", { key: i, className: "sheet-npc" },
                     React.createElement("div", { className: "sheet-npc-header", onClick: () => {
@@ -21157,6 +21326,9 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                         canRecruit && onRecruitNpc && (React.createElement("button", { onClick: () => onRecruitNpc(n.name), className: "sheet-heading-link sheet-recruit-link", type: "button" },
                             "\uD83E\uDD1D ",
                             t('recruitLink'))),
+                        canTrade && onTradeNpc && (React.createElement("button", { onClick: () => onTradeNpc(n.name), className: "sheet-heading-link sheet-trade-link", type: "button" },
+                            "\uD83D\uDED2 ",
+                            t('tradeItemLink'))),
                         React.createElement("p", { className: "sheet-npc-note" }, n.note)))));
             }))),
         gameState.factions.length > 0 && (React.createElement("div", { className: "sheet-section" },
@@ -21672,6 +21844,108 @@ function GivePartyItemModal({ npcName, gameState, itemRarities, itemWeights, equ
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
 }
+// ---- Trade with NPC ----
+// Two stacked panels rather than the pick-then-confirm flow the other
+// item modals use (GiftItemModal/PartyGearModal): trading is meant to be
+// quick and repeatable, so both sides' full offer sit on screen at once and
+// a click is the whole transaction — no separate confirm step. NPC panel
+// on top, hero's on the bottom, per the design discussion. Prices shown
+// here are always the exact same computeItemValue/computeSellMultiplier/
+// factionPriceMultiplier math the onBuy/onSell handlers in App() recompute
+// independently before actually charging anyone — this component never
+// hands a price back, only which item was clicked (by index into the real,
+// ungrouped array — see groupInventoryByName's firstIndex — so filtering
+// the grouped list for display never desyncs it from what onBuy/onSell
+// will actually remove).
+function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, onBuy, onSell, onClose, t }) {
+    const npcKey = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+    const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === npcKey);
+    const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
+    const factionRep = npc && npc.faction ? findFactionReputation(npc.faction, factionReputations || {}) : FACTION_DEFAULT_REPUTATION;
+    const buyMultiplier = factionPriceMultiplier(factionRep);
+    const npcCurrency = npcCurrencies[npcKey] || 0;
+    // Ordinary (non-merchant) NPCs only part with loose consumable/none-slot
+    // belongings — their weapon/armor is worn, not stock, per the design
+    // discussion — shown below anyway, locked, so it's clear why the shelf
+    // looks so bare instead of it just silently vanishing. A dedicated
+    // merchant's entire materialized inventory is their stock; nothing locked.
+    // Either way, anything tagged buybackPrice (see sellItemToNpc in App())
+    // is exempt from the locked rule — it's something the hero themselves
+    // sold this NPC a moment ago, never their own gear to begin with.
+    const npcInventory = npcInventories[npcKey] || [];
+    const allNpcGroups = groupInventoryByName(npcInventory);
+    const isSellableSlot = (slot) => slot === 'consumable' || slot === 'none';
+    const isPurchasable = (item) => merchantProfile || isSellableSlot(item.slot) || typeof item.buybackPrice === 'number';
+    const npcGroups = allNpcGroups.filter(g => isPurchasable(g.item));
+    const lockedGroups = merchantProfile ? [] : allNpcGroups.filter(g => !isPurchasable(g.item));
+    // Quest items never show up here at all — selling one out from under an
+    // active quest isn't something to allow silently in a first pass.
+    const heroGroups = groupInventoryByName(gameState.inventory).filter(g => !g.item.questId);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: (e) => { if (e.target === e.currentTarget)
+            onClose(); } },
+        React.createElement("div", { className: "modal-card trade-card" },
+            React.createElement("h2", { className: "modal-title" },
+                t('tradeModalTitle'),
+                " \u2014 ",
+                npcName),
+            React.createElement("div", { className: "trade-panel trade-panel-npc" },
+                React.createElement("div", { className: "trade-panel-header" },
+                    React.createElement("span", { className: "sheet-heading" }, npcName),
+                    React.createElement("span", { className: "trade-currency" },
+                        "\uD83E\uDE99 ",
+                        npcCurrency)),
+                npcGroups.length === 0 && lockedGroups.length === 0 && (React.createElement("p", { className: "sheet-empty" }, t('tradeNpcEmptyText'))),
+                npcGroups.map((group, gi) => {
+                    const { item, firstIndex, count } = group;
+                    const rarity = findItemRarity(item.name, itemRarities);
+                    const price = computeNpcBuyPrice(item, itemRarities, buyMultiplier);
+                    const affordable = price <= gameState.currency;
+                    return (React.createElement("p", { key: gi, className: 'sheet-list-item trade-row' + (affordable ? ' sheet-list-item-clickable' : ' trade-row-disabled'), style: rarity ? { color: rarityColor(rarity) } : undefined, onClick: () => affordable && onBuy(firstIndex), title: affordable ? t('tradeBuyAria') : t('tradeNotEnoughHeroCurrency') },
+                        "[",
+                        item.name,
+                        "]",
+                        count > 1 ? ' ×' + count : '',
+                        React.createElement("span", { className: "trade-price" },
+                            "\uD83E\uDE99 ",
+                            price)));
+                }),
+                lockedGroups.map((group, gi) => {
+                    const rarity = findItemRarity(group.item.name, itemRarities);
+                    return (React.createElement("p", { key: 'locked' + gi, className: "sheet-list-item trade-row-locked", style: rarity ? { color: rarityColor(rarity) } : undefined },
+                        "\uD83D\uDD12 [",
+                        group.item.name,
+                        "]",
+                        group.count > 1 ? ' ×' + group.count : '',
+                        React.createElement("span", { className: "trade-price trade-price-locked" }, t('tradeNotForSale'))));
+                })),
+            React.createElement("div", { className: "trade-panel trade-panel-hero" },
+                React.createElement("div", { className: "trade-panel-header" },
+                    React.createElement("span", { className: "sheet-heading" }, t('tradeYouLabel')),
+                    React.createElement("span", { className: "trade-currency" },
+                        "\uD83E\uDE99 ",
+                        gameState.currency)),
+                heroGroups.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('tradeHeroEmptyText')),
+                heroGroups.map((group, gi) => {
+                    const { item, firstIndex, count } = group;
+                    const rarity = findItemRarity(item.name, itemRarities);
+                    const multiplier = computeSellMultiplier(item.slot, merchantProfile);
+                    const price = Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * multiplier));
+                    const npcCanAfford = price <= npcCurrency;
+                    const arrow = multiplier > 1 ? '▲' : multiplier < 1 ? '▼' : '';
+                    const arrowClass = multiplier > 1 ? 'trade-arrow-up' : 'trade-arrow-down';
+                    return (React.createElement("p", { key: gi, className: 'sheet-list-item trade-row' + (npcCanAfford ? ' sheet-list-item-clickable' : ' trade-row-disabled'), style: rarity ? { color: rarityColor(rarity) } : undefined, onClick: () => npcCanAfford && onSell(firstIndex), title: npcCanAfford ? t('tradeSellAria') : t('tradeNotEnoughNpcCurrency') },
+                        "[",
+                        item.name,
+                        "]",
+                        count > 1 ? ' ×' + count : '',
+                        React.createElement("span", { className: "trade-price" },
+                            arrow && React.createElement("span", { className: arrowClass }, arrow),
+                            " \uD83E\uDE99 ",
+                            price)));
+                })),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
+}
 // ---- Equipment ----
 function EquipSlotPicker({ equippedName, equippedItem, currentStats, candidates, itemRarities, onEquip, onUnequip, t }) {
     const selectable = candidates.filter(c => c.name !== equippedName);
@@ -21815,26 +22089,27 @@ function EquipmentModal({ gameState, equipment, itemRarities, itemWeights, picke
                                 React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.intelligence))),
                         React.createElement("div", { className: "sheet-section equipment-stats-section" },
                             React.createElement("p", { className: "sheet-heading" }, t('equipmentGearHeading')),
-                            React.createElement("div", { className: "sheet-stat-row" },
-                                React.createElement("span", { className: "sheet-stat-label" },
-                                    React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
-                                    " ",
-                                    t('itemDefenseLabel')),
-                                React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, totalDefense)),
-                            React.createElement("div", { className: "sheet-stat-row" },
-                                React.createElement("span", { className: "sheet-stat-label" },
-                                    React.createElement("img", { src: EQUIP_ICON_WEAPON_LEFT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
-                                    " ",
-                                    t('itemDamageLabel')),
-                                React.createElement("span", { className: "sheet-stat-value equipment-stat-damage" }, totalDamage)),
-                            React.createElement("div", { className: "sheet-stat-row" },
-                                React.createElement("span", { className: "sheet-stat-label" },
-                                    React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
-                                    " ",
-                                    t('itemBlockLabel')),
-                                React.createElement("span", { className: "sheet-stat-value equipment-stat-block" },
-                                    totalBlockChance,
-                                    "%")))))),
+                            React.createElement("div", { className: "sheet-vitals" },
+                                React.createElement("div", { className: "sheet-stat-row" },
+                                    React.createElement("span", { className: "sheet-stat-label" },
+                                        React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                        " ",
+                                        t('itemDefenseLabel')),
+                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, totalDefense)),
+                                React.createElement("div", { className: "sheet-stat-row" },
+                                    React.createElement("span", { className: "sheet-stat-label" },
+                                        React.createElement("img", { src: EQUIP_ICON_WEAPON_LEFT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                        " ",
+                                        t('itemDamageLabel')),
+                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-damage" }, totalDamage)),
+                                React.createElement("div", { className: "sheet-stat-row" },
+                                    React.createElement("span", { className: "sheet-stat-label" },
+                                        React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                        " ",
+                                        t('itemBlockLabel')),
+                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-block" },
+                                        totalBlockChance,
+                                        "%"))))))),
             React.createElement("div", { className: "equipment-page-dots", "aria-hidden": "true" },
                 React.createElement("span", { className: 'equipment-page-dot' + (equipPage === 0 ? ' equipment-page-dot-active' : '') }),
                 React.createElement("span", { className: 'equipment-page-dot' + (equipPage === 1 ? ' equipment-page-dot-active' : '') })),
@@ -22092,7 +22367,12 @@ function CombatBodyPanel({ title, parts, targetable, onTargetClick, incomingPart
 // (it becomes ordinary inventory clutter), just visibly not worth much.
 function CombatLootPanel({ loot, onToggle, t }) {
     if (loot.status === 'loading') {
-        return React.createElement("p", { className: "hint-text loot-status-text" }, t('lootLoadingText'));
+        return (React.createElement("div", { className: "thinking loot-loading" },
+            React.createElement("span", { className: "thinking-text" }, t('lootLoadingText')),
+            React.createElement("span", { className: "thinking-dots" },
+                React.createElement("span", null, "."),
+                React.createElement("span", null, "."),
+                React.createElement("span", null, "."))));
     }
     if (loot.status === 'none' || (loot.status === 'ready' && loot.items.length === 0)) {
         return React.createElement("p", { className: "hint-text loot-status-text" }, t('lootEmptyText'));
@@ -22984,6 +23264,9 @@ function App() {
     // item scheme.
     const [partyInventories, setPartyInventories] = useState({});
     const [partyEquipment, setPartyEquipment] = useState({});
+    const [npcInventories, setNpcInventories] = useState({});
+    const [npcCurrencies, setNpcCurrencies] = useState({});
+    const [tradingNpc, setTradingNpc] = useState(null);
     // -- Pending turn-resolution refs (cleared each turn) --
     const pendingJustEquippedRef = useRef([]);
     const pendingJustUsedRef = useRef([]);
@@ -23217,7 +23500,7 @@ function App() {
             // storage unavailable — model choice just won't persist
         }
     }
-    async function saveGame(nextMessages, nextState, nextItemRarities, nextEquipment, nextItemWeights, nextNpcReputations, nextParty, nextPartyInventories, nextPartyEquipment, nextFactionReputations, nextNpcKindnessCooldowns) {
+    async function saveGame(nextMessages, nextState, nextItemRarities, nextEquipment, nextItemWeights, nextNpcReputations, nextParty, nextPartyInventories, nextPartyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies) {
         try {
             await window.storage.set(SAVE_KEY, JSON.stringify({
                 worldSetting, heroName, heroConcept,
@@ -23232,6 +23515,8 @@ function App() {
                 party: nextParty !== undefined ? nextParty : party,
                 partyInventories: nextPartyInventories !== undefined ? nextPartyInventories : partyInventories,
                 partyEquipment: nextPartyEquipment !== undefined ? nextPartyEquipment : partyEquipment,
+                npcInventories: nextNpcInventories !== undefined ? nextNpcInventories : npcInventories,
+                npcCurrencies: nextNpcCurrencies !== undefined ? nextNpcCurrencies : npcCurrencies,
                 narrativeSummary: narrativeSummaryRef.current,
                 summarizedUpTo: summarizedUpToRef.current
             }), false);
@@ -23265,9 +23550,13 @@ function App() {
         setPartyInventories(normalizedPartyInventories);
         const normalizedPartyEquipment = normalizePartyEquipment(saved.partyEquipment);
         setPartyEquipment(normalizedPartyEquipment);
+        const normalizedNpcInventories = normalizeNpcInventories(saved.npcInventories);
+        setNpcInventories(normalizedNpcInventories);
+        const normalizedNpcCurrencies = normalizeNpcCurrencies(saved.npcCurrencies);
+        setNpcCurrencies(normalizedNpcCurrencies);
         narrativeSummaryRef.current = saved.narrativeSummary || '';
         summarizedUpToRef.current = saved.summarizedUpTo || 0;
-        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.itemWeights || {}, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {});
+        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.itemWeights || {}, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {}, normalizedNpcInventories, normalizedNpcCurrencies);
         if (saved.messages && saved.messages.length > 0)
             setStage('playing');
     }
@@ -26004,6 +26293,97 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         setPartyEquipment(nextPartyEquipment);
         saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, party, partyInventories, nextPartyEquipment);
     }
+    // ---- TRADE HANDLERS ----
+    // Opening a trade window is the only place an NPC's purse gets rolled
+    // (see rollNpcCurrency) — lazily, once, the first time the player
+    // actually trades with them, then cached in npcCurrencies exactly like
+    // rarity/weight get cached elsewhere. Buy/sell prices are always
+    // recomputed here from scratch (never trusted from TradeModal's own
+    // render) so what the player is charged can never drift from what's
+    // shown — same reasoning as giftItemToNpc computing its own reputation
+    // delta rather than taking one from the modal.
+    function openTrade(npcName) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        if (!key)
+            return;
+        if (npcCurrencies[key] === undefined) {
+            const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+            const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
+            const nextNpcCurrencies = { ...npcCurrencies, [key]: rollNpcCurrency(!!merchantProfile) };
+            setNpcCurrencies(nextNpcCurrencies);
+            saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, npcInventories, nextNpcCurrencies);
+        }
+        setTradingNpc(npcName);
+    }
+    function closeTrade() {
+        setTradingNpc(null);
+    }
+    // Player buying one of the NPC's items — priced off rarity and, if this
+    // NPC belongs to a faction, the hero's standing with it (see
+    // factionPriceMultiplier: cheaper from a faction that likes the hero,
+    // marked up from one that doesn't). Specialization never affects buying
+    // — only selling, per the design discussion — so a weaponsmith's own
+    // wares cost the same as anyone else's would.
+    function buyItemFromNpc(npcName, index) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        const npcInventory = npcInventories[key] || [];
+        const item = npcInventory[index];
+        if (!item || !key)
+            return;
+        const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+        const factionName = npc ? findNpcFaction(npc.name, gameState.npcs) : null;
+        const factionRep = factionName ? findFactionReputation(factionName, factionReputations || {}) : FACTION_DEFAULT_REPUTATION;
+        const price = computeNpcBuyPrice(item, itemRarities, factionPriceMultiplier(factionRep));
+        if (price > gameState.currency)
+            return;
+        const nextNpcInventory = npcInventory.filter((_, i) => i !== index);
+        const nextNpcInventories = { ...npcInventories, [key]: nextNpcInventory };
+        const nextNpcCurrencies = { ...npcCurrencies, [key]: (npcCurrencies[key] || 0) + price };
+        // Once it's back in the hero's own bag it's just a normal item again —
+        // buybackPrice only means anything while it's sitting in an NPC's
+        // inventory (see computeNpcBuyPrice/TradeModal); selling it a second
+        // time prices it fresh off the usual rarity/specialization rules.
+        const boughtItem = { ...item };
+        delete boughtItem.buybackPrice;
+        const nextState = { ...gameState, currency: gameState.currency - price, inventory: [...gameState.inventory, boughtItem] };
+        setGameState(nextState);
+        setNpcInventories(nextNpcInventories);
+        setNpcCurrencies(nextNpcCurrencies);
+        saveGame(messages, nextState, itemRarities, equipment, itemWeights, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies);
+    }
+    // Player selling one of their own items to this NPC — priced off rarity
+    // and computeSellMultiplier (bonus if it's this merchant's specialty,
+    // penalty if it's off-topic equipment, neutral for consumables/junk or
+    // for an ordinary/generalist NPC). The item doesn't vanish: it's tagged
+    // with the price it just sold for (buybackPrice) and dropped into
+    // npcInventories, so it shows up buyable again — at a markup, see
+    // computeNpcBuyPrice — even past the "their own gear stays locked" rule
+    // an ordinary NPC's native belongings are otherwise held to, since this
+    // item was never theirs to begin with. Removing an equipped item from
+    // gameState.inventory here is enough on its own — the existing
+    // equipment-upkeep effect clears the now-dangling slot, same as dropping
+    // or gifting an equipped item already does.
+    function sellItemToNpc(npcName, index) {
+        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
+        const item = gameState.inventory[index];
+        if (!item || !key || item.questId)
+            return;
+        const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+        const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
+        const price = Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * computeSellMultiplier(item.slot, merchantProfile)));
+        const npcCurrency = npcCurrencies[key] || 0;
+        if (price > npcCurrency)
+            return;
+        const nextInventory = gameState.inventory.filter((_, i) => i !== index);
+        const nextState = { ...gameState, currency: gameState.currency + price, inventory: nextInventory };
+        const nextNpcCurrencies = { ...npcCurrencies, [key]: npcCurrency - price };
+        const npcInventory = npcInventories[key] || [];
+        const nextNpcInventories = { ...npcInventories, [key]: [...npcInventory, { ...item, questId: null, buybackPrice: price }] };
+        setGameState(nextState);
+        setNpcCurrencies(nextNpcCurrencies);
+        setNpcInventories(nextNpcInventories);
+        saveGame(messages, nextState, itemRarities, equipment, itemWeights, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies);
+    }
     // ---- COMBAT HANDLERS ----
     function startCombat(narratorIndex) {
         const narratorMsg = messages[narratorIndex];
@@ -26624,7 +27004,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // turned up.
     useEffect(() => {
         const partyItems = Object.values(partyInventories).flat();
-        const unrolled = [...gameState.inventory, ...partyItems].filter(it => !findItemRarity(it.name, itemRarities));
+        const npcItems = Object.values(npcInventories).flat();
+        const unrolled = [...gameState.inventory, ...partyItems, ...npcItems].filter(it => !findItemRarity(it.name, itemRarities));
         if (unrolled.length === 0)
             return;
         setItemRarities(prev => {
@@ -26639,7 +27020,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             }
             return changed ? next : prev;
         });
-    }, [gameState.inventory, partyInventories]);
+    }, [gameState.inventory, partyInventories, npcInventories]);
     // Same idea, for weight: every inventory item needs a cached number for
     // the carry total to mean anything, and unlike rarity a weight can only
     // be rolled once the item's "slot" is known — which only exists once it's
@@ -26717,6 +27098,47 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             setPartyEquipment(nextEquipment);
         saveGame(messages, gameState, itemRarities, equipment, itemWeights, npcReputations, party, nextInventories, equipmentChanged ? nextEquipment : partyEquipment);
     }, [gameState.npcs, party]);
+    // ---- NPC INVENTORY FROM NARRATIVE BELONGINGS (for trading) ----
+    // Same idea as the party-gear effect just above, generalized to every
+    // tracked NPC rather than only current party members: n.inventory (see
+    // reconcileNpcs) is otherwise pure flavor text nothing could act on, so
+    // this backfills npcInventories with any belonging the first time it's
+    // seen (materializeNarrativeItem — matched by exact name, so re-running
+    // this never adds the same thing twice). Every NPC's belongings are
+    // materialized here regardless of role — even an ordinary NPC's loose
+    // consumables need real slot data to be sellable at all — but whether any
+    // of it actually shows up as sellable in TradeModal, vs. locked as worn
+    // gear, depends on the NPC's role (see inferNpcMerchantProfile). Unlike
+    // the party effect, there's no equipment to backfill here — regular NPCs
+    // don't get a paper-doll, only a sellable/locked split by item slot.
+    // n.inventory itself is left untouched, same reasoning as the party
+    // effect: it stays the source of truth the narrative model reads back.
+    useEffect(() => {
+        if (!gameState.npcs || gameState.npcs.length === 0)
+            return;
+        let changed = false;
+        const next = { ...npcInventories };
+        for (const npc of gameState.npcs) {
+            if (!npc || typeof npc.name !== 'string')
+                continue;
+            const key = npc.name.trim().toLowerCase();
+            const narrativeItems = Array.isArray(npc.inventory) ? npc.inventory : [];
+            if (narrativeItems.length === 0)
+                continue;
+            const known = next[key] || [];
+            const alreadyKnown = new Set(known.map(it => it.name));
+            const newItems = narrativeItems
+                .filter(name => typeof name === 'string' && name.trim() && !alreadyKnown.has(name.trim()))
+                .map(materializeNarrativeItem);
+            if (newItems.length === 0)
+                continue;
+            next[key] = [...known, ...newItems];
+            changed = true;
+        }
+        if (!changed)
+            return;
+        setNpcInventories(next);
+    }, [gameState.npcs]);
     // ---- TURN SUBMISSION ----
     async function handleStart() {
         if (!worldSetting.trim() || !heroName.trim()) {
@@ -27435,14 +27857,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                             React.createElement("button", { onClick: handleSend, disabled: loading || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
             React.createElement("div", { className: "sidebar" },
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, t: t }))),
+                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onTradeNpc: openTrade, t: t }))),
         sheetOpen && (React.createElement("div", { className: "sheet-overlay" },
             React.createElement("div", { className: "sheet-overlay-backdrop", onClick: () => setSheetOpen(false) }),
             React.createElement("div", { className: "sheet-overlay-panel" },
                 React.createElement("div", { className: "sheet-overlay-header" },
                     React.createElement("p", { className: "title-display title-display-small" }, t('sheetOverlayTitle')),
                     React.createElement("button", { onClick: () => setSheetOpen(false), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, t: t })))),
+                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onTradeNpc: openTrade, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, itemWeights: itemWeights, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onOpenItemDetail: setItemDetailIndex, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
@@ -27464,6 +27886,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGift, onCancel: () => setGiftTargetNpc(null), t: t })),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
+        tradingNpc && (React.createElement(TradeModal, { npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, onBuy: (index) => buyItemFromNpc(tradingNpc, index), onSell: (index) => sellItemToNpc(tradingNpc, index), onClose: closeTrade, t: t })),
         groupModalOpen && (React.createElement(GroupModal, { party: party, npcs: gameState.npcs, onDismiss: dismissFromParty, onOpenGear: setPartyGearTarget, onClose: () => setGroupModalOpen(false), t: t })),
         partyGearTarget && (React.createElement(PartyGearModal, { npcName: partyGearTarget, inventory: partyInventories[partyGearKey] || [], equipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, itemRarities: itemRarities, onEquip: (slotKey, itemName) => equipPartyItemInSlot(partyGearTarget, slotKey, itemName), onUnequip: slotKey => unequipPartySlot(partyGearTarget, slotKey), onGiveItem: () => setPartyGiveModalOpen(true), onTakeBack: index => takeItemFromPartyMember(partyGearTarget, index), onClose: () => { setPartyGearTarget(null); setPartyGiveModalOpen(false); }, t: t })),
         partyGiveModalOpen && partyGearTarget && (React.createElement(GivePartyItemModal, { npcName: partyGearTarget, gameState: gameState, itemRarities: itemRarities, itemWeights: itemWeights, equipment: equipment, onConfirm: index => giveItemToPartyMember(partyGearTarget, index), onCancel: () => setPartyGiveModalOpen(false), t: t })),
@@ -27552,6 +27975,19 @@ const APP_STYLES = `
   .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 1.5rem 0; }
   .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); padding: 1rem; }
   .modal-card { background: var(--stone-900); border: 1px solid var(--amber-900); border-radius: 3px; padding: 1.5rem; width: 100%; max-width: 28rem; max-height: 100%; overflow-y: auto; }
+  .trade-card { max-width: 32rem; }
+  .trade-panel { border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.6rem 0.8rem; margin-bottom: 0.75rem; max-height: 11rem; overflow-y: auto; }
+  .trade-panel-npc { background: rgba(180, 83, 9, 0.06); }
+  .trade-panel-hero { background: rgba(87, 83, 78, 0.12); }
+  .trade-panel-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.4rem; position: sticky; top: -0.6rem; }
+  .trade-currency { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--amber-400); }
+  .trade-row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+  .trade-row-disabled { opacity: 0.45; cursor: default; }
+  .trade-row-locked { opacity: 0.55; }
+  .trade-price { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; white-space: nowrap; }
+  .trade-price-locked { color: var(--stone-500); font-size: 0.68rem; }
+  .trade-arrow-up { color: var(--emerald-400); }
+  .trade-arrow-down { color: var(--red-400); }
   .modal-title { font-family: 'Cinzel', serif; color: var(--amber-100); font-size: 1.25rem; margin: 0 0 1rem; }
   .item-type-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--stone-500); margin: -0.75rem 0 1rem; }
   .item-quest-tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--stone-600); margin: -0.9rem 0 1rem; }
@@ -27678,6 +28114,7 @@ const APP_STYLES = `
   .sheet-npc-dot-dead { background: var(--red-600); box-shadow: 0 0 5px var(--red-600); }
   .sheet-gift-link { display: block; margin: 0.2rem 0 0.4rem; }
   .sheet-recruit-link { display: block; margin: 0.2rem 0 0.4rem; }
+  .sheet-trade-link { display: block; margin: 0.2rem 0 0.4rem; }
   .gift-item-list { max-height: 50vh; overflow-y: auto; margin-bottom: 0.25rem; }
   .gift-confirm-item { font-size: 1rem; text-align: center; margin: 0 0 1rem; }
   .gift-currency-option { border-bottom: 1px solid var(--stone-800); padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
@@ -27765,6 +28202,7 @@ const APP_STYLES = `
   .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
   .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
   @keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  .loot-loading { justify-content: center; margin: 0.5rem 0 0; }
   .input-bar { border-top: 1px solid var(--amber-900); background: var(--stone-900); padding: 1rem; flex-shrink: 0; }
   .input-bar-inner { max-width: 42rem; margin: 0 auto; }
   .pending-note-chip { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--stone-950); border: 1px solid #7c6a9c; border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: #b09fd6; }
