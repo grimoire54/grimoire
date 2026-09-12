@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
-    "@capacitor/android": "^8.0.0"
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/assets": "^3.0.0"
   }
 }
