@@ -32,6 +32,11 @@ jobs:
       - name: Add the Android native project
         run: npx cap add android
 
+      - name: Register the AdMob App ID
+        run: |
+          sed -i '/<application/a\    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id" />' android/app/src/main/AndroidManifest.xml
+          sed -i 's#</resources>#    <string name="admob_app_id">ca-app-pub-6984929241398787~9526945696</string>\n</resources>#' android/app/src/main/res/values/strings.xml
+
       - name: Apply the app icon
         run: npx capacitor-assets generate --android --iconBackgroundColor '#0c0a09' --iconBackgroundColorDark '#0c0a09'
 
