@@ -18205,6 +18205,7 @@ const EMPTY_STATE = {
     currency: 0,
     npcs: [],
     quests: [],
+    pendingSecrets: [],
     map: { nodes: [], currentId: null, visitedEdges: [] },
     factions: []
 };
@@ -18443,6 +18444,42 @@ function normalizeQuests(raw) {
     if (!Array.isArray(raw))
         return [];
     return raw.map(normalizeQuest).filter(Boolean);
+}
+// A hidden intention or plan surfaced through the "secretsText"/
+// "newPendingSecrets" fields of generateStateAndEvents (see EVENT: HIDDEN
+// INFORMATION in buildStateAndEventsSystemPrompt) that hasn't played out
+// in the visible scene yet — e.g. an NPC privately deciding to ambush the
+// hero later. Tracked separately from quests because the hero never
+// learns of these directly — this exists purely so a planted intention
+// doesn't quietly vanish once the turn that revealed it scrolls out of
+// context. "text"/"trigger" are fixed the turn the entry is first raised
+// and never rewritten, only "status" changes from that point on.
+//
+// "trigger" is optional and distinguishes two very different kinds of
+// commitment (see pendingSecretsRule in buildNarrativeSystemPrompt):
+// - set: a concrete condition tied to a specific hero action ("takes the
+//   item off the floor") — the consequence fires immediately, the exact
+//   turn the hero's action matches it, never "eventually."
+// - unset: a looser intention with no single triggering action (someone
+//   privately planning to double-cross the hero later) — resolved
+//   whenever the story naturally reaches a moment for it, same as before.
+const PENDING_SECRET_STATUSES = ['pending', 'fulfilled', 'moot'];
+function normalizePendingSecret(raw) {
+    if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || !raw.id.trim())
+        return null;
+    if (typeof raw.text !== 'string' || !raw.text.trim())
+        return null;
+    return {
+        id: raw.id.trim(),
+        text: raw.text.trim(),
+        trigger: typeof raw.trigger === 'string' && raw.trigger.trim() ? raw.trigger.trim() : null,
+        status: PENDING_SECRET_STATUSES.includes(raw.status) ? raw.status : 'pending'
+    };
+}
+function normalizePendingSecrets(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    return raw.map(normalizePendingSecret).filter(Boolean);
 }
 const MAP_NODE_KINDS = ['settlement', 'wilderness', 'dungeon', 'landmark'];
 const MAP_DIRECTION_VECTORS = {
@@ -18871,6 +18908,7 @@ function normalizeGameState(raw) {
             ? raw.npcs.map(n => (n && typeof n === 'object' && Array.isArray(n.effects)) ? { ...n, effects: normalizeStoredEffects(n.effects) } : n)
             : [],
         quests: normalizeQuests(raw.quests),
+        pendingSecrets: normalizePendingSecrets(raw.pendingSecrets),
         map: normalizeMapState(raw.map),
         factions: normalizeFactions(raw.factions)
     };
@@ -19146,8 +19184,11 @@ const NARRATIVE_ITEM_SLOT_KEYWORDS = [
             'amulet', 'pendant', 'necklace', 'talisman', 'charm', 'medallion', 'locket', 'rosary'
         ]],
     ['ring', [
-            'кольц', 'перстен',
-            'ring'
+            // Bracelets/bangles have no slot of their own in this game — 'ring' is
+            // the closest existing analog (hand/wrist jewelry) since 'amulet' below
+            // is reserved for things actually worn at the neck.
+            'кольц', 'перстен', 'браслет',
+            'ring', 'bracelet', 'bangle'
         ]],
     ['backpack', [
             'рюкзак', 'котомк', 'торб', 'ранец',
@@ -19261,22 +19302,28 @@ function backfillEquipmentFromItems(equipment, newItems) {
 // ----------------------------------------------------------------------------
 // Lets the player tap a known item/character/place name right where it
 // appears inside the narrator's own prose and see that entity's current
-// info, without the model needing to mark anything up itself. Deliberately
-// narrow in what counts as "known", so a click never promises stats we
-// don't actually have:
+// info. The narrator model decides which mentions qualify — see GAME
+// MASTER RULE 10 in buildNarrativeSystemPrompt — bracketing a name only
+// when a character is speaking about that entity, by name, in a way that
+// matters to a quest (pointing someone toward a place, naming who to find,
+// asking after or handing over a specific item). Plain descriptive prose
+// is never bracketed, so a click stays rare and meaningful instead of
+// lighting up every piece of gear the narration happens to describe.
+// Deliberately narrow in what counts as "known", so a click never promises
+// stats we don't actually have:
 //   - items:  only the hero's OWN inventory (gameState.inventory) — these
 //             already have real rarity/weight tracked, see
 //             findItemRarity/findItemWeight; an item merely mentioned in
 //             passing (an NPC's sword, a shop's wares) isn't linked.
 //   - npcs:   every tracked character in gameState.npcs.
 //   - places: every map node the hero has encountered, gameState.map.nodes.
-// A name is matched only in the exact form it's stored in state — Russian's
-// case endings mean an inflected mention (a name in genitive/dative form,
-// say) won't always highlight. An acceptable MVP trade-off over trying to
-// guess word stems in a way that risks catching ordinary prose instead.
-function escapeRegexLiteral(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+// Because brackets are placed deliberately by the model rather than found
+// by scanning ordinary prose, the name inside them is free to decline
+// naturally with the sentence (case, gender, number) instead of being
+// forced into dictionary form — resolveBracketedEntity below matches that
+// declined form back to its entity with a rough Russian case-ending
+// stripper. A wrong guess there can at worst mislink one bracketed
+// mention; it can never invent new highlighting out of plain narration.
 function buildNarrativeEntityIndex(gameState) {
     if (!gameState)
         return null;
@@ -19306,39 +19353,46 @@ function buildNarrativeEntityIndex(gameState) {
     });
     if (lookup.size === 0)
         return null;
-    // Longest names first, so a shorter name that happens to be a substring
-    // of a longer one (e.g. an NPC "Марек" and an item "Меч Марека") never
-    // steals part of the longer match.
-    const names = [...lookup.keys()].sort((a, b) => b.length - a.length).map(escapeRegexLiteral);
-    let regex;
-    try {
-        // Word boundaries via \b don't work on Cyrillic (\b is ASCII-\w only),
-        // so boundaries are done by hand with unicode-aware lookaround instead.
-        regex = new RegExp(`(?<![\\p{L}\\p{N}])(${names.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+    // Stemmed lookup for resolving a declined bracketed mention (see
+    // stemRuPhrase below) back to its entity when the exact surface text
+    // doesn't match the stored dictionary form.
+    const stemmedLookup = new Map();
+    for (const [key, entity] of lookup)
+        stemmedLookup.set(stemRuPhrase(key), entity);
+    return { lookup, stemmedLookup };
+}
+// Approximate, non-authoritative Russian case-ending stripper — not a real
+// morphological analyzer, just enough of the common noun/adjective endings
+// to line up a declined mention ("топора", "мельницу") with its
+// dictionary-form entity name ("топор", "мельница") often enough to be
+// useful. Longest endings first so e.g. "-ями" strips before the shorter
+// "-и" it contains.
+const RU_CASE_ENDINGS = [
+    'иями', 'иях', 'иям', 'ями', 'ами', 'ыми', 'ими', 'его', 'ому', 'ему',
+    'ой', 'ей', 'ою', 'ею', 'ах', 'ях', 'ам', 'ям', 'ов', 'ев', 'ий', 'ый',
+    'ая', 'яя', 'ое', 'ее', 'ых', 'их', 'ым', 'им', 'у', 'ю', 'а', 'я', 'ы',
+    'и', 'е', 'о', 'й', 'ь',
+];
+function stemRuWord(word) {
+    const lower = word.toLowerCase();
+    for (const ending of RU_CASE_ENDINGS) {
+        if (lower.length - ending.length >= 3 && lower.endsWith(ending))
+            return lower.slice(0, -ending.length);
     }
-    catch (e) {
-        // Lookbehind / unicode property escapes aren't supported in every JS
-        // engine (older WebViews) — fail closed to no highlighting rather than
-        // crash the whole narrative render.
-        return null;
-    }
-    return { regex, lookup };
+    return lower;
+}
+function stemRuPhrase(phrase) {
+    return phrase.trim().split(/\s+/).map(stemRuWord).join(' ');
 }
 // Splits narrator text into an array of plain strings and { match, entity }
 // pieces, ready to render as alternating text / clickable-span pieces.
-// Two passes, in order of trust:
-//   1. Bracketed references — [Name] — that the narrator model itself now
-//      tags on an entity's first mention each scene (see GAME MASTER RULE
-//      10 in buildNarrativeSystemPrompt). These are exact by construction:
-//      no regex/declension guessing needed, just a direct lookup of
-//      whatever's inside the brackets. An unrecognized bracket (a stale
-//      save, a hallucinated tag) simply renders as its bare text with the
-//      brackets dropped, rather than a dead-looking span.
-//   2. Everything between/outside brackets still runs through the old
-//      whole-text name matcher (splitPlainTextByEntities) as a fallback —
-//      covers turns narrated before this rule existed, and the rare turn
-//      where the model mentions something again without re-bracketing it.
-// With no entity index at all, this returns the text untouched.
+// Only text the model itself wrapped in [brackets] — see GAME MASTER RULE
+// 10 — ever becomes a clickable span; everything else passes through as
+// plain text untouched, so an ordinary mention in descriptive narration is
+// never auto-highlighted. An unrecognized or unresolved bracket (a stale
+// save, a hallucinated tag) simply renders as its bare text with the
+// brackets dropped, rather than a dead-looking span. With no entity index
+// at all, this returns the text untouched.
 function splitNarrativeByEntities(text, entityIndex) {
     if (typeof text !== 'string' || !text)
         return [text];
@@ -19347,40 +19401,28 @@ function splitNarrativeByEntities(text, entityIndex) {
     let lastIndex = 0;
     let match;
     while ((match = bracketRegex.exec(text))) {
-        if (match.index > lastIndex) {
-            pieces.push(...splitPlainTextByEntities(text.slice(lastIndex, match.index), entityIndex));
-        }
+        if (match.index > lastIndex)
+            pieces.push(text.slice(lastIndex, match.index));
         const raw = match[1].trim();
-        const entity = entityIndex ? entityIndex.lookup.get(raw.toLowerCase()) : null;
+        const entity = resolveBracketedEntity(raw, entityIndex);
         pieces.push(entity ? { match: raw, entity } : raw);
         lastIndex = match.index + match[0].length;
     }
     if (lastIndex < text.length)
-        pieces.push(...splitPlainTextByEntities(text.slice(lastIndex), entityIndex));
-    return pieces;
-}
-// Fallback matcher: scans a chunk of plain prose (no brackets) for any
-// known entity name in its exact stored form. See splitNarrativeByEntities
-// above for why this is now the fallback rather than the only pass.
-function splitPlainTextByEntities(text, entityIndex) {
-    if (!entityIndex || typeof text !== 'string' || !text)
-        return [text];
-    const { regex, lookup } = entityIndex;
-    const pieces = [];
-    let lastIndex = 0;
-    regex.lastIndex = 0;
-    let match;
-    while ((match = regex.exec(text))) {
-        if (match.index > lastIndex)
-            pieces.push(text.slice(lastIndex, match.index));
-        pieces.push({ match: match[0], entity: lookup.get(match[0].toLowerCase()) });
-        lastIndex = match.index + match[0].length;
-        if (match[0].length === 0)
-            regex.lastIndex += 1; // guard against zero-length matches
-    }
-    if (lastIndex < text.length)
         pieces.push(text.slice(lastIndex));
     return pieces;
+}
+// Resolves the raw text inside a model-placed [bracket] to a known entity:
+// exact match first (covers the common case, including any name the model
+// happened to leave undeclined), then a stemmed match to catch a mention
+// the model naturally declined to fit the sentence's grammar.
+function resolveBracketedEntity(raw, entityIndex) {
+    if (!entityIndex || !raw)
+        return null;
+    const exact = entityIndex.lookup.get(raw.toLowerCase());
+    if (exact)
+        return exact;
+    return entityIndex.stemmedLookup.get(stemRuPhrase(raw)) || null;
 }
 // Renders narrator prose with known item/character/place names turned into
 // clickable gold-highlighted spans (see splitNarrativeByEntities above for
@@ -20239,26 +20281,38 @@ const RESTOCK_MAX_NEW_ITEMS = 3;
 // a long playthrough doesn't loop the same handful of names before the
 // "pool exhausted, reuse" fallback (same one grantFactionSpecialStock uses)
 // kicks in.
+//
+// Each entry is {name, slot} rather than a bare string because a
+// specialization's pool can legitimately span more than one literal equip
+// slot — see TRADE_SPECIALIZATION_SLOT_GROUPS above: "armor" covers cloak/
+// gloves/boots too, "amulet" covers ring too — so the slot a given name
+// actually equips to has to travel with that name instead of being assumed
+// equal to the pool's own key. computeNpcRestock used to make exactly that
+// assumption, which silently mislabeled every off-key entry below (e.g.
+// "Copper ring" tagged slot "amulet", "Field cloak" tagged slot "armor").
+// FACTION_SPECIAL_STOCK_NAMES just below doesn't need this treatment today
+// — every one of its entries happens to share its own pool's key — but
+// would need the same {name, slot} shape the moment that stops being true.
 const TRADE_RESTOCK_ITEM_NAMES = {
     weapon: {
-        ru: ['Простой одноручный меч', 'Охотничий нож', 'Короткий лук', 'Дорожный топорик', 'Метательные ножи', 'Тяжёлая дубина'],
-        en: ['Plain one-handed sword', 'Hunting knife', 'Short hunting bow', "Traveler's hatchet", 'Throwing knives', 'Heavy cudgel']
+        ru: [{ name: 'Простой одноручный меч', slot: 'weapon' }, { name: 'Охотничий нож', slot: 'weapon' }, { name: 'Короткий лук', slot: 'weapon' }, { name: 'Дорожный топорик', slot: 'weapon' }, { name: 'Метательные ножи', slot: 'weapon' }, { name: 'Тяжёлая дубина', slot: 'weapon' }],
+        en: [{ name: 'Plain one-handed sword', slot: 'weapon' }, { name: 'Hunting knife', slot: 'weapon' }, { name: 'Short hunting bow', slot: 'weapon' }, { name: "Traveler's hatchet", slot: 'weapon' }, { name: 'Throwing knives', slot: 'weapon' }, { name: 'Heavy cudgel', slot: 'weapon' }]
     },
     armor: {
-        ru: ['Стёганый доспех', 'Кожаная броня', 'Полевой плащ', 'Кожаные перчатки', 'Дорожные сапоги'],
-        en: ['Padded armor', 'Leather armor', 'Field cloak', 'Leather gloves', 'Travel boots']
+        ru: [{ name: 'Стёганый доспех', slot: 'armor' }, { name: 'Кожаная броня', slot: 'armor' }, { name: 'Полевой плащ', slot: 'cloak' }, { name: 'Кожаные перчатки', slot: 'gloves' }, { name: 'Дорожные сапоги', slot: 'boots' }],
+        en: [{ name: 'Padded armor', slot: 'armor' }, { name: 'Leather armor', slot: 'armor' }, { name: 'Field cloak', slot: 'cloak' }, { name: 'Leather gloves', slot: 'gloves' }, { name: 'Travel boots', slot: 'boots' }]
     },
     amulet: {
-        ru: ['Простой оберег', 'Медное кольцо', 'Бусы на удачу', 'Кулон путника'],
-        en: ['Plain charm', 'Copper ring', 'Beads for luck', "Traveler's pendant"]
+        ru: [{ name: 'Простой оберег', slot: 'amulet' }, { name: 'Медное кольцо', slot: 'ring' }, { name: 'Бусы на удачу', slot: 'amulet' }, { name: 'Кулон путника', slot: 'amulet' }],
+        en: [{ name: 'Plain charm', slot: 'amulet' }, { name: 'Copper ring', slot: 'ring' }, { name: 'Beads for luck', slot: 'amulet' }, { name: "Traveler's pendant", slot: 'amulet' }]
     },
     consumable: {
-        ru: ['Дорожный паёк', 'Флакон целебной настойки', 'Чистые бинты', 'Фляга с водой', 'Сушёные травы'],
-        en: ['Travel rations', 'Vial of healing tincture', 'Clean bandages', 'Waterskin', 'Dried herbs']
+        ru: [{ name: 'Дорожный паёк', slot: 'consumable' }, { name: 'Флакон целебной настойки', slot: 'consumable' }, { name: 'Чистые бинты', slot: 'consumable' }, { name: 'Фляга с водой', slot: 'consumable' }, { name: 'Сушёные травы', slot: 'consumable' }],
+        en: [{ name: 'Travel rations', slot: 'consumable' }, { name: 'Vial of healing tincture', slot: 'consumable' }, { name: 'Clean bandages', slot: 'consumable' }, { name: 'Waterskin', slot: 'consumable' }, { name: 'Dried herbs', slot: 'consumable' }]
     },
     none: {
-        ru: ['Моток верёвки', 'Огниво', 'Карта окрестностей', 'Точильный камень', 'Масляная лампа'],
-        en: ['Coil of rope', 'Fire starter kit', 'Map of the surrounding area', 'Whetstone', 'Oil lamp']
+        ru: [{ name: 'Моток верёвки', slot: 'none' }, { name: 'Огниво', slot: 'none' }, { name: 'Карта окрестностей', slot: 'none' }, { name: 'Точильный камень', slot: 'none' }, { name: 'Масляная лампа', slot: 'none' }],
+        en: [{ name: 'Coil of rope', slot: 'none' }, { name: 'Fire starter kit', slot: 'none' }, { name: 'Map of the surrounding area', slot: 'none' }, { name: 'Whetstone', slot: 'none' }, { name: 'Oil lamp', slot: 'none' }]
     }
 };
 // Pure so the aging/rotation logic is easy to reason about on its own —
@@ -20300,20 +20354,19 @@ function computeNpcRestock(npcInventory, merchantProfile, currentTurn, lang) {
             : { nextInventory: npcInventory, newRarities: {}, changed: false };
     }
     const poolKey = factionSpecialStockPoolKey(merchantProfile);
-    const itemSlot = poolKey === 'none' ? 'none' : poolKey;
     const namePool = (TRADE_RESTOCK_ITEM_NAMES[poolKey][lang] || TRADE_RESTOCK_ITEM_NAMES[poolKey].en).slice();
     const usedNames = new Set(kept.map(it => it.name));
     const batchSize = Math.min(stale.length, RESTOCK_MAX_NEW_ITEMS);
     const newItems = [];
     const newRarities = {};
     for (let i = 0; i < batchSize; i++) {
-        let available = namePool.filter(n => !usedNames.has(n));
+        let available = namePool.filter(entry => !usedNames.has(entry.name));
         if (available.length === 0)
             available = namePool; // pool exhausted — reuse rather than skip the restock
-        const name = available[Math.floor(Math.random() * available.length)];
-        usedNames.add(name);
-        newItems.push({ name, slot: itemSlot, twoHanded: false, shield: false, questId: null, restockTurn: currentTurn });
-        newRarities[name.trim().toLowerCase()] = rollItemRarity();
+        const picked = available[Math.floor(Math.random() * available.length)];
+        usedNames.add(picked.name);
+        newItems.push({ name: picked.name, slot: picked.slot, twoHanded: false, shield: false, questId: null, restockTurn: currentTurn });
+        newRarities[picked.name.trim().toLowerCase()] = rollItemRarity();
     }
     return { nextInventory: [...kept, ...newItems], newRarities, changed: true };
 }
@@ -21584,6 +21637,12 @@ const ACTION_CHECK_OUTCOME_GUIDANCE = {
 function detectSystemLanguage() {
     const raw = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
     return raw.startsWith('ru') ? 'ru' : 'en';
+}
+// Short opaque id for anything the CLIENT mints itself rather than the
+// model (quest/travel/reward offer ids, pending-secret ids) — used
+// whenever the model's own reply didn't supply a usable id of its own.
+function randomSlug() {
+    return Math.random().toString(36).slice(2, 8);
 }
 function buildTurns(messages) {
     const turns = [];
@@ -25509,6 +25568,27 @@ ${JSON.stringify(state)}${partySection}` };
         const partyRule = partyMemberNames.length > 0
             ? `\n${partyRuleNum}. PARTY MEMBERS: everyone named above under "CURRENT PARTY" travels with the hero as an established companion. Give them real presence in the scene — their own reactions, initiative, and dialogue — rather than reducing them to silent background or forgetting they're there. If the scene puts the hero in danger, a companion can be threatened, hurt, exhausted, or otherwise affected too, exactly like the hero can; reflect that naturally in the prose rather than treating them as invulnerable set dressing.`
             : '';
+        // Sourced from state.pendingSecrets (see PENDING_SECRET_STATUSES/
+        // reconcilePendingSecrets) — plans and intentions the hidden-information
+        // fields of generateStateAndEvents (see EVENT: HIDDEN INFORMATION in
+        // buildStateAndEventsSystemPrompt) surfaced on an earlier turn, which the
+        // hero was never told about directly. Without a rule like this, nothing
+        // stops a later turn from simply narrating past one of them forever —
+        // this is what turns "someone privately planning an ambush" into an
+        // actual future story beat instead of a one-off flavor line.
+        const pendingSecretsList = (state.pendingSecrets || []).filter(p => p.status === 'pending');
+        const triggeredSecrets = pendingSecretsList.filter(p => p.trigger);
+        const looseSecrets = pendingSecretsList.filter(p => !p.trigger);
+        const pendingSecretsRuleNum = pendingSecretsList.length > 0 ? ++ruleNum : null;
+        const triggeredSecretsText = triggeredSecrets.length > 0
+            ? `\nThe following are CONDITIONAL — each already has an exact, mechanical firing condition:\n${triggeredSecrets.map(p => `- ${p.text} (fires when: ${p.trigger})`).join('\n')}\nThe instant the hero's action THIS TURN matches one of these conditions, its consequence is NOT optional and NOT delayable — it MUST happen in THIS scene, immediately, as the direct and inevitable result of that action, exactly as severe as described. Never let the hero simply succeed at the triggering action without consequence, never soften it into a near-miss or a warning sign instead, and never push it off to "next time" because it's inconvenient for the plot or the hero's safety right now. Narrate it as the natural, automatic consequence of what the hero just did — up to (but never past) whatever threshold the COMBAT AND AMBUSH HANDOFF rule above requires if it turns violent. If the hero's action this turn does NOT match a condition, that entry simply stays dormant — do not trigger it early or reference it.`
+            : '';
+        const looseSecretsText = looseSecrets.length > 0
+            ? `\nThe following have no single triggering action and are UNCONDITIONAL over time instead:\n${looseSecrets.map(p => `- ${p.text}`).join('\n')}\nThese are commitments, not flavor — none of them simply evaporates on its own. The moment the scene naturally reaches a point where one of them would realistically happen (the schemer gets a real opportunity, the hero returns to the relevant place, enough time has plausibly passed, the right characters are together again), let it actually happen as an organic part of the story — never announce it, never have a character explain it was "the plan all along," just let it occur the way any other development would. Don't force one into a scene where it genuinely doesn't fit yet — it can keep waiting several turns if the story hasn't brought the pieces together — but never let the story quietly drift in a direction that makes one permanently impossible without that itself being a deliberate, visible story beat (the schemer killed or captured first, the target gone for good), never a convenient oversight.`
+            : '';
+        const pendingSecretsRule = pendingSecretsList.length > 0
+            ? `\n${pendingSecretsRuleNum}. UNRESOLVED HIDDEN PLANS: earlier hidden information — never shown to the hero — revealed plans/intentions still waiting to play out.${triggeredSecretsText}${looseSecretsText}`
+            : '';
         return `You are an experienced text role-playing game master, in the spirit of interactive fiction like Infinite Worlds or AI Dungeon.
 
 ${context}${gearContext}
@@ -25533,36 +25613,22 @@ GAME MASTER RULES:
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
 8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands.
 9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.
-10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. The FIRST time, and only the first time, any of those exact entities is mentioned by name anywhere in this scene, wrap that mention in square brackets, reproducing the name precisely as it appears in the state (same spelling and capitalization, base/dictionary form — never decline, inflect, or otherwise alter it inside the brackets, even where declined would read more naturally; let the surrounding sentence bend around it instead). Example: "Ты сжимаешь рукоять [Меч Дракона], пока [Елена] окидывает взглядом дорогу к [Старой мельнице]." Every later mention of that same entity later in the scene stays in plain, natural prose with no brackets at all. Only tag entities that are genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${partyRule}
+10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${partyRule}${pendingSecretsRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own — just the scene itself.`;
     }
-    function buildSecretsSystemPrompt(state) {
-        const { narrativeLanguage, context } = sharedContext(state);
-        return `You generate hidden, behind-the-scenes information for a text role-playing game. You are still the voice of this fictional world, not an assistant — never mention being an AI, and never break immersion.
-
-${context}
-
-You will be given the scene that just happened. Extract ONLY the following, and NOTHING else:
-1. The private thoughts and intentions of characters present in the scene — what they actually think of the hero and what they're planning, if this differs from what they said or showed outwardly.
-2. The surrounding circumstances, ONLY if genuinely needed to understand the scene (something happening nearby the hero can't perceive, a fact about the setting relevant right now) — skip this entirely if the scene's surface is already the whole picture.
-
-Do not include anything else — no world lore, no foreshadowing, no analysis, no restating what the scene already showed. If a character present has nothing hidden (their outward behavior already is their real intent), say so in one short line or omit them. If NOTHING in the scene has a hidden layer at all, respond with exactly: (none)
-
-STYLE — IMPORTANT: as terse as possible while staying clear. One short line per character, plain facts only, no elaboration, no philosophizing, no metaphor. This is a bare-bones briefing, not prose.
-
-VOICE — IMPORTANT: third person throughout, like an outside observer — never address anyone as "you," including the hero (${heroName || 'the hero'}): describe them the same way as any other character (e.g. "${heroName || 'The hero'} was not noticed doing…").
-
-Respond with ONLY this hidden information (or the single word "(none)"), written in ${narrativeLanguage}. No headings, no meta-commentary, no markdown.`;
-    }
     // Single combined extraction call replacing what used to be five separate
     // requests (state, suggestions, quest offers, combat setup, travel offer)
-    // plus a sixth when item-pickup convenience is on (item offers) — each of
-    // those used to independently pay for its own copy of sharedContext(state)
-    // (world setting, hero, full game-state JSON, active quests, known map),
-    // which was easily the largest part of every one of those prompts. Folding
-    // them into one call pays that cost exactly once per turn instead of five
-    // or six times, on top of cutting five API round-trips down to one — see
+    // plus a sixth when item-pickup convenience is on (item offers), and a
+    // SEVENTH later on — hidden-information extraction, once its own
+    // buildSecretsSystemPrompt/generateSecrets pair, now the "secretsText"/
+    // "newPendingSecrets"/"pendingSecretUpdates" fields below (see EVENT:
+    // HIDDEN INFORMATION further down) — each of those used to independently
+    // pay for its own copy of sharedContext(state) (world setting, hero, full
+    // game-state JSON, active quests, known map), which was easily the
+    // largest part of every one of those prompts. Folding them into one call
+    // pays that cost exactly once per turn instead of five, six, or seven
+    // times, on top of cutting up to six API round-trips down to one — see
     // generateStateAndEvents, which parses the one JSON blob this produces
     // back into the same per-concern shapes the old separate calls returned,
     // so nothing downstream of it had to change. Combat asks for a "tier"
@@ -25595,6 +25661,15 @@ Respond with ONLY this hidden information (or the single word "(none)"), written
                 return `- id "${q.id}": "${q.title}" (given by ${q.giver})${stagePart}${npcPart}`;
             }).join('\n')}`
             : '\n\nTHE HERO CURRENTLY HAS NO ACTIVE QUESTS.';
+        // Mirrors questContext just above, for state.pendingSecrets (see
+        // PENDING_SECRET_STATUSES/reconcilePendingSecrets) — commitments raised
+        // by an earlier turn's own "secretsText"/"newPendingSecrets" (below)
+        // that haven't resolved yet, so "pendingSecretUpdates" always has real
+        // ids to reference and never re-raises one that's already tracked.
+        const pendingSecrets = state.pendingSecrets ? state.pendingSecrets.filter(p => p.status === 'pending') : [];
+        const pendingSecretsContext = pendingSecrets.length > 0
+            ? `\n\nHIDDEN PLANS/INTENTIONS ALREADY ON RECORD FROM AN EARLIER TURN'S HIDDEN INFORMATION (reference these ids in "pendingSecretUpdates" below — never invent a new id for one of these; a genuinely new plan goes in "newPendingSecrets" instead):\n${pendingSecrets.map(p => `- id "${p.id}": ${p.text}${p.trigger ? ` (TRIGGER: ${p.trigger})` : ''}`).join('\n')}`
+            : '\n\nNOTHING IS CURRENTLY ON RECORD FROM EARLIER HIDDEN INFORMATION.';
         const mapNodes = state.map && state.map.nodes.length > 0 ? state.map.nodes : [];
         const mapContext = mapNodes.length > 0
             ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character; do not create a near-duplicate with slightly different wording):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}`
@@ -25632,7 +25707,7 @@ Respond with ONLY this hidden information (or the single word "(none)"), written
             ? `
 
 === EVENT: ITEM OFFERS ===
-"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is single-use (potion, food, scroll). "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for this specifically, right now, as an open choice they still have to accept or decline (a merchant naming a price for goods, an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Omit it entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`
+"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is single-use (potion, food, scroll). "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "label" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for this specifically, right now, as an open choice they still have to accept or decline (a merchant naming a price for goods, an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Omit it entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`
             : '';
         // "suggestions" is deliberately the FIRST key in the schema below, not
         // last. This whole JSON blob can run long once npcs/inventory/quests
@@ -25643,14 +25718,14 @@ Respond with ONLY this hidden information (or the single word "(none)"), written
         // narrative text and active-quest/map context above are already enough
         // to suggest 3 generic next actions), so moving it first costs nothing
         // and means it survives even a badly truncated response.
-        return `You are the game-state engine for a text role-playing game. You are not the narrator — never write prose, only the JSON described below. Given the scene that just happened, you both (A) return the full updated structured state and (B) detect any of several distinct kinds of moment the scene may contain.
+        return `You are the game-state engine for a text role-playing game. You are not the narrator — never write prose except inside "secretsText" below, which is never shown to the hero. Given the scene that just happened, you (A) return the full updated structured state, (B) detect any of several distinct kinds of moment the scene may contain, and (C) extract hidden, behind-the-scenes information never shown to the player directly.
 
-${context}${questContext}${mapContext}${itemBudgetContext}
+${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContext}
 
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down"}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down"}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
@@ -25661,7 +25736,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no te
 "stats" has exactly three integers from 1 to 100: "strength", "agility", "intelligence" — the hero's innate physical and mental attributes. Calibration is DIFFERENT from health/psyche: an ordinary person's physical/mental attributes are NOT around 50 — they're modest, generally no higher than about 10, unless the world/hero description above explicitly establishes the hero as unusually strong, agile, or intelligent (only then can that specific attribute run meaningfully higher, scaled to how exceptional the description implies). Never default to 50 for these three out of habit. These represent lasting capability, not momentary condition, so change them rarely and only for a real reason (significant training, a crippling injury, a transformative event) — never fluctuate them scene to scene the way health/psyche do.
 "effects" is a list of the hero's current ongoing conditions — injuries, illnesses, poisons, curses, or similar lingering effects. Each entry is an object with "kind", "label", and "severity". "kind" MUST be exactly one of: "bleed" (an open, still-bleeding wound), "poison" (venom, toxin, or poisoning of any kind), "fracture" (a broken bone, crippled limb, or similarly serious injury that impairs movement or combat), "concussion" (a head injury or dazing blow), "exhaustion" (fatigue, starvation, dehydration, or being run ragged), "curse" (a supernatural affliction with no physical cause), "adrenaline" (a genuine combat-high, battle-fury, or similar temporary edge — this is the one entry on the list that HELPS the hero rather than hindering them), or "other" for any real bodily/mental condition that doesn't fit one of those (a rash, a phobia, a broken heart) — "other" is tracked for flavor only and carries no mechanical weight, so don't force a condition into a more specific kind just to make it "count". "label" is a short descriptive phrase, exactly like before (e.g. "deep gash on the left arm", "mild poisoning", "cursed with rotten luck"). "severity" is exactly one of "mild", "moderate", "severe", reflecting how serious the condition currently is — omit "severity" for "other". This field is STRICTLY limited to states of the hero's own body or mind — something a healer, priest, or physician could diagnose or treat. It is NEVER a place for plot state, situational facts, or story flags, no matter how much they might "affect" the hero going forward — do NOT put things like: a guard or NPC noticing/being suspicious of the hero, being watched or followed, an action being logged/recorded/tracked by some system, a need to stay still or quiet, an alarm or alert being raised, a secret being at risk of discovery, or any other note about what's happening in the world or what the hero should do next. That kind of information belongs in the narrative prose itself (and, if it meaningfully advances one, in "quests"/"progress" below) — never in this list. If in doubt whether something is a bodily/mental condition or a plot fact, leave it OUT of "effects". Add a new entry when the scene introduces a genuine condition, and remove an entry once the scene resolves or heals it. When an already-tracked condition (see CURRENT GAME STATE above, which shows its stored "kind" and "label") is still ongoing and unresolved, re-list it with that SAME "kind" and "label" rather than rephrasing it — the game uses that pairing to recognize it as the same condition continuing rather than a brand-new one starting over. This is separate from the health/psyche numbers — those track overall condition, this tracks what specifically is currently afflicting the hero's body or mind. Leave it as an empty list when nothing is currently afflicting the hero.
 Nothing else belongs in "stats" — no other attributes, skills, or invented characteristics.
-Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded" and "shield". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is anything single-use (a potion, food, a scroll). "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon.
+Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded" and "shield". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is anything single-use (a potion, food, a scroll). "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon.
 Only include an item in "inventory" if the scene explicitly settles the hero as now possessing it — already carried over from before, explicitly handed over and accepted, explicitly picked up, or (opening scene only) established as starting kit. An item that was merely offered, noticed, or nearby but not yet resolved does NOT belong in "inventory" yet — leave it out rather than assuming the hero took it.
 "currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity, ALREADY settled and done — a payment received, a price paid, money found and picked up, a bribe or toll, winnings or a loss from a wager, an outright theft. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. Do NOT use this field for a price a character has just named as something the hero can still accept or decline (a merchant's asking price, an innkeeper's rate, a fare, a demanded bribe not yet handed over) — that belongs in a priced "itemOffers" entry instead (see its "cost" field above), so the app only ever charges the hero once they actually confirm. "reason" is a short, dry phrase for what happened (e.g. "sold the pelts", "paid the ferryman"), omitted along with the rest of the field when amount is 0.
 "npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
@@ -25692,6 +25767,12 @@ If a fight is starting: "combat": {"combat": true, "enemyName": "short name or d
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of this opponent's overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate this honestly against what the story has actually established about the opponent — do not soften it toward something the hero is likely to beat.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
 "ambush" is true only when the hero is the one attacking, the target has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, and mutual/open hostility of any kind.${itemOffersSection}
+
+=== EVENT: HIDDEN INFORMATION ===
+"secretsText" is hidden, behind-the-scenes information about the scene that just happened, shown to the player in a separate panel the hero never sees — never prose that belongs in the story itself. Extract ONLY: (1) the private thoughts and intentions of characters present, ONLY where they differ from what was said or shown outwardly; (2) surrounding circumstances the hero can't perceive, ONLY if genuinely needed to understand the scene (skip this entirely if the scene's surface is already the whole picture). Nothing else — no world lore, no foreshadowing, no analysis, no restating what the scene already showed. If a character present has nothing hidden, say so in one short line or omit them. If NOTHING in the scene has a hidden layer at all, set "secretsText" to exactly "(none)".
+STYLE for "secretsText" — IMPORTANT: as terse as possible while staying clear — one short line per character, plain facts only, no elaboration, no philosophizing, no metaphor; this is a bare-bones briefing, not prose. Third person throughout, like an outside observer — never address anyone as "you," including the hero (${heroName || 'the hero'}): describe them the same way as any other character (e.g. "${heroName || 'The hero'} was not noticed doing…"). Always written in ${narrativeLanguage}, regardless of this being one field among many in an otherwise unlabeled JSON object.
+
+"newPendingSecrets" and "pendingSecretUpdates" track commitments raised by "secretsText" over multiple turns, referencing the list given above under "HIDDEN PLANS/INTENTIONS ALREADY ON RECORD" (if any) — this is what stops a planted intention from quietly vanishing once this turn scrolls out of context. "newPendingSecrets" is for a hidden CONCRETE PLAN OR INTENTION revealed in "secretsText" this turn that hasn't played out yet and needs to be paid off later — a character privately deciding to act against, help, betray, ambush, or intervene for someone, a scheme being set in motion — NOT a passing feeling, opinion, or mood with nothing to act on; most turns should add nothing here at all. Each entry's optional "trigger" is for the case where the hidden information itself made the firing condition explicit and mechanical — e.g. "the hero picks up/takes the item on the floor," "the hero opens that door," "the hero speaks that name aloud" — versus a looser intention like "waiting for a chance to strike" which has no single trigger and should omit the field. "pendingSecretUpdates" marks an existing entry from the list above "fulfilled" the moment its plan actually plays out in a LATER scene (never the same turn it was first raised), or "moot" if something in the story has made it permanently impossible or irrelevant (the schemer died, the target left for good, the hero pre-empted it). Both "text" (and "trigger", if set) must be in ${narrativeLanguage}. Omit either array entirely if it has nothing to add — do not force an empty array's worth of invented content just to fill the field.
 
 === SUGGESTIONS ===
 "suggestions" always has exactly 3 short, concrete, varied possible next actions the hero could take next — each no more than a short sentence. Always exactly 3, no matter what: even if the scene ends on an offered item, a question, or any other pause awaiting the player's choice — that pending choice (if any) is handled through the event fields above, so your 3 suggestions should be things the hero could do next regardless of how that choice resolves (talk to someone present, examine something, move on, ask a question), not a restatement of the choice itself. Whenever this turn's own "travelOffer" above is non-null, this rule is absolute for travel specifically: none of the 3 suggestions may involve heading off toward, setting out for, or otherwise traveling to the offered place or anywhere else — the hero may end up staying exactly where they are, so a suggestion here must never presume the trip, hint at it, or offer a second, disguised way into the same choice the travel widget is already handling.
@@ -25817,11 +25898,6 @@ ${chunkText}`;
         catch (e) {
             // best-effort — see comment above the function
         }
-    }
-    async function generateSecrets(narrativeText, currentState) {
-        const raw = await callGemini(buildSecretsSystemPrompt(currentState), [{ role: 'user', content: 'Scene:\n\n' + narrativeText }]);
-        const trimmed = (raw || '').trim();
-        return /^\(none\)$/i.test(trimmed) ? '' : trimmed;
     }
     // Reads whatever the PRECEDING narrator turn offered and what the player
     // actually clicked ✓ on for it, keyed by lowercase label -> the slot/
@@ -26115,6 +26191,35 @@ ${chunkText}`;
             }
         }
         return { quests, reputationDeltas, factionReputationDeltas, xpGained };
+    }
+    // Mirrors reconcileQuests' shape but far simpler: no reputation/XP side
+    // effects, no stages, no offer/acceptance step — just a status machine
+    // (pending -> fulfilled/moot) plus new entries appended each turn.
+    // Called from generateStateAndEvents itself using that same call's own
+    // "newPendingSecrets"/"pendingSecretUpdates" fields (see EVENT: HIDDEN
+    // INFORMATION in buildStateAndEventsSystemPrompt) — these use to come
+    // from a separate generateSecrets call, since folded into this one.
+    function reconcilePendingSecrets(currentState, rawUpdates, rawNew) {
+        const updatesById = new Map((Array.isArray(rawUpdates) ? rawUpdates : [])
+            .filter(u => u && typeof u.id === 'string' && u.id.trim())
+            .map(u => [u.id.trim(), u.status]));
+        const carried = (currentState.pendingSecrets || []).map(entry => {
+            if (entry.status !== 'pending')
+                return entry;
+            const nextStatus = updatesById.get(entry.id);
+            return (PENDING_SECRET_STATUSES.includes(nextStatus) && nextStatus !== 'pending')
+                ? { ...entry, status: nextStatus }
+                : entry;
+        });
+        const fresh = (Array.isArray(rawNew) ? rawNew : [])
+            .filter(e => e && typeof e.text === 'string' && e.text.trim())
+            .map(e => ({
+            id: 'secret-' + randomSlug(),
+            text: e.text.trim(),
+            trigger: typeof e.trigger === 'string' && e.trigger.trim() ? e.trigger.trim() : null,
+            status: 'pending'
+        }));
+        return [...carried, ...fresh];
     }
     // Sentinel "location" value for a character actively travelling
     // alongside the hero right now (a companion, an escort, active pursuit)
@@ -26437,7 +26542,13 @@ ${chunkText}`;
             npcs,
             quests,
             map,
-            factions: reconcileFactions(parsed.factions, currentState.factions)
+            factions: reconcileFactions(parsed.factions, currentState.factions),
+            // Reconciled from the SAME response as everything else above now —
+            // "secretsText" is extracted from this scene's hidden layer, so it's
+            // naturally the same call that decides whether one of its plans is
+            // brand new or an existing one just resolved. See
+            // PENDING_SECRET_STATUSES/reconcilePendingSecrets.
+            pendingSecrets: reconcilePendingSecrets(currentState, parsed.pendingSecretUpdates, parsed.newPendingSecrets)
         };
         // Consumed for this turn — see requestMapTravel/pendingMapDestinationRef.
         pendingMapDestinationRef.current = null;
@@ -26449,7 +26560,6 @@ ${chunkText}`;
         // --- quest offers (was generateQuestOffers) ---
         const activeQuests = currentState.quests.filter(q => q.status === 'active');
         const activeIds = new Set(activeQuests.map(q => q.id));
-        const randomSlug = () => Math.random().toString(36).slice(2, 8);
         const newOffersRaw = Array.isArray(parsed.newQuestOffers) ? parsed.newQuestOffers : [];
         const questOffers = newOffersRaw
             .filter(o => o && typeof o.title === 'string' && o.title.trim() && typeof o.giver === 'string' && o.giver.trim())
@@ -26529,7 +26639,11 @@ ${chunkText}`;
                 rarity: rollItemRarity()
             }))
         }));
-        return { state, surpriseItems, reputationDeltas, factionReputationDeltas, npcRenames, kindnessCooldownNpcs, suggestions, questOffers, rewardOffers, travelOffer, combatEncounter, itemOffers, startingPartyMembers };
+        // --- hidden information (was generateSecrets, now folded into this
+        // same response — see the EVENT: HIDDEN INFORMATION section above) ---
+        const secretsTextRaw = typeof parsed.secretsText === 'string' ? parsed.secretsText.trim() : '';
+        const secretsText = /^\(none\)$/i.test(secretsTextRaw) ? '' : secretsTextRaw;
+        return { state, surpriseItems, reputationDeltas, factionReputationDeltas, npcRenames, kindnessCooldownNpcs, suggestions, questOffers, rewardOffers, travelOffer, combatEncounter, itemOffers, startingPartyMembers, secretsText };
     }
     // Returns null when nothing in the story could revive the hero (also the
     // safe fallback on any parsing/network failure — see tryResurrection,
@@ -26573,7 +26687,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no text before or af
 
 Rules:
 - "id": short, lowercase, ascii, unique slug.
-- Every item needs a "slot", classified immediately: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (a small valuable, trinket, or document). A shield is also "weapon".
+- Every item needs a "slot", classified immediately: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (a small valuable, trinket, or document). A shield is also "weapon". "ring" also covers bracelets, bangles, and cuffs (there's no separate wrist slot); "amulet" is neck-worn only (pendant, necklace, talisman, medallion) and must never label a bracelet. The "label" must describe the same physical object as the slot chosen — never mismatch them (e.g. a bracelet tagged "amulet").
 - "twoHanded" is true only for a weapon needing both hands — omit or set false otherwise, and omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed.
 - "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon.
 - Keep it plausible and modest for what was actually described — an ordinary bandit shouldn't drop what a war-hardened knight would carry, and a mindless beast or ooze has nothing worth taking.
@@ -27050,8 +27164,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         }
         catch (e) {
             // Fails silently and simply skips the check for this turn, exactly like
-            // generateSecrets/generateStateAndEvents fail back to their own empty
-            // defaults below — this call is a hidden enhancement layered on top of
+            // generateStateAndEvents falls back to EMPTY_STATE_AND_EVENTS_FALLBACK
+            // below — this call is a hidden enhancement layered on top of
             // the narrative, never a blocker for it. When it comes back null, the
             // narrator simply falls back to GAME MASTER RULE 4 alone, same as
             // before this system existed.
@@ -27094,16 +27208,18 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             },
             surpriseItems: [], reputationDeltas: {}, factionReputationDeltas: {}, npcRenames: [], kindnessCooldownNpcs: [],
             suggestions: FALLBACK_SUGGESTIONS[uiLang] || FALLBACK_SUGGESTIONS.ru,
-            questOffers: [], rewardOffers: [], travelOffer: null, combatEncounter: null, itemOffers: [], startingPartyMembers: []
+            questOffers: [], rewardOffers: [], travelOffer: null, combatEncounter: null, itemOffers: [], startingPartyMembers: [],
+            secretsText: ''
         };
     };
-    // Three calls on an ordinary turn now: an optional action-check
+    // Two calls on an ordinary turn now: an optional action-check
     // classification first (see generateActionCheck — skipped on the opening
     // turn and while combat is unresolved, so plenty of turns still only make
-    // two), then the narrative itself, then secrets and the combined
-    // state/events extraction in parallel (both only need the narrative text,
-    // not each other) — see generateStateAndEvents for what used to be five
-    // separate requests here.
+    // one), then the narrative itself, then the single combined state/events/
+    // hidden-information extraction — see generateStateAndEvents for what
+    // used to be up to seven separate requests here, including its own former
+    // secrets/pendingSecrets round trip (buildSecretsSystemPrompt/
+    // generateSecrets, since removed).
     async function callGameMaster(historyMessages, currentState, isOpeningTurn) {
         usageAccumulatorRef.current = { output: 0 };
         // buildTurns(historyMessages).length is how many complete turns already
@@ -27126,16 +27242,10 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const lastPlayerMessage = (isOpeningTurn || combatStillPending) ? null : [...historyMessages].reverse().find(m => m.role === 'player');
         const actionCheck = lastPlayerMessage ? await generateActionCheck(lastPlayerMessage.text, currentState, precedingNarrator) : null;
         const narrative = await generateNarrative(historyMessages, currentState, actionCheck);
-        const [secrets, combined] = await Promise.all([
-            withRateLimitRetry(() => generateSecrets(narrative, currentState)).catch(e => {
-                console.error('[Grimoire] generateSecrets failed, secrets skipped this turn:', e);
-                return '';
-            }),
-            withRateLimitRetry(() => generateStateAndEvents(narrative, currentState, precedingNarrator, isOpeningTurn, turnIndex)).catch(e => {
-                console.error('[Grimoire] generateStateAndEvents failed, character sheet NOT updated this turn:', e);
-                return EMPTY_STATE_AND_EVENTS_FALLBACK(currentState, precedingNarrator, isOpeningTurn);
-            })
-        ]);
+        const combined = await withRateLimitRetry(() => generateStateAndEvents(narrative, currentState, precedingNarrator, isOpeningTurn, turnIndex)).catch(e => {
+            console.error('[Grimoire] generateStateAndEvents failed, character sheet NOT updated this turn:', e);
+            return EMPTY_STATE_AND_EVENTS_FALLBACK(currentState, precedingNarrator, isOpeningTurn);
+        });
         const tokenUsage = usageAccumulatorRef.current.output;
         const declaredOffers = combined.itemOffers;
         // A "surprise" item might also have its own proper declared offer this
@@ -27153,7 +27263,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const surpriseGroup = buildSurpriseOfferGroup(dedupedSurprises);
         return {
             narrative,
-            secrets,
+            secrets: combined.secretsText || '',
             state: combined.state,
             suggestions: combined.suggestions,
             itemOffers: surpriseGroup ? [...declaredOffers, surpriseGroup] : declaredOffers,
@@ -29015,7 +29125,24 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             // its base and silently bundle the old failed message in with the
             // new one, sending both together. Reverting to `base` here prevents
             // that.
-            setMessages(base);
+            // `base` can itself already carry an optimistic mutation made just
+            // before this call: accepting a travel offer (see toggleTravelOffer)
+            // marks it resolved right away so the auto-continue action below can
+            // report the choice, then fires this same sendBatch to actually
+            // narrate the trip. If that narration never comes back, the trip
+            // never really happened — but the offer's own message was already
+            // marked resolved, so reverting to `base` as-is would leave the
+            // travel widget permanently hidden (TravelOffer returns null once
+            // travelOfferResolution is set) with no way to accept or decline
+            // again. Undo that one mutation too when it's still sitting
+            // unrealized at the end of `base`, so the buttons come back.
+            let reverted = base;
+            const lastBase = base.length > 0 ? base[base.length - 1] : null;
+            if (lastBase && lastBase.role === 'narrator' && lastBase.travelOffer && lastBase.travelOfferResolution === true) {
+                const { travelOfferResolution, ...withoutResolution } = lastBase;
+                reverted = [...base.slice(0, -1), withoutResolution];
+            }
+            setMessages(reverted);
             setError(describeError(e, 'sendFailedPrefix'));
         }
         finally {
@@ -29861,8 +29988,8 @@ const APP_STYLES = `
   .narrative-inner { max-width: 42rem; margin: 0 auto; }
   .narrator-block { margin: 0 0 1.25rem; }
   .narrative-text { font-family: 'EB Garamond', serif; color: var(--amber-50); font-size: 1.15rem; line-height: 1.7; white-space: pre-wrap; margin: 0; }
-  .entity-link { color: var(--amber-400); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
-  .entity-link:hover, .entity-link:focus-visible { color: var(--amber-300); text-decoration-style: solid; }
+  .entity-link { color: var(--amber-400); cursor: pointer; text-decoration: none; text-underline-offset: 3px; }
+  .entity-link:hover, .entity-link:focus-visible { color: var(--amber-300); text-decoration: underline solid; }
   .entity-link:focus-visible { outline: 2px solid var(--amber-400); outline-offset: 2px; border-radius: 2px; }
   .narrator-text-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
   .narrator-edit { margin-bottom: 0.5rem; }
