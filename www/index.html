@@ -29096,6 +29096,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             setMessages(updatedMessages);
             setGameState(result.state);
             setLastTokenUsage(result.tokenUsage);
+            maybeShowAd(result.turnIndex);
             // Chained the same way as handleStart above: each call's returned
             // value feeds the next, and the final values go straight to saveGame
             // instead of letting it fall back to the pre-turn closure state (which
@@ -30485,6 +30486,53 @@ const APP_STYLES = `
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
 
+
+// ---- Ads (Android app only — does nothing on the plain web version) ----
+const ADMOB_INTERSTITIAL_AD_UNIT_ID = 'ca-app-pub-6984929241398787/5963492244';
+let admobInterstitialReady = false;
+function isNativeApp() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+async function prepareAd() {
+    if (!isNativeApp())
+        return;
+    try {
+        const { AdMob } = window.Capacitor.Plugins;
+        await AdMob.prepareInterstitial({ adId: ADMOB_INTERSTITIAL_AD_UNIT_ID });
+        admobInterstitialReady = true;
+    }
+    catch (e) {
+        console.warn('AdMob prepare failed', e);
+    }
+}
+async function initAds() {
+    if (!isNativeApp())
+        return;
+    try {
+        const { AdMob } = window.Capacitor.Plugins;
+        await AdMob.initialize({});
+        await prepareAd();
+    }
+    catch (e) {
+        console.warn('AdMob init failed', e);
+    }
+}
+async function maybeShowAd(turnIndex) {
+    if (!isNativeApp() || !admobInterstitialReady || !turnIndex || turnIndex % 5 !== 0)
+        return;
+    try {
+        const { AdMob } = window.Capacitor.Plugins;
+        admobInterstitialReady = false;
+        await AdMob.showInterstitial();
+    }
+    catch (e) {
+        console.warn('AdMob show failed', e);
+    }
+    finally {
+        prepareAd();
+    }
+}
+initAds();
 
 // ---- Mount ----
 const root = ReactDOM.createRoot(document.getElementById('root'));

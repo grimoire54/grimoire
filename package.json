@@ -4,7 +4,8 @@
   "private": true,
   "description": "Android wrapper for the Grimoire text RPG",
   "dependencies": {
-    "@capacitor/core": "^8.0.0"
+    "@capacitor/core": "^8.0.0",
+    "@capacitor-community/admob": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
