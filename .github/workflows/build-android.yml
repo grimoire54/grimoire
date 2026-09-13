@@ -34,8 +34,25 @@ jobs:
 
       - name: Register the AdMob App ID
         run: |
-          sed -i '/<application/a\    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id" />' android/app/src/main/AndroidManifest.xml
-          sed -i 's#</resources>#    <string name="admob_app_id">ca-app-pub-6984929241398787~9526945696</string>\n</resources>#' android/app/src/main/res/values/strings.xml
+          python3 - <<'PY'
+          import re
+
+          manifest_path = 'android/app/src/main/AndroidManifest.xml'
+          with open(manifest_path, 'r', encoding='utf-8') as f:
+              manifest = f.read()
+          meta_data = '<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id" />'
+          manifest = re.sub(r'(<application\b[^>]*>)', r'\1\n        ' + meta_data, manifest, count=1)
+          with open(manifest_path, 'w', encoding='utf-8') as f:
+              f.write(manifest)
+
+          strings_path = 'android/app/src/main/res/values/strings.xml'
+          with open(strings_path, 'r', encoding='utf-8') as f:
+              strings = f.read()
+          admob_string = '    <string name="admob_app_id">ca-app-pub-6984929241398787~9526945696</string>\n'
+          strings = strings.replace('</resources>', admob_string + '</resources>')
+          with open(strings_path, 'w', encoding='utf-8') as f:
+              f.write(strings)
+          PY
 
       - name: Apply the app icon
         run: npx capacitor-assets generate --android --iconBackgroundColor '#0c0a09' --iconBackgroundColorDark '#0c0a09'
