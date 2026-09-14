@@ -17350,6 +17350,12 @@ const TRANSLATIONS = {
         cloudOverwriteConfirm: 'В этом слоте уже есть сохранение. Перезаписать?',
         cloudLoadConfirm: 'Загрузить это сохранение? Текущий прогресс в приложении будет заменён.',
         cloudDeleteConfirm: 'Удалить это сохранение? Отменить не получится.',
+        cloudOverwriteConfirmTitle: 'Перезаписать сохранение?',
+        cloudLoadConfirmTitle: 'Загрузить сохранение?',
+        cloudDeleteConfirmTitle: 'Удалить сохранение?',
+        cloudOverwriteConfirmButton: 'Да, перезаписать',
+        cloudLoadConfirmButton: 'Да, загрузить',
+        cloudDeleteConfirmButton: 'Да, удалить',
         cloudCheckEmailNotice: 'Проверь почту и подтверди адрес — после этого сможешь войти.',
         cloudErrorPrefix: 'Ошибка: ',
         cloudLoadingLabel: 'Загрузка…',
@@ -17406,6 +17412,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Дальше',
         sendFailedPrefix: 'Мастер игры не ответил: ',
         rateLimitError: 'У ключа закончились доступные сейчас запросы к нейросети (лимит Gemini API) — он сбрасывается примерно раз в 24 часа. Попробуй вернуться через сутки или используй другой аккаунт с другим ключом.',
+        authError: 'Ключ Gemini API не принят — проверь, что он вставлен правильно, в настройках.',
         // -- Turn labels & play-screen menu items --
         playerLabel: 'Ты',
         directorLabel: '📝 Указание',
@@ -17480,6 +17487,7 @@ const TRANSLATIONS = {
         inventorySortWeight: 'По весу',
         inventorySortRarity: 'По редкости',
         inventorySortName: 'По имени',
+        inventorySortType: 'По типу',
         inventoryFilterLabel: 'Фильтр',
         inventoryFilterAll: 'Все',
         inventoryFilterEmpty: 'Нет предметов такого типа.',
@@ -17576,12 +17584,18 @@ const TRANSLATIONS = {
         combatLogBlockPartialText: 'Блок смягчает часть удара',
         combatLogParryPartialText: 'Парирование сбивает часть силы удара',
         combatLogParryRiposteText: 'Открывшегося противника настигает ответный удар',
+        combatLogStunAppliedText: 'оглушён',
+        combatLogStunSkipText: 'оглушён — пропускает ход',
         combatUnarmedLabel: 'кулак',
         combatUnarmedEnemyLabel: 'кулаки',
         combatPartDisabledSuffix: 'не действует',
         combatVitalHitSuffix: 'получает критическое повреждение — бой окончен',
         combatFxBlockLabel: 'БЛОК',
+        combatFxParryLabel: 'ПАРИРОВАНИЕ',
+        combatFxDodgeLabel: 'УКЛОНЕНИЕ',
         combatFxMissLabel: 'МИМО',
+        combatFxDamageLabel: 'урон',
+        combatFxStunLabel: 'ОГЛУШЁН',
         combatVictoryTitle: 'Победа',
         combatVictoryText: 'Противник повержен. Урон и потери учтены в состоянии героя.',
         combatDeathResultTitle: 'Смертельный удар',
@@ -17615,8 +17629,12 @@ const TRANSLATIONS = {
         // -- Quest journal modal --
         questJournalModalTitle: 'Журнал заданий',
         questJournalEmptyText: 'Журнал пуст — задания появятся по ходу истории.',
+        questFilterEmptyText: 'В этой категории пока нет заданий.',
+        questSortLabel: 'Сортировка',
         questSortButtonNewestFirst: 'Сначала новые',
         questSortButtonOldestFirst: 'Сначала старые',
+        questFilterLabel: 'Статус',
+        questFilterAll: 'Все',
         questActiveHeading: 'Текущие',
         questCompletedHeading: 'Выполненные',
         questFailedHeading: 'Проваленные',
@@ -17679,6 +17697,9 @@ const TRANSLATIONS = {
         groupCapacityLabel: 'Спутников',
         groupEmptyText: 'Пока никто не путешествует с тобой.',
         dismissFromPartyButton: 'Отпустить',
+        dismissConfirmTitle: 'Отпустить спутника?',
+        dismissConfirmText: 'Он покинет группу и продолжит свой путь один, пока ты не решишь позвать его снова.',
+        dismissConfirmButton: 'Да, отпустить',
         recruitLink: 'Позвать в группу',
         recruitModalTitle: 'Приглашение в группу',
         recruitConfirmText: 'Он присоединится к тебе и будет путешествовать вместе, пока ты не решишь иначе.',
@@ -17821,6 +17842,12 @@ const TRANSLATIONS = {
         cloudOverwriteConfirm: 'This slot already has a save. Overwrite it?',
         cloudLoadConfirm: "Load this save? Your current in-app progress will be replaced.",
         cloudDeleteConfirm: "Delete this save? This can't be undone.",
+        cloudOverwriteConfirmTitle: 'Overwrite this save?',
+        cloudLoadConfirmTitle: 'Load this save?',
+        cloudDeleteConfirmTitle: 'Delete this save?',
+        cloudOverwriteConfirmButton: 'Yes, overwrite',
+        cloudLoadConfirmButton: 'Yes, load',
+        cloudDeleteConfirmButton: 'Yes, delete',
         cloudCheckEmailNotice: 'Check your email to confirm your address — then you can sign in.',
         cloudErrorPrefix: 'Error: ',
         cloudLoadingLabel: 'Loading…',
@@ -17877,6 +17904,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Next',
         sendFailedPrefix: "The game master didn't respond: ",
         rateLimitError: "This key is out of available AI requests for now (Gemini API limit) — it resets roughly once every 24 hours. Try again in a day, or use a different account with a different key.",
+        authError: "The Gemini API key wasn't accepted — check that it's entered correctly in settings.",
         // -- Turn labels & play-screen menu items --
         playerLabel: 'You',
         directorLabel: '📝 Note',
@@ -17951,6 +17979,7 @@ const TRANSLATIONS = {
         inventorySortWeight: 'By weight',
         inventorySortRarity: 'By rarity',
         inventorySortName: 'By name',
+        inventorySortType: 'By type',
         inventoryFilterLabel: 'Filter',
         inventoryFilterAll: 'All',
         inventoryFilterEmpty: 'No items of this type.',
@@ -18047,12 +18076,18 @@ const TRANSLATIONS = {
         combatLogBlockPartialText: 'The block softens some of the blow',
         combatLogParryPartialText: "The parry deflects some of the blow's force",
         combatLogParryRiposteText: 'The opening is met with a counter-strike',
+        combatLogStunAppliedText: 'stunned',
+        combatLogStunSkipText: 'stunned — skips turn',
         combatUnarmedLabel: 'fist',
         combatUnarmedEnemyLabel: 'fists',
         combatPartDisabledSuffix: 'disabled',
         combatVitalHitSuffix: 'takes a critical hit — the fight is over',
         combatFxBlockLabel: 'BLOCK',
+        combatFxParryLabel: 'PARRY',
+        combatFxDodgeLabel: 'DODGE',
         combatFxMissLabel: 'MISS',
+        combatFxDamageLabel: 'dmg',
+        combatFxStunLabel: 'STUNNED',
         combatVictoryTitle: 'Victory',
         combatVictoryText: "The enemy is defeated. Damage and losses are reflected in the hero's condition.",
         combatDeathResultTitle: 'Fatal blow',
@@ -18086,8 +18121,12 @@ const TRANSLATIONS = {
         // -- Quest journal modal --
         questJournalModalTitle: 'Quest journal',
         questJournalEmptyText: 'The journal is empty — quests will appear as the story unfolds.',
+        questFilterEmptyText: 'No quests in this category yet.',
+        questSortLabel: 'Sort',
         questSortButtonNewestFirst: 'Newest first',
         questSortButtonOldestFirst: 'Oldest first',
+        questFilterLabel: 'Status',
+        questFilterAll: 'All',
         questActiveHeading: 'Active',
         questCompletedHeading: 'Completed',
         questFailedHeading: 'Failed',
@@ -18150,6 +18189,9 @@ const TRANSLATIONS = {
         groupCapacityLabel: 'Companions',
         groupEmptyText: 'No one is traveling with you yet.',
         dismissFromPartyButton: 'Dismiss',
+        dismissConfirmTitle: 'Dismiss this companion?',
+        dismissConfirmText: 'They will leave the group and continue on their own, until you decide to call them back.',
+        dismissConfirmButton: 'Yes, dismiss',
         recruitLink: 'Invite to group',
         recruitModalTitle: 'Invite to the group',
         recruitConfirmText: 'They will join you and travel together, until you decide otherwise.',
@@ -18763,8 +18805,24 @@ function reconcileMap(rawLocation, currentState) {
     // anchor.layer + 1 or - 1. Only matters for a NEW node; revisiting an
     // already-known place (the `existing` branch below) keeps whatever layer
     // it was first created with, full stop.
-    function upsert(name, kind, description, questId, stageId, direction, fromNode, faction, danger, verticalMove, far) {
-        const existing = byName(name);
+    // "previousName" is how a place first tracked under a generic or
+    // placeholder label (no proper name known yet) gets promoted to its real
+    // name once the story actually reveals it — mirrors reconcileNpcs's own
+    // handling of a character first tracked under a role or description
+    // rather than a name. Without this, a genuinely new name reported for
+    // the same physical place would either leave the stale placeholder on
+    // the map forever (byName above only matches by name, and a real name
+    // is genuinely different text from whatever placeholder came before it)
+    // or spawn a second, duplicate node right next to the original — so
+    // this looks the node up by its OLD name instead and renames that SAME
+    // node in place.
+    function upsert(name, kind, description, questId, stageId, direction, fromNode, faction, danger, verticalMove, far, previousName) {
+        let existing = byName(name);
+        if (!existing && typeof previousName === 'string' && previousName.trim()) {
+            existing = byName(previousName);
+            if (existing)
+                existing.name = name.trim();
+        }
         if (existing) {
             if (!existing.description && description)
                 existing.description = description;
@@ -18805,7 +18863,7 @@ function reconcileMap(rawLocation, currentState) {
         nodes.push(node);
         return node;
     }
-    const currentNode = upsert(rawLocation.current, rawLocation.kind, rawLocation.description, rawLocation.questId, rawLocation.stageId, rawLocation.directionFromPrevious, priorCurrent, rawLocation.faction, rawLocation.danger, rawLocation.verticalMove);
+    const currentNode = upsert(rawLocation.current, rawLocation.kind, rawLocation.description, rawLocation.questId, rawLocation.stageId, rawLocation.directionFromPrevious, priorCurrent, rawLocation.faction, rawLocation.danger, rawLocation.verticalMove, false, rawLocation.previousName);
     currentNode.discovered = true;
     // A node the hero is now actually standing in is never still "pending" —
     // without this, a "far" node the model teleports the hero straight into
@@ -18830,7 +18888,7 @@ function reconcileMap(rawLocation, currentState) {
         if (!spot || typeof spot.name !== 'string' || !spot.name.trim())
             continue;
         const far = spot.far === true;
-        const node = upsert(spot.name, spot.kind, spot.description, spot.questId, spot.stageId, spot.direction, currentNode, spot.faction, spot.danger, spot.verticalMove, far);
+        const node = upsert(spot.name, spot.kind, spot.description, spot.questId, spot.stageId, spot.direction, currentNode, spot.faction, spot.danger, spot.verticalMove, far, spot.previousName);
         // A far node is explicitly not reachable from here, so unlike a near
         // one it never gets an edge back to the current node — that keeps the
         // map from drawing a path to it and keeps its popup from offering it as
@@ -21114,7 +21172,13 @@ const COMBAT_TUNING = {
     stealthKillAgilityScale: 2.5, // % shift in kill chance per point of hero agility above baseline
     stealthMissBaseChance: 25, // % chance the ambush lands no damage at all
     stealthMissAgilityScale: 1.8, // higher agility reduces this
-    stealthDamageFraction: 0.6 // fraction of a normal hit's damage a non-lethal stealth strike still deals
+    stealthDamageFraction: 0.6, // fraction of a normal hit's damage a non-lethal stealth strike still deals
+    // A solid (non-fight-ending) hit to the head has this % chance to stun
+    // its target — see resolveOneAttack's stunApplied and resolveStunSkip.
+    // Not spelled out anywhere else, so calibrated as a design assumption:
+    // common enough to matter tactically, not so common it dominates every
+    // head-targeted swing.
+    headStunChance: 35
 };
 // Weapon damage is deliberately the dominant factor in a hit (see
 // computeWeaponDamage) — strength only nudges it. Numbers are per hit,
@@ -22903,9 +22967,7 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
         React.createElement("div", { className: "sheet-vitals" },
             React.createElement("div", { className: "sheet-vital-row" },
                 React.createElement("span", { className: "sheet-stat-label" }, t('levelLabel')),
-                React.createElement("span", { className: "sheet-vital-value" },
-                    gameState.level,
-                    gameState.level >= LEVEL_CAP ? '' : ' / ' + LEVEL_CAP)),
+                React.createElement("span", { className: "sheet-vital-value" }, gameState.level)),
             (() => {
                 const xpInfo = computeXpBarInfo(gameState.level, gameState.xp);
                 return (React.createElement("div", { className: "xp-bar-track", "aria-label": t('xpLabel') + ': ' + xpInfo.current + '/' + xpInfo.needed },
@@ -22978,7 +23040,7 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                     " (",
                     inventoryGroups.reduce((sum, g) => sum + g.count, 0),
                     ")")))))),
-        gameState.quests.length > 0 && (React.createElement("div", { className: "sheet-section" },
+        gameState.quests.some(q => q.status === 'active') && (React.createElement("div", { className: "sheet-section" },
             React.createElement("div", { className: "sheet-section-header" },
                 React.createElement("p", { className: "sheet-heading" }, t('questsHeading')),
                 onOpenQuests && React.createElement("button", { onClick: onOpenQuests, className: "sheet-heading-link", type: "button" },
@@ -22991,11 +23053,7 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                     activeStages.length > 0 ? (React.createElement("p", { className: "sheet-quest-meta" }, activeStages.map(s => s.title).join(' · '))) : (React.createElement("p", { className: "sheet-quest-meta" },
                         q.giver,
                         q.reward ? ' · ' + q.reward : ''))));
-            }),
-            gameState.quests.filter(q => q.status !== 'active').map(q => (React.createElement("p", { key: q.id, className: 'sheet-quest-resolved' + (q.status === 'completed' ? ' sheet-quest-completed' : ' sheet-quest-failed') },
-                q.title,
-                " \u2014 ",
-                q.status === 'completed' ? t('questStatusCompleted') : t('questStatusFailed')))))),
+            }))),
         gameState.npcs.length > 0 && (React.createElement("div", { className: "sheet-section" },
             React.createElement("p", { className: "sheet-heading" }, t('npcsHeading')),
             [...gameState.npcs].sort((a, b) => (b.presentNow === true ? 1 : 0) - (a.presentNow === true ? 1 : 0)).map((n, i) => {
@@ -23408,13 +23466,41 @@ function RecruitModal({ npcName, partyFull, onConfirm, onCancel, t }) {
 // maxPsyche/stats/effects exist ONLY once someone is a party member (see the companion
 // branch in reconcileNpcs) and simply read as "—" until the next turn's
 // state extraction has had a chance to fill them in for a just-recruited
-// companion. Dismissing is a single direct action, unlike recruiting —
-// it only ever shrinks the roster and reputation is untouched, so there's
-// nothing here worth a confirm step the way a gift or a recruit gets one.
+// companion. Dismissing only ever shrinks the roster and reputation is
+// untouched, but it's still a one-way action from the player's point of
+// view, so it gets the same list->confirm swap as PartyGearModal's
+// take-back flow (see dismissConfirmName below) before it actually calls
+// onDismiss.
 function GroupModal({ party, npcs, onDismiss, onOpenGear, onClose, t }) {
     const members = (party || [])
         .map(key => (npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key))
         .filter(Boolean);
+    // Collapsed to just the name by default — same expand-on-tap pattern as
+    // the NPC roster in CharacterSheet (see expandedNpcs there) — keyed by
+    // lowercased name so a toggle survives the list re-sorting or the party
+    // gaining/losing members between renders.
+    const [expandedMembers, setExpandedMembers] = useState(() => new Set());
+    // Dismissing now asks for confirmation first — same list->confirm swap
+    // of the ENTIRE modal content that PartyGearModal's takeBackIndex and
+    // DropConfirmModal's flow use elsewhere, rather than stacking a second
+    // modal on top. Holds the member's display name (not the lowercased
+    // key) so the confirm screen and the eventual onDismiss call both have
+    // exactly what they need without re-deriving it.
+    const [dismissConfirmName, setDismissConfirmName] = useState(null);
+    if (dismissConfirmName) {
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                setDismissConfirmName(null); } },
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" }, t('dismissConfirmTitle')),
+                React.createElement("p", { className: "hint-text hint-text-block warning-text" },
+                    t('dismissConfirmText'),
+                    " [",
+                    dismissConfirmName,
+                    "]"),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: () => setDismissConfirmName(null), className: "btn btn-ghost", type: "button" }, t('cancelButton')),
+                    React.createElement("button", { onClick: () => { onDismiss(dismissConfirmName); setDismissConfirmName(null); }, className: "btn btn-danger", type: "button" }, t('dismissConfirmButton'))))));
+    }
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card group-card" },
@@ -23426,50 +23512,65 @@ function GroupModal({ party, npcs, onDismiss, onOpenGear, onClose, t }) {
                 " / ",
                 MAX_PARTY_SIZE),
             members.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('groupEmptyText')),
-            members.map((n, i) => (React.createElement("div", { key: i, className: "group-member" },
-                React.createElement("div", { className: "group-member-header" },
-                    React.createElement("span", { className: "sheet-npc-name" }, n.name)),
-                React.createElement("div", { className: "group-member-actions" },
-                    onOpenGear && React.createElement("button", { onClick: () => onOpenGear(n.name), className: "btn btn-ghost", type: "button" },
-                        React.createElement("img", { src: EQUIP_ICON_ARMOR, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
-                        " ",
-                        t('equipmentButton')),
-                    React.createElement("button", { onClick: () => onDismiss(n.name), className: "btn btn-ghost", type: "button" }, t('dismissFromPartyButton'))),
-                n.note && React.createElement("p", { className: "sheet-npc-note" }, n.note),
-                React.createElement("div", { className: "sheet-vitals" },
-                    React.createElement("div", { className: "sheet-vital-row" },
-                        React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
-                        React.createElement("span", { className: "sheet-vital-value" }, typeof n.health === 'number' ? (n.health + '/' + (typeof n.maxHealth === 'number' ? n.maxHealth : n.health)) : '—')),
-                    React.createElement("div", { className: "sheet-vital-row" },
-                        React.createElement("span", { className: "sheet-stat-label" }, t('psycheLabel')),
-                        React.createElement("span", { className: "sheet-vital-value" }, typeof n.psyche === 'number' ? (n.psyche + '/' + (typeof n.maxPsyche === 'number' ? n.maxPsyche : n.psyche)) : '—'))),
-                n.stats && typeof n.stats === 'object' && (React.createElement("div", { className: "sheet-section" },
-                    React.createElement("div", { className: "sheet-stat-row" },
-                        React.createElement("span", { className: "sheet-stat-label" }, t('strengthLabel')),
-                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.strength)),
-                    React.createElement("div", { className: "sheet-stat-row" },
-                        React.createElement("span", { className: "sheet-stat-label" }, t('agilityLabel')),
-                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.agility)),
-                    React.createElement("div", { className: "sheet-stat-row" },
-                        React.createElement("span", { className: "sheet-stat-label" }, t('intelligenceLabel')),
-                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.intelligence)),
-                    React.createElement("div", { className: "sheet-stat-row" },
-                        React.createElement("span", { className: "sheet-stat-label" }, t('initiativeLabel')),
-                        React.createElement("span", { className: "sheet-stat-value" }, n.stats.initiative)))),
-                Array.isArray(n.effects) && n.effects.length > 0 && (React.createElement("div", { className: "sheet-section" },
-                    React.createElement("p", { className: "sheet-heading" }, t('effectsHeading')),
-                    n.effects.map((e, ei) => (React.createElement("p", { key: e.id || ei, className: "sheet-list-item" },
-                        "\u2014 ",
-                        EFFECT_ICONS[e.kind] ? EFFECT_ICONS[e.kind] + ' ' : '',
-                        e.label || e,
-                        typeof e.turnsLeft === 'number' && React.createElement("span", { className: "sheet-effect-duration" },
-                            " \u23F3",
-                            e.turnsLeft)))))),
-                Array.isArray(n.inventory) && n.inventory.length > 0 && (React.createElement("div", { className: "sheet-section" },
-                    React.createElement("p", { className: "sheet-heading" }, t('inventoryHeading')),
-                    n.inventory.map((item, ii) => React.createElement("p", { key: ii, className: "sheet-list-item" },
-                        "\u2014 ",
-                        item))))))),
+            members.map((n, i) => {
+                const memberKey = n.name.trim().toLowerCase();
+                const isMemberExpanded = expandedMembers.has(memberKey);
+                return (React.createElement("div", { key: i, className: "group-member" },
+                    React.createElement("div", { className: "sheet-npc-header", onClick: () => {
+                            setExpandedMembers(prev => {
+                                const next = new Set(prev);
+                                if (next.has(memberKey))
+                                    next.delete(memberKey);
+                                else
+                                    next.add(memberKey);
+                                return next;
+                            });
+                        } },
+                        React.createElement("span", { className: "sheet-npc-toggle" }, isMemberExpanded ? '▾' : '▸'),
+                        React.createElement("span", { className: "sheet-npc-name" }, n.name)),
+                    isMemberExpanded && (React.createElement(React.Fragment, null,
+                        React.createElement("div", { className: "group-member-actions" },
+                            onOpenGear && React.createElement("button", { onClick: () => onOpenGear(n.name), className: "btn btn-ghost", type: "button" },
+                                React.createElement("img", { src: EQUIP_ICON_ARMOR, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                " ",
+                                t('equipmentButton')),
+                            React.createElement("button", { onClick: () => setDismissConfirmName(n.name), className: "btn btn-ghost", type: "button" }, t('dismissFromPartyButton'))),
+                        n.note && React.createElement("p", { className: "sheet-npc-note" }, n.note),
+                        React.createElement("div", { className: "sheet-vitals" },
+                            React.createElement("div", { className: "sheet-vital-row" },
+                                React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
+                                React.createElement("span", { className: "sheet-vital-value" }, typeof n.health === 'number' ? (n.health + '/' + (typeof n.maxHealth === 'number' ? n.maxHealth : n.health)) : '—')),
+                            React.createElement("div", { className: "sheet-vital-row" },
+                                React.createElement("span", { className: "sheet-stat-label" }, t('psycheLabel')),
+                                React.createElement("span", { className: "sheet-vital-value" }, typeof n.psyche === 'number' ? (n.psyche + '/' + (typeof n.maxPsyche === 'number' ? n.maxPsyche : n.psyche)) : '—'))),
+                        n.stats && typeof n.stats === 'object' && (React.createElement("div", { className: "sheet-section" },
+                            React.createElement("div", { className: "sheet-stat-row" },
+                                React.createElement("span", { className: "sheet-stat-label" }, t('strengthLabel')),
+                                React.createElement("span", { className: "sheet-stat-value" }, n.stats.strength)),
+                            React.createElement("div", { className: "sheet-stat-row" },
+                                React.createElement("span", { className: "sheet-stat-label" }, t('agilityLabel')),
+                                React.createElement("span", { className: "sheet-stat-value" }, n.stats.agility)),
+                            React.createElement("div", { className: "sheet-stat-row" },
+                                React.createElement("span", { className: "sheet-stat-label" }, t('intelligenceLabel')),
+                                React.createElement("span", { className: "sheet-stat-value" }, n.stats.intelligence)),
+                            React.createElement("div", { className: "sheet-stat-row" },
+                                React.createElement("span", { className: "sheet-stat-label" }, t('initiativeLabel')),
+                                React.createElement("span", { className: "sheet-stat-value" }, n.stats.initiative)))),
+                        Array.isArray(n.effects) && n.effects.length > 0 && (React.createElement("div", { className: "sheet-section" },
+                            React.createElement("p", { className: "sheet-heading" }, t('effectsHeading')),
+                            n.effects.map((e, ei) => (React.createElement("p", { key: e.id || ei, className: "sheet-list-item" },
+                                "\u2014 ",
+                                EFFECT_ICONS[e.kind] ? EFFECT_ICONS[e.kind] + ' ' : '',
+                                e.label || e,
+                                typeof e.turnsLeft === 'number' && React.createElement("span", { className: "sheet-effect-duration" },
+                                    " \u23F3",
+                                    e.turnsLeft)))))),
+                        Array.isArray(n.inventory) && n.inventory.length > 0 && (React.createElement("div", { className: "sheet-section" },
+                            React.createElement("p", { className: "sheet-heading" }, t('inventoryHeading')),
+                            n.inventory.map((item, ii) => React.createElement("p", { key: ii, className: "sheet-list-item" },
+                                "\u2014 ",
+                                item))))))));
+            }),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
@@ -23918,9 +24019,7 @@ function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, isSlot
                         React.createElement("div", { className: "sheet-vitals equipment-stats-merged" },
                             React.createElement("div", { className: "sheet-vital-row" },
                                 React.createElement("span", { className: "sheet-stat-label" }, t('levelLabel')),
-                                React.createElement("span", { className: "sheet-vital-value" },
-                                    gameState.level,
-                                    gameState.level >= LEVEL_CAP ? '' : ' / ' + LEVEL_CAP)),
+                                React.createElement("span", { className: "sheet-vital-value" }, gameState.level)),
                             React.createElement("div", { className: "sheet-vital-row" },
                                 React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
                                 React.createElement("span", { className: "sheet-vital-value" },
@@ -24152,16 +24251,36 @@ function InventoryModal({ gameState, itemRarities, equipment, inventorySort, onI
             return !!g.item.questId;
         return g.item.slot === inventoryFilter;
     });
+    // Shared by every sort mode below as the tiebreak once the mode's own
+    // primary key ties: rarer first, then alphabetical — so "by weight" and
+    // "by type" both still cluster same-rarity items together instead of
+    // falling back to plain array order, matching "by rarity" itself.
+    const rarityIndexOf = item => RARITY_TIERS.findIndex(tier => tier.key === (findItemRarity(item.name, itemRarities) || 'common'));
+    const byRarityThenName = (a, b) => {
+        const diff = rarityIndexOf(b.item) - rarityIndexOf(a.item);
+        return diff !== 0 ? diff : a.item.name.localeCompare(b.item.name);
+    };
     const sortedGroups = [...visibleGroups].sort((a, b) => {
         if (inventorySort === 'weight') {
-            return computeItemWeight(b.item) - computeItemWeight(a.item);
+            const diff = computeItemWeight(b.item) - computeItemWeight(a.item);
+            return diff !== 0 ? diff : byRarityThenName(a, b);
         }
         if (inventorySort === 'rarity') {
-            const rarityIndex = key => RARITY_TIERS.findIndex(tier => tier.key === key);
-            return rarityIndex(findItemRarity(b.item.name, itemRarities) || 'common') - rarityIndex(findItemRarity(a.item.name, itemRarities) || 'common');
+            return byRarityThenName(a, b);
         }
         if (inventorySort === 'name') {
             return a.item.name.localeCompare(b.item.name);
+        }
+        if (inventorySort === 'type') {
+            // Groups every item of the same equip-slot type together, in the
+            // same fixed order EQUIPMENT_SLOT_TYPES already defines everywhere
+            // else in the app (weapons, then armor, then helmets, ...), with
+            // the shared rarity-then-name tiebreak within a type so the
+            // grouping itself stays visually stable rather than falling back
+            // to array order.
+            const slotIndex = slot => EQUIPMENT_SLOT_TYPES.indexOf(slot);
+            const diff = slotIndex(a.item.slot) - slotIndex(b.item.slot);
+            return diff !== 0 ? diff : byRarityThenName(a, b);
         }
         return 0;
     });
@@ -24173,8 +24292,7 @@ function InventoryModal({ gameState, itemRarities, equipment, inventorySort, onI
                 React.createElement("div", { className: "inventory-modal-gold" },
                     React.createElement("img", { src: CURRENCY_ICON, alt: "", style: { width: 18, height: 18, verticalAlign: 'middle', marginRight: 3 } }),
                     " ",
-                    React.createElement("span", null, gameState.currency)),
-                React.createElement("button", { onClick: onClose, className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
+                    React.createElement("span", null, gameState.currency))),
             React.createElement("div", { className: "inventory-modal-subheader" },
                 React.createElement("div", { className: "sheet-weight-row" },
                     React.createElement("span", { className: "sheet-stat-label" }, t('weightLabel')),
@@ -24192,7 +24310,8 @@ function InventoryModal({ gameState, itemRarities, equipment, inventorySort, onI
                             { value: 'default', label: t('inventorySortDefault') },
                             { value: 'weight', label: t('inventorySortWeight') },
                             { value: 'rarity', label: t('inventorySortRarity') },
-                            { value: 'name', label: t('inventorySortName') }
+                            { value: 'name', label: t('inventorySortName') },
+                            { value: 'type', label: t('inventorySortType') }
                         ] }),
                     (presentSlotTypes.length > 1 || (presentSlotTypes.length >= 1 && hasQuestTaggedItems)) && (React.createElement(InlineSelect, { label: t('inventoryFilterLabel'), value: inventoryFilter, onChange: onInventoryFilterChange, options: [
                             { value: 'all', label: t('inventoryFilterAll') },
@@ -24217,7 +24336,9 @@ function InventoryModal({ gameState, itemRarities, equipment, inventorySort, onI
                         count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
                             "\u00D7",
                             count)));
-                })))))));
+                })))),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
 function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -24246,14 +24367,20 @@ function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isActive, targetable, onClick, t, variant, fx, dmgPopup }) {
+function CombatPortrait({ name, parts, isDown, isActive, targetable, onClick, t, variant, fx, dmgPopup, portraitRef }) {
     const keys = Object.keys(parts);
     const maxHp = keys.reduce((sum, k) => sum + parts[k].maxHp, 0);
     const hp = keys.reduce((sum, k) => sum + Math.max(0, parts[k].hp), 0);
     const pct = maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0;
     const fxCls = fx && fx.cls ? fx.cls : '';
-    return (React.createElement("div", { className: "combat-portrait-wrap" },
-        React.createElement("button", { type: "button", onClick: () => targetable && onClick && onClick(), disabled: !targetable, className: 'combat-portrait' +
+    // The attacker's lunge is aimed at the defender's actual on-screen
+    // position — see CombatModal's fx effect — via these two CSS custom
+    // properties, which the combat-fx-lunge keyframes read directly. Falls
+    // back to no movement (0,0) when there's no vector (e.g. this card isn't
+    // the one lunging right now).
+    const lungeStyle = fx && fx.vec ? { '--lunge-x': fx.vec.x + 'px', '--lunge-y': fx.vec.y + 'px' } : undefined;
+    return (React.createElement("div", { className: "combat-portrait-wrap", ref: portraitRef },
+        React.createElement("button", { type: "button", onClick: () => targetable && onClick && onClick(), disabled: !targetable, style: lungeStyle, className: 'combat-portrait' +
                 (variant === 'hero' ? ' combat-portrait-hero' : '') +
                 (variant === 'boss' ? ' combat-portrait-boss' : '') +
                 (isDown ? ' combat-portrait-down' : '') +
@@ -24276,7 +24403,7 @@ function CombatPortrait({ name, parts, isDown, isActive, targetable, onClick, t,
             React.createElement("span", null),
             React.createElement("span", null),
             React.createElement("span", null))),
-        dmgPopup && (React.createElement("span", { key: 'dmg-' + dmgPopup.seq, className: 'combat-dmg-popup' + (dmgPopup.tone ? ' combat-dmg-popup-' + dmgPopup.tone : ''), "aria-hidden": "true" }, dmgPopup.text))));
+        dmgPopup && dmgPopup.items.map((item, idx) => (React.createElement("span", { key: 'dmg-' + dmgPopup.seq + '-' + idx, className: 'combat-dmg-popup' + (item.tone ? ' combat-dmg-popup-' + item.tone : ''), style: { '--pop-dx': item.dx + 'px', '--pop-dy': item.dy + 'px', animationDelay: (item.delay || 0) + 'ms' }, "aria-hidden": "true" }, item.text)))));
 }
 function CombatBodyPanel({ title, parts, targetable, onTargetClick, incomingPartKey, t }) {
     return (React.createElement("div", { className: "combat-panel" },
@@ -24361,12 +24488,13 @@ function CombatModal({ combat, heroName, onAttack, onFlee, onToggleLoot, onClose
     const lootReadyWithItems = showLoot && combat.loot.status === 'ready' && combat.loot.items.length > 0;
     const enemyNames = combat.enemies.map(e => e.enemyName).join(', ');
     const { left: alliesLeft, right: alliesRight } = splitForFlanking(combat.allies);
-    // ---- Hit/block/dodge animation state ----
+    // ---- Hit/block/dodge/stun animation state ----
     // Driven off combat.lastAction, a compact { attacker, defender, resultKind,
-    // dmg, seq } summary that resolveHeroAttack/runAutoTurn/resolveFleeAttempt
-    // attach to combat state alongside the HP changes they already make (see
-    // those functions). Keyed by "type:id" (e.g. "enemy:enemy-3", "hero:hero")
-    // so any of the three portrait kinds can be targeted uniformly. Each fx/
+    // dmg, partKey, partLabel, justDisabled, stunApplied, seq } summary that
+    // resolveHeroAttack/runAutoTurn/resolveFleeAttempt/resolveStunSkip attach
+    // to combat state alongside the HP changes they already make (see those
+    // functions). Keyed by "type:id" (e.g. "enemy:enemy-3", "hero:hero") so
+    // any of the three portrait kinds can be targeted uniformly. Each fx/
     // popup entry carries the seq it was created for and clears itself off a
     // timer — that (rather than leaving the class applied) is what lets the
     // exact same attacker hitting the exact same target twice in a row still
@@ -24374,6 +24502,23 @@ function CombatModal({ combat, heroName, onAttack, onFlee, onToggleLoot, onClose
     const [fx, setFx] = useState({});
     const [popups, setPopups] = useState({});
     const seenSeqRef = useRef(0);
+    // Live DOM node for every portrait currently on screen, keyed the same
+    // "type:id" way as fx/popups — lets the attacker's lunge aim at the
+    // defender's actual on-screen position (see below) instead of just
+    // "up" or "down", since the row layout (how many enemies/allies, where
+    // the hero sits between them) isn't known until it's actually rendered.
+    const portraitRefs = useRef({});
+    const setPortraitRef = (key) => (el) => { portraitRefs.current[key] = el; };
+    // A handful of small random popups fanning out at different angles reads
+    // as more alive than every one flying straight up — see the popupItems
+    // build-up below. spreadDeg is the total left-right fan (centered on
+    // straight up); distances are in px.
+    function randomFxVector(spreadDeg, minDist, maxDist) {
+        const angleDeg = (Math.random() * spreadDeg) - spreadDeg / 2;
+        const rad = (angleDeg * Math.PI) / 180;
+        const dist = minDist + Math.random() * (maxDist - minDist);
+        return { dx: Math.round(Math.sin(rad) * dist), dy: Math.round(-Math.cos(rad) * dist) };
+    }
     useEffect(() => {
         const action = combat.lastAction;
         if (!action || action.seq === seenSeqRef.current)
@@ -24382,32 +24527,79 @@ function CombatModal({ combat, heroName, onAttack, onFlee, onToggleLoot, onClose
         const seq = action.seq;
         const attackerKey = action.attackerType + ':' + action.attackerId;
         const defenderKey = action.defenderType + ':' + action.defenderId;
-        const attackerCls = action.attackerType === 'enemy' ? 'combat-fx-lunge-down' : 'combat-fx-lunge-up';
+        // A stun-skip is self-targeted (attacker === defender, nobody actually
+        // swung) — no lunge for it, just the defender-side "woozy" cue below.
+        const isSelfEvent = action.resultKind === 'stunSkip';
         let defenderCls = '';
         let spark = null;
-        let popup = null;
-        if (action.resultKind === 'hit') {
-            defenderCls = 'combat-fx-hit';
+        let basePopup = null;
+        if (action.resultKind === 'hit' || action.resultKind === 'vital') {
+            defenderCls = action.resultKind === 'vital' ? 'combat-fx-hit-vital' : 'combat-fx-hit';
             spark = 'hit';
-            popup = { text: '−' + action.dmg, tone: 'dmg', seq };
+            basePopup = { text: t('combatFxDamageLabel') + ' ' + action.dmg, tone: 'dmg' };
         }
-        else if (action.resultKind === 'vital') {
-            defenderCls = 'combat-fx-hit-vital';
-            spark = 'hit';
-            popup = { text: '−' + action.dmg, tone: 'dmg', seq };
-        }
-        else if (action.resultKind === 'blocked' || action.resultKind === 'parried') {
+        else if (action.resultKind === 'blocked') {
             defenderCls = 'combat-fx-block';
             spark = 'block';
-            popup = { text: t('combatFxBlockLabel'), tone: 'block', seq };
+            basePopup = { text: t('combatFxBlockLabel'), tone: 'block' };
         }
-        else if (action.resultKind === 'dodged' || action.resultKind === 'miss') {
+        else if (action.resultKind === 'parried') {
+            defenderCls = 'combat-fx-block';
+            spark = 'block';
+            basePopup = { text: t('combatFxParryLabel'), tone: 'parry' };
+        }
+        else if (action.resultKind === 'dodged') {
             defenderCls = 'combat-fx-dodge';
-            popup = { text: t('combatFxMissLabel'), tone: 'miss', seq };
+            basePopup = { text: t('combatFxDodgeLabel'), tone: 'dodge' };
         }
-        setFx(prev => ({ ...prev, [attackerKey]: { cls: attackerCls, seq, spark: null }, [defenderKey]: { cls: defenderCls, seq, spark } }));
-        if (popup)
-            setPopups(prev => ({ ...prev, [defenderKey]: popup }));
+        else if (action.resultKind === 'miss') {
+            defenderCls = 'combat-fx-dodge';
+            basePopup = { text: t('combatFxMissLabel'), tone: 'miss' };
+        }
+        else if (action.resultKind === 'stunSkip') {
+            defenderCls = 'combat-fx-stunned';
+            basePopup = { text: t('combatFxStunLabel'), tone: 'stun' };
+        }
+        // Attacker "flies toward the target" — measured off the actual
+        // on-screen portraits rather than a flat up/down guess, so the lunge
+        // always points at whoever's actually getting hit. Falls back to the
+        // old straight up/down nudge on the rare frame where a ref isn't
+        // mounted yet.
+        let lungeVec = null;
+        if (!isSelfEvent) {
+            const attackerEl = portraitRefs.current[attackerKey];
+            const defenderEl = portraitRefs.current[defenderKey];
+            if (attackerEl && defenderEl) {
+                const a = attackerEl.getBoundingClientRect();
+                const d = defenderEl.getBoundingClientRect();
+                const dx = (d.left + d.width / 2) - (a.left + a.width / 2);
+                const dy = (d.top + d.height / 2) - (a.top + a.height / 2);
+                const dist = Math.hypot(dx, dy) || 1;
+                const travel = Math.min(dist * 0.4, 46);
+                lungeVec = { x: Math.round((dx / dist) * travel), y: Math.round((dy / dist) * travel) };
+            }
+            else {
+                lungeVec = { x: 0, y: action.attackerType === 'enemy' ? 16 : -16 };
+            }
+        }
+        // Base result popup, plus a staggered follow-up for a stun taking hold
+        // and/or a body part going down — each at its own random angle so a
+        // hit that does several things at once reads as several distinct
+        // callouts rather than one overwriting the last.
+        const popupItems = [];
+        if (basePopup)
+            popupItems.push({ ...basePopup, ...randomFxVector(130, 26, 42), delay: 0 });
+        if (action.stunApplied)
+            popupItems.push({ text: t('combatFxStunLabel'), tone: 'stun', ...randomFxVector(130, 26, 42), delay: 90 });
+        if (action.justDisabled)
+            popupItems.push({ text: action.partLabel + ': ' + t('combatPartDisabledSuffix'), tone: 'disabled', ...randomFxVector(130, 26, 42), delay: action.stunApplied ? 180 : 90 });
+        setFx(prev => ({
+            ...prev,
+            [attackerKey]: isSelfEvent ? prev[attackerKey] : { cls: 'combat-fx-lunge', seq, spark: null, vec: lungeVec },
+            [defenderKey]: { cls: defenderCls, seq, spark, vec: null }
+        }));
+        if (popupItems.length > 0)
+            setPopups(prev => ({ ...prev, [defenderKey]: { seq, items: popupItems } }));
         const timer = setTimeout(() => {
             setFx(prev => {
                 const next = { ...prev };
@@ -24424,7 +24616,7 @@ function CombatModal({ combat, heroName, onAttack, onFlee, onToggleLoot, onClose
                 delete next[defenderKey];
                 return next;
             });
-        }, 650);
+        }, 900);
         return () => clearTimeout(timer);
     }, [combat.lastAction]);
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget && combat.result)
@@ -24439,11 +24631,11 @@ function CombatModal({ combat, heroName, onAttack, onFlee, onToggleLoot, onClose
                 " ",
                 combat.round),
             React.createElement("div", { className: "combat-arena-group" },
-                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !isVitalDisabled(enemy.parts), onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], t: t })))),
+                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !isVitalDisabled(enemy.parts), onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), t: t })))),
                 React.createElement("div", { className: "combat-row combat-row-party" },
-                    alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], t: t }))),
-                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, variant: "hero", fx: fx['hero:hero'], dmgPopup: popups['hero:hero'], t: t }),
-                    alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], t: t }))))),
+                    alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), t: t }))),
+                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, variant: "hero", fx: fx['hero:hero'], dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), t: t }),
+                    alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), t: t }))))),
             React.createElement("div", { className: "combat-log" }, combat.log.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
             !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, isHeroTurn ? t('combatChooseTargetHint') : t('combatWaitingHint'))),
             isHeroTurn && (React.createElement("div", { className: "combat-flee-row" },
@@ -25346,27 +25538,42 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
 // The quest journal: every quest the hero has ever picked up, grouped by
 // status (active/completed/failed — always in that order, matching the
 // player's natural priority), each row collapsed to just its title until
-// tapped. The sort button only reorders quests WITHIN each status group
-// (by acceptance order, i.e. array order — quests are only ever appended,
+// tapped. The status filter picks which group(s) show at all; the sort
+// select only reorders quests WITHIN whatever group(s) remain (by
+// acceptance order, i.e. array order — quests are only ever appended,
 // never reordered elsewhere) since the active/completed/failed grouping
 // itself is the one ordering the player actually depends on to find things.
+// Both controls use InlineSelect — the same themed dropdown the inventory
+// modal's own sort/filter row uses (see InlineSelect above) — rather than
+// a plain toggle button, so this matches the rest of the app.
 function QuestJournalModal({ quests, onClose, t }) {
     const [openId, setOpenId] = useState(null);
     const [newestFirst, setNewestFirst] = useState(true);
-    const groups = [
+    const [statusFilter, setStatusFilter] = useState('all');
+    const allGroups = [
         { key: 'active', heading: t('questActiveHeading'), list: quests.filter(q => q.status === 'active') },
         { key: 'completed', heading: t('questCompletedHeading'), list: quests.filter(q => q.status === 'completed') },
         { key: 'failed', heading: t('questFailedHeading'), list: quests.filter(q => q.status === 'failed') }
     ];
+    const groups = statusFilter === 'all' ? allGroups : allGroups.filter(g => g.key === statusFilter);
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card quest-journal-card" },
             React.createElement("div", { className: "quest-journal-header" },
-                React.createElement("h2", { className: "modal-title" }, t('questJournalModalTitle')),
-                quests.length > 0 && (React.createElement("button", { onClick: () => setNewestFirst(v => !v), className: "btn btn-ghost quest-sort-btn", type: "button" },
-                    "\u2195 ",
-                    newestFirst ? t('questSortButtonNewestFirst') : t('questSortButtonOldestFirst')))),
+                React.createElement("h2", { className: "modal-title" }, t('questJournalModalTitle'))),
+            quests.length > 0 && (React.createElement("div", { className: "sheet-inventory-controls quest-journal-controls" },
+                React.createElement(InlineSelect, { label: t('questFilterLabel'), value: statusFilter, onChange: setStatusFilter, options: [
+                        { value: 'all', label: t('questFilterAll') },
+                        { value: 'active', label: t('questActiveHeading') },
+                        { value: 'completed', label: t('questCompletedHeading') },
+                        { value: 'failed', label: t('questFailedHeading') }
+                    ] }),
+                React.createElement(InlineSelect, { label: t('questSortLabel'), value: newestFirst ? 'newest' : 'oldest', onChange: v => setNewestFirst(v === 'newest'), options: [
+                        { value: 'newest', label: t('questSortButtonNewestFirst') },
+                        { value: 'oldest', label: t('questSortButtonOldestFirst') }
+                    ] }))),
             quests.length === 0 && React.createElement("p", { className: "quest-journal-empty" }, t('questJournalEmptyText')),
+            quests.length > 0 && groups.every(g => g.list.length === 0) && (React.createElement("p", { className: "quest-journal-empty" }, t('questFilterEmptyText'))),
             groups.map(group => group.list.length === 0 ? null : (React.createElement("div", { key: group.key, className: "quest-journal-group" },
                 React.createElement("p", { className: "sheet-heading" }, group.heading),
                 (newestFirst ? [...group.list].reverse() : group.list).map(q => {
@@ -25375,24 +25582,26 @@ function QuestJournalModal({ quests, onClose, t }) {
                         React.createElement("button", { onClick: () => setOpenId(open ? null : q.id), className: 'quest-journal-row quest-journal-row-' + q.status, type: "button", "aria-expanded": open },
                             React.createElement("span", { className: "quest-journal-title" }, q.title),
                             React.createElement("span", { className: "quest-journal-caret" }, open ? '▾' : '▸')),
-                        open && (React.createElement("div", { className: "quest-journal-detail" },
-                            q.description && React.createElement("p", { className: "quest-journal-description" }, q.description),
-                            q.npcs.length > 0 && (React.createElement("p", { className: "quest-journal-characters" },
-                                t('questCharactersLabel'),
-                                ": ",
-                                q.npcs.join(', '))),
-                            q.stages.length > 0 && (React.createElement("div", { className: "quest-stage-list" },
-                                React.createElement("p", { className: "quest-journal-log-heading" }, t('questStagesHeading')),
-                                q.stages.map(stage => (React.createElement("div", { key: stage.id, className: 'quest-stage-item quest-stage-item-' + stage.status },
-                                    React.createElement("p", { className: "quest-stage-title" }, stage.title),
-                                    stage.description && React.createElement("p", { className: "quest-stage-description" }, stage.description),
-                                    stage.log.length > 0 && (React.createElement("ul", { className: "quest-journal-log quest-stage-log" }, stage.log.map((entry, i) => React.createElement("li", { key: i }, entry))))))))),
-                            React.createElement("p", { className: "quest-journal-log-heading" }, t('questLogHeading')),
-                            q.log.length > 0 ? (React.createElement("ul", { className: "quest-journal-log" }, q.log.map((entry, i) => React.createElement("li", { key: i }, entry)))) : (React.createElement("p", { className: "quest-journal-log-empty" }, t('questLogEmptyText'))),
-                            React.createElement("p", { className: "quest-journal-reward" },
-                                t('questRewardLabel'),
-                                ": ",
-                                q.reward || '—')))));
+                        React.createElement("div", { className: 'quest-journal-collapse' + (open ? ' quest-journal-collapse-open' : '') },
+                            React.createElement("div", { className: "quest-journal-collapse-inner" },
+                                React.createElement("div", { className: "quest-journal-detail" },
+                                    q.description && React.createElement("p", { className: "quest-journal-description" }, q.description),
+                                    q.npcs.length > 0 && (React.createElement("p", { className: "quest-journal-characters" },
+                                        t('questCharactersLabel'),
+                                        ": ",
+                                        q.npcs.join(', '))),
+                                    q.stages.length > 0 && (React.createElement("div", { className: "quest-stage-list" },
+                                        React.createElement("p", { className: "quest-journal-log-heading" }, t('questStagesHeading')),
+                                        q.stages.map(stage => (React.createElement("div", { key: stage.id, className: 'quest-stage-item quest-stage-item-' + stage.status },
+                                            React.createElement("p", { className: "quest-stage-title" }, stage.title),
+                                            stage.description && React.createElement("p", { className: "quest-stage-description" }, stage.description),
+                                            stage.log.length > 0 && (React.createElement("ul", { className: "quest-journal-log quest-stage-log" }, stage.log.map((entry, i) => React.createElement("li", { key: i }, entry))))))))),
+                                    React.createElement("p", { className: "quest-journal-log-heading" }, t('questLogHeading')),
+                                    q.log.length > 0 ? (React.createElement("ul", { className: "quest-journal-log" }, q.log.map((entry, i) => React.createElement("li", { key: i }, entry)))) : (React.createElement("p", { className: "quest-journal-log-empty" }, t('questLogEmptyText'))),
+                                    React.createElement("p", { className: "quest-journal-reward" },
+                                        t('questRewardLabel'),
+                                        ": ",
+                                        q.reward || '—'))))));
                 })))),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
@@ -25557,7 +25766,7 @@ function SettingsModal({ uiLang, onSetLanguage, itemInteractionEnabled, onSetIte
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
-function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSetEmail, cloudPassword, onSetPassword, cloudAuthLoading, cloudAuthError, cloudAuthNotice, onSignInEmail, onSignUpEmail, onSignInGoogle, onSignOut, cloudSaves, cloudSavesLoading, cloudActionSlot, cloudActionError, onSaveSlot, onLoadSlot, onDeleteSlot, onClose, t }) {
+function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSetEmail, cloudPassword, onSetPassword, cloudAuthLoading, cloudAuthError, cloudAuthNotice, onSignInEmail, onSignUpEmail, onSignInGoogle, onSignOut, cloudSaves, cloudSavesLoading, cloudActionSlot, cloudActionError, onSaveSlot, onLoadSlot, onDeleteSlot, cloudConfirm, onConfirmCloudAction, onCancelCloudAction, onClose, t }) {
     if (!window.supabaseClient) {
         return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
                 onClose(); } },
@@ -25566,6 +25775,28 @@ function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSet
                 React.createElement("p", { className: "hint-text hint-text-block" }, t('cloudNotConfigured')),
                 React.createElement("div", { className: "modal-actions" },
                     React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
+    }
+    // A pending save/load/delete asks for confirmation here, themed like
+    // every other confirm screen in the app, instead of the browser's own
+    // window.confirm popup — see requestSaveToCloudSlot & friends. Full
+    // content swap (not a stacked second modal) for the same reason
+    // GroupModal's dismiss confirm and PartyGearModal's take-back confirm
+    // do it that way.
+    if (cloudConfirm) {
+        const titleKey = cloudConfirm.action === 'overwrite' ? 'cloudOverwriteConfirmTitle'
+            : cloudConfirm.action === 'load' ? 'cloudLoadConfirmTitle' : 'cloudDeleteConfirmTitle';
+        const textKey = cloudConfirm.action === 'overwrite' ? 'cloudOverwriteConfirm'
+            : cloudConfirm.action === 'load' ? 'cloudLoadConfirm' : 'cloudDeleteConfirm';
+        const buttonKey = cloudConfirm.action === 'overwrite' ? 'cloudOverwriteConfirmButton'
+            : cloudConfirm.action === 'load' ? 'cloudLoadConfirmButton' : 'cloudDeleteConfirmButton';
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                onCancelCloudAction(); } },
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" }, t(titleKey)),
+                React.createElement("p", { className: "hint-text hint-text-block warning-text" }, t(textKey)),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: onCancelCloudAction, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
+                    React.createElement("button", { onClick: onConfirmCloudAction, className: cloudConfirm.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary', type: "button" }, t(buttonKey))))));
     }
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
@@ -25639,9 +25870,9 @@ function ExportModal({ exportText, generating, copyFeedback, onCopy, onDownload,
                 " ",
                 t('exportGenerating'))) : (React.createElement("textarea", { readOnly: true, value: exportText, rows: 6, className: "text-field textarea-field export-textarea", onClick: e => e.target.select() })),
             React.createElement("div", { className: "modal-actions" },
-                React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton')),
-                React.createElement("button", { onClick: onDownload, disabled: generating, className: "btn btn-ghost", type: "button" }, t('downloadButton')),
-                React.createElement("button", { onClick: onCopy, disabled: generating, className: "btn btn-primary", type: "button" }, copyFeedback ? t('copiedFeedback') : t('copyButton'))))));
+                React.createElement("button", { onClick: onCopy, disabled: generating, className: "btn btn-ghost export-action-btn", type: "button" }, copyFeedback ? t('copiedFeedback') : t('copyButton')),
+                React.createElement("button", { onClick: onDownload, disabled: generating, className: "btn btn-ghost export-action-btn", type: "button" }, t('downloadButton')),
+                React.createElement("button", { onClick: onClose, className: "btn btn-primary export-copy-btn", type: "button" }, t('closeButton'))))));
 }
 function ImportModal({ value, onChange, error, onLoad, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -25708,6 +25939,12 @@ function App() {
     const [cloudSavesLoading, setCloudSavesLoading] = useState(false);
     const [cloudActionSlot, setCloudActionSlot] = useState(null);
     const [cloudActionError, setCloudActionError] = useState(null);
+    // Pending confirmation for a cloud-save action (overwrite/load/delete)
+    // still awaiting the player's yes/no — see requestSaveToCloudSlot etc.
+    // below. Themed in-app modal instead of window.confirm, same as every
+    // other destructive/replacing action in the app (drop item, dismiss
+    // companion, restart, ...).
+    const [cloudConfirm, setCloudConfirm] = useState(null);
     const [initializing, setInitializing] = useState(true);
     const [stage, setStage] = useState('setup');
     // -- Setup form: world & hero --
@@ -26262,12 +26499,24 @@ function App() {
         setCloudAuthError(null);
         setCloudAuthNotice(null);
     }
-    async function saveToCloudSlot(slot) {
+    // Each cloud-save action that used to gate on window.confirm now splits
+    // into a "request" half (decides whether confirmation is even needed,
+    // then either performs immediately or stashes {action, slot} in
+    // cloudConfirm for CloudModal's own themed confirm screen to pick up)
+    // and a "perform" half (the actual network call, unchanged from before
+    // apart from losing its window.confirm guard). confirmCloudAction/
+    // cancelCloudAction below are what CloudModal's confirm screen calls.
+    function requestSaveToCloudSlot(slot) {
         if (!cloudUser)
             return;
         const existing = cloudSaves.find(s => s.slot === slot);
-        if (existing && !window.confirm(t('cloudOverwriteConfirm')))
+        if (existing) {
+            setCloudConfirm({ action: 'overwrite', slot });
             return;
+        }
+        performSaveToCloudSlot(slot);
+    }
+    async function performSaveToCloudSlot(slot) {
         setCloudActionSlot(slot);
         setCloudActionError(null);
         try {
@@ -26294,11 +26543,12 @@ function App() {
             setCloudActionSlot(null);
         }
     }
-    async function loadFromCloudSlot(slot) {
+    function requestLoadFromCloudSlot(slot) {
         if (!cloudUser)
             return;
-        if (!window.confirm(t('cloudLoadConfirm')))
-            return;
+        setCloudConfirm({ action: 'load', slot });
+    }
+    async function performLoadFromCloudSlot(slot) {
         setCloudActionSlot(slot);
         setCloudActionError(null);
         try {
@@ -26320,11 +26570,12 @@ function App() {
             setCloudActionSlot(null);
         }
     }
-    async function deleteCloudSlot(slot) {
+    function requestDeleteCloudSlot(slot) {
         if (!cloudUser)
             return;
-        if (!window.confirm(t('cloudDeleteConfirm')))
-            return;
+        setCloudConfirm({ action: 'delete', slot });
+    }
+    async function performDeleteCloudSlot(slot) {
         setCloudActionSlot(slot);
         setCloudActionError(null);
         try {
@@ -26343,6 +26594,21 @@ function App() {
         finally {
             setCloudActionSlot(null);
         }
+    }
+    function confirmCloudAction() {
+        if (!cloudConfirm)
+            return;
+        const { action, slot } = cloudConfirm;
+        setCloudConfirm(null);
+        if (action === 'overwrite')
+            performSaveToCloudSlot(slot);
+        else if (action === 'load')
+            performLoadFromCloudSlot(slot);
+        else if (action === 'delete')
+            performDeleteCloudSlot(slot);
+    }
+    function cancelCloudAction() {
+        setCloudConfirm(null);
     }
     // A generation can take a while (streamed narrative plus several
     // follow-up calls), and on a phone the single biggest reason the tab gets
@@ -26427,10 +26693,22 @@ function App() {
         if (status === 'RESOURCE_EXHAUSTED' || status === 'UNAVAILABLE') {
             err.code = 'rate_limit';
         }
+        else if (status === 'UNAUTHENTICATED' || status === 'PERMISSION_DENIED') {
+            // Google's raw message here ("Method doesn't allow unregistered
+            // callers...") is internal API-plumbing language, not something to
+            // show the player — same treatment as rate_limit below: a short,
+            // translated explanation replaces the raw text entirely rather than
+            // getting appended after sendFailedPrefix (see describeError).
+            err.code = 'auth';
+        }
         throw err;
     }
     function describeError(e, prefixKey) {
-        return e.code === 'rate_limit' ? t('rateLimitError') : t(prefixKey) + e.message;
+        if (e.code === 'rate_limit')
+            return t('rateLimitError');
+        if (e.code === 'auth')
+            return t('authError');
+        return t(prefixKey) + e.message;
     }
     async function callGemini(system, messages, retriesLeft) {
         if (retriesLeft === undefined)
@@ -26903,7 +27181,7 @@ Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings
             : '\n\nNOTHING IS CURRENTLY ON RECORD FROM EARLIER HIDDEN INFORMATION.';
         const mapNodes = state.map && state.map.nodes.length > 0 ? state.map.nodes : [];
         const mapContext = mapNodes.length > 0
-            ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character; do not create a near-duplicate with slightly different wording):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}`
+            ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character; do not create a near-duplicate with slightly different wording — UNLESS this scene is genuinely the first time a place listed here under a placeholder/generic label gets its real proper name revealed, in which case see "previousName" under "location" below):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}`
             : '';
         // Every location's supply of findable items is capped client-side (see
         // MAP_NODE_ITEM_CAPACITY_RANGE/isMapNodeCleared) — only the CURRENT
@@ -26956,7 +27234,7 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
@@ -26976,7 +27254,7 @@ Every character named above under CURRENT PARTY is a traveling companion, not ju
 This same entry is also where a quest GROWS (see questDepthRule) — a plain errand can skip all three of the following fields forever and that's the normal case, not a gap to fill. "npcs" names any character (already tracked in "npcs" above) who just became meaningfully tied to THIS quest's story specifically, beyond its own giver — include a name here only the first turn it's true for this quest, never restate one already listed above. "newStages" is for when the scene reveals a genuinely distinct next step, complication, or fresh thread within this quest — something concrete enough to track as its own objective, not just atmosphere or flavor. Give each a fresh "id" that doesn't collide with a stage id already listed above, a short evocative "title" the same way a quest's own title reads, and a dry one-sentence "description" the same way a quest's own description reads. A stage is tracked the moment it appears here — there's no separate accept step the way a whole new quest has, since it's simply the next part of a commitment the hero already made. "stageUpdates" is for a stage that ALREADY exists (its id already given above): "status" is set only when the scene clearly resolves that ONE stage — "completed" if its own objective was met, "failed" if it's now impossible or was abandoned, "moot" if the hero's own choice closed it off by committing to a different path within the same quest instead (a road not taken is not a failure — never use "failed" for that); "progress" works exactly like the quest-level field above, but scoped to this one stage. A stage resolving does NOT automatically resolve the quest itself, and a quest resolving does NOT require every stage to have resolved first — the quest's own top-level "status" above is always its own separate, deliberate call.
 "reputationHits" flags any named character (matching how they appear in "HERO'S STANDING WITH CHARACTERS..." or the npcs list above) that the hero insulted, threatened, mocked, acted with outright hostility toward, showed real unprompted kindness to, or helped in some meaningful way, IN THE SCENE JUST PLAYED. Each entry has "name" and "type": "insult" for verbal disrespect, mockery, or threats; "hostile" for actual violence, betrayal, sabotage, or an attack; "kindness" for a genuine, notable act of warmth, respect, or generosity that clearly goes beyond ordinary politeness (a real compliment that visibly moves them, comforting them through genuine distress, standing up for them at some cost to the hero); "help" for something substantial done in their favor — saving them from real danger, a costly sacrifice on their behalf, solving a serious problem for them outside of an active quest. Only include a character here if the scene just played genuinely shows the HERO doing this to THEM — never for a character who is simply unfriendly, refuses a request, or negotiates hard back at the hero, and never for the hero merely disagreeing or being blunt; likewise never for routine courtesy, a passing "thank you," or cooperating because the scene calls for it — "kindness" and "help" are for moments that clearly stand out, not everyday pleasantness. This is a rare event in both directions: leave the list empty on the large majority of turns where nothing like this happened.
 "factionReputationHits" is the same idea as "reputationHits" immediately above, but for a FACTION as a whole rather than one tracked person — reserve it for something the scene shows rising to the level of the group as an institution noticing and caring, not just the one individual on the receiving end. An insult traded with a single guard is a "reputationHits" entry for that guard, not automatically a hit against the whole legion he serves — only flag the faction too when the act is clearly directed at, done in the name of, or witnessed in a way that would credibly reach the faction as a whole (defying a direct order issued in the faction's name, sabotaging something that belongs to them collectively, publicly humiliating their authority, risking real danger to save several of their people at once, a notable public act of loyalty or generosity toward them as a group). Each entry has "faction" (exactly as tracked) and the same "type" values as above: "insult", "hostile", "kindness", "help". Just as rare as "reputationHits", if not rarer — leave it empty on the large majority of turns.
-"location" tracks where the hero currently is, for a map the player can gradually explore. "current" is the name of the hero's present location — if it matches somewhere in the known list above, reuse that exact name (do not rename or rephrase it); only give a new name if this is genuinely a place the story hasn't visited before. "kind" is exactly one of "settlement", "wilderness", "dungeon", "landmark". "description" is one short evocative sentence — include it ONLY the first time this name appears (it's cached after that, so repeating it later is wasted). "questId" links this place to one of the active quest ids above ONLY when the scene establishes it as that quest's actual objective or destination — omit otherwise. If that quest already has stages listed above, also set "stageId" to whichever of its stages this specific place actually serves, so the map only reveals this location once the story reaches that particular stage rather than the moment the quest itself began — leave "stageId" out if the quest has no stages yet, or if this place is the quest's overall destination rather than one specific stage's. "directionFromPrevious" is a rough compass heading (N, NE, E, SE, S, SW, W, or NW) from the hero's previous location to this one — needed only when "current" is a brand-new name. "nearbyMentioned" lists any OTHER named places the scene mentions as visible, nearby, or rumored but not currently occupied by the hero — each needs "name", "kind", "direction" (heading from the current location) and, first mention only, "description". This includes every distinct path or destination the scene actually presents from here as part of the setting, not only whichever one (if any) becomes this turn's "travelOffer" below — a fork described with two named directions means two "nearbyMentioned" entries, one per path, even when only one of them is also being offered as an immediate trip right now. Add "far": true on an entry for somewhere the scene places at a real remove — spoken of from afar, rumored, recalled from a character's own travels, or otherwise clearly not a path leading out from here — rather than an adjacent place actually reachable from the current location; omit "far" (or set it false) for anywhere genuinely nearby. "direction" may be left off a "far": true entry the scene gives no real sense of bearing for. Whenever this scene has a character name or clearly imply a specific place where a quest — new or already active — actually needs to be carried out, that place MUST be reported here (as "current" if the hero is already standing there, otherwise as an entry in "nearbyMentioned") with "questId" set to that quest's id, even if the hero's own position didn't change and nothing else about "location" would otherwise be worth reporting. Only omit "location" entirely on a turn where neither the hero's place changed nor any quest's destination was named. "faction" (on "current" and on each "nearbyMentioned" entry) is the name of whichever faction visibly controls or holds authority over that place — a garrison's banner, a guild's sign, whose law is enforced there — reusing an exact known faction name from the list below where possible; omit it for anywhere with no clear controlling faction (a lawless waystop, untouched wilderness). Once a place has a faction, it stays that faction's territory turn after turn — repeat the SAME value every time this place is reported as "current" (an omitted "faction" on a later turn leaves it unchanged, it does NOT clear it) and only give a genuinely different value the turn the story itself shows control actually changing hands (a conquest, a garrison driven out, a new authority moving in). "danger" (on "current" and on each "nearbyMentioned" entry) is true ONLY when this specific place currently has a genuine, known hostile threat sitting there right now — an enemy, monster, or hostile group the hero could plausibly end up fighting there — something the scene has actually established, never a vague sense that an area is generally unsafe. Set it to false the turn the story itself shows that specific threat resolved (defeated, fled, no longer there); omit it entirely on any turn that neither introduces nor resolves a threat at that place — like "faction", an omitted "danger" leaves the location's existing flag exactly as it was, it does NOT clear it. "verticalMove" (on "current" and on each "nearbyMentioned" entry) is "up" or "down", and ONLY applies the one time a place is first being created — set it when, and only when, this place is a different floor/level of the exact same structure the hero is moving from (for "current": the hero's previous location; for a "nearbyMentioned" entry: the hero's current location this turn) — climbing a stairwell to the floor above, descending into a cellar or basement below, and so on. Judge only the single, immediate step: is THIS specific place directly one level above, or directly one level below, wherever it connects from — never try to work out or state an absolute floor number yourself, the game tracks that. Leave "verticalMove" out entirely for any place reached by ordinary horizontal travel (use "directionFromPrevious"/"direction" for those instead, never both on the same place), and also leave it out for a place that already exists (reusing a known name) — its level was already fixed the first time it was created and never changes after.
+"location" tracks where the hero currently is, for a map the player can gradually explore. "current" is the name of the hero's present location — if it matches somewhere in the known list above, reuse that exact name (do not rename or rephrase it) UNLESS this exact place was so far only tracked under a generic or placeholder label (a bare description like "the village" or "a small settlement", never yet its own proper name) and this scene is genuinely the first time its real name is learned — in that case report the real name as "current" and set "previousName" to exactly the old placeholder label as it appears in the known list above, so that SAME map entry is renamed rather than a second, duplicate entry being created for the same place (mirrors how a placeholder-tracked NPC above gets renamed rather than duplicated). Omit "previousName" every other turn, including every later turn about this now-named place, and never use it to rephrase or "improve" a name the place already properly had — only for a genuine first-time reveal of a name that wasn't known before. The same applies to any "nearbyMentioned" entry below, via its own "previousName". Only give a brand-new name with no "previousName" set if this is genuinely a place the story hasn't referenced in any form before. "kind" is exactly one of "settlement", "wilderness", "dungeon", "landmark". "description" is one short evocative sentence — include it ONLY the first time this name appears (it's cached after that, so repeating it later is wasted). "questId" links this place to one of the active quest ids above ONLY when the scene establishes it as that quest's actual objective or destination — omit otherwise. If that quest already has stages listed above, also set "stageId" to whichever of its stages this specific place actually serves, so the map only reveals this location once the story reaches that particular stage rather than the moment the quest itself began — leave "stageId" out if the quest has no stages yet, or if this place is the quest's overall destination rather than one specific stage's. "directionFromPrevious" is a rough compass heading (N, NE, E, SE, S, SW, W, or NW) from the hero's previous location to this one — needed only when "current" is a brand-new name. "nearbyMentioned" lists any OTHER named places the scene mentions as visible, nearby, or rumored but not currently occupied by the hero — each needs "name", "kind", "direction" (heading from the current location) and, first mention only, "description". This includes every distinct path or destination the scene actually presents from here as part of the setting, not only whichever one (if any) becomes this turn's "travelOffer" below — a fork described with two named directions means two "nearbyMentioned" entries, one per path, even when only one of them is also being offered as an immediate trip right now. Add "far": true on an entry for somewhere the scene places at a real remove — spoken of from afar, rumored, recalled from a character's own travels, or otherwise clearly not a path leading out from here — rather than an adjacent place actually reachable from the current location; omit "far" (or set it false) for anywhere genuinely nearby. "direction" may be left off a "far": true entry the scene gives no real sense of bearing for. Whenever this scene has a character name or clearly imply a specific place where a quest — new or already active — actually needs to be carried out, that place MUST be reported here (as "current" if the hero is already standing there, otherwise as an entry in "nearbyMentioned") with "questId" set to that quest's id, even if the hero's own position didn't change and nothing else about "location" would otherwise be worth reporting. Only omit "location" entirely on a turn where neither the hero's place changed nor any quest's destination was named. "faction" (on "current" and on each "nearbyMentioned" entry) is the name of whichever faction visibly controls or holds authority over that place — a garrison's banner, a guild's sign, whose law is enforced there — reusing an exact known faction name from the list below where possible; omit it for anywhere with no clear controlling faction (a lawless waystop, untouched wilderness). Once a place has a faction, it stays that faction's territory turn after turn — repeat the SAME value every time this place is reported as "current" (an omitted "faction" on a later turn leaves it unchanged, it does NOT clear it) and only give a genuinely different value the turn the story itself shows control actually changing hands (a conquest, a garrison driven out, a new authority moving in). "danger" (on "current" and on each "nearbyMentioned" entry) is true ONLY when this specific place currently has a genuine, known hostile threat sitting there right now — an enemy, monster, or hostile group the hero could plausibly end up fighting there — something the scene has actually established, never a vague sense that an area is generally unsafe. Set it to false the turn the story itself shows that specific threat resolved (defeated, fled, no longer there); omit it entirely on any turn that neither introduces nor resolves a threat at that place — like "faction", an omitted "danger" leaves the location's existing flag exactly as it was, it does NOT clear it. "verticalMove" (on "current" and on each "nearbyMentioned" entry) is "up" or "down", and ONLY applies the one time a place is first being created — set it when, and only when, this place is a different floor/level of the exact same structure the hero is moving from (for "current": the hero's previous location; for a "nearbyMentioned" entry: the hero's current location this turn) — climbing a stairwell to the floor above, descending into a cellar or basement below, and so on. Judge only the single, immediate step: is THIS specific place directly one level above, or directly one level below, wherever it connects from — never try to work out or state an absolute floor number yourself, the game tracks that. Leave "verticalMove" out entirely for any place reached by ordinary horizontal travel (use "directionFromPrevious"/"direction" for those instead, never both on the same place), and also leave it out for a place that already exists (reusing a known name) — its level was already fixed the first time it was created and never changes after.
 "factions" lists ONLY named GROUPS that matter to the ongoing story — a legion, guild, cult, noble house, gang, cartel, order, or anything else the story treats as acting with one will, never a whole nation or people. Skip anything mentioned only once in passing with no ongoing role. Each entry has a "name" and a short "note" — one sentence on what this group is, does, or wants. Include an entry here for EVERY faction referenced anywhere else this turn (as a "location.faction", a "nearbyMentioned[].faction", or an "npcs[].faction") the first time it's established, so the registry never falls out of sync with what's actually controlling places or backing characters. This field is returned in full each turn, the same as "npcs": carry forward existing entries that are still relevant (repeat them even if this specific scene doesn't touch them), and only add a "note" update when the scene genuinely reveals something new about them. Each entry may also include "relations" — this faction's own declared relationships with OTHER known factions, each an object with a "faction" (reusing an exact known faction name) and a "stance" of either "war" (open, active hostility — real, ongoing conflict, not just a passing insult) or "allied" (active cooperation — shared goals, coordination, backing each other). Only declare a relation once the story has genuinely established it, and only from whichever side is natural in the scene — no need to duplicate it onto the other faction's own list too, and omit it once it's no longer true (a war that ends, an alliance that breaks) rather than leaving a stale entry in place.
 
 === EVENT: NEW QUESTS AND REWARDS ===
@@ -29649,7 +29927,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             round: 1,
             log: [],
             result: null,
-            loot: null
+            loot: null,
+            stunned: {}
         });
         setCombatModalOpen(true);
     }
@@ -29717,7 +29996,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             round: 1,
             log,
             result,
-            loot: null
+            loot: null,
+            stunned: {}
         });
         setCombatModalOpen(true);
     }
@@ -29859,6 +30139,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // — the hero (unless the fight already ended), a living ally, or a living
     // enemy. Used both to find the next actor and to detect a side being
     // completely wiped out.
+    // The stunned-map key for whoever's turn it currently is — same
+    // "type:id" scheme fx/popups already use (see CombatModal), so a single
+    // map (combat.stunned) can track it for hero/ally/enemy alike.
+    function currentStunKey(entry) {
+        if (!entry)
+            return null;
+        return entry.type === 'hero' ? 'hero:hero' : entry.type + ':' + entry.id;
+    }
     function isOrderEntryAlive(entry, allies, enemies) {
         if (entry.type === 'hero')
             return true;
@@ -29917,12 +30205,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     //  - attacker: { name, parts, agility (hit chance), weaponDamage, weaponLabel, mods }
     //  - defender: { name, parts, isEnemy, agility (defense chance), defenseAvailability, getDefenseForPart(partKey), mods }
     // Returns { parts: <defender's updated parts>, riposteDamage, log: [...],
-    // resultKind, dmg } — riposteDamage (0 if none) is the caller's job to
-    // apply back to the attacker, since only the caller knows which combatant
-    // that is. resultKind/dmg are a compact summary of the same outcome the
-    // log already narrates, meant for the combat-arena hit/block/miss
-    // animations (see triggerCombatFx) rather than for any game-logic use —
-    // 'miss' | 'dodged' | 'blocked' | 'parried' | 'hit' | 'vital'.
+    // resultKind, dmg, partKey, partLabel, justDisabled, stunApplied } —
+    // riposteDamage (0 if none) is the caller's job to apply back to the
+    // attacker, since only the caller knows which combatant that is.
+    // resultKind/dmg/partKey/partLabel/justDisabled/stunApplied are a compact
+    // summary of the same outcome the log already narrates, meant for the
+    // combat-arena hit/block/miss/stun animations and floating callouts (see
+    // CombatModal's fx effect) rather than for any game-logic use —
+    // resultKind is 'miss' | 'dodged' | 'blocked' | 'parried' | 'hit' | 'vital'.
     function resolveOneAttack(attacker, defender, t) {
         const partKey = pickEnemyTargetPart(defender.parts);
         const part = BODY_PARTS.find(p => p.key === partKey);
@@ -29933,7 +30223,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const hit = Math.random() * 100 < hitChance;
         if (!hit) {
             log.push({ text: attacker.name + ' — ' + t('combatLogMissTag') + ': ' + partLabel, kind: 'miss' });
-            return { parts: defender.parts, riposteDamage: 0, log, defeated: false, resultKind: 'miss', dmg: 0 };
+            return { parts: defender.parts, riposteDamage: 0, log, defeated: false, resultKind: 'miss', dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false };
         }
         // Enemies never get a defense roll of their own in this system (only
         // the player side ever dodges/blocks/parries) — a hit on an enemy is
@@ -29944,11 +30234,19 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const justDisabled = newHp === 0 && !targetState.disabled;
             const parts = { ...defender.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
             log.push({ text: attacker.name + ' — ' + t('combatLogHitTag') + ' (' + attacker.weaponLabel + '): ' + defender.name + ' ' + partLabel + ' −' + dmg + ' HP', kind: 'hit' });
-            if (justDisabled && part.vital)
+            const defeated = justDisabled && part.vital;
+            // A solid hit to the head — even one that doesn't end the fight —
+            // has a chance to stun (see COMBAT_TUNING.headStunChance). A
+            // fight-ending vital hit skips this: there's no "next turn" left to
+            // cost them.
+            const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
+            if (defeated)
                 log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' });
             else if (justDisabled)
                 log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' });
-            return { parts, riposteDamage: 0, log, defeated: justDisabled && part.vital, resultKind: (justDisabled && part.vital) ? 'vital' : 'hit', dmg };
+            if (stunApplied)
+                log.push({ text: defender.name + ' — ' + t('combatLogStunAppliedText'), kind: 'effect' });
+            return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
         }
         // Player-side defender (hero or ally): automatic dodge/block/parry —
         // same full/partial/fail math and riposte-on-full-parry the manual
@@ -29974,7 +30272,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 riposteDamage = Math.max(1, Math.round(defender.weaponDamage * COMBAT_TUNING.parryRiposteFraction * defender.mods.damageMultiplier));
                 log.push({ text: defender.name + ' — ' + t('combatLogParryRiposteText'), kind: 'hit' });
             }
-            return { parts: defender.parts, riposteDamage, log, defeated: false, resultKind, dmg: 0 };
+            return { parts: defender.parts, riposteDamage, log, defeated: false, resultKind, dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false };
         }
         const rawDmg = Math.max(1, Math.round(computeEnemyDamage(attacker.power)));
         const softenedDmg = key === 'block' ? rawDmg * COMBAT_TUNING.blockChipDamageFraction
@@ -29989,11 +30287,15 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             : outcome === 'partial' ? t('combatLogParryPartialText')
                 : (key === 'none' ? t('combatLogNoDefenseTag') : t('combatLogDefenseFailTag'));
         log.push({ text: defender.name + ' — ' + tag + ' (' + attacker.weaponLabel + '): ' + partLabel + ' −' + dmg + ' HP', kind: 'hit' });
-        if (justDisabled && part.vital)
+        const defeated = justDisabled && part.vital;
+        const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
+        if (defeated)
             log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' });
         else if (justDisabled)
             log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' });
-        return { parts, riposteDamage: 0, log, defeated: justDisabled && part.vital, resultKind: (justDisabled && part.vital) ? 'vital' : 'hit', dmg };
+        if (stunApplied)
+            log.push({ text: defender.name + ' — ' + t('combatLogStunAppliedText'), kind: 'effect' });
+        return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
     }
     // Builds the attacker/defender descriptor resolveOneAttack expects for
     // whichever of the three combatant kinds is acting/being hit right now.
@@ -30068,11 +30370,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const outcome = resolveOneAttack(attacker, defender, t);
             log = [...log, ...outcome.log];
             const enemies = prev.enemies.map(e => e.id === enemyId ? { ...e, parts: outcome.parts } : e);
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg };
+            const defenderKey = 'enemy:' + enemyId;
+            const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
             if (enemies.every(isEnemyDown)) {
-                return { ...prev, heroParts, enemies, log, lastAction, result: 'victory' };
+                return { ...prev, heroParts, enemies, log, lastAction, stunned, result: 'victory' };
             }
-            return advanceTurn({ ...prev, heroParts, enemies, log, lastAction });
+            return advanceTurn({ ...prev, heroParts, enemies, log, lastAction, stunned });
         });
     }
     // Advances turnPos/round to the next living actor and hands off to the
@@ -30109,10 +30413,12 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const outcome = resolveOneAttack(attacker, makeEnemyDefender(target), t);
                 log = [...log, ...outcome.log];
                 const enemies = prev.enemies.map(e => e.id === target.id ? { ...e, parts: outcome.parts } : e);
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg };
+                const defenderKey = 'enemy:' + target.id;
+                const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 if (enemies.every(isEnemyDown))
-                    return { ...prev, enemies, log, lastAction, result: 'victory' };
-                return advanceTurn({ ...prev, enemies, log, lastAction });
+                    return { ...prev, enemies, log, lastAction, stunned, result: 'victory' };
+                return advanceTurn({ ...prev, enemies, log, lastAction, stunned });
             }
             // Enemy turn: attacks a random living hero/ally, automatically
             // defended (see resolveOneAttack/pickAutoDefenseKey).
@@ -30127,10 +30433,11 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const defender = makeHeroDefender(prev.heroParts, mods);
                 const outcome = resolveOneAttack(attacker, defender, t);
                 log = [...log, ...outcome.log];
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg };
+                const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 if (outcome.defeated)
-                    return { ...prev, heroParts: outcome.parts, log, lastAction, result: 'death', killedBy: enemy.enemyName };
-                return advanceTurn({ ...prev, heroParts: outcome.parts, log, lastAction });
+                    return { ...prev, heroParts: outcome.parts, log, lastAction, stunned, result: 'death', killedBy: enemy.enemyName };
+                return advanceTurn({ ...prev, heroParts: outcome.parts, log, lastAction, stunned });
             }
             const ally = targetChoice.ally;
             const defender = makeAllyDefender(ally, mods);
@@ -30139,19 +30446,71 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             if (outcome.defeated)
                 log = [...log, { text: ally.name + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
             const allies = prev.allies.map(a => a.id === ally.id ? { ...a, parts: outcome.parts } : a);
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg };
-            return advanceTurn({ ...prev, allies, log, lastAction });
+            const defenderKey = 'ally:' + ally.id;
+            const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+            return advanceTurn({ ...prev, allies, log, lastAction, stunned });
+        });
+    }
+    // Whoever's turn it is gets skipped entirely if they're stunned (see
+    // resolveOneAttack's stunApplied, set by a solid head hit) — hero, ally,
+    // or enemy alike, since stun doesn't care which side got rattled. As a
+    // small consolation for losing the turn, this nudges that entry one slot
+    // earlier in the fight's fixed initiative order (see buildInitiativeOrder
+    // on why the order otherwise never changes for the whole fight — this is
+    // the one deliberate, status-driven exception to that). Only swaps when
+    // there's an earlier slot to take (turnPos > 0); skipped on the very
+    // first slot rather than wrapping around, to keep the logic simple.
+    function resolveStunSkip() {
+        setCombat(prev => {
+            if (!prev || prev.result)
+                return prev;
+            const current = prev.order[prev.turnPos];
+            const key = currentStunKey(current);
+            if (!current || !prev.stunned || !prev.stunned[key])
+                return prev;
+            const name = current.type === 'hero' ? (heroName || t('combatYouLabel'))
+                : current.type === 'ally' ? ((prev.allies.find(a => a.id === current.id) || {}).name || '')
+                    : ((prev.enemies.find(e => e.id === current.id) || {}).enemyName || '');
+            const log = [...prev.log, { text: name + ' — ' + t('combatLogStunSkipText'), kind: 'effect' }];
+            const stunned = { ...prev.stunned };
+            delete stunned[key];
+            let order = prev.order;
+            if (prev.turnPos > 0) {
+                order = order.slice();
+                const tmp = order[prev.turnPos];
+                order[prev.turnPos] = order[prev.turnPos - 1];
+                order[prev.turnPos - 1] = tmp;
+            }
+            const lastAction = {
+                seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1,
+                attackerType: current.type, attackerId: current.type === 'hero' ? 'hero' : current.id,
+                defenderType: current.type, defenderId: current.type === 'hero' ? 'hero' : current.id,
+                resultKind: 'stunSkip', dmg: 0
+            };
+            return advanceTurn({ ...prev, order, log, stunned, lastAction });
         });
     }
     // Drives every non-hero turn forward on a short delay (so a multi-enemy
     // round reads as a sequence of blows rather than jumping straight to the
-    // hero's next prompt) — see runAutoTurn just above. Stops the instant the
-    // turn lands back on the hero or the fight ends.
+    // hero's next prompt) — see runAutoTurn just above. A stunned actor (see
+    // resolveStunSkip) is skipped the same automatic way regardless of whose
+    // turn it is, hero included — stun overrides the usual "wait for the
+    // player to click" rule since there's nothing for them to choose.
+    // Otherwise stops the instant the turn lands back on the hero or the
+    // fight ends.
     useEffect(() => {
         if (!combat || combat.result || !combatModalOpen)
             return;
         const current = combat.order[combat.turnPos];
-        if (!current || current.type === 'hero')
+        if (!current)
+            return;
+        const stunKey = currentStunKey(current);
+        if (combat.stunned && combat.stunned[stunKey]) {
+            const timer = setTimeout(() => resolveStunSkip(), 650);
+            return () => clearTimeout(timer);
+        }
+        if (current.type === 'hero')
             return;
         const timer = setTimeout(() => runAutoTurn(), 650);
         return () => clearTimeout(timer);
@@ -30193,15 +30552,22 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const newHp = Math.max(0, targetState.hp - dmg);
             const justDisabled = newHp === 0 && !targetState.disabled;
             const heroParts = { ...prev.heroParts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
+            const defeated = justDisabled && part.vital;
+            // Same head-stun chance as a normal swing (see resolveOneAttack) — an
+            // unopposed punish hit is still just a hit.
+            const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
             log = [...log, { text: t('combatLogFleeFailTag') + ' (' + punisher.weaponDescription + '): ' + partLabel + ' −' + dmg + ' HP', kind: 'hit' }];
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: punisher.id, defenderType: 'hero', defenderId: 'hero', resultKind: (justDisabled && part.vital) ? 'vital' : 'hit', dmg };
-            if (justDisabled && part.vital) {
+            const stunned = stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: punisher.id, defenderType: 'hero', defenderId: 'hero', resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
+            if (defeated) {
                 log = [...log, { text: partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
-                return { ...prev, heroParts, log, lastAction, result: 'death', killedBy: punisher.enemyName };
+                return { ...prev, heroParts, log, lastAction, stunned, result: 'death', killedBy: punisher.enemyName };
             }
             if (justDisabled)
                 log = [...log, { text: partLabel + ': ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
-            return { ...prev, heroParts, log, lastAction };
+            if (stunApplied)
+                log = [...log, { text: t('combatLogStunAppliedText'), kind: 'effect' }];
+            return { ...prev, heroParts, log, lastAction, stunned };
         });
     }
     function buildCombatSummaryTag(finalCombat, failedQuests) {
@@ -31359,7 +31725,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             importModalOpen && (React.createElement(ImportModal, { value: importText, onChange: setImportText, error: importError, onLoad: handleImportSave, onCancel: () => { setImportModalOpen(false); setImportText(''); setImportError(null); }, t: t })),
             settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
             apiKeyGuideOpen && (React.createElement(ApiKeyGuideModal, { apiKey: geminiApiKey, onSetApiKey: setApiKey, onClose: () => setApiKeyGuideOpen(false), t: t })),
-            cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: saveToCloudSlot, onLoadSlot: loadFromCloudSlot, onDeleteSlot: deleteCloudSlot, onClose: () => setCloudModalOpen(false), t: t }))));
+            cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t }))));
     }
     const secretsText = currentTurn && currentTurn.narrator.secrets
         ? currentTurn.narrator.secrets
@@ -31522,7 +31888,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         dropConfirmIndex !== null && (React.createElement(DropConfirmModal, { itemName: (gameState.inventory[dropConfirmIndex] || {}).name || '', onConfirm: () => dropItem(dropConfirmIndex), onCancel: () => setDropConfirmIndex(null), t: t })),
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
-        cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: saveToCloudSlot, onLoadSlot: loadFromCloudSlot, onDeleteSlot: deleteCloudSlot, onClose: () => setCloudModalOpen(false), t: t })),
+        cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
         mapModalOpen && (React.createElement(MapModal, { map: gameState.map, quests: gameState.quests, factionReputations: factionReputations, onClose: () => setMapModalOpen(false), onRequestTravel: requestMapTravel, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: pendingMapTravel, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
@@ -31676,6 +32042,8 @@ const APP_STYLES = `
   .item-quest-tag { font-family: var(--font-mono); font-size: 0.7rem; color: var(--stone-600); margin: -0.9rem 0 1rem; }
   .item-quest-tag-active { color: var(--amber-400); }
   .modal-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.25rem; }
+  .export-action-btn { flex: 1; }
+  .export-copy-btn { flex: 1 1 100%; }
   .settings-danger-zone-divider { border-top: 1px solid var(--stone-700); margin: 1.25rem 0 1rem; }
   .settings-restart-btn { width: 100%; }
   .modal-actions .btn { flex: 1 1 auto; }
@@ -31853,7 +32221,8 @@ const APP_STYLES = `
   .group-member-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0; }
   .quest-journal-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
   .quest-journal-header .modal-title { margin: 0; }
-  .quest-sort-btn { padding: 0.4rem 0.7rem; font-size: 0.68rem; flex-shrink: 0; white-space: nowrap; }
+  .quest-journal-controls { margin: 0 0 0.9rem; }
+  .quest-journal-controls .sheet-inventory-control { flex: 1; min-width: 8rem; }
   .quest-journal-empty { font-family: var(--font-serif); font-style: italic; font-size: 0.9rem; color: var(--stone-500); text-align: center; margin: 1.5rem 0; }
   .quest-journal-group { margin-bottom: 1.1rem; }
   .quest-journal-item { border-bottom: 1px solid var(--stone-800); }
@@ -31862,6 +32231,9 @@ const APP_STYLES = `
   .quest-journal-row-completed { color: var(--stone-400); }
   .quest-journal-row-failed { color: var(--stone-500); text-decoration: line-through; text-decoration-color: var(--red-400); }
   .quest-journal-caret { color: var(--stone-600); font-size: 0.75rem; flex-shrink: 0; }
+  .quest-journal-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.25s ease; }
+  .quest-journal-collapse-open { grid-template-rows: 1fr; }
+  .quest-journal-collapse-inner { overflow: hidden; }
   .quest-journal-detail { padding: 0 0.1rem 0.85rem; }
   .quest-journal-description { font-family: var(--font-serif); font-style: italic; font-size: 0.85rem; color: var(--stone-400); line-height: 1.5; margin: 0 0 0.6rem; }
   .quest-journal-log-heading { font-family: var(--font-mono); font-size: 0.65rem; color: var(--amber-700); text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 0.35rem; }
@@ -32004,23 +32376,18 @@ const APP_STYLES = `
      than the arena as a whole. flex-shrink:0 keeps it from being squashed
      by the row when a neighbor's fx transform briefly changes width. */
   .combat-portrait-wrap { position: relative; display: flex; flex-shrink: 0; }
-  /* Attacker "flies in and hits" — a quick lunge toward the opposing row
-     and back. Enemies lunge down (toward the party row below them),
-     heroes/allies lunge up (toward the enemy row above them). */
-  @keyframes combat-fx-lunge-down {
-    0% { transform: translateY(0) scale(1); }
-    38% { transform: translateY(16px) scale(1.05); }
-    58% { transform: translateY(16px) scale(1.05); }
-    100% { transform: translateY(0) scale(1); }
+  /* Attacker "flies in and hits" — a quick lunge toward wherever the
+     defender's card actually is on screen right now (see CombatModal's fx
+     effect, which measures both portraits and sets --lunge-x/--lunge-y
+     accordingly), rather than a flat up/down guess. Falls back to 0 (no
+     movement) when the vars aren't set. */
+  @keyframes combat-fx-lunge {
+    0% { transform: translate(0, 0) scale(1); }
+    38% { transform: translate(var(--lunge-x, 0px), var(--lunge-y, 0px)) scale(1.05); }
+    58% { transform: translate(var(--lunge-x, 0px), var(--lunge-y, 0px)) scale(1.05); }
+    100% { transform: translate(0, 0) scale(1); }
   }
-  @keyframes combat-fx-lunge-up {
-    0% { transform: translateY(0) scale(1); }
-    38% { transform: translateY(-16px) scale(1.05); }
-    58% { transform: translateY(-16px) scale(1.05); }
-    100% { transform: translateY(0) scale(1); }
-  }
-  .combat-fx-lunge-down { animation: combat-fx-lunge-down 0.5s cubic-bezier(.36,.07,.19,.97) both; position: relative; z-index: 2; }
-  .combat-fx-lunge-up { animation: combat-fx-lunge-up 0.5s cubic-bezier(.36,.07,.19,.97) both; position: relative; z-index: 2; }
+  .combat-fx-lunge { animation: combat-fx-lunge 0.5s cubic-bezier(.36,.07,.19,.97) both; position: relative; z-index: 2; }
   /* Defender takes a hit: flashes red and shrinks for an instant, then
      settles back to its normal size and color. */
   @keyframes combat-fx-hit {
@@ -32056,8 +32423,20 @@ const APP_STYLES = `
     100% { transform: translateX(0) rotate(0); opacity: 1; }
   }
   .combat-fx-dodge { animation: combat-fx-dodge 0.45s ease-out; }
+  /* Stun taking hold / a stunned turn being skipped: a woozy tilt-wobble
+     with a violet flash (matching .combat-log-effect's accent color, so
+     the card and the log agree on "this is a status effect, not damage"). */
+  @keyframes combat-fx-stunned {
+    0% { transform: rotate(0deg); box-shadow: none; }
+    20% { transform: rotate(-6deg); box-shadow: inset 0 0 0 999px rgba(167, 139, 250, 0.35); border-color: #a78bfa; }
+    40% { transform: rotate(5deg); }
+    60% { transform: rotate(-4deg); box-shadow: inset 0 0 0 999px rgba(167, 139, 250, 0.2); }
+    80% { transform: rotate(2deg); }
+    100% { transform: rotate(0deg); box-shadow: none; }
+  }
+  .combat-fx-stunned { animation: combat-fx-stunned 0.6s ease-out; }
   @media (prefers-reduced-motion: reduce) {
-    .combat-portrait-active, .combat-fx-lunge-down, .combat-fx-lunge-up, .combat-fx-hit, .combat-fx-hit-vital, .combat-fx-block, .combat-fx-dodge { animation: none !important; }
+    .combat-portrait-active, .combat-fx-lunge, .combat-fx-hit, .combat-fx-hit-vital, .combat-fx-block, .combat-fx-dodge, .combat-fx-stunned { animation: none !important; }
   }
   /* Spark burst on any weapon contact (a real hit or a full block/parry) —
      a handful of dots flying outward from the point of impact and fading.
@@ -32082,19 +32461,29 @@ const APP_STYLES = `
     100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); opacity: 0; }
   }
   @media (prefers-reduced-motion: reduce) { .combat-spark-burst span { animation: none !important; opacity: 0; } }
-  /* Floating "-N HP" / BLOCK / MISS callout above the card. */
+  /* Floating "урон N" / БЛОК / ПАРИРОВАНИЕ / УКЛОНЕНИЕ / ОГЛУШЁН / part-
+     disabled callout above the card. Each instance sets --pop-dx/--pop-dy
+     (see CombatModal's randomFxVector) so it flies out at its own random
+     angle instead of always straight up — several can appear on the same
+     card at once (a hit that both deals damage and disables a limb, say),
+     each with a different angle and a slight animation-delay stagger so
+     they read as distinct callouts rather than overlapping. */
   .combat-dmg-popup {
-    position: absolute; top: -0.3rem; left: 50%; transform: translateX(-50%);
+    position: absolute; top: -0.3rem; left: 50%;
     font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; color: var(--red-400);
     text-shadow: 0 1px 3px rgba(0,0,0,0.85); pointer-events: none; z-index: 5; white-space: nowrap;
     animation: combat-dmg-float 0.65s ease-out forwards;
   }
   .combat-dmg-popup-block { color: var(--sky-400); font-size: 0.6rem; letter-spacing: 0.08em; }
+  .combat-dmg-popup-parry { color: var(--amber-300); font-size: 0.6rem; letter-spacing: 0.08em; }
+  .combat-dmg-popup-dodge { color: var(--emerald-600); font-size: 0.6rem; letter-spacing: 0.08em; }
   .combat-dmg-popup-miss { color: var(--stone-400); font-size: 0.6rem; font-style: italic; letter-spacing: 0.06em; }
+  .combat-dmg-popup-stun { color: #a78bfa; font-size: 0.6rem; letter-spacing: 0.08em; }
+  .combat-dmg-popup-disabled { color: var(--red-600); font-size: 0.58rem; letter-spacing: 0.06em; }
   @keyframes combat-dmg-float {
-    0% { opacity: 0; transform: translate(-50%, 0) scale(0.8); }
-    22% { opacity: 1; transform: translate(-50%, -8px) scale(1.1); }
-    100% { opacity: 0; transform: translate(-50%, -28px) scale(1); }
+    0% { opacity: 0; transform: translate(-50%, 0) translate(0px, 0px) scale(0.8); }
+    22% { opacity: 1; transform: translate(-50%, 0) translate(calc(var(--pop-dx, 0px) * 0.3), calc(var(--pop-dy, -8px) * 0.3)) scale(1.1); }
+    100% { opacity: 0; transform: translate(-50%, 0) translate(var(--pop-dx, 0px), var(--pop-dy, -28px)) scale(1); }
   }
   @media (prefers-reduced-motion: reduce) { .combat-dmg-popup { animation: none !important; opacity: 0; } }
   .combat-arena { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
