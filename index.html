@@ -17617,6 +17617,11 @@ const TRANSLATIONS = {
         combatLogParryRiposteText: 'Открывшегося противника настигает ответный удар',
         combatLogStunAppliedText: 'оглушён',
         combatLogStunSkipText: 'оглушён — пропускает ход',
+        combatLogCritTag: 'Критический удар!',
+        combatLogEnemyFleeText: 'теряет самообладание и обращается в бегство',
+        combatLogEnemySurrenderText: 'бросает оружие и сдаётся',
+        combatLogAllyFleeSuccessText: 'теряет самообладание и убегает из боя',
+        combatLogAllyFleeFailText: 'пытается сбежать, но получает удар',
         combatUnarmedLabel: 'кулак',
         combatUnarmedEnemyLabel: 'кулаки',
         combatPartDisabledSuffix: 'не действует',
@@ -17680,6 +17685,7 @@ const TRANSLATIONS = {
         questLogHeading: 'Ход выполнения',
         questLogEmptyText: 'Пока без изменений.',
         questLogAcceptedEntry: 'Задание принято',
+        questLogDiscoveredEntry: 'Замечено самим героем',
         questLogCompletedEntry: 'Задание выполнено',
         questLogFailedEntry: 'Задание провалено',
         questLogHaggleFailedEntry: 'Провалено — торг разозлил нанимателя, и тот отозвал предложение',
@@ -18123,6 +18129,11 @@ const TRANSLATIONS = {
         combatLogParryRiposteText: 'The opening is met with a counter-strike',
         combatLogStunAppliedText: 'stunned',
         combatLogStunSkipText: 'stunned — skips turn',
+        combatLogCritTag: 'Critical hit!',
+        combatLogEnemyFleeText: 'loses its nerve and flees',
+        combatLogEnemySurrenderText: 'drops its weapon and surrenders',
+        combatLogAllyFleeSuccessText: 'loses its nerve and flees the fight',
+        combatLogAllyFleeFailText: 'tries to flee but gets hit',
         combatUnarmedLabel: 'fist',
         combatUnarmedEnemyLabel: 'fists',
         combatPartDisabledSuffix: 'disabled',
@@ -18186,6 +18197,7 @@ const TRANSLATIONS = {
         questLogHeading: 'Progress',
         questLogEmptyText: 'No progress yet.',
         questLogAcceptedEntry: 'Quest accepted',
+        questLogDiscoveredEntry: 'Noticed by the hero themselves',
         questLogCompletedEntry: 'Quest completed',
         questLogFailedEntry: 'Quest failed',
         questLogHaggleFailedEntry: 'Failed — haggling angered the giver, who pulled the offer',
@@ -18780,6 +18792,21 @@ function normalizeMapNode(raw) {
         // just standing, never an absolute number the model has to track
         // itself) and MapModal for the up/down floor switcher this drives.
         layer: Number.isFinite(raw.layer) ? Math.trunc(raw.layer) : 0,
+        // The id of whichever OTHER node is this floor's ground-level origin —
+        // the one specific place whose stairs or cellar door this entire
+        // vertical stack grows out of — or null for a node that has never had
+        // a floor built off it. Set once, the first time anything is ever
+        // built above or below some location (see reconcileMap's upsert), and
+        // never touched again after that, same as layer just above. This is
+        // what actually keeps two unrelated buildings' same-numbered floors
+        // from being treated as one place just because "layer" landed on the
+        // same integer for both: MapModal scopes what it shows on a non-ground
+        // floor to nodes sharing the hero's own current floorRootId. A node
+        // saved before this field existed has floorRootId null, and MapModal
+        // deliberately never hides a null-floorRootId node behind the stack
+        // check — it falls back to plain layer-only matching for exactly that
+        // node, so an old save never loses a floor it could already see.
+        floorRootId: typeof raw.floorRootId === 'string' && raw.floorRootId.trim() ? raw.floorRootId.trim() : null,
         // True only for a "far" (mentioned-but-unconnected, see reconcileMap's
         // upsert) node the player hasn't opened yet — drives the one-time white
         // off-screen arrow in MapModal, which clears the flag the moment the
@@ -18896,6 +18923,22 @@ function reconcileMap(rawLocation, currentState) {
         const anchorLayer = anchor.layer || 0;
         const isVertical = verticalMove === 'up' || verticalMove === 'down';
         const layer = isVertical ? (verticalMove === 'up' ? anchorLayer + 1 : anchorLayer - 1) : anchorLayer;
+        // A floor's identity is pinned to the SPECIFIC ground location its own
+        // stairs/cellar lead from — never to the bare "layer" number alone —
+        // so two unrelated buildings that each happen to grow a 2nd floor are
+        // never treated as the same place just because both landed on the same
+        // relative height. The anchor becomes a stack's root the first time
+        // anything is ever built off it (floorRootId set to its own id, once,
+        // same "never touched again" spirit as layer itself); every floor
+        // above or below it, and every ordinary horizontal neighbor reached
+        // FROM one of those floors, then just inherits that one id, however
+        // many vertical hops away it is. A plain horizontal move off an anchor
+        // that has never grown a floor (anchor.floorRootId still null) stays
+        // null too — the open world at layer 0 is meant to hold many unrelated
+        // places at once, so only an actual stack of floors needs this at all.
+        if (isVertical && anchor.id && !anchor.floorRootId)
+            anchor.floorRootId = anchor.id;
+        const floorRootId = anchor.floorRootId || null;
         // findFreeGridCell already falls back to due east for a missing or
         // unrecognized direction, which is fine for a near spot tucked one cell
         // over, but would line up every direction-less FAR node to the east of
@@ -18913,7 +18956,7 @@ function reconcileMap(rawLocation, currentState) {
         const { gx, gy } = isVertical
             ? { gx: anchor.gx, gy: anchor.gy }
             : (nodes.length === 0 && !fromNode) ? { gx: 0, gy: 0 } : findFreeGridCell(anchor.gx, anchor.gy, farDirection, occupiedCellsOnLayer(layer), far ? FAR_MAP_GRID_DISTANCE : 1);
-        const node = { id, name: name.trim(), kind: MAP_NODE_KINDS.includes(kind) ? kind : 'landmark', gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, arrowPending: far === true };
+        const node = { id, name: name.trim(), kind: MAP_NODE_KINDS.includes(kind) ? kind : 'landmark', gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId, arrowPending: far === true };
         nodes.push(node);
         return node;
     }
@@ -18982,7 +19025,10 @@ function applyConfirmedTravel(mapState, precedingNarrator, isOpeningTurn) {
         const layer = anchor.layer || 0;
         const occupied = new Set(nodes.filter(n => (n.layer || 0) === layer).map(n => `${n.gx},${n.gy}`));
         const { gx, gy } = nodes.length === 0 ? { gx: 0, gy: 0 } : findFreeGridCell(anchor.gx, anchor.gy, 'E', occupied);
-        destination = { id: slugifyMapId(offer.label, existingIds), name: offer.label, kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, arrowPending: false };
+        // No verticalMove concept here — a travel offer is always an ordinary
+        // horizontal trip — so the destination simply inherits whatever stack
+        // its anchor already belongs to, same as any horizontal upsert above.
+        destination = { id: slugifyMapId(offer.label, existingIds), name: offer.label, kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId: anchor.floorRootId || null, arrowPending: false };
         nodes.push(destination);
     }
     destination.discovered = true;
@@ -19329,6 +19375,23 @@ function rollEnemyStatsForTier(tierKey) {
     const rollRange = ([min, max]) => Math.round(min + Math.random() * (max - min));
     return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armor: rollRange(tier.armor) };
 }
+// SCAFFOLD — not wired into any actual combat behavior yet. Every enemy the
+// model generates (see the COMBAT event schema) is now tagged with a
+// "role" alongside its "tier", and that tag is parsed and carried through
+// onto the combat enemy object exactly like "fearless" is — but nothing
+// currently reads ENEMY_ROLES or branches on an enemy's role during a
+// fight. It exists so the data is already flowing (model → parsed enemy →
+// combat.enemies[i].role) by the time ranged weapons/enemy-specific
+// behavior actually get built. Once that lands, this is where per-role
+// combat behavior (an archer enemy holding range instead of closing in, a
+// caster inflicting an effect instead of a plain hit, a tank leaning on
+// innate mitigation) belongs.
+const ENEMY_ROLES = {
+    melee: {}, // closes in and swings — today's only actual behavior, and every enemy's fallback
+    ranged: {}, // reserved: will want to keep distance once positioning/ranged weapons exist
+    caster: {}, // reserved: will want to apply EFFECT_DEFS-style effects instead of/alongside plain damage
+    tank: {} // reserved: will want extra passive mitigation (armor/block) beyond its rolled tier stats
+};
 function rarityColor(key) {
     const tier = RARITY_TIERS.find(tr => tr.key === key);
     return tier ? tier.color : null;
@@ -21251,7 +21314,53 @@ const COMBAT_TUNING = {
     // Not spelled out anywhere else, so calibrated as a design assumption:
     // common enough to matter tactically, not so common it dominates every
     // head-targeted swing.
-    headStunChance: 35
+    headStunChance: 35,
+    // Critical hits (see rollCritical) — a flat chance on every landed hit
+    // (hero, ally, or enemy alike) to multiply that hit's damage. Kept
+    // separate from damageVariance below: variance is small, constant, per-hit
+    // noise; a crit is a rare, dramatic spike meant to be a memorable beat in
+    // the combat log, not just a wider bell curve.
+    critChance: 12, // % chance any given landed hit is a critical
+    critMultiplier: 1.8, // damage multiplier on a critical hit
+    // How much extra swing a single hit's damage roll can have. Was a flat
+    // 0.3 for every attack; now attacker precision narrows the spread (a more
+    // skilled combatant lands more *consistent* damage, not just more of it)
+    // and the roll itself is weighted toward the middle (two averaged rolls)
+    // rather than a flat uniform spread, so wild low/high outliers are rarer
+    // and a crit reads as a distinct spike rather than blending into ordinary
+    // variance. See computeWeaponDamage/computeEnemyDamage.
+    damageVarianceBase: 0.3, // variance fraction at "ordinary" (baseline) precision
+    damageVarianceMinFraction: 0.5, // variance never shrinks below this fraction of the base, however precise the attacker
+    damageVariancePrecisionScale: 0.01, // variance fraction reduced per point of attacker precision above baseline
+    // ---- Enemy morale (see rollMoraleBreak/applyMoraleShockToGroup) ----
+    // Every non-fearless enemy (see the combat encounter schema's "fearless"
+    // flag — undead, constructs, mindless swarms, anything with nothing to
+    // lose by dying) tracks morale 0-100, starting full. It drops when that
+    // enemy takes a hit (scaled to how big a bite that hit took out of its
+    // own max HP, so a fragile enemy spooks faster than a tough one even from
+    // the same raw damage number) and drops again, as a group-wide shock,
+    // whenever any one of its allies dies or breaks and runs. Below
+    // moraleFleeThreshold there's a rising chance, rolled the instant morale
+    // drops that low, that the enemy breaks — flees or surrenders (flavor-only
+    // distinction; see moraleSurrenderShare) and leaves the fight alive,
+    // un-looted, uncounted for XP (see isEnemyOut vs. isEnemyDown).
+    //
+    // Party members (see buildAllyCombatants/runAutoTurn's ally branch) track
+    // morale the same way, dropping from damage taken and from a fellow
+    // ally dying or fleeing (see applyAllyMoraleShock) — the hero never does.
+    // Unlike an enemy, an ally doesn't auto-break mid-hit; low morale just
+    // makes them actively try to flee on their own next turn instead of
+    // attacking (see moraleFleeAttemptChance) — succeed and their card leaves
+    // the fight, fail and they eat an unopposed punish hit and try again next
+    // turn (or simply resume fighting if morale has recovered by then).
+    moraleStart: 100,
+    moraleDamageLossScale: 70, // morale lost = (damage taken / own max HP) * this, on every hit landed against them
+    moraleAllyDeathLoss: 30, // flat morale hit to surviving allies when one of their own is killed
+    moraleAllyFleeLoss: 15, // flat morale hit to surviving allies when one of their own breaks and runs (smaller than a death — scary, but not as scarring)
+    moraleFleeThreshold: 50, // morale has to drop below this before a break becomes possible at all
+    moraleFleeChancePerPoint: 2.5, // % chance to break per point of morale below moraleFleeThreshold
+    moraleFleeMaxChance: 80, // even at 0 morale, breaking isn't a certainty
+    moraleSurrenderShare: 0.4 // of enemies that break, this fraction surrenders (log flavor) rather than fleeing outright
 };
 // Weapon damage is deliberately the dominant factor in a hit (see
 // computeWeaponDamage) — strength only nudges it. Numbers are per hit,
@@ -22177,26 +22286,61 @@ function computeHitChance(part, attackerPrecision, mods) {
     const modifier = (attackerPrecision - COMBAT_TUNING.precisionBaseline) * COMBAT_TUNING.precisionHitScale;
     return clampPercent(part.hitChance + modifier + (mods ? mods.hitChanceDelta : 0));
 }
+// Flat per-hit chance for a landed attack (hero, ally, or enemy alike — the
+// roll itself is symmetric, only the resulting numbers differ by who's
+// swinging) to come down as a critical strike — see COMBAT_TUNING.critChance/
+// critMultiplier and computeWeaponDamage/computeEnemyDamage below, which are
+// what actually apply the multiplier.
+function rollCritical() {
+    return Math.random() * 100 < COMBAT_TUNING.critChance;
+}
+// Averages two independent rolls instead of one flat uniform spread, which
+// pulls the result toward the middle of the variance band (roughly
+// triangular rather than flat) — an ordinary hit reads as fairly
+// consistent, so a critical (see rollCritical) stands out as the actual
+// spike instead of blending into everyday variance. Range is -1..1.
+function rollVarianceFactor() {
+    return (Math.random() + Math.random()) - 1;
+}
+// How wide a single hit's damage roll can swing, as a fraction of that
+// hit's base damage. A more precise attacker lands more *consistent*
+// blows, not just more of them, so variance narrows (never below
+// damageVarianceMinFraction of the base spread) as precision climbs above
+// the "ordinary" baseline.
+function damageVarianceFraction(attackerPrecision) {
+    const precision = typeof attackerPrecision === 'number' ? attackerPrecision : COMBAT_TUNING.precisionBaseline;
+    const reduced = COMBAT_TUNING.damageVarianceBase - Math.max(0, precision - COMBAT_TUNING.precisionBaseline) * COMBAT_TUNING.damageVariancePrecisionScale;
+    return Math.max(COMBAT_TUNING.damageVarianceBase * COMBAT_TUNING.damageVarianceMinFraction, reduced);
+}
 // The hero's damage: driven primarily by the equipped weapon's own rating
 // (see getPlayerWeaponInfo, which already folds in two-handed doubling and
 // dual-wielding), with strength only nudging it up or down — a rusty
 // dagger stays a rusty dagger in strong hands, but raw power still helps
 // land a harder blow. `mods` (see aggregateEffectModifiers) applies status
 // effects — exhaustion/fracture drag it down, adrenaline pushes it up.
-function computeWeaponDamage(weaponDamage, attackerPower, mods) {
+// attackerPrecision (agility) only narrows the variance band here — its
+// other job is hit chance, computed separately. Returns { dmg, isCrit } —
+// isCrit is purely for the combat log/fx layer to flag the hit; the
+// multiplier is already folded into dmg.
+function computeWeaponDamage(weaponDamage, attackerPower, mods, attackerPrecision) {
     const powerModifier = 1 + (attackerPower - COMBAT_TUNING.powerBaseline) * COMBAT_TUNING.weaponPowerModifierScale;
     const base = weaponDamage * Math.max(COMBAT_TUNING.weaponPowerModifierFloor, powerModifier) * (mods ? mods.damageMultiplier : 1);
-    const variance = base * COMBAT_TUNING.damageVariance;
-    return Math.max(1, Math.round(base + (Math.random() * 2 - 1) * variance));
+    const variance = base * damageVarianceFraction(attackerPrecision);
+    const raw = base + rollVarianceFactor() * variance;
+    const isCrit = rollCritical();
+    return { dmg: Math.max(1, Math.round(isCrit ? raw * COMBAT_TUNING.critMultiplier : raw)), isCrit };
 }
 // An enemy's damage: enemies carry no inventory/rarity, so their hits scale
 // directly off their generated "power" stat instead, calibrated so an
 // ordinary opponent (power ~10) hits about as hard as a common one-handed
-// weapon (see WEAPON_DAMAGE_BY_RARITY).
-function computeEnemyDamage(enemyPower) {
+// weapon (see WEAPON_DAMAGE_BY_RARITY). Same { dmg, isCrit } shape as
+// computeWeaponDamage, for the same reason.
+function computeEnemyDamage(enemyPower, enemyPrecision) {
     const base = COMBAT_TUNING.enemyDamageBase + enemyPower * COMBAT_TUNING.enemyDamagePowerScale;
-    const variance = base * COMBAT_TUNING.damageVariance;
-    return Math.max(1, Math.round(base + (Math.random() * 2 - 1) * variance));
+    const variance = base * damageVarianceFraction(enemyPrecision);
+    const raw = base + rollVarianceFactor() * variance;
+    const isCrit = rollCritical();
+    return { dmg: Math.max(1, Math.round(isCrit ? raw * COMBAT_TUNING.critMultiplier : raw)), isCrit };
 }
 // blockChanceBase is the equipped shield/two-handed weapon's own rarity-
 // scaled block rating (see getBlockChanceForItem/computeDefenseAvailability)
@@ -22232,6 +22376,41 @@ function computeFleeChance(enemyPower, enemyPrecision, enemyTotalHp, playerAgili
     const difficultyPenalty = powerPrecisionExcess * COMBAT_TUNING.fleeDifficultyScale + hpExcess * COMBAT_TUNING.fleeHpDifficultyScale;
     const agilityBonus = (playerAgility - COMBAT_TUNING.precisionBaseline) * COMBAT_TUNING.fleeAgilityScale;
     return clampPercent(COMBAT_TUNING.fleeBase - difficultyPenalty + agilityBonus + (mods ? mods.fleeChanceDelta : 0));
+}
+// Shared ramp used by both morale-break paths: how likely a break/flee
+// attempt is to succeed, purely as a function of how far under
+// moraleFleeThreshold the combatant's morale has fallen. 0 at/above the
+// threshold (nothing to roll), rising by moraleFleeChancePerPoint per point
+// below it, capped at moraleFleeMaxChance — even a thoroughly broken
+// combatant isn't a guaranteed success. Used directly by an ally's own
+// flee-attempt roll (see runAutoTurn's ally branch) and indirectly, via
+// rollMoraleBreak just below, by an enemy's instant break-on-hit check.
+function moraleFleeAttemptChance(morale) {
+    if (morale >= COMBAT_TUNING.moraleFleeThreshold)
+        return 0;
+    return Math.min(COMBAT_TUNING.moraleFleeMaxChance, (COMBAT_TUNING.moraleFleeThreshold - morale) * COMBAT_TUNING.moraleFleeChancePerPoint);
+}
+// Enemy morale break check (see the COMBAT_TUNING.morale* block and the
+// group-fight comment above buildCombatantParts/isEnemyOut). Called both
+// right after an enemy takes a hit (against its own freshly-lowered
+// morale) and, via applyMoraleShockToGroup, against every one of its
+// still-fighting allies the instant one of them dies or breaks. Rolls
+// instantly and unconditionally against moraleFleeAttemptChance — unlike a
+// party member's own flee attempt (see runAutoTurn), there's no
+// fail-and-get-punished consequence for an enemy; it just doesn't break
+// yet. Returns null (holds), 'flee', or 'surrender' — the two are purely a
+// log-flavor coin flip (moraleSurrenderShare); both remove the enemy from
+// the fight alive, un-looted, and worth no XP (see isEnemyOut vs.
+// isEnemyDown). Never called at all for a "fearless" enemy (undead,
+// constructs, mindless swarms — see the combat encounter schema) — those
+// never track morale in the first place.
+function rollMoraleBreak(morale) {
+    const chance = moraleFleeAttemptChance(morale);
+    if (chance <= 0)
+        return null;
+    if (Math.random() * 100 >= chance)
+        return null;
+    return Math.random() < COMBAT_TUNING.moraleSurrenderShare ? 'surrender' : 'flee';
 }
 // Resolves a stealth-kill attempt (see the "ambush" combat-encounter flag)
 // against the hero's agility into one of three outcomes: an instant kill, a
@@ -22598,38 +22777,87 @@ function stripEphemeralForExport(messages) {
         return rest;
     });
 }
-// Folds identically-named inventory entries (spare rings, a matching
-// weapon pair, stacked potions) into one display row with a ×count, tied
-// back to one representative array index (first occurrence) for whatever
-// that row's tap target does. Dropping, viewing, and (see GiftItemModal)
+// Folds identically-named STACKABLE inventory entries (potions, materials,
+// other 'none'-slot stuff) into one display row with a ×count, tied back
+// to one representative array index (first occurrence) for whatever that
+// row's tap target does. Dropping, viewing, and (see GiftItemModal)
 // gifting all act on exactly that one index, so a stack of 3 potions ever
 // loses just 1 — shared here so CharacterSheet's inventory list and
 // GiftItemModal's item picker group the exact same way.
+// Equippable gear (weapon/armor/helmet/amulet/gloves/boots/ring/cloak/
+// backpack — anything except 'consumable'/'none') never stacks, even
+// sharing a name with another copy: two spare rings stay two separate
+// rows instead of folding into one "×2" row, so any specific copy —
+// worn or not — always has its own row and its own firstIndex. See
+// countEquippedByName/annotateEquipped/excludeEquipped just below for how
+// that plays with only one of several identically-named copies being worn.
 function groupInventoryByName(inventory) {
     const groups = [];
     const indexByName = new Map();
     inventory.forEach((item, i) => {
-        if (indexByName.has(item.name)) {
+        const stackable = item.slot === 'consumable' || item.slot === 'none';
+        if (stackable && indexByName.has(item.name)) {
             groups[indexByName.get(item.name)].count += 1;
         }
         else {
-            indexByName.set(item.name, groups.length);
+            if (stackable)
+                indexByName.set(item.name, groups.length);
             groups.push({ item, firstIndex: i, count: 1 });
         }
     });
     return groups;
 }
-// Hides anything currently worn/wielded from a hand-over list entirely —
-// give-to-party, gift-to-NPC and sell-to-merchant all use this on top of
+// How many equipment slots currently hold each item name — e.g.
+// { 'Silver Ring': 2 } with an identical ring in both ring slots. A count
+// rather than a plain Set of names: the app's equip state only ever
+// tracks a slot's item by name (see the INVENTORY UPKEEP EFFECTS
+// reconciliation and takeItemsFromPartyMember's own stillPresent check,
+// which reconcile equipment the same name-only way), so with two copies
+// of a name in inventory and only one worn, there's no way to tell WHICH
+// specific copy is "the" equipped one — only how many of that name are.
+function countEquippedByName(equipment) {
+    const counts = new Map();
+    if (equipment) {
+        Object.values(equipment).forEach(name => {
+            if (name)
+                counts.set(name, (counts.get(name) || 0) + 1);
+        });
+    }
+    return counts;
+}
+// Spends countEquippedByName's per-name budget across the groups sharing
+// that name, in the order given, and returns the same groups each tagged
+// with `worn` — how many of that group's own count the budget accounted
+// for (0 or 1 for gear, since gear no longer stacks; nothing stackable is
+// ever equipped in practice, so a stackable's count is never touched).
+// Which specific same-named copy "absorbs" the worn budget is arbitrary —
+// identically-named gear is interchangeable, and nothing in the app's
+// data tracks a more specific identity than the name — but the total
+// count spent is exact, so exactly as many copies end up flagged worn as
+// are actually equipped, never every copy of that name at once.
+function annotateEquipped(groups, equippedCounts) {
+    const remaining = new Map(equippedCounts);
+    return groups.map(g => {
+        const budget = remaining.get(g.item.name) || 0;
+        const worn = Math.min(g.count, budget);
+        if (worn > 0)
+            remaining.set(g.item.name, budget - worn);
+        return { ...g, worn };
+    });
+}
+// Drops anything currently worn/wielded from a hand-over list — give-to-
+// party, gift-to-NPC and sell-to-merchant all use this on top of
 // groupInventoryByName, rather than the old approach of merely marking an
 // equipped row with a checkmark, so the hero has to unequip something
 // before it can be handed off, gifted or sold out from under themselves.
-// Same name-level granularity groupInventoryByName itself already uses —
-// if two copies of a name exist and one happens to be worn, the whole
-// stack is treated as equipped until it's freed up, rather than trying to
-// split out which specific copy is the worn one.
-function excludeEquipped(groups, equippedNames) {
-    return groups.filter(g => !equippedNames.has(g.item.name));
+// Built on annotateEquipped, so only as many copies of a name as are
+// actually worn get hidden — a spare copy of an equipped name (its own
+// row, now that gear never stacks) stays offerable instead of the whole
+// name disappearing from the list until every copy is unequipped.
+function excludeEquipped(groups, equippedCounts) {
+    return annotateEquipped(groups, equippedCounts)
+        .map(g => ({ ...g, count: g.count - g.worn }))
+        .filter(g => g.count > 0);
 }
 // ==============================================================================
 // PRESENTATIONAL COMPONENTS
@@ -23314,9 +23542,9 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
                 const activeStages = q.stages.filter(s => s.status === 'active');
                 return (React.createElement("div", { key: q.id, className: "sheet-quest" },
                     React.createElement("p", { className: "sheet-quest-title" }, q.title),
-                    activeStages.length > 0 ? (React.createElement("p", { className: "sheet-quest-meta" }, activeStages.map(s => s.title).join(' · '))) : (React.createElement("p", { className: "sheet-quest-meta" },
+                    activeStages.length > 0 ? (React.createElement("p", { className: "sheet-quest-meta" }, activeStages.map(s => s.title).join(' · '))) : (q.giver || q.reward) ? (React.createElement("p", { className: "sheet-quest-meta" },
                         q.giver,
-                        q.reward ? ' · ' + q.reward : ''))));
+                        q.reward ? ' · ' + q.reward : '')) : null));
             }))),
         gameState.npcs.length > 0 && (React.createElement("div", { className: "sheet-section" },
             React.createElement("p", { className: "sheet-heading" }, t('npcsHeading')),
@@ -23608,8 +23836,8 @@ function GiftItemModal({ npcName, gameState, itemRarities, equipment, skipGiftCo
     const [currencyInput, setCurrencyInput] = useState('');
     const [stage, setStage] = useState('tray'); // 'tray' | 'confirm'
     const [dontShowAgain, setDontShowAgain] = useState(false);
-    const equippedNames = new Set(equipment ? Object.values(equipment).filter(Boolean) : []);
-    const groups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedNames);
+    const equippedCounts = countEquippedByName(equipment);
+    const groups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedCounts);
     const takenIndexes = new Set(slots.filter(s => s !== null));
     const currencyAmount = Math.max(0, Math.min(gameState.currency, Math.round(Number(currencyInput)) || 0));
     const offerEmpty = takenIndexes.size === 0 && currencyAmount === 0;
@@ -23907,8 +24135,8 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
     // A two-handed weapon in either hand occupies the opposite one too —
     // see the shared isWeaponSlotBlocked helper; PartyGearModal already has
     // both inventory and equipment on hand so it can just call it per slot.
-    const equippedNames = new Set(Object.values(equipment).filter(Boolean));
-    const groups = groupInventoryByName(inventory);
+    const equippedCounts = countEquippedByName(equipment);
+    const groups = annotateEquipped(groupInventoryByName(inventory), equippedCounts);
     const activeSets = computeActiveEquipmentSets(equipment, inventory, itemRarities);
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
@@ -23966,7 +24194,7 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
                 groups.map((group, gi) => {
                     const { item, firstIndex, count } = group;
                     const rarity = findItemRarity(item.name, itemRarities);
-                    const isEquipped = equippedNames.has(item.name);
+                    const isEquipped = group.worn > 0;
                     const armorDefense = getArmorDefenseForSlot(item.slot, rarity || 'common', item.weightCategory);
                     const weaponDamage = getWeaponDamageForSlot(item.slot, rarity || 'common', item.twoHanded);
                     const blockChance = getBlockChanceForItem(item, rarity || 'common');
@@ -24031,8 +24259,8 @@ function GivePartyItemModal({ npcName, gameState, itemRarities, equipment, inven
     // it isn't offered as a candidate at all until it's unequipped. The
     // take-back side has no such filter — this companion's equipped items
     // stay eligible, exactly like their belongings list in PartyGearModal.
-    const equippedNames = new Set(equipment ? Object.values(equipment).filter(Boolean) : []);
-    const giveGroups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedNames);
+    const equippedCounts = countEquippedByName(equipment);
+    const giveGroups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedCounts);
     const takeGroups = groupInventoryByName(inventory || []);
     const takenGiveIndexes = new Set(giveSlots.filter(s => s !== null));
     const takenTakeIndexes = new Set(takeSlots.filter(s => s !== null));
@@ -24147,8 +24375,8 @@ function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRar
     // worn gear has to come off before it can be sold out from under the
     // hero (previously this side showed no equipped indicator at all).
     // Quest items still never show up here regardless.
-    const equippedNames = new Set(equipment ? Object.values(equipment).filter(Boolean) : []);
-    const heroGroups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedNames).filter(g => !g.item.questId);
+    const equippedCounts = countEquippedByName(equipment);
+    const heroGroups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedCounts).filter(g => !g.item.questId);
     return (React.createElement("div", { className: "modal-backdrop", onClick: (e) => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card trade-card" },
@@ -24615,14 +24843,17 @@ function ItemDetailModal({ itemIndex, emptySlotKey, hideDropButton, gameState, i
 // re-renders, so a re-render right after using/dropping something doesn't
 // silently point the buttons at the wrong stack.
 function InventoryModal({ gameState, itemRarities, equipment, inventorySort, onInventorySortChange, inventoryFilter, onInventoryFilterChange, onOpenItemDetail, onClose, t }) {
-    const equippedNames = new Set(equipment ? Object.values(equipment).filter(Boolean) : []);
+    const equippedCounts = countEquippedByName(equipment);
     const totalWeight = computeTotalWeight(gameState.inventory);
     const carryCapacity = computeCarryCapacity(gameState.stats.strength, equipment, itemRarities);
     const isOverweight = totalWeight > carryCapacity;
     // Same grouping/sort/filter rules as the sheet's own inline list (see
     // CharacterSheet) — kept in sync deliberately so switching between the
     // sidebar summary and this full window never shows a different order.
-    const inventoryGroups = groupInventoryByName(gameState.inventory);
+    // Annotated with `worn` (see annotateEquipped) right here, before the
+    // filter/sort below, since both just reorder/select these same group
+    // objects rather than rebuild them — the flag rides along either way.
+    const inventoryGroups = annotateEquipped(groupInventoryByName(gameState.inventory), equippedCounts);
     const presentSlotTypes = Array.from(new Set(inventoryGroups.map(g => g.item.slot)))
         .filter(slot => ITEM_SLOT_LABEL_KEYS[slot]);
     const hasQuestTaggedItems = inventoryGroups.some(g => g.item.questId);
@@ -24705,7 +24936,7 @@ function InventoryModal({ gameState, itemRarities, equipment, inventorySort, onI
                 sortedGroups.length > 0 && (React.createElement("div", { className: "inventory-modal-grid" }, sortedGroups.map((group, gi) => {
                     const { item, count } = group;
                     const rarity = findItemRarity(item.name, itemRarities);
-                    const isEquipped = equippedNames.has(item.name);
+                    const isEquipped = group.worn > 0;
                     const isQuestActive = isActiveQuestItem(item, gameState.quests);
                     const icon = getInventoryItemIcon(item);
                     return (React.createElement("button", { key: gi, type: "button", className: 'inventory-cell' + (isEquipped ? ' inventory-cell-equipped' : ''), style: rarity ? { background: rarityBackground(rarity) } : undefined, onClick: () => onOpenItemDetail(group.firstIndex), title: item.name },
@@ -24749,7 +24980,7 @@ function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor }) {
+function CombatPortrait({ name, parts, isDown, isFled, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor }) {
     const keys = Object.keys(parts);
     const maxHp = keys.reduce((sum, k) => sum + parts[k].maxHp, 0);
     const hp = keys.reduce((sum, k) => sum + Math.max(0, parts[k].hp), 0);
@@ -24788,28 +25019,24 @@ function CombatPortrait({ name, parts, isDown, isActive, targetable, onClick, he
                 (variant === 'hero' ? ' combat-portrait-hero' : '') +
                 (variant === 'boss' ? ' combat-portrait-boss' : '') +
                 (isDown ? ' combat-portrait-down' : '') +
+                (!isDown && isFled ? ' combat-portrait-fled' : '') +
                 (isActive ? ' combat-portrait-active' : '') +
                 (targetable ? ' combat-portrait-targetable' : '') +
                 (healTargetable ? ' combat-portrait-heal-targetable' : '') +
                 (fxCls ? ' ' + fxCls : '') },
             React.createElement("span", { className: "combat-portrait-frame", "aria-hidden": "true" }, isDown
                 ? React.createElement("span", { className: "combat-portrait-frame-skull" }, "\uD83D\uDC80")
-                : React.createElement("img", { className: "combat-portrait-frame-img", src: COMBAT_PORTRAIT_ICON, alt: "" })),
+                : isFled
+                    ? React.createElement("span", { className: "combat-portrait-frame-skull" }, "\uD83C\uDFC3")
+                    : React.createElement("img", { className: "combat-portrait-frame-img", src: COMBAT_PORTRAIT_ICON, alt: "" })),
             React.createElement("div", { className: "combat-portrait-overlay" },
+                React.createElement("div", { className: "combat-portrait-note-slot" }, isDown && React.createElement("p", { className: "equip-slot-occupied-note" }, t('combatPartDisabledSuffix'))),
                 React.createElement("p", { className: "combat-portrait-name" }, name),
-                React.createElement("div", { className: "combat-hp-bar" },
-                    React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } })),
-                React.createElement("p", { className: "combat-hp-value" },
-                    displayHp,
-                    "/",
-                    displayMaxHp),
-                typeof armor === 'number' && armor > 0 && (React.createElement(React.Fragment, null,
-                    React.createElement("div", { className: "combat-armor-bar", "aria-label": t('itemDefenseLabel') },
-                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: '100%' } })),
-                    React.createElement("p", { className: "combat-portrait-armor" },
-                        "\uD83D\uDEE1\uFE0F ",
-                        armor))),
-                React.createElement("div", { className: "combat-portrait-note-slot" }, isDown && React.createElement("p", { className: "equip-slot-occupied-note" }, t('combatPartDisabledSuffix'))))),
+                React.createElement("div", { className: "combat-portrait-bars" },
+                    React.createElement("div", { className: "combat-hp-bar", "aria-label": displayHp + '/' + displayMaxHp },
+                        React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } })),
+                    typeof armor === 'number' && armor > 0 && (React.createElement("div", { className: "combat-armor-bar", "aria-label": t('itemDefenseLabel') + ': ' + armor },
+                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: '100%' } })))))),
         fx && fx.spark && (React.createElement("span", { key: 'spark-' + fx.seq, className: 'combat-spark-burst' + (fx.spark === 'block' ? ' combat-spark-burst-block' : ''), "aria-hidden": "true" },
             React.createElement("span", null),
             React.createElement("span", null),
@@ -24900,14 +25127,20 @@ function splitForFlanking(list) {
     const half = Math.ceil(list.length / 2);
     return { left: list.slice(0, half), right: list.slice(half) };
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, onAttack, onFlee, onUseItem, onToggleLoot, onClose, t }) {
+function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, introActive, onAttack, onFlee, onUseItem, onToggleLoot, onClose, t }) {
     const current = combat.order[combat.turnPos];
     const isHeroTurn = !combat.result && current && current.type === 'hero';
     const resultCopy = combat.result ? RESULT_COPY[combat.result] : null;
     const showLoot = combat.result === 'victory' && combat.loot;
     const lootReadyWithItems = showLoot && combat.loot.status === 'ready' && (combat.loot.items.length > 0 || combat.loot.currency > 0);
     const enemyNames = combat.enemies.map(e => e.enemyName).join(', ');
-    const { left: alliesLeft, right: alliesRight } = splitForFlanking(combat.allies);
+    // A fled ally (see runAutoTurn's ally branch/COMBAT_TUNING's morale*
+    // block) is kept in combat.allies data-side — the post-combat health
+    // reconciliation still needs it (see nextNpcs) — but its card should
+    // vanish from the arena the instant it runs, per the fled-ally design:
+    // filtered out here, before the flanking split, rather than at render
+    // time in each of the three JSX spots below.
+    const { left: alliesLeft, right: alliesRight } = splitForFlanking(combat.allies.filter(a => !a.fled));
     // ---- In-combat item use (see useConsumableInCombat in App()) ----
     // Two-step flow off the hero's own turn only: opening the panel lists
     // every "consumable" item still in inventory (itemPanelOpen); picking one
@@ -24961,19 +25194,17 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, onA
     const portraitRefs = useRef({});
     const setPortraitRef = (key) => (el) => { portraitRefs.current[key] = el; };
     // ---- Pre-battle sword-clash intro ----
-    // Plays exactly once, right when the modal first mounts for this fight
-    // (CombatModal is only ever mounted while a fight is open — see its use
-    // in App() — so this useState initializer firing "true" once per fight
-    // is enough; no need to key it off combat.round or sourceNarratorIndex).
-    // introSparks is generated once on mount too, so the burst has a little
-    // natural randomness without re-rolling on every re-render.
-    const [introActive, setIntroActive] = useState(true);
+    // introActive itself now lives in App() (combatIntroActive) — shared with
+    // the auto-turn effect there so nothing can act in the background while
+    // this is playing (see its declaration for why). introSparks is still
+    // generated once per mount here, so the burst has a little natural
+    // randomness without re-rolling on every re-render.
     const introSparksRef = useRef(null);
     if (!introSparksRef.current) {
         const count = 10;
         introSparksRef.current = Array.from({ length: count }, (_, i) => {
             const angle = (Math.PI * 2 * i / count) + (Math.random() * 0.4 - 0.2);
-            const dist = 22 + Math.random() * 24;
+            const dist = 30 + Math.random() * 32;
             return {
                 dx: (Math.cos(angle) * dist).toFixed(1) + 'px',
                 dy: (Math.sin(angle) * dist).toFixed(1) + 'px',
@@ -24981,10 +25212,6 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, onA
             };
         });
     }
-    useEffect(() => {
-        const timer = setTimeout(() => setIntroActive(false), 1700);
-        return () => clearTimeout(timer);
-    }, []);
     // A handful of small random popups fanning out at different angles reads
     // as more alive than every one flying straight up — see the popupItems
     // build-up below. spreadDeg is the total left-right fan (centered on
@@ -25105,14 +25332,6 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, onA
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget && combat.result)
             onClose(); } },
         React.createElement("div", { className: "modal-card combat-card combat-card-group" },
-            introActive && (React.createElement("div", { className: "combat-intro-fx", "aria-hidden": "true" },
-                React.createElement("div", { className: "combat-intro-center" },
-                    React.createElement("div", { className: "combat-intro-sword combat-intro-sword-left" },
-                        React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
-                    React.createElement("div", { className: "combat-intro-sword combat-intro-sword-right" },
-                        React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
-                    React.createElement("div", { className: "combat-intro-flash" }),
-                    introSparksRef.current.map((s, i) => (React.createElement("span", { key: i, className: "combat-intro-spark", style: { '--dx': s.dx, '--dy': s.dy, animationDelay: s.delay + 'ms' } })))))),
             React.createElement("h2", { className: "modal-title" },
                 t('combatModalTitle'),
                 ": ",
@@ -25122,25 +25341,33 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, onA
                 " ",
                 combat.round),
             React.createElement("div", { className: "combat-arena-group" },
-                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && pendingItemIndex === null && !isVitalDisabled(enemy.parts), onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, t: t })))),
+                introActive && (React.createElement("div", { className: "combat-intro-fx", "aria-hidden": "true" },
+                    React.createElement("div", { className: "combat-intro-center" },
+                        React.createElement("div", { className: "combat-intro-sword combat-intro-sword-left" },
+                            React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
+                        React.createElement("div", { className: "combat-intro-sword combat-intro-sword-right" },
+                            React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
+                        React.createElement("div", { className: "combat-intro-flash" }),
+                        introSparksRef.current.map((s, i) => (React.createElement("span", { key: i, className: "combat-intro-spark", style: { '--dx': s.dx, '--dy': s.dy, animationDelay: s.delay + 'ms' } })))))),
+                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isFled: !!enemy.fled, isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isVitalDisabled(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, t: t })))),
                 React.createElement("div", { className: "combat-row combat-row-party" },
                     alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, t: t }))),
                     React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: () => pickHealTarget('hero', null), variant: "hero", fx: fx['hero:hero'], dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armor: heroArmor, t: t }),
                     alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, t: t }))))),
             React.createElement("div", { className: "combat-log" }, combat.log.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
-            !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null ? t('combatUseItemPickTargetHint') : (isHeroTurn ? t('combatChooseTargetHint') : t('combatWaitingHint')))),
+            !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null ? t('combatUseItemPickTargetHint') : (isHeroTurn && !introActive ? t('combatChooseTargetHint') : t('combatWaitingHint')))),
             !combat.result && pendingItemIndex === null && (React.createElement("div", { className: "combat-flee-row" },
-                React.createElement("button", { onClick: () => setItemPanelOpen(o => !o), className: "btn btn-ghost combat-item-btn", type: "button", disabled: !isHeroTurn },
+                React.createElement("button", { onClick: () => setItemPanelOpen(o => !o), className: "btn btn-ghost combat-item-btn", type: "button", disabled: !isHeroTurn || introActive },
                     React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-item-btn-icon" }),
                     " ",
                     t('combatUseItemButtonLabel')),
-                React.createElement("button", { onClick: onFlee, className: "btn btn-ghost combat-flee-btn", type: "button", disabled: !isHeroTurn },
+                React.createElement("button", { onClick: onFlee, className: "btn btn-ghost combat-flee-btn", type: "button", disabled: !isHeroTurn || introActive },
                     "\uD83C\uDFC3 ",
                     t('combatLeaveButtonLabel')))),
-            isHeroTurn && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel grim-slide-down" },
+            isHeroTurn && !introActive && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel grim-slide-down" },
                 React.createElement("p", { className: "combat-item-panel-title" }, t('combatUseItemPanelTitle')),
                 usableItems.length === 0 ? (React.createElement("p", { className: "combat-item-panel-empty" }, t('combatUseItemPanelEmpty'))) : (usableItems.map(({ item, index }) => (React.createElement("button", { key: index, type: "button", className: "combat-item-panel-row", onClick: () => { setPendingItemIndex(index); setItemPanelOpen(false); }, style: { color: rarityColor(findItemRarity(item.name, itemRarities)) || undefined } }, item.name)))))),
-            isHeroTurn && pendingItemIndex !== null && (React.createElement("div", { className: "combat-flee-row" },
+            isHeroTurn && !introActive && pendingItemIndex !== null && (React.createElement("div", { className: "combat-flee-row" },
                 React.createElement("button", { onClick: () => setPendingItemIndex(null), className: "btn btn-ghost combat-item-cancel-btn", type: "button" },
                     "\u2715 ",
                     t('combatUseItemCancelLabel')))),
@@ -25458,9 +25685,54 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     // only two places it's ever reset out from under the player — otherwise
     // browsing floors with the ▲/▼ buttons sticks until one of those fires.
     const [viewLayer, setViewLayer] = useState(() => (currentNode ? (currentNode.layer || 0) : 0));
-    const nodeLayers = map.nodes.map(n => n.layer || 0);
-    const minLayer = nodeLayers.length ? Math.min(...nodeLayers) : 0;
-    const maxLayer = nodeLayers.length ? Math.max(...nodeLayers) : 0;
+    // Which building's/dungeon's vertical stack is being browsed — the id of
+    // that stack's own ground-level root node (see floorRootId on
+    // normalizeMapNode). Companion to viewLayer, independent of it the same
+    // way viewLayer is independent of pan/zoom: reset alongside viewLayer
+    // everywhere viewLayer itself resets (mount, recenter — see the effect
+    // below and centerOnHeroRef), and re-pointed by handleMapSearch when a
+    // search jumps to a node from a different stack than wherever the hero
+    // actually stands. Without this, browsing floor-by-floor after such a
+    // jump would silently snap back to the HERO's own building instead of
+    // the one just searched for.
+    const [viewStackRootId, setViewStackRootId] = useState(() => (currentNode ? (currentNode.floorRootId || currentNode.id) : null));
+    // Bounds for the ▲/▼ switcher: how far THIS ONE stack actually runs, not
+    // the tallest/deepest floor anywhere on the whole map — otherwise an
+    // unrelated dungeon eight levels down would let the button keep going
+    // long after the CURRENT building has run out of floors. Math.min/max
+    // always fold in a literal 0 so ground level stays reachable even for a
+    // stack that (so far) has nothing built above or below it.
+    const stackLayerValues = viewStackRootId
+        ? map.nodes.filter(n => (n.floorRootId || n.id) === viewStackRootId).map(n => n.layer || 0)
+        : [];
+    const minLayer = Math.min(0, ...stackLayerValues);
+    const maxLayer = Math.max(0, ...stackLayerValues);
+    // Whether a node belongs on the sheet currently being browsed: same
+    // layer AND same stack as whichever floor/building atLayer+atStackRootId
+    // point at, with two deliberate exceptions baked in below. (1) A node
+    // with no floorRootId at all is never hidden by the stack check — it's
+    // either plain ground level (where many unrelated places are meant to
+    // coexist, same as always) or a save from before this field existed, and
+    // refusing to guess its real building is safer than hiding it outright.
+    // (2) A DIFFERENT stack's node that the hero can walk to directly right
+    // now — a lore-established link like a tunnel joining two basements,
+    // not a coincidence of numbering — still shows up on the hero's own
+    // current floor even though it fails the stack check, because that's a
+    // genuine connection rather than an unrelated building's same-numbered
+    // floor. A same-stack vertical neighbor (an ordinary stairway) never
+    // qualifies for this second exception, since its floorRootId already
+    // matches — it stays hidden behind the ▲/▼ switcher exactly as before.
+    // Parameterized (rather than just reading viewLayer/viewStackRootId off
+    // component state) so handleMapSearch can ask this same question about a
+    // floor it's about to jump to, before that floor is actually the live
+    // view.
+    function nodeVisibleOn(n, atLayer, atStackRootId) {
+        if ((n.layer || 0) === atLayer && (atLayer === 0 || !n.floorRootId || !atStackRootId || n.floorRootId === atStackRootId))
+            return true;
+        return !!(currentNode && atLayer === (currentNode.layer || 0) && n.id !== currentNode.id &&
+            currentNode.connections.includes(n.id) && n.floorRootId && n.floorRootId !== atStackRootId);
+    }
+    const onViewLayer = n => nodeVisibleOn(n, viewLayer, viewStackRootId);
     // See computeMapDisplayLayout above: this is the only place gx/gy get
     // turned into on-screen pixels for the whole modal now — every spot
     // that used to call mapNodePixel directly (edges, node icons, off-
@@ -25468,7 +25740,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     // clustering/collision nudge can never leave one of those pieces
     // pointing at a node's old, un-nudged position while everything else
     // has moved.
-    const nodesOnLayer = useMemo(() => map.nodes.filter(n => (n.layer || 0) === viewLayer), [map.nodes, viewLayer]);
+    const nodesOnLayer = useMemo(() => map.nodes.filter(onViewLayer), [map.nodes, viewLayer, viewStackRootId, currentNode]);
     const layoutPositions = useMemo(() => computeMapDisplayLayout(nodesOnLayer), [nodesOnLayer]);
     const posOf = n => layoutPositions.get(n.id) || mapNodePixel(n);
     // Kept in sync on every render (not just whenever the pan/zoom effect
@@ -25485,6 +25757,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
         let scale = 0.95, panX = 0, panY = 0;
         const current = map.nodes.find(n => n.id === map.currentId);
         setViewLayer(current ? (current.layer || 0) : 0);
+        setViewStackRootId(current ? (current.floorRootId || current.id) : null);
         const apply = () => {
             world.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
             viewStateRef.current = { panX, panY, scale };
@@ -25507,7 +25780,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
         // layer back to the hero's own, same reasoning as the effect-mount case
         // above: recentering on the hero while looking at a floor they're not
         // even on would just show an empty layer.
-        centerOnHeroRef.current = () => { const p = heroPixel(); centerOn(p.x, p.y); setViewLayer(current ? (current.layer || 0) : 0); };
+        centerOnHeroRef.current = () => { const p = heroPixel(); centerOn(p.x, p.y); setViewLayer(current ? (current.layer || 0) : 0); setViewStackRootId(current ? (current.floorRootId || current.id) : null); };
         // See applyViewRef's own declaration above for why this exists: lets
         // fitMapToView/handleMapSearch (both defined fresh every render, so
         // they always see this render's own nodes/layout/viewLayer — unlike
@@ -25672,7 +25945,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     const drawnEdges = new Set();
     const lines = [];
     map.nodes.forEach(n => {
-        if ((n.layer || 0) !== viewLayer)
+        if (!onViewLayer(n))
             return;
         n.connections.forEach(otherId => {
             const key = edgeKey(n.id, otherId);
@@ -25682,11 +25955,17 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
             const other = nodeById(otherId);
             if (!other || !n.discovered || !other.discovered)
                 return;
-            // A connection to a different floor (see reconcileMap's upsert) is
-            // shown via the ▲/▼ switcher, not a line — the two ends share a
-            // gx/gy on purpose, so drawing it here would just be a zero-length
-            // stub sitting invisibly on top of the node anyway.
-            if ((other.layer || 0) !== viewLayer)
+            if (!onViewLayer(other))
+                return;
+            // A connection to a different floor of the SAME stack (see
+            // reconcileMap's upsert) is shown via the ▲/▼ switcher, not a line —
+            // the two ends share a gx/gy on purpose, so drawing it here would
+            // just be a zero-length stub sitting invisibly on top of the node
+            // anyway. A cross-STACK link (onViewLayer's own second exception,
+            // above — a lore-established tunnel between two buildings, say) has
+            // two genuinely distinct positions even when it also crosses layers,
+            // so it's drawn as a real line like any other road on the map.
+            if ((other.floorRootId || other.id) === (n.floorRootId || n.id) && (other.layer || 0) !== (n.layer || 0))
                 return;
             const walked = walkedKeys.has(key);
             lines.push(React.createElement("path", { key: key, d: edgePathBetween(n, other), fill: "none", className: walked ? 'map-edge map-edge-walked' : 'map-edge' }));
@@ -25704,7 +25983,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
         const viewport = viewportRef.current;
         if (!viewport)
             return;
-        const layerNodes = map.nodes.filter(n => n.discovered && (n.layer || 0) === viewLayer);
+        const layerNodes = map.nodes.filter(n => n.discovered && onViewLayer(n));
         if (layerNodes.length === 0)
             return;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -25753,13 +26032,22 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
         }
         setSearchMissed(false);
         const matchLayer = match.layer || 0;
-        if (matchLayer !== viewLayer)
+        // A hit can live in a completely different building's stack than
+        // wherever the hero actually stands — jump the browsed stack to THAT
+        // node's own (see floorRootId), not just its raw layer number, or the
+        // very scoping this fix adds would make the result invisible the
+        // instant the jump landed.
+        const matchStackRootId = match.floorRootId || match.id;
+        const sameSheet = matchLayer === viewLayer && matchStackRootId === viewStackRootId;
+        if (!sameSheet) {
             setViewLayer(matchLayer);
+            setViewStackRootId(matchStackRootId);
+        }
         const viewport = viewportRef.current;
         if (viewport) {
-            const positions = matchLayer === viewLayer
+            const positions = sameSheet
                 ? layoutPositions
-                : computeMapDisplayLayout(map.nodes.filter(n => (n.layer || 0) === matchLayer));
+                : computeMapDisplayLayout(map.nodes.filter(n => nodeVisibleOn(n, matchLayer, matchStackRootId)));
             const p = positions.get(match.id) || mapNodePixel(match);
             const w = viewport.clientWidth, h = viewport.clientHeight;
             const scale = Math.max(0.9, viewStateRef.current.scale || 0.95);
@@ -25782,14 +26070,14 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     // away from it. Layer-filtered like everything else that's actually
     // drawn on the current sheet — a quest marker on a floor that isn't even
     // being shown would just be a phantom arrow pointing at nothing visible.
-    const questArrowNodes = map.nodes.filter(n => n.discovered && (!currentNode || n.id !== currentNode.id) && n.questId && (n.layer || 0) === viewLayer &&
+    const questArrowNodes = map.nodes.filter(n => n.discovered && (!currentNode || n.id !== currentNode.id) && n.questId && onViewLayer(n) &&
         quests.some(q => q.id === n.questId && q.status === 'active'));
     // A "far" node (see reconcileMap's upsert) the player hasn't opened yet —
     // gets a one-time white off-screen arrow, distinct from the hero's own
     // and from quest markers, that clears for good the moment its popup is
     // opened (see the onClick handlers below), whether or not it's still
     // off-screen at that point.
-    const newArrowNodes = map.nodes.filter(n => n.arrowPending && (n.layer || 0) === viewLayer);
+    const newArrowNodes = map.nodes.filter(n => n.arrowPending && onViewLayer(n));
     // Positions (and shows/hides) the small edge arrows for the hero and any
     // active quest markers currently panned out of the viewport. Rebuilt on
     // every render so it always closes over this render's nodes/quests, but
@@ -25826,9 +26114,10 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
             el.classList.add('map-edge-arrow-visible');
         };
         // Only the hero's own layer gets an arrow pointing at them — if the
-        // player is browsing a different floor, the hero isn't actually
-        // anywhere on this sheet to point at.
-        if (currentNode && (currentNode.layer || 0) === viewLayer) {
+        // player is browsing a different floor (or another building's floor
+        // that only coincidentally shares the same layer number), the hero
+        // isn't actually anywhere on this sheet to point at.
+        if (currentNode && onViewLayer(currentNode)) {
             const p = posOf(currentNode);
             place(heroArrowRef.current, p.x, p.y);
         }
@@ -25860,7 +26149,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     // travel or preview could target a floor above/below (an adjacent node
     // via a vertical connection), and drawing a line toward a node that
     // isn't even rendered on this sheet would just be a stray path.
-    const routeTargetVisible = routeTargetNode && (routeTargetNode.layer || 0) === viewLayer ? routeTargetNode : null;
+    const routeTargetVisible = routeTargetNode && onViewLayer(routeTargetNode) ? routeTargetNode : null;
     // Built with the same canonical-order helper as the road's own <path>
     // above, so the highlight (and the dot that travels along it) sits
     // exactly on top of that road's curve instead of bowing to the opposite
@@ -25926,7 +26215,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                     React.createElement("svg", { className: "map-svg" },
                         lines,
                         routeHighlightLine),
-                    map.nodes.filter(n => n.discovered && (n.layer || 0) === viewLayer).map(n => {
+                    map.nodes.filter(n => n.discovered && onViewLayer(n)).map(n => {
                         const isCurrent = n.id === map.currentId;
                         const quest = n.questId ? quests.find(q => q.id === n.questId && q.status === 'active') : null;
                         const open = openNodeId === n.id;
@@ -25988,7 +26277,7 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                                 n.description && React.createElement("p", null, n.description),
                                 isMapNodeCleared(n) && React.createElement("p", { className: "map-node-cleared-tag" }, t('mapNodeClearedLabel'))))));
                     }),
-                    map.nodes.filter(n => !n.discovered && (n.layer || 0) === viewLayer).map(n => {
+                    map.nodes.filter(n => !n.discovered && onViewLayer(n)).map(n => {
                         const open = openNodeId === n.id;
                         const p = posOf(n);
                         return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
@@ -26592,6 +26881,13 @@ function App() {
     // itself, never corrupts the hero's underlying health.
     const [combat, setCombat] = useState(null);
     const [combatModalOpen, setCombatModalOpen] = useState(false);
+    // True for the duration of the pre-battle sword-clash intro (see
+    // CombatModal's combat-intro-fx) — single source of truth shared between
+    // the intro animation itself and the auto-turn effect below, so nothing
+    // (an enemy/ally auto-attack, a stun-skip, or the hero's own attack/item/
+    // flee buttons) can act while the intro is still playing. Re-arms itself
+    // every time a fresh fight opens (combatModalOpen flips false -> true).
+    const [combatIntroActive, setCombatIntroActive] = useState(false);
     // -- Death & resurrection --
     // Shown after a real death (a vital part destroyed in combat). Tracks
     // which narrator message the fatal fight was attached to, so "go back a
@@ -27448,7 +27744,8 @@ ${JSON.stringify(state)}${partySection}` };
         const tradeRuleNum = ++ruleNum;
         const tradeRule = `\n${tradeRuleNum}. A merchant or vendor's ordinary goods — their general stock of wares, or anything of the hero's such a character would buy (loot, trophies, unwanted gear) — are never bought or sold within the narrative itself; that always happens through a separate trade-window interface the player opens directly with that character, entirely outside this scene. The scene can still have such a character show interest, gesture at their wares, haggle, or invite the hero to look at what they have — write that exactly like any other dialogue — but never narrate the actual exchange happening: no goods changing hands for a settled sum, no coins handed over, nothing leaving or entering the hero's possession as a result. If such a character names a specific price for something THEY are selling, treat that number as final and deliberate rather than a rough or rounded guess — it becomes exactly what the trade window charges for it afterward, so give it the same care as any other concrete figure in the scene. A price they name for something of the HERO's they'd merely like to buy carries no such weight and is never binding either way. Do not stop the scene mid-offer waiting on an accept/decline for any of this either, the way a found item or a service does — there is no such mechanism for it here, so simply let the scene continue and close normally. This is entirely separate from a character charging the hero for a service they personally provide (a room, a meal, a fare, a toll, a bribe), which is still handled the ordinary way described just above.`;
         const questRuleNum = ++ruleNum;
-        const questRule = `\n${questRuleNum}. If a character offers the hero a quest, task, or job, the giver MUST state a concrete, specific reward as part of the offer, in the same breath as the task itself — a sum of money, a named item, a favor, protection, information, or some other tangible thing, spelled out in the dialogue (e.g. "do this and I'll pay you 20 silver," not "you won't regret it" or "I'll make it worth your while"). Never have a character propose a task while leaving the reward vague, unstated, or merely implied — if the scene calls for an offer at all, invent a concrete reward fitting the character and situation and have them say it outright. Once that concrete offer is made, introduce it narratively and then STOP there, the same way an item offer works: end the scene at the offer, without confirming whether the hero accepts, and without resolving any advance payment mentioned. Likewise, if a character is handing over the reward for one of the hero's ACTIVE QUESTS (listed below, if any) now that it's resolved, introduce that moment and STOP there too — whether the hero accepts or declines the reward is handled separately, not decided in the prose. Lines marked "[QUEST DECISIONS FROM PREVIOUS TURN]:" tell you what the hero decided about a quest, its advance, or a reward last turn — reflect that naturally without dwelling on it.`;
+        const questRule = `\n${questRuleNum}. If a character offers the hero a quest, task, or job, the giver MUST state a concrete, specific reward as part of the offer, in the same breath as the task itself — a sum of money, a named item, a favor, protection, information, or some other tangible thing, spelled out in the dialogue (e.g. "do this and I'll pay you 20 silver," not "you won't regret it" or "I'll make it worth your while"). Never have a character propose a task while leaving the reward vague, unstated, or merely implied — if the scene calls for an offer at all, invent a concrete reward fitting the character and situation and have them say it outright. Once that concrete offer is made, introduce it narratively and then STOP there, the same way an item offer works: end the scene at the offer, without confirming whether the hero accepts, and without resolving any advance payment mentioned. Likewise, if a character is handing over the reward for one of the hero's ACTIVE QUESTS (listed below, if any) now that it's resolved, introduce that moment and STOP there too — whether the hero accepts or declines the reward is handled separately, not decided in the prose. Lines marked "[QUEST DECISIONS FROM PREVIOUS TURN]:" tell you what the hero decided about a quest, its advance, or a reward last turn — reflect that naturally without dwelling on it. If the character voicing the offer explicitly says the job or its payment isn't actually theirs — a messenger relaying work for an absent employer, a herald reading someone else's bounty notice, a servant passing on their master's errand — the "giver" recorded for that offer (see the JSON fields below) must be the person the speaker names as ultimately responsible, never the speaker themselves, and that offer must be marked non-negotiable, since a mere go-between has no authority to sweeten someone else's deal. Never let a character both be recorded as the one handing out and paying for a job AND say on-scene that it isn't theirs to give or pay for — those two are contradictory and must not both happen.
+    A quest thread can also start with NO giver and no formal offer at all: the hero overhears something, stumbles on a scene, finds a suggestive object or note, or simply notices something worth investigating, with nobody actually proposing a task or naming a reward. This kind of quest is never introduced through the offer mechanism above — it needs no stated reward, no giver, no accept/decline moment, and no STOP; just let the scene play out and it becomes part of the hero's ongoing business on its own (see the JSON fields below for how to record it). Most quests in a good story should be a mix of both kinds, not everything routed through an NPC standing there with a job and a price.`;
         const questDepthRuleNum = ++ruleNum;
         const questDepthRule = `\n${questDepthRuleNum}. QUESTS CAN GROW: not every task has to resolve in one clean fetch. When it genuinely fits the story and stakes of one of the hero's ACTIVE QUESTS (listed below, if any) — a job turns out more complicated than it looked, another character turns out to have a stake in it, the road to the goal forks into real alternatives — let it deepen naturally instead of wrapping it up early just because the hero reached its first objective. Don't force this onto an ordinary errand that has no reason to be more than it is; plenty of quests should stay exactly as simple as they started. When an active quest does reach a moment like this, write it as a real scene the same way any other beat would be — a complication surfacing, a new character stepping in, a genuine choice taking shape — never as a list or a meta description of "the next stage." Whenever a scene puts the hero at a real fork within an active quest — one where committing to a path visibly costs the OTHER path, not just adds to what the hero already has — make what's being given up as clear in the fiction as what's being gained (a burned bridge, a door that won't open again, someone who won't help twice), so the choice actually means something, and follow through on that cost in later scenes rather than quietly softening it later. This is GAME MASTER RULE 4 applied to a quest already underway: a fork like this is still a choice the hero has to actually make, in their own next action, never one the narration decides for them by default.`;
         const rewardHaggleRuleNum = ++ruleNum;
@@ -27489,7 +27786,7 @@ ${JSON.stringify(state)}${partySection}` };
         }
         const activeQuests = state.quests.filter(q => q.status === 'active');
         if (activeQuests.length > 0) {
-            gearContext += `\n\nHERO'S ACTIVE QUESTS: ${activeQuests.map(q => `"${q.title}" for ${q.giver} (promised reward: ${q.reward || 'unspecified'})`).join('; ')}.`;
+            gearContext += `\n\nHERO'S ACTIVE QUESTS: ${activeQuests.map(q => q.giver ? `"${q.title}" for ${q.giver} (promised reward: ${q.reward || 'unspecified'})` : `"${q.title}" (self-started, no giver, no promised reward)`).join('; ')}.`;
         }
         const knownReputations = Object.keys(npcReputations);
         const hostileNpcNames = knownReputations.filter(k => isHostileReputation(npcReputations[k]));
@@ -27693,12 +27990,13 @@ Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings
         // that way; see questDepthRule in buildNarrativeSystemPrompt for when
         // it's actually worth growing one.
         const questContext = activeQuests.length > 0
-            ? `\n\nTHE HERO'S CURRENTLY ACTIVE QUESTS (reference these ids in "quests"/"rewardOffers" below — never invent a new id for an existing quest; a brand-new quest goes in "newQuestOffers" instead, with its own fresh id):\n${activeQuests.map(q => {
+            ? `\n\nTHE HERO'S CURRENTLY ACTIVE QUESTS (reference these ids in "quests"/"rewardOffers" below — never invent a new id for an existing quest; a brand-new quest with an actual giver goes in "newQuestOffers" instead, a brand-new self-starting one with no giver goes in "newDiscoveredQuests", either way with its own fresh id):\n${activeQuests.map(q => {
                 const stagePart = q.stages.length > 0
                     ? ` — stages: ${q.stages.map(s => `[id "${s.id}": "${s.title}", ${s.status}]`).join(', ')}`
                     : '';
                 const npcPart = q.npcs.length > 0 ? ` — involved: ${q.npcs.join(', ')}` : '';
-                return `- id "${q.id}": "${q.title}" (given by ${q.giver})${stagePart}${npcPart}`;
+                const giverPart = q.giver ? ` (given by ${q.giver})` : ' (self-started, no giver)';
+                return `- id "${q.id}": "${q.title}"${giverPart}${stagePart}${npcPart}`;
             }).join('\n')}`
             : '\n\nTHE HERO CURRENTLY HAS NO ACTIVE QUESTS.';
         // Mirrors questContext just above, for state.pendingSecrets (see
@@ -27765,7 +28063,7 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
@@ -27779,7 +28077,7 @@ Nothing else belongs in "stats" — no other attributes, skills, or invented cha
 Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded" and "shield". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; judge each item relative to typical examples of its own slot, never against other slots).
 Only include an item in "inventory" if the scene explicitly settles the hero as now possessing it — already carried over from before, explicitly handed over and accepted, explicitly picked up, or (opening scene only) established as starting kit. An item that was merely offered, noticed, or nearby but not yet resolved does NOT belong in "inventory" yet — leave it out rather than assuming the hero took it.
 "currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity, ALREADY settled and done — a payment received, a price paid, money found and picked up, a bribe or toll, winnings or a loss from a wager, an outright theft. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. Do NOT use this field for a price a character has just named as something the hero can still accept or decline (an innkeeper's rate, a fare, a demanded bribe not yet handed over) — that belongs in a priced "itemOffers" entry instead (see its "cost" field above), so the app only ever charges the hero once they actually confirm. Also never use this field for a merchant or vendor buying or selling their ordinary goods, in either direction, even if the scene described it as already completed — that transaction is never resolved through state here, only through a separate trade-window interface, so it should never produce a "currencyChange" (or an "inventory" change) of its own. "reason" is a short, dry phrase for what happened (e.g. "found on the road", "paid the ferryman"), omitted along with the rest of the field when amount is 0.
-"npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. That starting inventory is held to the same mandatory-gear floor used for the hero's own opening kit and for party members: unless this character is established as destitute, stripped of belongings, or otherwise plainly without possessions (a beggar, a prisoner, and the like — the existing case where an empty list is fine), give them their own one "armor"-slot item and one "boots"-slot item, ordinary and modest, fitting who they are, alongside whatever weapon or role-specific gear suits them — these two count as real equipment slots, not the "ordinary clothing" that's otherwise skipped as flavor below, so don't omit them by default the way incidental clothing is waved off. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. For a character clearly acting as a merchant, vendor, or shopkeeper in the scene — someone running a shop, stall, or trade of their own — every item they specifically name or point to as something they have for sale counts as them gaining it into this same inventory the moment the scene first shows it, whether or not the hero actually buys it that turn; list it under the same name the dialogue used, alongside anything else already established for them. If the scene's dialogue also gave an exact price for that item, report it as an object instead of a plain string — {"name": "item name", "cost": N} using the precise number spoken — and that becomes exactly what the trade window charges for it later, verbatim, with no rounding, markup, or recomputation of any kind; only do this when a specific number was genuinely spoken aloud for that item in the scene, never a guess or a rough figure, and leave it as a plain string with no "cost" for anything mentioned without one. This "cost" is unrelated to the "cost" field on a priced "itemOffers" entry above — that one is for a service the hero can still accept or decline right now; this one is a price attached to a merchant's ordinary stock, purely for the separate trade window to charge later. This is the only way such an item ever reaches the separate trade window the hero buys from later — buying or selling it is never itself resolved through "itemOffers", "currencyChange", or anywhere else in this state (see the "cost" field notes above), only tracked here as part of what this character has. This only applies to what the character is themselves offering to sell — never to something of the HERO's that a character merely expresses interest in buying; that stays out of this list entirely, and out of the rest of this state too, no matter how the scene describes the offer. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "factionLeader": true — set it only once the story has clearly established this specific character as the acknowledged head of their own tracked "faction" (a warlord commanding a war band, a guild's master, a cult's high priest, a don running a syndicate), never for an ordinary member, deputy, or lieutenant who merely answers to someone else; only meaningful together with "faction", so never set it for a character with no faction of their own. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" below — restate "factionLeader": false explicitly only if the story itself later shows this specific character actually losing that position (deposed, stepped down, replaced by someone else), the same way "dead": false is reserved for an actual depicted resurrection. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
+"npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. That starting inventory is held to the same mandatory-gear floor used for the hero's own opening kit and for party members: unless this character is established as destitute, stripped of belongings, or otherwise plainly without possessions (a beggar, a prisoner, and the like — the existing case where an empty list is fine), give them their own one "armor"-slot item and one "boots"-slot item, ordinary and modest, fitting who they are, alongside whatever weapon or role-specific gear suits them — these two count as real equipment slots, not the "ordinary clothing" that's otherwise skipped as flavor below, so don't omit them by default the way incidental clothing is waved off. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. For a character clearly acting as a merchant, vendor, or shopkeeper in the scene — someone running a shop, stall, or trade of their own — every item they specifically name or point to as something they have for sale counts as them gaining it into this same inventory the moment the scene first shows it, whether or not the hero actually buys it that turn; list it under the same name the dialogue used, alongside anything else already established for them — but always as a single item in the singular grammatical form (e.g. "a leather helmet"/"кожаный шлем"), even if the dialogue phrased it as a plural category of stock ("leather helmets"/"кожаные шлемы" as a general kind of goods on offer); if the dialogue is clear the merchant is offering more than one distinct copy of the same item, add that many separate singular entries rather than one plural-named entry. If the scene's dialogue also gave an exact price for that item, report it as an object instead of a plain string — {"name": "item name", "cost": N} using the precise number spoken — and that becomes exactly what the trade window charges for it later, verbatim, with no rounding, markup, or recomputation of any kind; only do this when a specific number was genuinely spoken aloud for that item in the scene, never a guess or a rough figure, and leave it as a plain string with no "cost" for anything mentioned without one. This "cost" is unrelated to the "cost" field on a priced "itemOffers" entry above — that one is for a service the hero can still accept or decline right now; this one is a price attached to a merchant's ordinary stock, purely for the separate trade window to charge later. This is the only way such an item ever reaches the separate trade window the hero buys from later — buying or selling it is never itself resolved through "itemOffers", "currencyChange", or anywhere else in this state (see the "cost" field notes above), only tracked here as part of what this character has. This only applies to what the character is themselves offering to sell — never to something of the HERO's that a character merely expresses interest in buying; that stays out of this list entirely, and out of the rest of this state too, no matter how the scene describes the offer. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "factionLeader": true — set it only once the story has clearly established this specific character as the acknowledged head of their own tracked "faction" (a warlord commanding a war band, a guild's master, a cult's high priest, a don running a syndicate), never for an ordinary member, deputy, or lieutenant who merely answers to someone else; only meaningful together with "faction", so never set it for a character with no faction of their own. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" below — restate "factionLeader": false explicitly only if the story itself later shows this specific character actually losing that position (deposed, stepped down, replaced by someone else), the same way "dead": false is reserved for an actual depicted resurrection. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
 Every character named above under CURRENT PARTY is a traveling companion, not just an ordinary tracked NPC — treat their entry in "npcs" differently in two ways. First, they MUST appear in "npcs" every single turn without exception, even a turn where they didn't speak or act — never drop a party member from this list the way an ordinary NPC can be dropped once no longer relevant — and their "presentNow" must be true unless the scene just played explicitly, deliberately separated them from the hero. Second, for a party member ONLY — never for any other character — also include "health", "maxHealth", "psyche", "maxPsyche", "stats" (an object with "strength", "agility", "intelligence", "initiative"), and "effects" in their entry, using the exact same 1-1000/1-1000/1-100 scales, calibration, and judgment described above for the hero's own fields of the same name: a companion can be hurt, exhausted, healed, or emboldened by the scene just played exactly like the hero can, while "maxHealth"/"maxPsyche" stay stable the same restrained way the hero's own do. The very first turn a character has these fields (the turn they're recruited), judge them fresh from how the scene and story have portrayed that character so far; on every later turn, carry them forward and adjust only as much as this scene's events actually warrant, the same restrained way the hero's own vitals move turn to turn — never reset them arbitrarily. Omit all six of these fields entirely for every character who is not currently a party member. Third, a party member's "inventory" is held to the same mandatory-gear floor as the hero's own opening starting kit: unless this specific companion has been explicitly established as destitute, stripped of belongings, or otherwise deliberately without gear, their inventory must include their own one "armor"-slot item and one "boots"-slot item alongside whatever weapon fits them — the turn a character first becomes a party member (whether introduced already traveling with the hero or recruited later) is exactly the "first time added" moment the general inventory rule above already covers, so invent modest, ordinary versions of any of these two pieces not already established for them, rather than leaving a companion effectively bare-torsoed or barefoot by omission. Beyond that floor, a companion can plainly have other ordinary worn or carried items the same as anyone else (a cloak, an amulet, a ring, a backpack, and the like) wherever the scene or their portrayal calls for it — never required, just as available to them as to the hero.${openingPartyInstruction}
 "quests" tracks the active list above (by their given id) and feeds a quest journal, so keep entries short and factual, like a log, not narrated prose. "status" is set ONLY when the scene clearly shows that quest now resolved: "completed" if the hero achieved what it asked, "failed" if it's now impossible or was abandoned for good — omit "status" entirely if it's still simply ongoing (don't repeat "active" for everything). "progress" is a SEPARATE, optional one-line note — telegraphic, dry, a few words to one short sentence, no more (e.g. "Learned the gate is guarded at night", "Reached the abandoned mill") — include it ONLY when the scene meaningfully moved that specific quest forward (a lead found, a step completed, a setback); omit it on turns where the quest wasn't meaningfully touched, and never restate the objective itself or pad it with atmosphere. Skip a quest's entry entirely (all fields) if nothing about it changed this turn. NEVER invent a new quest here or use an id that isn't in the active list; new quests go in "newQuestOffers" below instead.
 This same entry is also where a quest GROWS (see questDepthRule) — a plain errand can skip all three of the following fields forever and that's the normal case, not a gap to fill. "npcs" names any character (already tracked in "npcs" above) who just became meaningfully tied to THIS quest's story specifically, beyond its own giver — include a name here only the first turn it's true for this quest, never restate one already listed above. "newStages" is for when the scene reveals a genuinely distinct next step, complication, or fresh thread within this quest — something concrete enough to track as its own objective, not just atmosphere or flavor. Give each a fresh "id" that doesn't collide with a stage id already listed above, a short evocative "title" the same way a quest's own title reads, and a dry one-sentence "description" the same way a quest's own description reads. A stage is tracked the moment it appears here — there's no separate accept step the way a whole new quest has, since it's simply the next part of a commitment the hero already made. "stageUpdates" is for a stage that ALREADY exists (its id already given above): "status" is set only when the scene clearly resolves that ONE stage — "completed" if its own objective was met, "failed" if it's now impossible or was abandoned, "moot" if the hero's own choice closed it off by committing to a different path within the same quest instead (a road not taken is not a failure — never use "failed" for that); "progress" works exactly like the quest-level field above, but scoped to this one stage. A stage resolving does NOT automatically resolve the quest itself, and a quest resolving does NOT require every stage to have resolved first — the quest's own top-level "status" above is always its own separate, deliberate call.
@@ -27789,7 +28087,7 @@ This same entry is also where a quest GROWS (see questDepthRule) — a plain err
 "factions" lists ONLY named GROUPS that matter to the ongoing story — a legion, guild, cult, noble house, gang, cartel, order, or anything else the story treats as acting with one will, never a whole nation or people. Skip anything mentioned only once in passing with no ongoing role. Each entry has a "name" and a short "note" — one sentence on what this group is, does, or wants. Include an entry here for EVERY faction referenced anywhere else this turn (as a "location.faction", a "nearbyMentioned[].faction", or an "npcs[].faction") the first time it's established, so the registry never falls out of sync with what's actually controlling places or backing characters. This field is returned in full each turn, the same as "npcs": carry forward existing entries that are still relevant (repeat them even if this specific scene doesn't touch them), and only add a "note" update when the scene genuinely reveals something new about them. Each entry may also include "relations" — this faction's own declared relationships with OTHER known factions, each an object with a "faction" (reusing an exact known faction name) and a "stance" of either "war" (open, active hostility — real, ongoing conflict, not just a passing insult) or "allied" (active cooperation — shared goals, coordination, backing each other). Only declare a relation once the story has genuinely established it, and only from whichever side is natural in the scene — no need to duplicate it onto the other faction's own list too, and omit it once it's no longer true (a war that ends, an alliance that breaks) rather than leaving a stale entry in place.
 
 === EVENT: NEW QUESTS AND REWARDS ===
-"newQuestOffers"/"rewardOffers" each detect a distinct kind of moment, either of which may or may not be present: (1) a NEW quest being offered — a character proposing a task, asking for help, or pointing the hero toward some goal, where the scene's dialogue explicitly states a concrete reward (a specific sum, item, favor, or other tangible thing — never merely implied or left vague); only count it if the scene stops at the offer itself, not something the hero has already agreed to and is now acting on. If the scene has a character propose a task WITHOUT the dialogue stating a concrete reward, do not emit a newQuestOffers entry for it at all. (2) a REWARD being handed over for one of the hero's ACTIVE quests listed above, now that the scene shows it resolved and the giver following through on payment.
+"newQuestOffers"/"newDiscoveredQuests"/"rewardOffers" each detect a distinct kind of moment, any of which may or may not be present: (1) a NEW quest being offered — a character proposing a task, asking for help, or pointing the hero toward some goal, where the scene's dialogue explicitly states a concrete reward (a specific sum, item, favor, or other tangible thing — never merely implied or left vague); only count it if the scene stops at the offer itself, not something the hero has already agreed to and is now acting on. If the scene has a character propose a task WITHOUT the dialogue stating a concrete reward, do not emit a newQuestOffers entry for it at all — and never invent one just to have a reward to put here. For an offer voiced by a mere go-between relaying someone else's job (see the giver rule above), "giver" is that ultimately responsible person's name and "rewardNegotiable" is false. (2) a REWARD being handed over for one of the hero's ACTIVE quests listed above, now that the scene shows it resolved and the giver following through on payment. (3) a NEW self-starting quest thread with no giver and no offer moment at all — the hero overhears, discovers, or stumbles onto something worth pursuing, with nobody proposing a task or a reward. This is not a fallback for rule (1) when a reward is missing — use it only when the scene itself has no one actually offering the hero a job to accept in the first place. It goes in "newDiscoveredQuests" instead and is added to the quest log immediately, active, with no accept/decline step and no reward field at all; never duplicate the same thread as also a newQuestOffers entry.
 For "newQuestOffers.title": must NOT be a literal restatement of the dialogue — invent a short, evocative name the way a chapter title would read (e.g. if a character says "we're trapped in this cave, we need to find a way out", the title could be "Path to Freedom", not "Find a way out of the cave"). "description" is the opposite: plain and dry, not evocative — state the objective in one short sentence, the way a quest log entry would. No atmosphere, no flavor text there. "rewardNegotiable" defaults to true; set it to false only for a giver who, by personality or circumstance, would never raise this reward no matter how the hero pushes — a miser, someone with genuinely nothing more to give, a rigid authority who won't be seen bending. Leave it true for everyone else, including gruff or hard-bargaining characters who could still be swayed.
 "id"/"questId": short, lowercase, ascii, unique slugs. "questId" must exactly match one of the active quest ids given above — never invent one, and never put a brand-new quest in "rewardOffers".
 If this scene names a specific place where a quest must be carried out — a brand-new quest offered just now, or one already active — also report that place under this turn's "location" above (see its "questId"/"stageId" rules) so the map picks it up the moment the quest (or, for a staged quest, that specific stage) itself does.
@@ -27802,11 +28100,13 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 === EVENT: COMBAT ===
 "combat" detects whether the scene puts the hero into a hostile physical fight right now — an enemy attacking the hero, the hero clearly initiating violence against someone who will fight back, or the hero striking at an unaware target from ambush — calling for turn-based combat, as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile individuals fight the hero at once, list each one separately in "enemies" below (up to 5) rather than collapsing them into one combined opponent — a real group fight is exactly what this system is for. If more than 5 are actually attacking, list the 5 most significant separately and fold the rest into the last entry's description as unnamed backup. By design, the narrative is never supposed to carry the hero's own fight through to a blow, an injury, or any other outcome — it always cuts away right as the violence begins — so a fight the hero is actually part of should essentially never read as "resolved entirely in prose already." Only return {"combat": false} for violence that does NOT involve the hero as a combatant (a fight between other people that the hero merely witnesses or hears about from a distance) or when the context above already contains a "[COMBAT RESULT]" line for this exact encounter (meaning the game's own combat system already resolved it this turn, and the scene you're reading is its aftermath, not a fresh fight).
 If no fight is starting: "combat": {"combat": false}.
-If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false}.
+If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "role": "melee", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false}.
 "enemies" is an array of 1 to 5 objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry.
 "enemyName" must be in ${narrativeLanguage}, matching how the scene refers to that opponent — give each a distinguishing name or descriptor (e.g. "бандит с топором", "бандит с луком") when several share the same base type, so they read as distinct in the fight. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
+"role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). This is recorded for future combat variety and has no mechanical effect yet, so a reasonable best guess is always fine — never leave it out or invent a fifth category.
+"fearless" is true only for an opponent that fundamentally cannot be frightened, demoralized, or panicked into fleeing — undead, constructs/automatons, oozes/swarms, or anything else established as mindless or otherwise incapable of fear — and false for absolutely everything else, including dangerous, confident, or fanatical living opponents (a fanatic can still break when things go badly enough; only make this true when the scene or the opponent's nature makes fear itself inapplicable). Default to false whenever genuinely unsure.
 "ambush" is a single top-level flag for the whole encounter — true only when the hero is the one attacking, every listed opponent has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself; only ever set it true when "enemies" has exactly one entry, since a stealth strike is a single decisive blow against a single unaware target, not a group action. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, mutual/open hostility of any kind, and any fight with more than one opponent.${itemOffersSection}
 
 === EVENT: HIDDEN INFORMATION ===
@@ -28174,7 +28474,7 @@ ${chunkText}`;
     // a stage resolving, on its own, never does — that stays a deliberate,
     // separate call by the model, the same way it always has been for the
     // quest as a whole.
-    function reconcileQuests(rawQuests, currentState, precedingNarrator, isOpeningTurn) {
+    function reconcileQuests(rawQuests, currentState, precedingNarrator, isOpeningTurn, rawDiscoveredQuests) {
         if (isOpeningTurn)
             return { quests: [], reputationDeltas: {}, factionReputationDeltas: {}, xpGained: 0 };
         const rawById = new Map(rawQuests.map(q => [q.id, q]));
@@ -28210,14 +28510,18 @@ ${chunkText}`;
             if (progress)
                 newEntries.push(progress);
             if (prior.status === 'active' && status === 'completed') {
-                bumpReputation(prior.giver, QUEST_COMPLETE_REPUTATION_DELTA);
-                bumpFactionReputation(prior.giver, FACTION_QUEST_COMPLETE_REPUTATION_DELTA);
+                if (prior.giver) {
+                    bumpReputation(prior.giver, QUEST_COMPLETE_REPUTATION_DELTA);
+                    bumpFactionReputation(prior.giver, FACTION_QUEST_COMPLETE_REPUTATION_DELTA);
+                }
                 newEntries.push(t('questLogCompletedEntry'));
                 xpGained += QUEST_COMPLETE_XP;
             }
             else if (prior.status === 'active' && status === 'failed') {
-                bumpReputation(prior.giver, QUEST_FAIL_REPUTATION_DELTA);
-                bumpFactionReputation(prior.giver, FACTION_QUEST_FAIL_REPUTATION_DELTA);
+                if (prior.giver) {
+                    bumpReputation(prior.giver, QUEST_FAIL_REPUTATION_DELTA);
+                    bumpFactionReputation(prior.giver, FACTION_QUEST_FAIL_REPUTATION_DELTA);
+                }
                 newEntries.push(t('questLogFailedEntry'));
             }
             const stages = raw ? appendNewQuestStages(reconcileQuestStages(prior.stages, raw.stageUpdates), raw.newStages) : prior.stages;
@@ -28244,6 +28548,30 @@ ${chunkText}`;
             if (!priorIds.has(offerId)) {
                 quests.push({ id: offerId, title: info.title, giver: info.giver, reward: info.reward, description: info.description, status: 'active', log: [t('questLogAcceptedEntry')], npcs: [], stages: [] });
             }
+        }
+        // Self-starting quest threads (see "newDiscoveredQuests" in the state
+        // schema and the questRule text above) skip the whole offer/accept
+        // flow above entirely — no giver, no reward, no player decision — so
+        // they're just appended straight into the active log the moment the
+        // model reports them, the same instant a confirmed offer above is.
+        const rawDiscovered = Array.isArray(rawDiscoveredQuests) ? rawDiscoveredQuests : [];
+        for (const raw of rawDiscovered) {
+            if (!raw || typeof raw.title !== 'string' || !raw.title.trim())
+                continue;
+            const id = (typeof raw.id === 'string' && raw.id.trim()) ? raw.id.trim() : 'quest-' + randomSlug();
+            if (priorIds.has(id) || quests.some(q => q.id === id))
+                continue;
+            quests.push({
+                id,
+                title: raw.title.trim(),
+                giver: '',
+                reward: '',
+                description: typeof raw.description === 'string' ? raw.description.trim() : '',
+                status: 'active',
+                log: [t('questLogDiscoveredEntry')],
+                npcs: [],
+                stages: []
+            });
         }
         return { quests, reputationDeltas, factionReputationDeltas, xpGained };
     }
@@ -28547,7 +28875,7 @@ ${chunkText}`;
         const { inventory, surpriseItems, justTakenCount } = reconcileInventory(rawInventory, currentState, precedingNarrator, isOpeningTurn);
         const currency = reconcileCurrency(parsed.currencyChange, currentState);
         const rawQuests = Array.isArray(parsed.quests) ? parsed.quests.filter(q => q && typeof q.id === 'string') : [];
-        const { quests, reputationDeltas: questDeltas, factionReputationDeltas: questFactionDeltas, xpGained: questXpGained } = reconcileQuests(rawQuests, currentState, precedingNarrator, isOpeningTurn);
+        const { quests, reputationDeltas: questDeltas, factionReputationDeltas: questFactionDeltas, xpGained: questXpGained } = reconcileQuests(rawQuests, currentState, precedingNarrator, isOpeningTurn, parsed.newDiscoveredQuests);
         const { deltas: reputationHitDeltas, factionRippleDeltas: npcHitFactionRippleDeltas, kindnessCooldownNpcs } = reconcileReputationHits(parsed.reputationHits, isOpeningTurn, currentState.npcs, turnIndex);
         const reputationDeltas = { ...questDeltas };
         for (const key of Object.keys(reputationHitDeltas))
@@ -28726,7 +29054,7 @@ ${chunkText}`;
         if (combatRaw && combatRaw.combat) {
             const rawEnemyList = Array.isArray(combatRaw.enemies) && combatRaw.enemies.length > 0
                 ? combatRaw.enemies
-                : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, tier: combatRaw.tier, bodyParts: combatRaw.bodyParts }];
+                : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, tier: combatRaw.tier, role: combatRaw.role, fearless: combatRaw.fearless, bodyParts: combatRaw.bodyParts }];
             const enemies = rawEnemyList.slice(0, MAX_COMBAT_ENEMIES).map((raw, i) => {
                 const enemyName = typeof raw.enemyName === 'string' && raw.enemyName.trim()
                     ? raw.enemyName.trim()
@@ -28736,12 +29064,22 @@ ${chunkText}`;
                     : t('combatUnarmedEnemyLabel');
                 const tier = ENEMY_TIERS[raw.tier] ? raw.tier : 'average';
                 const rolled = rollEnemyStatsForTier(tier);
+                // "role" is a data-only scaffold for now (see ENEMY_ROLES) — parsed
+                // and carried through even though nothing in combat branches on it
+                // yet, so it's already flowing by the time ranged/role-specific
+                // behavior gets built. "fearless" is live today (see
+                // COMBAT_TUNING's morale* block/rollMoraleBreak) — an enemy flagged
+                // fearless never tracks morale and can never break/flee/surrender.
+                const role = ENEMY_ROLES[raw.role] ? raw.role : 'melee';
+                const fearless = raw.fearless === true;
                 return {
                     id: 'enemy_' + i,
                     enemyName,
                     enemyDescription: typeof raw.enemyDescription === 'string' ? raw.enemyDescription.trim() : '',
                     weaponDescription,
                     tier,
+                    role,
+                    fearless,
                     totalHp: rolled.totalHp,
                     power: rolled.power,
                     precision: rolled.precision,
@@ -30520,7 +30858,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             if (!npc || !(npc.health > 0))
                 return null;
             const armor = computeTotalArmorDefense(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
-            return { id: 'ally_' + i, name, stats: npc.stats || EMPTY_STATE.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts: buildCombatantParts(npc.health, npc.maxHealth), armor };
+            // Party members track morale the same way enemies do (see
+            // COMBAT_TUNING's morale* block) — the hero never does (no
+            // makeHeroDefender.morale field), only companions. A companion whose
+            // morale drops too low doesn't auto-flee mid-hit like an enemy would;
+            // instead it actively tries to flee on its own next turn (see
+            // runAutoTurn's ally branch) — same single roll, succeed-and-leave or
+            // fail-and-get-punished shape as the hero's own manual flee button.
+            return { id: 'ally_' + i, name, stats: npc.stats || EMPTY_STATE.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts: buildCombatantParts(npc.health, npc.maxHealth), armor, morale: COMBAT_TUNING.moraleStart };
         }).filter(Boolean);
     }
     function startCombat(narratorIndex) {
@@ -30528,7 +30873,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const encounter = narratorMsg && narratorMsg.combatEncounter;
         if (!encounter || !Array.isArray(encounter.enemies) || encounter.enemies.length === 0)
             return;
-        const enemies = encounter.enemies.map(e => ({ ...e, parts: buildCombatantParts(e.totalHp, e.totalHp, normalizeEnemyBodyParts(e.bodyParts)) }));
+        const enemies = encounter.enemies.map(e => ({ ...e, parts: buildCombatantParts(e.totalHp, e.totalHp, normalizeEnemyBodyParts(e.bodyParts)), morale: COMBAT_TUNING.moraleStart, fearless: !!e.fearless, fled: false }));
         const allies = buildAllyCombatants();
         const order = buildInitiativeOrder(allies, enemies);
         setCombat({
@@ -30586,8 +30931,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         }
         else if (outcome === 'damage') {
             const weaponInfo = getPlayerWeaponInfo();
-            const rawDmg = computeWeaponDamage(weaponInfo.damage, gameState.stats.strength, aggregateEffectModifiers(gameState.effects));
-            const dmg = Math.max(1, Math.round(rawDmg * COMBAT_TUNING.stealthDamageFraction - (typeof enemy.armor === 'number' ? enemy.armor : 0)));
+            const rolled = computeWeaponDamage(weaponInfo.damage, gameState.stats.strength, aggregateEffectModifiers(gameState.effects), gameState.stats.agility);
+            const dmg = Math.max(1, Math.round(rolled.dmg * COMBAT_TUNING.stealthDamageFraction - (typeof enemy.armor === 'number' ? enemy.armor : 0)));
             const targetKey = pickEnemyTargetPart(freshParts);
             const targetState = freshParts[targetKey];
             // Never lands the kill here — an outright kill is only ever the 'kill'
@@ -30599,7 +30944,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         else {
             log = [{ text: t('stealthKillMissLogText'), kind: 'miss' }];
         }
-        const enemies = [{ ...enemy, parts: enemyParts }];
+        const enemies = [{ ...enemy, parts: enemyParts, morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false }];
         setCombat({
             sourceNarratorIndex: narratorIndex,
             allies,
@@ -30636,7 +30981,11 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             let items = [];
             let currency = 0;
             try {
-                const perEnemy = await Promise.all(finalCombat.enemies.map(e => generateCombatLoot(e, e.id)));
+                // Only enemies actually killed (see isEnemyDown vs. isEnemyOut) drop
+                // loot — one that broke and fled/surrendered (see the morale system)
+                // got away with whatever it was carrying.
+                const killedEnemies = finalCombat.enemies.filter(isEnemyDown);
+                const perEnemy = await Promise.all(killedEnemies.map(e => generateCombatLoot(e, e.id)));
                 items = perEnemy.flatMap(r => r.items);
                 currency = perEnemy.reduce((sum, r) => sum + (r.currency || 0), 0);
             }
@@ -30743,7 +31092,22 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // the old per-hit defense choice for pacing: a crowd fight would otherwise
     // stop for a popup on every single one of a dozen incoming swings.
     function isAllyDown(ally) { return isVitalDisabled(ally.parts); }
+    // Mirrors isEnemyOut on the party side: a fled ally (see runAutoTurn's
+    // ally branch) is out of the fight — no turn, not attackable/healable —
+    // without being "down" for the narrative summary/reconciliation formula,
+    // which both still care whether they were actually beaten unconscious
+    // (isAllyDown) or just ran off under their own power.
+    function isAllyOut(ally) { return !!ally.fled || isAllyDown(ally); }
     function isEnemyDown(enemy) { return isVitalDisabled(enemy.parts); }
+    // "Down" (dead) is deliberately kept separate from "out of the fight" — a
+    // broken enemy that fled or surrendered (see the morale system further
+    // down: rollMoraleBreak/applyMoraleShockToGroup) leaves combat alive, so
+    // it has to stop being targeted, stop taking turns, and count toward a
+    // side being wiped out (isEnemyOut) WITHOUT being treated as a kill for
+    // loot/XP/the "defeated" narrative summary, which all still key off
+    // isEnemyDown alone (see the victory-loot effect and
+    // buildCombatSummaryTag).
+    function isEnemyOut(enemy) { return !!enemy.fled || isEnemyDown(enemy); }
     // One shared turn order for the whole fight, highest initiative first,
     // fixed for the fight's whole duration (a real initiative roll, not
     // re-rolled every round) — exactly what was asked for. Ties keep the
@@ -30785,10 +31149,10 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             return true;
         if (entry.type === 'ally') {
             const a = allies.find(x => x.id === entry.id);
-            return !!a && !isAllyDown(a);
+            return !!a && !isAllyOut(a);
         }
         const e = enemies.find(x => x.id === entry.id);
-        return !!e && !isEnemyDown(e);
+        return !!e && !isEnemyOut(e);
     }
     // Walks forward from `fromPos` (inclusive) to the next order entry with
     // someone still able to act, wrapping around the order and counting a
@@ -30822,6 +31186,46 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         if (alive.length === 0)
             return null;
         return alive[Math.floor(Math.random() * alive.length)];
+    }
+    // Ripples a morale hit out to every one of sourceId's still-fighting
+    // allies the instant it dies or breaks (see COMBAT_TUNING.moraleAllyDeathLoss/
+    // moraleAllyFleeLoss and resolveOneAttack, which is what actually calls
+    // this) — each of them takes the flat hit and immediately re-rolls its
+    // own break check (rollMoraleBreak) against its new, lower morale, so one
+    // kill or one broken comrade can chain into more of the group giving up
+    // on the spot. Fearless enemies (see the combat encounter schema) are
+    // skipped entirely — they never track morale and never break. Returns
+    // the updated enemies array plus any additional flee/surrender log lines
+    // this shock caused, for the caller to merge into its own log/state.
+    function applyMoraleShockToGroup(enemies, sourceId, amount, t) {
+        const log = [];
+        const updated = enemies.map(e => {
+            if (e.id === sourceId || e.fearless || isEnemyOut(e))
+                return e;
+            const morale = Math.max(0, (typeof e.morale === 'number' ? e.morale : COMBAT_TUNING.moraleStart) - amount);
+            const brk = rollMoraleBreak(morale);
+            if (brk) {
+                log.push({ text: e.enemyName + ' — ' + t(brk === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' });
+                return { ...e, morale, fled: true };
+            }
+            return { ...e, morale };
+        });
+        return { enemies: updated, log };
+    }
+    // Same ripple, party-member side: a dead or successfully-fled ally (see
+    // runAutoTurn's ally branch) knocks morale down for the rest of the
+    // party. Unlike applyMoraleShockToGroup, this never rolls a break itself
+    // — a party member doesn't auto-flee mid-shock, it only decides whether
+    // to actively try fleeing on its OWN next turn, against whatever morale
+    // it's sitting on by then (see moraleFleeAttemptChance). isAllyOut
+    // combatants are skipped since they're already out of the fight either
+    // way.
+    function applyAllyMoraleShock(allies, sourceId, amount) {
+        return allies.map(a => {
+            if (a.id === sourceId || isAllyOut(a) || typeof a.morale !== 'number')
+                return a;
+            return { ...a, morale: Math.max(0, a.morale - amount) };
+        });
     }
     // Automatic defense choice for whichever player-side body (hero or ally)
     // just got hit — no popup anymore (see the section note above), so this
@@ -30863,7 +31267,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const hit = Math.random() * 100 < hitChance;
         if (!hit) {
             log.push({ text: attacker.name + ' — ' + t('combatLogMissTag') + ': ' + partLabel, kind: 'miss' });
-            return { parts: defender.parts, riposteDamage: 0, log, defeated: false, resultKind: 'miss', dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false };
+            return { parts: defender.parts, riposteDamage: 0, log, defeated: false, resultKind: 'miss', dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null };
         }
         // Enemies never get a defense ROLL of their own (no dodge/block/parry —
         // that's a player-side-only mechanic), but they DO have a flat armor
@@ -30872,13 +31276,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         // armor reduces an incoming blow — always at least 1 damage gets
         // through regardless of how much armor the target has.
         if (defender.isEnemy) {
-            const rawDmg = computeWeaponDamage(attacker.weaponDamage, attacker.power, attacker.mods);
+            const rolled = computeWeaponDamage(attacker.weaponDamage, attacker.power, attacker.mods, attacker.agility);
             const armor = typeof defender.armor === 'number' ? defender.armor : 0;
-            const dmg = Math.max(1, Math.round(rawDmg - armor));
+            const dmg = Math.max(1, Math.round(rolled.dmg - armor));
             const newHp = Math.max(0, targetState.hp - dmg);
             const justDisabled = newHp === 0 && !targetState.disabled;
             const parts = { ...defender.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
-            log.push({ text: attacker.name + ' — ' + t('combatLogHitTag') + ' (' + attacker.weaponLabel + '): ' + defender.name + ' ' + partLabel + ' −' + dmg + ' HP', kind: 'hit' });
+            const hitTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogHitTag');
+            log.push({ text: attacker.name + ' — ' + hitTag + ' (' + attacker.weaponLabel + '): ' + defender.name + ' ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' });
             const defeated = justDisabled && part.vital;
             // A solid hit to the head — even one that doesn't end the fight —
             // has a chance to stun (see COMBAT_TUNING.headStunChance). A
@@ -30891,7 +31296,23 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' });
             if (stunApplied)
                 log.push({ text: defender.name + ' — ' + t('combatLogStunAppliedText'), kind: 'effect' });
-            return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
+            // ---- Morale (see COMBAT_TUNING's morale* block / rollMoraleBreak) ----
+            // A "fearless" defender (undead, constructs, mindless swarms — see the
+            // combat encounter schema) never tracks morale at all, so it can never
+            // break here regardless of how much damage lands. A killing blow skips
+            // the break roll too — nothing left to flee with.
+            let morale = defender.morale;
+            let moraleBreak = null;
+            if (!defender.fearless && !defeated && typeof morale === 'number') {
+                const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (defender.parts[p.key] ? defender.parts[p.key].maxHp : 0), 0);
+                const lossFraction = totalMaxHp > 0 ? dmg / totalMaxHp : 0;
+                morale = Math.max(0, morale - lossFraction * COMBAT_TUNING.moraleDamageLossScale);
+                moraleBreak = rollMoraleBreak(morale);
+                if (moraleBreak) {
+                    log.push({ text: defender.name + ' — ' + t(moraleBreak === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' });
+                }
+            }
+            return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied, isCrit: rolled.isCrit, morale, moraleBreak };
         }
         // Player-side defender (hero or ally): automatic dodge/block/parry —
         // same full/partial/fail math and riposte-on-full-parry the manual
@@ -30917,21 +31338,21 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 riposteDamage = Math.max(1, Math.round(defender.weaponDamage * COMBAT_TUNING.parryRiposteFraction * defender.mods.damageMultiplier));
                 log.push({ text: defender.name + ' — ' + t('combatLogParryRiposteText'), kind: 'hit' });
             }
-            return { parts: defender.parts, riposteDamage, log, defeated: false, resultKind, dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false };
+            return { parts: defender.parts, riposteDamage, log, defeated: false, resultKind, dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null };
         }
-        const rawDmg = Math.max(1, Math.round(computeEnemyDamage(attacker.power)));
-        const softenedDmg = key === 'block' ? rawDmg * COMBAT_TUNING.blockChipDamageFraction
-            : outcome === 'partial' ? rawDmg * COMBAT_TUNING.partialDamageFraction
-                : rawDmg;
+        const rolled = computeEnemyDamage(attacker.power, attacker.agility);
+        const softenedDmg = key === 'block' ? rolled.dmg * COMBAT_TUNING.blockChipDamageFraction
+            : outcome === 'partial' ? rolled.dmg * COMBAT_TUNING.partialDamageFraction
+                : rolled.dmg;
         const defense = defender.getDefenseForPart(partKey);
         const dmg = Math.max(1, Math.round(softenedDmg - defense));
         const newHp = Math.max(0, targetState.hp - dmg);
         const justDisabled = newHp === 0 && !targetState.disabled;
         const parts = { ...defender.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
-        const tag = key === 'block' ? t('combatLogBlockPartialText')
+        const tag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + (key === 'block' ? t('combatLogBlockPartialText')
             : outcome === 'partial' ? t('combatLogParryPartialText')
-                : (key === 'none' ? t('combatLogNoDefenseTag') : t('combatLogDefenseFailTag'));
-        log.push({ text: defender.name + ' — ' + tag + ' (' + attacker.weaponLabel + '): ' + partLabel + ' −' + dmg + ' HP', kind: 'hit' });
+                : (key === 'none' ? t('combatLogNoDefenseTag') : t('combatLogDefenseFailTag')));
+        log.push({ text: defender.name + ' — ' + tag + ' (' + attacker.weaponLabel + '): ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' });
         const defeated = justDisabled && part.vital;
         const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
         if (defeated)
@@ -30940,7 +31361,22 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' });
         if (stunApplied)
             log.push({ text: defender.name + ' — ' + t('combatLogStunAppliedText'), kind: 'effect' });
-        return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
+        // The hero never tracks morale (that's a party-member-only mechanic —
+        // see COMBAT_TUNING's morale* block and runAutoTurn's ally-turn flee
+        // attempt, which is what actually acts on a low ally morale value), so
+        // makeHeroDefender never sets defender.morale and this is skipped for
+        // the hero. An ally does track it: a hit against them chips morale down
+        // (scaled to how big a bite it took out of their own max HP), same as
+        // it does for enemies, but nothing rolls a break here — an ally never
+        // auto-flees mid-hit; they only decide whether to try fleeing on their
+        // own next turn, against whatever their morale has drifted to by then.
+        let morale = defender.morale;
+        if (!defeated && typeof morale === 'number') {
+            const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (defender.parts[p.key] ? defender.parts[p.key].maxHp : 0), 0);
+            const lossFraction = totalMaxHp > 0 ? dmg / totalMaxHp : 0;
+            morale = Math.max(0, morale - lossFraction * COMBAT_TUNING.moraleDamageLossScale);
+        }
+        return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied, isCrit: rolled.isCrit, morale, moraleBreak: null };
     }
     // Builds the attacker/defender descriptor resolveOneAttack expects for
     // whichever of the three combatant kinds is acting/being hit right now.
@@ -30963,13 +31399,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const inv = partyInventories[key] || [];
         const availability = computeDefenseAvailability(eq, inv, itemRarities);
         const weaponInfo = getWeaponInfoForLoadout(eq, inv, t('combatUnarmedLabel'));
-        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k), weaponDamage: weaponInfo.damage, mods };
+        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k), weaponDamage: weaponInfo.damage, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart };
     }
     function makeEnemyActor(enemy) {
         return { name: enemy.enemyName, parts: null, agility: enemy.precision, power: enemy.power, weaponDamage: null, weaponLabel: enemy.weaponDescription, mods: aggregateEffectModifiers([]), isEnemy: false };
     }
     function makeEnemyDefender(enemy) {
-        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, armor: typeof enemy.armor === 'number' ? enemy.armor : 0 };
+        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, armor: typeof enemy.armor === 'number' ? enemy.armor : 0, fearless: !!enemy.fearless, morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart };
     }
     // The hero's own turn: player clicks an enemy portrait, targeting a
     // random body part weighted by pickEnemyTargetPart (same weighting the
@@ -30978,6 +31414,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // swing lands (or misses), the turn hands off to whoever's next in the
     // initiative order — see advanceTurn.
     function resolveHeroAttack(enemyId) {
+        // Nothing should happen while the pre-battle intro is still playing.
+        if (combatIntroActive)
+            return;
         setCombat(prev => {
             if (!prev || prev.result)
                 return prev;
@@ -30985,7 +31424,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             if (!current || current.type !== 'hero')
                 return prev;
             const enemy = prev.enemies.find(e => e.id === enemyId);
-            if (!enemy || isEnemyDown(enemy))
+            if (!enemy || isEnemyOut(enemy))
                 return prev;
             let log = prev.log;
             let heroParts = prev.heroParts;
@@ -31014,11 +31453,21 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const defender = makeEnemyDefender(enemy);
             const outcome = resolveOneAttack(attacker, defender, t);
             log = [...log, ...outcome.log];
-            const enemies = prev.enemies.map(e => e.id === enemyId ? { ...e, parts: outcome.parts } : e);
+            let enemies = prev.enemies.map(e => e.id === enemyId ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak } : e);
+            if (outcome.moraleBreak) {
+                const shock = applyMoraleShockToGroup(enemies, enemyId, COMBAT_TUNING.moraleAllyFleeLoss, t);
+                enemies = shock.enemies;
+                log = [...log, ...shock.log];
+            }
+            else if (outcome.defeated) {
+                const shock = applyMoraleShockToGroup(enemies, enemyId, COMBAT_TUNING.moraleAllyDeathLoss, t);
+                enemies = shock.enemies;
+                log = [...log, ...shock.log];
+            }
             const defenderKey = 'enemy:' + enemyId;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
             const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
-            if (enemies.every(isEnemyDown)) {
+            if (enemies.every(isEnemyOut)) {
                 return { ...prev, heroParts, enemies, log, lastAction, stunned, result: 'victory' };
             }
             return advanceTurn({ ...prev, heroParts, enemies, log, lastAction, stunned });
@@ -31053,6 +31502,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // fight it was already drunk during. Never touches equipment/weapon
     // slots — gear stays locked for the whole fight by design.
     function useConsumableInCombat(itemIndex, targetType, targetId) {
+        // Nothing should happen while the pre-battle intro is still playing.
+        if (combatIntroActive)
+            return;
         const item = gameState.inventory[itemIndex];
         if (!item || item.slot !== 'consumable')
             return;
@@ -31072,7 +31524,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             let actualHeal = 0;
             if (targetType === 'ally') {
                 const ally = prev.allies.find(a => a.id === targetId);
-                if (!ally || isAllyDown(ally))
+                if (!ally || isAllyOut(ally))
                     return prev;
                 const result = healCombatantParts(ally.parts, scaledHeal);
                 allies = prev.allies.map(a => a.id === targetId ? { ...a, parts: result.parts } : a);
@@ -31111,28 +31563,92 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             let log = prev.log;
             if (current.type === 'ally') {
                 const ally = prev.allies.find(a => a.id === current.id);
-                if (!ally || isAllyDown(ally))
+                if (!ally || isAllyOut(ally))
                     return advanceTurn(prev);
-                const target = pickLivingTarget(prev.enemies, isEnemyDown);
+                // Low-morale party member tries to flee instead of attacking (see
+                // COMBAT_TUNING's morale* block/moraleFleeAttemptChance) — checked
+                // fresh every time it's their turn, so if morale has since climbed
+                // back above the threshold (a rally effect, a heal, whatever) they
+                // just skip this and fight normally below instead.
+                if (typeof ally.morale === 'number' && ally.morale < COMBAT_TUNING.moraleFleeThreshold) {
+                    const fleeChance = moraleFleeAttemptChance(ally.morale);
+                    const fleeSucceeded = Math.random() * 100 < fleeChance;
+                    if (fleeSucceeded) {
+                        // Marked fled rather than removed outright — still needed by
+                        // the post-combat health reconciliation (see nextNpcs below) so
+                        // the damage they took before running is preserved instead of
+                        // silently reverting to their pre-fight health. The visible
+                        // card disappearing is handled purely on the render side (see
+                        // CombatModal's ally list, which filters fled allies out).
+                        const allies = prev.allies.map(a => a.id === ally.id ? { ...a, fled: true } : a);
+                        log = [...log, { text: ally.name + ' — ' + t('combatLogAllyFleeSuccessText'), kind: 'defended' }];
+                        return advanceTurn({ ...prev, allies, log });
+                    }
+                    // Failed attempt: an unopposed punish hit from a random living
+                    // enemy, same shape as the hero's own resolveFleeAttempt — no
+                    // dodge/block/parry since they were busy running, not fighting.
+                    // Costs the turn either way; nothing here is "sticky", so if
+                    // still under the threshold next time it's simply tried again.
+                    const punishers = prev.enemies.filter(e => !isEnemyOut(e));
+                    if (punishers.length === 0) {
+                        log = [...log, { text: ally.name + ' — ' + t('combatLogAllyFleeFailText'), kind: 'miss' }];
+                        return advanceTurn({ ...prev, log });
+                    }
+                    const punisher = punishers[Math.floor(Math.random() * punishers.length)];
+                    const partKey = pickEnemyTargetPart(ally.parts);
+                    const part = BODY_PARTS.find(p => p.key === partKey);
+                    const partLabel = t(part.labelKey);
+                    const targetState = ally.parts[partKey];
+                    const rolled = computeEnemyDamage(punisher.power, punisher.precision);
+                    const allyKey = ally.name.trim().toLowerCase();
+                    const defense = getDefenseForPartOfLoadout(partyEquipment[allyKey] || EMPTY_EQUIPMENT, partyInventories[allyKey] || [], partKey);
+                    const dmg = Math.max(1, Math.round(rolled.dmg - defense));
+                    const newHp = Math.max(0, targetState.hp - dmg);
+                    const justDisabled = newHp === 0 && !targetState.disabled;
+                    const newParts = { ...ally.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
+                    const defeated = justDisabled && part.vital;
+                    const punishTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogAllyFleeFailText');
+                    log = [...log, { text: ally.name + ' — ' + punishTag + ' (' + punisher.weaponDescription + '): ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' }];
+                    let punishedAllies = prev.allies.map(a => a.id === ally.id ? { ...a, parts: newParts } : a);
+                    if (defeated) {
+                        log = [...log, { text: ally.name + ': ' + partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
+                        punishedAllies = applyAllyMoraleShock(punishedAllies, ally.id, COMBAT_TUNING.moraleAllyDeathLoss);
+                    }
+                    else if (justDisabled) {
+                        log = [...log, { text: ally.name + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
+                    }
+                    return advanceTurn({ ...prev, allies: punishedAllies, log });
+                }
+                const target = pickLivingTarget(prev.enemies, isEnemyOut);
                 if (!target)
                     return { ...prev, log, result: 'victory' };
                 const attacker = makeAllyActor(ally, mods);
                 const outcome = resolveOneAttack(attacker, makeEnemyDefender(target), t);
                 log = [...log, ...outcome.log];
-                const enemies = prev.enemies.map(e => e.id === target.id ? { ...e, parts: outcome.parts } : e);
+                let enemies = prev.enemies.map(e => e.id === target.id ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak } : e);
+                if (outcome.moraleBreak) {
+                    const shock = applyMoraleShockToGroup(enemies, target.id, COMBAT_TUNING.moraleAllyFleeLoss, t);
+                    enemies = shock.enemies;
+                    log = [...log, ...shock.log];
+                }
+                else if (outcome.defeated) {
+                    const shock = applyMoraleShockToGroup(enemies, target.id, COMBAT_TUNING.moraleAllyDeathLoss, t);
+                    enemies = shock.enemies;
+                    log = [...log, ...shock.log];
+                }
                 const defenderKey = 'enemy:' + target.id;
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
                 const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
-                if (enemies.every(isEnemyDown))
+                if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, result: 'victory' };
                 return advanceTurn({ ...prev, enemies, log, lastAction, stunned });
             }
             // Enemy turn: attacks a random living hero/ally, automatically
             // defended (see resolveOneAttack/pickAutoDefenseKey).
             const enemy = prev.enemies.find(e => e.id === current.id);
-            if (!enemy || isEnemyDown(enemy))
+            if (!enemy || isEnemyOut(enemy))
                 return advanceTurn(prev);
-            const livingAllies = prev.allies.filter(a => !isAllyDown(a));
+            const livingAllies = prev.allies.filter(a => !isAllyOut(a));
             const targets = [{ kind: 'hero' }, ...livingAllies.map(a => ({ kind: 'ally', ally: a }))];
             const targetChoice = targets[Math.floor(Math.random() * targets.length)];
             const attacker = makeEnemyActor(enemy);
@@ -31152,7 +31668,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             log = [...log, ...outcome.log];
             if (outcome.defeated)
                 log = [...log, { text: ally.name + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
-            const allies = prev.allies.map(a => a.id === ally.id ? { ...a, parts: outcome.parts } : a);
+            let allies = prev.allies.map(a => a.id === ally.id ? { ...a, parts: outcome.parts, morale: outcome.morale } : a);
+            if (outcome.defeated)
+                allies = applyAllyMoraleShock(allies, ally.id, COMBAT_TUNING.moraleAllyDeathLoss);
             const defenderKey = 'ally:' + ally.id;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
             const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
@@ -31198,6 +31716,19 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             return advanceTurn({ ...prev, order, log, stunned, lastAction });
         });
     }
+    // Arms/disarms combatIntroActive around the pre-battle sword-clash intro
+    // (see CombatModal's combat-intro-fx) — the 1700ms here must match the
+    // intro's own timing there. Re-fires every time combatModalOpen goes
+    // false -> true, i.e. every fresh fight.
+    useEffect(() => {
+        if (!combatModalOpen) {
+            setCombatIntroActive(false);
+            return;
+        }
+        setCombatIntroActive(true);
+        const timer = setTimeout(() => setCombatIntroActive(false), 1700);
+        return () => clearTimeout(timer);
+    }, [combatModalOpen]);
     // Drives every non-hero turn forward on a short delay (so a multi-enemy
     // round reads as a sequence of blows rather than jumping straight to the
     // hero's next prompt) — see runAutoTurn just above. A stunned actor (see
@@ -31205,9 +31736,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // turn it is, hero included — stun overrides the usual "wait for the
     // player to click" rule since there's nothing for them to choose.
     // Otherwise stops the instant the turn lands back on the hero or the
-    // fight ends.
+    // fight ends. Also holds off entirely while combatIntroActive is true
+    // (the pre-battle intro is still playing) and re-fires the moment it
+    // clears, so nothing fights in the background during the intro.
     useEffect(() => {
         if (!combat || combat.result || !combatModalOpen)
+            return;
+        if (combatIntroActive)
             return;
         const current = combat.order[combat.turnPos];
         if (!current)
@@ -31221,7 +31756,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             return;
         const timer = setTimeout(() => runAutoTurn(), 650);
         return () => clearTimeout(timer);
-    }, [combat, combatModalOpen]);
+    }, [combat, combatModalOpen, combatIntroActive]);
     // The "leave combat" option, available on the hero's own turn as an
     // alternative to attacking. Success ends the fight immediately (result:
     // 'fled'); failure means one random living enemy gets an unopposed hit on
@@ -31231,13 +31766,16 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // standing, so a fight that's down to one weak straggler is easy to
     // outrun even if the original group was fearsome.
     function resolveFleeAttempt() {
+        // Nothing should happen while the pre-battle intro is still playing.
+        if (combatIntroActive)
+            return;
         setCombat(prev => {
             if (!prev || prev.result)
                 return prev;
             const current = prev.order[prev.turnPos];
             if (!current || current.type !== 'hero')
                 return prev;
-            const living = prev.enemies.filter(e => !isEnemyDown(e));
+            const living = prev.enemies.filter(e => !isEnemyOut(e));
             if (living.length === 0)
                 return prev;
             const toughest = living.reduce((a, b) => (a.power + a.precision >= b.power + b.precision ? a : b));
@@ -31253,9 +31791,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const part = BODY_PARTS.find(p => p.key === partKey);
             const partLabel = t(part.labelKey);
             const targetState = prev.heroParts[partKey];
-            const rawDmg = computeEnemyDamage(punisher.power);
+            const rolled = computeEnemyDamage(punisher.power, punisher.precision);
             const defense = getPlayerDefenseForPart(partKey);
-            const dmg = Math.max(1, Math.round(rawDmg - defense));
+            const dmg = Math.max(1, Math.round(rolled.dmg - defense));
             const newHp = Math.max(0, targetState.hp - dmg);
             const justDisabled = newHp === 0 && !targetState.disabled;
             const heroParts = { ...prev.heroParts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
@@ -31263,7 +31801,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             // Same head-stun chance as a normal swing (see resolveOneAttack) — an
             // unopposed punish hit is still just a hit.
             const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
-            log = [...log, { text: t('combatLogFleeFailTag') + ' (' + punisher.weaponDescription + '): ' + partLabel + ' −' + dmg + ' HP', kind: 'hit' }];
+            const punishTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogFleeFailTag');
+            log = [...log, { text: punishTag + ' (' + punisher.weaponDescription + '): ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' }];
             const stunned = stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
             const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: punisher.id, defenderType: 'hero', defenderId: 'hero', resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
             if (defeated) {
@@ -31279,11 +31818,22 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     }
     function buildCombatSummaryTag(finalCombat, failedQuests) {
         const defeatedNames = finalCombat.enemies.filter(isEnemyDown).map(e => e.enemyName);
+        // Broken enemies (see the morale system: rollMoraleBreak/applyMoraleShockToGroup)
+        // left the fight alive and un-looted — worth calling out separately in
+        // the narrative context so the model doesn't describe them as slain
+        // alongside whoever was actually killed.
+        const fledNames = finalCombat.enemies.filter(e => e.fled).map(e => e.enemyName);
         let outcome;
         if (finalCombat.result === 'victory') {
-            outcome = defeatedNames.length > 1
-                ? `The hero and companions defeated ${defeatedNames.join(', ')} in a fight.`
-                : `The hero defeated ${defeatedNames[0]} in a fight.`;
+            const killedSentence = defeatedNames.length > 0
+                ? (defeatedNames.length > 1
+                    ? `The hero and companions defeated ${defeatedNames.join(', ')} in a fight.`
+                    : `The hero defeated ${defeatedNames[0]} in a fight.`)
+                : `The hero and companions won a fight without killing anyone — every opponent broke and ran.`;
+            const fledSentence = fledNames.length > 0
+                ? ` ${fledNames.join(', ')} lost ${fledNames.length > 1 ? 'their' : 'its'} nerve partway through, broke, and got away alive (fled or surrendered) rather than fight to the death.`
+                : '';
+            outcome = killedSentence + fledSentence;
         }
         else if (finalCombat.result === 'fled') {
             outcome = `The hero fled from a fight with ${finalCombat.enemies.map(e => e.enemyName).join(', ')}, taking some injuries in the process.`;
@@ -31299,6 +31849,15 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const allyNote = downedAllies.length > 0
             ? ` ${downedAllies.join(', ')} ${downedAllies.length > 1 ? 'were' : 'was'} badly hurt and knocked out of the fight.`
             : '';
+        // A party member's own morale system (see COMBAT_TUNING's morale*
+        // block/runAutoTurn's ally branch) — distinct from a fled/surrendered
+        // ENEMY (fledNames above) — an ally who broke and ran is alive and
+        // uninjured beyond whatever they'd already taken, just no longer
+        // present for the rest of the fight or its immediate aftermath.
+        const fledAllies = finalCombat.allies.filter(a => a.fled && !isAllyDown(a)).map(a => a.name);
+        const fledAllyNote = fledAllies.length > 0
+            ? ` ${fledAllies.join(', ')} lost ${fledAllies.length > 1 ? 'their' : 'its'} nerve partway through the fight and ran off rather than keep fighting — alive, but no longer present.`
+            : '';
         const takenLoot = collectTakenLoot(finalCombat);
         const lootNote = takenLoot.length > 0
             ? ` The hero searched the bodies afterward and took: ${takenLoot.map(it => it.label).join(', ')}.`
@@ -31306,7 +31865,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const questFailNote = failedQuests && failedQuests.length > 0
             ? ` Killing ${defeatedNames.join(', ')} also permanently fails the hero's quest${failedQuests.length > 1 ? 's' : ''} "${failedQuests.map(q => q.title).join('", "')}" — the giver is dead and it can never be turned in.`
             : '';
-        return `[COMBAT RESULT]: ${outcome}${disabledNote}${allyNote}${lootNote}${questFailNote}`;
+        return `[COMBAT RESULT]: ${outcome}${disabledNote}${allyNote}${fledAllyNote}${lootNote}${questFailNote}`;
     }
     // If any of the enemies the hero just defeated also happens to be the
     // giver of one of the hero's own active quests, that quest can never be
@@ -31320,7 +31879,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const enemyKeys = enemyNames.map(n => n.trim().toLowerCase());
         const failed = [];
         const nextQuests = quests.map(q => {
-            if (q.status !== 'active')
+            if (q.status !== 'active' || !q.giver)
                 return q;
             const giverKey = q.giver.trim().toLowerCase();
             const matches = enemyKeys.some(enemyKey => giverKey === enemyKey || giverKey.includes(enemyKey) || enemyKey.includes(giverKey));
@@ -31459,6 +32018,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const reputationDeltas = {};
             const factionReputationDeltas = {};
             for (const q of failedQuests) {
+                if (!q.giver)
+                    continue;
                 const giverKey = q.giver.trim().toLowerCase();
                 reputationDeltas[giverKey] = (reputationDeltas[giverKey] || 0) + QUEST_FAIL_REPUTATION_DELTA;
                 const faction = findNpcFaction(q.giver, gameState.npcs);
@@ -32593,7 +33154,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onOpenItemDetail: openItemDetailFromEquipment, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
-        combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroArmor: computeTotalArmorDefense(equipment, gameState.inventory, itemRarities), onAttack: resolveHeroAttack, onFlee: resolveFleeAttempt, onUseItem: useConsumableInCombat, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, t: t })),
+        combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroArmor: computeTotalArmorDefense(equipment, gameState.inventory, itemRarities), introActive: combatIntroActive, onAttack: resolveHeroAttack, onFlee: resolveFleeAttempt, onUseItem: useConsumableInCombat, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: gameState, itemRarities: itemRarities, equipment: equipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, onClose: () => setInventoryModalOpen(false), t: t })),
         (itemDetailIndex !== null || itemDetailEmptySlot !== null) && (React.createElement(ItemDetailModal, { itemIndex: itemDetailIndex, 
@@ -33075,7 +33636,7 @@ const APP_STYLES = `
   .combat-card { max-width: 34rem; position: relative; }
   .combat-card-group { max-width: 40rem; }
   .combat-round-indicator { text-align: center; margin: 0.2rem 0 0; font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; color: var(--amber-400); letter-spacing: 0.03em; }
-  .combat-arena-group { display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem; }
+  .combat-arena-group { position: relative; display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem; }
   /* Rows are top-aligned by default so a taller card (hero/boss variants
      below) always grows in one predictable direction instead of shifting
      its neighbors — see combat-row-party override for the hero's case. */
@@ -33126,18 +33687,14 @@ const APP_STYLES = `
      to a 3rd line or growing the box. */
   .combat-portrait-name {
     font-family: var(--font-mono); font-size: 0.62rem; color: var(--stone-100);
-    text-align: center; margin: 0 0 0.3rem; line-height: 1.1;
+    text-align: center; margin: 0; line-height: 1.1;
     height: 1.4rem; width: 100%; overflow: hidden;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
-  /* Brighter than the body-panel's plain-background .combat-hp-value (kept
-     as-is below) since this copy sits on the image + scrim, not a flat
-     stone-900 panel. */
-  .combat-portrait-overlay .combat-hp-value { color: var(--stone-200); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
-  .combat-portrait-overlay .combat-portrait-armor { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
   .combat-portrait-active { border-color: var(--amber-500); box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.35); animation: combat-fx-active-pulse 1.4s ease-in-out infinite; }
   .combat-portrait-down { opacity: 0.4; border-color: var(--stone-700); }
+  .combat-portrait-fled { opacity: 0.55; border-color: var(--stone-600); filter: grayscale(0.6); }
   .combat-portrait-targetable { cursor: pointer; border-color: var(--amber-600); }
   .combat-portrait-targetable:hover { border-color: var(--amber-300); background: var(--stone-800); }
   .combat-portrait-heal-targetable { cursor: pointer; border-color: #4ade80; box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.35); }
@@ -33233,9 +33790,17 @@ const APP_STYLES = `
   }
   /* ---- Pre-battle intro: two swords fly in from the bottom corners with a
      wind-up, clash into an X at the center of the arena (with a spark burst),
-     then swing back out the way they came. Plays once on mount (see
-     CombatModal's introActive state) and is removed from the DOM afterward —
-     purely decorative, so it's excluded from prefers-reduced-motion below. */
+     then swing back out the way they came. Plays once per fight (driven by
+     App()'s combatIntroActive, shared with the auto-turn effect there so
+     nothing fights in the background while this plays — see its
+     declaration) and is removed from the DOM afterward — purely decorative,
+     so it's excluded from prefers-reduced-motion below. Anchored to
+     .combat-arena-group (not the whole modal-card) so the clash always
+     centers on the actual enemy/hero portrait rows — the "battle window" —
+     rather than drifting low when the log/buttons below make the full card
+     taller than the visible arena. Sized and staged at 1.35x the original
+     figures throughout (sword/flash dimensions and every travel distance in
+     the keyframes below) so the swords read clearly at combat-card width. */
   .combat-intro-fx {
     position: absolute; inset: 0; z-index: 30;
     display: flex; align-items: center; justify-content: center;
@@ -33245,8 +33810,8 @@ const APP_STYLES = `
   .combat-intro-center { position: relative; width: 0; height: 0; }
   .combat-intro-sword {
     position: absolute; left: 0; top: 0;
-    width: 4.4rem; height: 4.4rem;
-    margin-left: -2.2rem; margin-top: -2.2rem;
+    width: 6rem; height: 6rem;
+    margin-left: -3rem; margin-top: -3rem;
     opacity: 0;
   }
   .combat-intro-sword img {
@@ -33258,31 +33823,31 @@ const APP_STYLES = `
   .combat-intro-sword-left { animation: combat-intro-sword-left 1600ms linear both; }
   .combat-intro-sword-right { animation: combat-intro-sword-right 1600ms linear both; }
   @keyframes combat-intro-sword-left {
-    0%   { transform: translate(-8.3rem, 6.4rem) scale(.32) rotate(-95deg); opacity: 0;
+    0%   { transform: translate(-11.2rem, 8.6rem) scale(.32) rotate(-95deg); opacity: 0;
            animation-timing-function: cubic-bezier(.3,.1,.4,1); }
-    7%   { transform: translate(-8.7rem, 6.7rem) scale(.42) rotate(-112deg); opacity: .55;
+    7%   { transform: translate(-11.7rem, 9rem) scale(.42) rotate(-112deg); opacity: .55;
            animation-timing-function: cubic-bezier(.76,0,.86,.04); }
     34%  { transform: translate(0, 0) scale(1.1) rotate(0deg); opacity: 1;
            animation-timing-function: linear; }
     58%  { transform: translate(0, 0) scale(1.05) rotate(0deg); opacity: 1;
            animation-timing-function: cubic-bezier(.4,0,.2,1); }
-    100% { transform: translate(-8.6rem, 6.8rem) scale(.32) rotate(-95deg); opacity: 0; }
+    100% { transform: translate(-11.6rem, 9.2rem) scale(.32) rotate(-95deg); opacity: 0; }
   }
   @keyframes combat-intro-sword-right {
-    0%   { transform: translate(8.3rem, 6.4rem) scale(.32) rotate(95deg); opacity: 0;
+    0%   { transform: translate(11.2rem, 8.6rem) scale(.32) rotate(95deg); opacity: 0;
            animation-timing-function: cubic-bezier(.3,.1,.4,1); }
-    7%   { transform: translate(8.7rem, 6.7rem) scale(.42) rotate(112deg); opacity: .55;
+    7%   { transform: translate(11.7rem, 9rem) scale(.42) rotate(112deg); opacity: .55;
            animation-timing-function: cubic-bezier(.76,0,.86,.04); }
     34%  { transform: translate(0, 0) scale(1.1) rotate(0deg); opacity: 1;
            animation-timing-function: linear; }
     58%  { transform: translate(0, 0) scale(1.05) rotate(0deg); opacity: 1;
            animation-timing-function: cubic-bezier(.4,0,.2,1); }
-    100% { transform: translate(8.6rem, 6.8rem) scale(.32) rotate(95deg); opacity: 0; }
+    100% { transform: translate(11.6rem, 9.2rem) scale(.32) rotate(95deg); opacity: 0; }
   }
   .combat-intro-flash {
     position: absolute; left: 0; top: 0;
-    width: 3.6rem; height: 3.6rem;
-    margin-left: -1.8rem; margin-top: -1.8rem;
+    width: 4.9rem; height: 4.9rem;
+    margin-left: -2.45rem; margin-top: -2.45rem;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(253, 230, 138, 0.9), rgba(217, 119, 6, 0.3) 45%, transparent 70%);
     opacity: 0; pointer-events: none;
@@ -33372,15 +33937,25 @@ const APP_STYLES = `
   .combat-part-disabled { opacity: 0.4; border-color: var(--stone-700); }
   .combat-hp-bar { width: 100%; height: 4px; background: var(--stone-800); border-radius: 2px; margin-top: 0.3rem; overflow: hidden; }
   .combat-hp-bar-fill { height: 100%; background: var(--emerald-600); transition: width 0.3s ease; }
-  /* Second, gray bar under the HP one — the armor value shown as flat
+  /* Second, blue bar under the HP one — the armor value shown as flat
      "protection points", not yet a resource that depletes. Kept as its
      own bar (not folded into the HP one) so a later feature can drain
      .combat-armor-bar-fill's width as armor takes damage before HP does,
-     without needing to restructure this markup. */
-  .combat-armor-bar { width: 100%; height: 3px; background: var(--stone-800); border-radius: 2px; margin-top: 0.25rem; overflow: hidden; }
-  .combat-armor-bar-fill { height: 100%; background: var(--stone-400); transition: width 0.3s ease; }
+     without needing to restructure this markup. Blue matches the defense
+     color used elsewhere (equip-slot-defense-badge, the sheet's defense
+     stat) now that the bar is the only on-card cue for armor. */
+  .combat-armor-bar { width: 100%; height: 3px; background: var(--stone-800); border-radius: 2px; overflow: hidden; }
+  .combat-armor-bar-fill { height: 100%; background: var(--sky-400); transition: width 0.3s ease; }
   .combat-hp-value { font-size: 0.62rem; color: var(--stone-500); margin: 0.15rem 0 0; font-family: var(--font-mono); }
-  .combat-portrait-armor { font-size: 0.6rem; color: var(--sky-400); margin: 0.05rem 0 0; font-family: var(--font-mono); }
+  /* Portrait-only: the HP+armor pair, no number/shield-icon labels (see
+     the aria-labels in CombatPortrait's JSX instead). margin-top:0 on the
+     nested .combat-hp-bar hands its usual top spacing over to this flex
+     gap instead, so name→HP bar, HP bar→armor bar, and armor bar→the
+     overlay's own 0.3rem bottom padding all end up the same 0.3rem. The
+     body-part grid's own .combat-hp-bar (outside this wrapper) keeps its
+     original margin-top untouched. */
+  .combat-portrait-bars { width: 100%; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
+  .combat-portrait-bars .combat-hp-bar { margin-top: 0; }
   .combat-log { margin-top: 0.85rem; padding: 0.6rem 0.75rem; background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px; max-height: 8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem; }
   .combat-log-line { margin: 0; font-family: var(--font-mono); font-size: 0.75rem; color: var(--stone-400); }
   .combat-log-hit { color: var(--amber-300); }
