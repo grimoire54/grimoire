@@ -17486,6 +17486,8 @@ const TRANSLATIONS = {
         sheetOverlayTitle: 'Лист героя',
         closeAria: 'Закрыть',
         heroFallback: 'Герой',
+        heroNameRecoveryHint: 'Имя героя потерялось в сохранении. Введи его заново:',
+        heroNameRecoverySave: 'Сохранить',
         sheetEmpty: 'Остальное — эффекты, инвентарь, персонажи — появится по ходу истории.',
         timeLabel: 'Время',
         healthLabel: 'Здоровье',
@@ -17781,11 +17783,13 @@ const TRANSLATIONS = {
         tradeNpcEmptyText: 'У него нечего купить прямо сейчас.',
         tradeHeroEmptyText: 'Тебе нечего продать.',
         tradeNotForSale: 'не продаётся',
-        tradeBuyAria: 'Купить',
-        tradeSellAria: 'Продать',
-        tradeSpecialStockBadge: 'Особый товар — отложен для тебя благодаря репутации',
-        tradeNotEnoughHeroCurrency: 'Не хватает денег',
-        tradeNotEnoughNpcCurrency: 'У него нет столько денег',
+        tradeBuyTrayTitle: 'Купить',
+        tradeSellTrayTitle: 'Продать',
+        tradePriceLabel: 'Цена',
+        tradeAddToOfferButton: 'Добавить',
+        tradeRemoveFromOfferButton: 'Убрать',
+        tradeConfirmButton: 'Обменять',
+        tradeCantAffordHint: 'Не хватает денег для такого обмена.',
         // -- Group / party --
         groupMenuLabel: '🤝 Группа',
         groupModalTitle: 'Группа',
@@ -18049,6 +18053,8 @@ const TRANSLATIONS = {
         sheetOverlayTitle: 'Character sheet',
         closeAria: 'Close',
         heroFallback: 'Hero',
+        heroNameRecoveryHint: "The hero's name was lost from the save. Enter it again:",
+        heroNameRecoverySave: 'Save',
         sheetEmpty: 'The rest — effects, inventory, characters — will fill in as the story unfolds.',
         timeLabel: 'Time',
         healthLabel: 'Health',
@@ -18344,11 +18350,13 @@ const TRANSLATIONS = {
         tradeNpcEmptyText: 'Nothing here worth buying right now.',
         tradeHeroEmptyText: 'You have nothing to sell.',
         tradeNotForSale: 'not for sale',
-        tradeBuyAria: 'Buy',
-        tradeSellAria: 'Sell',
-        tradeSpecialStockBadge: "Special stock — set aside for you thanks to your reputation",
-        tradeNotEnoughHeroCurrency: 'Not enough money',
-        tradeNotEnoughNpcCurrency: "They don't have enough money",
+        tradeBuyTrayTitle: 'Buy',
+        tradeSellTrayTitle: 'Sell',
+        tradePriceLabel: 'Price',
+        tradeAddToOfferButton: 'Add',
+        tradeRemoveFromOfferButton: 'Remove',
+        tradeConfirmButton: 'Trade',
+        tradeCantAffordHint: "There isn't enough money for this trade.",
         // -- Group / party --
         groupMenuLabel: '🤝 Group',
         groupModalTitle: 'Group',
@@ -20205,7 +20213,9 @@ const NPC_MERCHANT_ROLE_KEYWORDS = [
         ]],
     ['consumable', [
             'зельевар', 'алхимик', 'аптекар', 'травник', 'знахар',
-            'alchemist', 'apothecary', 'herbalist'
+            'трактирщик', 'кабатчик', 'корчмар', 'бармен',
+            'alchemist', 'apothecary', 'herbalist',
+            'innkeeper', 'barkeep', 'bartender', 'tavernkeeper'
         ]],
     ['amulet', [
             'ювелир', 'златокузнец',
@@ -20269,7 +20279,7 @@ function computeSellMultiplier(itemSlot, merchantProfile) {
     return group.includes(itemSlot) ? TRADE_SPECIALTY_SELL_BONUS : TRADE_OFF_SPECIALTY_SELL_PENALTY;
 }
 // Buying back something the hero themselves sold this NPC a moment ago
-// (see sellItemToNpc in App(), which tags the item with buybackPrice on its
+// (see executeTrade in App(), which tags the item with buybackPrice on its
 // way into npcInventories) — a small markup over what they were paid,
 // never repriced off rarity/reputation like the rest of an NPC's stock, so
 // the number on screen always matches "what you got, plus a bit." Also the
@@ -20295,8 +20305,8 @@ function computeNpcBuyPrice(item, itemRarities, buyMultiplier) {
 // when a trade window is actually opened with them (see openTrade in
 // App()), since unlike rarity this is never needed for anyone the player
 // never trades with.
-const NPC_MERCHANT_CURRENCY_RANGE = [40, 220];
-const NPC_ORDINARY_CURRENCY_RANGE = [0, 15];
+const NPC_MERCHANT_CURRENCY_RANGE = [120, 500];
+const NPC_ORDINARY_CURRENCY_RANGE = [0, 30];
 function rollNpcCurrency(isMerchant) {
     const [min, max] = isMerchant ? NPC_MERCHANT_CURRENCY_RANGE : NPC_ORDINARY_CURRENCY_RANGE;
     return rollIntInRange(min, max);
@@ -20990,7 +21000,7 @@ function computeFactionRivalRippleDeltas(deltas, factions) {
     }
     return rippleDeltas;
 }
-// Used by the trading system (see the buy price in buyItemFromNpc and the
+// Used by the trading system (see the buy price in executeTrade and the
 // matching preview in TradeModal) to turn a faction's standing into a price
 // multiplier a merchant in that faction's territory would charge — a
 // stable, already-tuned curve to price off of instead of reinventing one.
@@ -21172,8 +21182,8 @@ function grantFactionSpecialStock(npcInventory, merchantProfile, factionRep, lan
 // (see inferNpcMerchantProfile) gets a restock pass at all — an ordinary
 // townsfolk's handful of belongings isn't "assortment," it's just what
 // that person happens to be carrying.
-const RESTOCK_STALE_TURNS = 10;
-const RESTOCK_MAX_NEW_ITEMS = 3;
+const RESTOCK_STALE_TURNS = 6;
+const RESTOCK_MAX_NEW_ITEMS = 5;
 // Ordinary market goods — deliberately plainer/more mundane in flavor than
 // FACTION_SPECIAL_STOCK_NAMES' "private stash" wording above, since this is
 // everyday rotating stock a merchant could have restocked from anywhere,
@@ -22302,6 +22312,30 @@ function buildCombatantParts(currentHp, maxHp, partKeys) {
 // and falls back to the full humanoid set for missing/invalid data — this
 // also covers a save from before this field existed, whose stored
 // combatEncounter won't have bodyParts at all.
+// Safety net for the "enemyName" prompt rule: models still occasionally
+// prefix/suffix an ordinal ("первый драугр", "Draugr 2", "wolf #3") even
+// though identical opponents are meant to share one plain name. Strips
+// those and leaves the rest untouched; never returns an empty string
+// (falls back to the original if stripping would remove everything).
+const ENEMY_NAME_ORDINAL_RU = '(?:перв|втор|трет|четв[её]рт|пят)(?:ый|ая|ое|ого|ой|ые|ых|ому|ым|ую|ом|ий|ья|ье|ьего|ьему)';
+const ENEMY_NAME_ORDINAL_EN = '(?:first|second|third|fourth|fifth)';
+const ENEMY_NAME_LEADING_RE = new RegExp('^(?:' + ENEMY_NAME_ORDINAL_RU + '|' + ENEMY_NAME_ORDINAL_EN + ')\\s+', 'iu');
+const ENEMY_NAME_TRAILING_ORDINAL_RE = new RegExp('\\s+(?:' + ENEMY_NAME_ORDINAL_RU + '|' + ENEMY_NAME_ORDINAL_EN + ')$', 'iu');
+const ENEMY_NAME_TRAILING_NUMBER_RE = /\s*(?:[#№]\s*\d+|\(\d+\)|\d+)$/u;
+function stripEnemyNameOrdinal(name) {
+    let result = name.trim();
+    for (let i = 0; i < 3; i++) {
+        const next = result
+            .replace(ENEMY_NAME_LEADING_RE, '')
+            .replace(ENEMY_NAME_TRAILING_ORDINAL_RE, '')
+            .replace(ENEMY_NAME_TRAILING_NUMBER_RE, '')
+            .trim();
+        if (next === result)
+            break;
+        result = next;
+    }
+    return result || name.trim();
+}
 function normalizeEnemyBodyParts(raw) {
     const validKeys = BODY_PARTS.map(p => p.key);
     if (Array.isArray(raw)) {
@@ -23819,7 +23853,16 @@ function TravelOffer({ narratorMessage, interactive, onToggle, t }) {
                 React.createElement("button", { onClick: confirm, className: "item-choice-confirm-btn", disabled: !interactive || exiting || pending === undefined, type: "button" }, t('itemChoiceConfirmButton'))))));
 }
 // ---- Character sheet ----
-function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRarities, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onGiftNpc, onRecruitNpc, onTradeNpc, onOpenEffect, t }) {
+function HeroNameRecovery({ onSubmit, t }) {
+    const [value, setValue] = useState('');
+    return (React.createElement("div", { style: { marginTop: 8 } },
+        React.createElement("p", { style: { margin: '0 0 6px', fontSize: '0.8rem', opacity: 0.8 } }, t('heroNameRecoveryHint')),
+        React.createElement("div", { style: { display: 'flex', gap: 6 } },
+            React.createElement("input", { value: value, onChange: e => setValue(e.target.value), onKeyDown: e => { if (e.key === 'Enter')
+                    onSubmit(value); }, placeholder: t('heroNamePlaceholder'), className: "text-field" }),
+            React.createElement("button", { type: "button", className: "btn btn-ghost", onClick: () => onSubmit(value), disabled: !value.trim() }, t('heroNameRecoverySave')))));
+}
+function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, tokenUsage, itemRarities, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onGiftNpc, onRecruitNpc, onTradeNpc, onOpenEffect, t }) {
     const isEmpty = !gameState.time &&
         gameState.effects.length === 0 &&
         gameState.inventory.length === 0 &&
@@ -23862,6 +23905,7 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
     return (React.createElement("div", { className: "sheet" },
         React.createElement("div", { className: "sheet-hero" },
             React.createElement("p", { className: "sheet-hero-name" }, heroName || t('heroFallback')),
+            !heroName && onHeroNameChange && React.createElement(HeroNameRecovery, { onSubmit: onHeroNameChange, t: t }),
             heroConcept && React.createElement("p", { className: "sheet-hero-concept" }, heroConcept)),
         onOpenEquipment && (React.createElement("button", { onClick: onOpenEquipment, className: "btn btn-ghost sheet-equipment-btn", type: "button" },
             React.createElement("img", { src: EQUIP_ICON_ARMOR, alt: "", style: { width: 20, height: 20, verticalAlign: 'middle', marginRight: 4 } }),
@@ -24205,8 +24249,22 @@ function CharacterSheet({ heroName, heroConcept, gameState, tokenUsage, itemRari
 // derived from inventory size — plenty for a single hand-over, and small
 // enough to never need its own scrolling the way the full bag grid does.
 const TRANSFER_SLOT_COUNT = 5;
-function TransferTraySlots({ slots, groups, itemRarities, onSlotClick, t }) {
+function TransferTraySlots({ slots, groups, itemRarities, getPrice, getPriceArrow, onSlotClick, t }) {
+    const [previewSlot, setPreviewSlot] = useState(null);
     const byIndex = new Map(groups.map(g => [g.firstIndex, g]));
+    // Re-tapping a filled slot used to clear it on the spot — same complaint
+    // as picking blind in TransferItemPicker (see above): no chance to
+    // double-check what you were about to pull back out of the offer before
+    // it was gone. So a filled slot now reopens the exact same
+    // TradeItemPreviewModal the picker uses, just with its one button
+    // relabeled to "remove" and wired to actually clear the slot
+    // (onSlotClick(previewSlot), the same call an instant clear used to make
+    // directly) instead of adding anything.
+    const previewInvIndex = previewSlot !== null ? slots[previewSlot] : null;
+    const previewGroup = previewInvIndex !== null && previewInvIndex !== undefined ? byIndex.get(previewInvIndex) : null;
+    if (previewGroup) {
+        return (React.createElement(TradeItemPreviewModal, { item: previewGroup.item, itemRarities: itemRarities, price: getPrice ? getPrice(previewGroup.item) : null, priceArrow: getPriceArrow ? getPriceArrow(previewGroup.item) : null, actionLabel: t('tradeRemoveFromOfferButton'), t: t, onBack: () => setPreviewSlot(null), onAdd: () => { onSlotClick(previewSlot); setPreviewSlot(null); } }));
+    }
     return (React.createElement("div", { className: "transfer-tray" }, slots.map((invIndex, slotIdx) => {
         const group = invIndex === null ? null : byIndex.get(invIndex);
         if (!group) {
@@ -24215,40 +24273,165 @@ function TransferTraySlots({ slots, groups, itemRarities, onSlotClick, t }) {
         const { item, count } = group;
         const rarity = findItemRarity(item.name, itemRarities);
         const icon = getInventoryItemIcon(item);
-        return (React.createElement("button", { key: slotIdx, type: "button", className: "inventory-cell", onClick: () => onSlotClick(slotIdx), title: item.name, "aria-label": item.name },
+        const price = getPrice ? getPrice(item) : null;
+        const arrow = getPriceArrow ? getPriceArrow(item) : null;
+        return (React.createElement("button", { key: slotIdx, type: "button", className: "inventory-cell", onClick: () => setPreviewSlot(slotIdx), title: item.name, "aria-label": item.name },
             rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
             React.createElement("span", { className: "inventory-cell-art" }, icon.image
                 ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
                 : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji)),
             count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
                 "\u00D7",
-                count)));
+                count),
+            price !== null && (React.createElement("span", { className: "trade-cell-price trade-cell-price-tag" },
+                arrow && React.createElement("span", { className: arrow === 'up' ? 'trade-arrow-up' : 'trade-arrow-down' }, arrow === 'up' ? '▲' : '▼'),
+                " \uD83E\uDE99 ",
+                price))));
     })));
+}
+// The stat-detail popup a tray's item picker opens into now, instead of
+// adding an item to the offer the instant it's tapped in the list (see
+// bug report: picking blind, with no way to check what you were about to
+// hand over or receive, felt too fast/risky once trading and party
+// hand-overs both moved to this same tray system). Deliberately a much
+// lighter cousin of ItemDetailModal below — no equip/replace/carousel
+// machinery, since nothing browsed from a tray (an NPC's stock, the
+// hero's own unequipped goods) is ever equipped directly from here — just
+// the same stat rows so the player can actually judge the item, plus an
+// optional price line when the caller (TradeModal) supplies one. Confirms
+// by calling onAdd only once, from the one dedicated "Добавить" button —
+// tapping the item itself never adds it, matching the "look, then decide"
+// flow the request asked for.
+function TradeItemPreviewModal({ item, itemRarities, price, priceArrow, actionLabel, t, onAdd, onBack }) {
+    const rarity = findItemRarity(item.name, itemRarities);
+    const weight = computeItemWeight(item);
+    const isConsumable = item.slot === 'consumable';
+    const isBackpack = item.slot === 'backpack';
+    const healRange = (isConsumable && itemActuallyHeals(item.name)) ? (HEAL_RANGE_BY_RARITY[rarity] || HEAL_RANGE_BY_RARITY.common) : null;
+    const capacityBonus = isBackpack ? (BACKPACK_CAPACITY_BY_RARITY[rarity] || BACKPACK_CAPACITY_BY_RARITY.common) : null;
+    const armorDefense = getArmorDefenseForSlot(item.slot, rarity, item.weightCategory);
+    const weaponDamage = getWeaponDamageForSlot(item.slot, rarity, item.twoHanded);
+    const blockChance = getBlockChanceForItem(item, rarity || 'common');
+    const initiativeMod = armorDefense !== null ? (ARMOR_WEIGHT_CLASS_INITIATIVE_DELTA[item.weightCategory] || 0) : null;
+    const icon = getInventoryItemIcon(item);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onBack(); } },
+        React.createElement("div", { className: "modal-card" },
+            React.createElement("div", { className: "item-detail-icon-wrap", style: rarity ? { background: rarityBackground(rarity) } : undefined },
+                rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
+                icon.image
+                    ? React.createElement("img", { className: "item-detail-icon-img", src: icon.image, alt: "" })
+                    : React.createElement("span", { className: "item-detail-icon-emoji", "aria-hidden": "true" }, icon.emoji)),
+            React.createElement("div", { className: "item-detail-name-box" },
+                React.createElement("h2", { className: "modal-title", style: { color: rarity ? rarityColor(rarity) : undefined } },
+                    "[",
+                    item.name,
+                    weaponHandTag(item.slot, item.twoHanded, t) ? ' ' + weaponHandTag(item.slot, item.twoHanded, t) : '',
+                    "]"),
+                React.createElement("p", { className: "item-type-label" }, itemTypeLabel(item, t))),
+            React.createElement("div", { className: "item-detail-stats-scroll" },
+                weaponDamage !== null && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemDamageLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" }, weaponDamage))),
+                React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemWeightLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" }, weight)),
+                healRange && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemHealLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        healRange[0],
+                        "\u2013",
+                        healRange[1]))),
+                isBackpack && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemCapacityBonusLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        "+",
+                        capacityBonus))),
+                armorDefense !== null && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemDefenseLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" }, armorDefense))),
+                initiativeMod !== null && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" },
+                        "\u26A1 ",
+                        t('initiativeLabel')),
+                    React.createElement("span", { className: "sheet-stat-value", style: { color: initiativeMod > 0 ? 'var(--emerald-600)' : (initiativeMod < 0 ? 'var(--red-400)' : undefined) } },
+                        initiativeMod > 0 ? '+' : '',
+                        initiativeMod))),
+                blockChance !== null && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemBlockLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        blockChance,
+                        "%"))),
+                price !== null && price !== undefined && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('tradePriceLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        priceArrow && React.createElement("span", { className: priceArrow === 'up' ? 'trade-arrow-up' : 'trade-arrow-down' }, priceArrow === 'up' ? '▲' : '▼'),
+                        " \uD83E\uDE99 ",
+                        price)))),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onBack, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
+                React.createElement("button", { onClick: onAdd, className: "btn btn-primary", type: "button" }, actionLabel || t('tradeAddToOfferButton'))))));
 }
 // The grid a tray slot opens into — visually identical to InventoryModal's
 // own bag grid (same classes, same getInventoryItemIcon), narrowed to
 // whatever's left to offer: equipped items never reach `groups` at all
 // (see excludeEquipped at the call site), and takenIndexes additionally
 // drops anything already sitting in one of the tray's OTHER slots, since
-// one physical item can't fill two slots at once.
-function TransferItemPicker({ groups, takenIndexes, itemRarities, onPick, onCancel, t }) {
+// one physical item can't fill two slots at once. Tapping a pickable cell
+// no longer adds it on the spot — it opens TradeItemPreviewModal above so
+// the player can actually read the item first, and onPick only fires once
+// they hit that popup's own "Добавить" button (see bug report: instant-add
+// gave no way to check what you were about to hand over or buy). The
+// optional getPrice/getPriceArrow/getDisabled/lockedGroups props are
+// TradeModal's own hooks into this same grid — a plain gift/party hand-over
+// (GiftItemModal, GivePartyItemModal) simply omits them and gets the exact
+// same grid with no price tags, nothing disabled, and no locked row.
+function TransferItemPicker({ groups, takenIndexes, itemRarities, getPrice, getPriceArrow, getDisabled, lockedGroups, onPick, onCancel, t }) {
+    const [previewIndex, setPreviewIndex] = useState(null);
     const pickable = groups.filter(g => !takenIndexes.has(g.firstIndex));
+    const locked = lockedGroups || [];
+    const previewGroup = previewIndex != null ? groups.find(g => g.firstIndex === previewIndex) : null;
+    if (previewGroup) {
+        return (React.createElement(TradeItemPreviewModal, { item: previewGroup.item, itemRarities: itemRarities, price: getPrice ? getPrice(previewGroup.item) : null, priceArrow: getPriceArrow ? getPriceArrow(previewGroup.item) : null, t: t, onBack: () => setPreviewIndex(null), onAdd: () => { onPick(previewGroup.firstIndex); setPreviewIndex(null); } }));
+    }
     return (React.createElement(React.Fragment, null,
         React.createElement("div", { className: "inventory-modal-grid-wrap" },
-            pickable.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('transferPickerEmpty')),
-            pickable.length > 0 && (React.createElement("div", { className: "inventory-modal-grid" }, pickable.map((group, gi) => {
-                const { item, firstIndex, count } = group;
-                const rarity = findItemRarity(item.name, itemRarities);
-                const icon = getInventoryItemIcon(item);
-                return (React.createElement("button", { key: gi, type: "button", className: "inventory-cell", onClick: () => onPick(firstIndex), title: item.name },
-                    rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
-                    React.createElement("span", { className: "inventory-cell-art" }, icon.image
-                        ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
-                        : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji)),
-                    count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
-                        "\u00D7",
-                        count)));
-            })))),
+            pickable.length === 0 && locked.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('transferPickerEmpty')),
+            (pickable.length > 0 || locked.length > 0) && (React.createElement("div", { className: "inventory-modal-grid" },
+                pickable.map((group, gi) => {
+                    const { item, firstIndex, count } = group;
+                    const rarity = findItemRarity(item.name, itemRarities);
+                    const icon = getInventoryItemIcon(item);
+                    const disabled = getDisabled ? getDisabled(item) : false;
+                    const price = getPrice ? getPrice(item) : null;
+                    const arrow = getPriceArrow ? getPriceArrow(item) : null;
+                    return (React.createElement("button", { key: gi, type: "button", className: 'inventory-cell' + (disabled ? ' trade-cell-disabled' : ''), onClick: () => !disabled && setPreviewIndex(firstIndex), title: item.name, disabled: disabled },
+                        rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
+                        React.createElement("span", { className: "inventory-cell-art" }, icon.image
+                            ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
+                            : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji)),
+                        count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
+                            "\u00D7",
+                            count),
+                        price !== null && (React.createElement("span", { className: "trade-cell-price trade-cell-price-tag" },
+                            arrow && React.createElement("span", { className: arrow === 'up' ? 'trade-arrow-up' : 'trade-arrow-down' }, arrow === 'up' ? '▲' : '▼'),
+                            " \uD83E\uDE99 ",
+                            price))));
+                }),
+                locked.map((group, gi) => {
+                    const rarity = findItemRarity(group.item.name, itemRarities);
+                    const icon = getInventoryItemIcon(group.item);
+                    return (React.createElement("div", { key: 'locked' + gi, className: "inventory-cell trade-cell-locked", title: group.item.name },
+                        rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
+                        React.createElement("span", { className: "trade-cell-lock-badge", "aria-hidden": "true" }, "\uD83D\uDD12"),
+                        React.createElement("span", { className: "inventory-cell-art" }, icon.image
+                            ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
+                            : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji)),
+                        group.count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
+                            "\u00D7",
+                            group.count),
+                        React.createElement("span", { className: "trade-cell-price trade-cell-price-tag trade-price-locked" }, t('tradeNotForSale'))));
+                })))),
         React.createElement("div", { className: "modal-actions" },
             React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('cancelButton')))));
 }
@@ -24888,22 +25071,31 @@ function GivePartyItemModal({ npcName, gameState, itemRarities, equipment, inven
                     React.createElement("button", { onClick: () => onConfirm(Array.from(takenGiveIndexes)), disabled: takenGiveIndexes.size === 0, className: "btn btn-primary", type: "button" }, t('partyGiveConfirmAria')))))));
 }
 // ---- Trade with NPC ----
-// A tabbed icon grid rather than the pick-then-confirm flow the other item
-// modals use (GiftItemModal/PartyGearModal): trading is meant to be quick
-// and repeatable, so a click is the whole transaction — no separate confirm
-// step. The two sides no longer sit stacked on screen at once (that was the
-// original "wall of text" complaint — everything crammed into two panels
-// with no way to tell items apart at a glance); a tab switches between the
-// NPC's stock and the hero's own, each rendered as the same icon-grid
-// InventoryModal itself uses. Prices shown here are always the exact same
-// computeItemValue/computeSellMultiplier/factionPriceMultiplier math the
-// onBuy/onSell handlers in App() recompute independently before actually
-// charging anyone — this component never hands a price back, only which
-// item was clicked (by index into the real, ungrouped array — see
-// groupInventoryByName's firstIndex — so filtering the grouped list for
-// display never desyncs it from what onBuy/onSell will actually remove).
-function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, equipment, onBuy, onSell, onClose, t }) {
-    const [tab, setTab] = useState('buy');
+// Rebuilt to read as the exact same gesture as the party hand-over window
+// (GivePartyItemModal above) instead of its own tap-to-instantly-buy/sell
+// icon grid: two stacked trays — what you're buying off this character's
+// stock, what you're selling from your own bag — filled via the same
+// TransferTraySlots/TransferItemPicker machinery, and nothing actually
+// changes hands until the player fills in whatever they want and hits one
+// combined confirm button at the bottom (see bug report: instant-click
+// buying/selling gave no chance to look an item over, or to line up a
+// multi-item trade, before money moved). TransferItemPicker's own
+// price/disabled/locked hooks (added for exactly this) carry over the old
+// grid's price tags, unaffordable dimming, and the ordinary-NPC "own gear
+// stays locked" row — tapping a pickable cell now opens TradeItemPreviewModal
+// first, same as every other tray in the app, and onPick only fires from
+// that popup's own "Добавить" button.
+// Currency now nets both directions in one go rather than gating each side
+// independently the way onBuy/onSell used to (buy price against the hero's
+// wallet, sell price against the NPC's, each checked and settled the
+// instant that single click landed): buyTotal/sellTotal are summed across
+// every slot in both trays, and the single onTrade(npcName, buyIndexes,
+// sellIndexes) call (executeTrade in App()) is the only thing that ever
+// moves currency or inventory, once, for the whole batch — so selling
+// something to fund a bigger purchase in the same trade actually works,
+// and the confirm button simply won't fire (canTrade below) if either side
+// would end up short.
+function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, equipment, onTrade, onClose, t }) {
     const npcKey = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
     const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === npcKey);
     const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
@@ -24912,12 +25104,12 @@ function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRar
     const npcCurrency = npcCurrencies[npcKey] || 0;
     // Ordinary (non-merchant) NPCs only part with loose consumable/none-slot
     // belongings — their weapon/armor is worn, not stock, per the design
-    // discussion — shown below anyway, locked, so it's clear why the shelf
-    // looks so bare instead of it just silently vanishing. A dedicated
+    // discussion — shown in the picker anyway, locked, so it's clear why the
+    // shelf looks so bare instead of it just silently vanishing. A dedicated
     // merchant's entire materialized inventory is their stock; nothing locked.
-    // Either way, anything tagged buybackPrice (see sellItemToNpc in App())
-    // is exempt from the locked rule — it's something the hero themselves
-    // sold this NPC a moment ago, never their own gear to begin with.
+    // Either way, anything tagged buybackPrice (see executeTrade in App()) is
+    // exempt from the locked rule — it's something the hero themselves sold
+    // this NPC a moment ago, never their own gear to begin with.
     const npcInventory = npcInventories[npcKey] || [];
     const allNpcGroups = groupInventoryByName(npcInventory);
     const isSellableSlot = (slot) => slot === 'consumable' || slot === 'none';
@@ -24926,94 +25118,125 @@ function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRar
     const lockedGroups = merchantProfile ? [] : allNpcGroups.filter(g => !isPurchasable(g.item));
     // Equipped items are excluded outright, same as the give/gift trays —
     // worn gear has to come off before it can be sold out from under the
-    // hero (previously this side showed no equipped indicator at all).
-    // Quest items still never show up here regardless.
+    // hero. Quest items never show up here regardless.
     const equippedCounts = countEquippedByName(equipment);
     const heroGroups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedCounts).filter(g => !g.item.questId);
+    const [buySlots, setBuySlots] = useState(() => Array(TRANSFER_SLOT_COUNT).fill(null));
+    const [buyPickerSlot, setBuyPickerSlot] = useState(null);
+    const [sellSlots, setSellSlots] = useState(() => Array(TRANSFER_SLOT_COUNT).fill(null));
+    const [sellPickerSlot, setSellPickerSlot] = useState(null);
+    const takenBuyIndexes = new Set(buySlots.filter(s => s !== null));
+    const takenSellIndexes = new Set(sellSlots.filter(s => s !== null));
+    function pickForBuySlot(invIndex) {
+        setBuySlots(prev => prev.map((s, i) => (i === buyPickerSlot ? invIndex : s)));
+        setBuyPickerSlot(null);
+    }
+    function handleBuySlotClick(slotIdx) {
+        if (buySlots[slotIdx] !== null)
+            setBuySlots(prev => prev.map((s, i) => (i === slotIdx ? null : s)));
+        else
+            setBuyPickerSlot(slotIdx);
+    }
+    function pickForSellSlot(invIndex) {
+        setSellSlots(prev => prev.map((s, i) => (i === sellPickerSlot ? invIndex : s)));
+        setSellPickerSlot(null);
+    }
+    function handleSellSlotClick(slotIdx) {
+        if (sellSlots[slotIdx] !== null)
+            setSellSlots(prev => prev.map((s, i) => (i === slotIdx ? null : s)));
+        else
+            setSellPickerSlot(slotIdx);
+    }
+    const getBuyPrice = (item) => computeNpcBuyPrice(item, itemRarities, buyMultiplier);
+    const getSellPrice = (item) => Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * computeSellMultiplier(item.slot, merchantProfile)));
+    const getSellPriceArrow = (item) => {
+        const m = computeSellMultiplier(item.slot, merchantProfile);
+        return m > 1 ? 'up' : (m < 1 ? 'down' : null);
+    };
+    const buyTotal = Array.from(takenBuyIndexes).reduce((sum, idx) => {
+        const item = npcInventory[idx];
+        return sum + (item ? getBuyPrice(item) : 0);
+    }, 0);
+    const sellTotal = Array.from(takenSellIndexes).reduce((sum, idx) => {
+        const item = gameState.inventory[idx];
+        return sum + (item ? getSellPrice(item) : 0);
+    }, 0);
+    const nextHeroCurrency = gameState.currency - buyTotal + sellTotal;
+    const nextNpcCurrency = npcCurrency + buyTotal - sellTotal;
+    const tradeEmpty = takenBuyIndexes.size === 0 && takenSellIndexes.size === 0;
+    const canTrade = !tradeEmpty && nextHeroCurrency >= 0 && nextNpcCurrency >= 0;
+    function handleConfirm() {
+        if (!canTrade)
+            return;
+        onTrade(Array.from(takenBuyIndexes), Array.from(takenSellIndexes));
+        onClose();
+    }
+    if (buyPickerSlot !== null) {
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                onClose(); } },
+            React.createElement("div", { className: "modal-card inventory-modal-card" },
+                React.createElement("div", { className: "inventory-modal-header" },
+                    React.createElement("p", { className: "modal-title inventory-modal-title" },
+                        t('tradeBuyTrayTitle'),
+                        " \u2014 ",
+                        npcName),
+                    React.createElement("button", { onClick: () => setBuyPickerSlot(null), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
+                React.createElement(TransferItemPicker, { groups: npcGroups, takenIndexes: takenBuyIndexes, itemRarities: itemRarities, getPrice: getBuyPrice, lockedGroups: lockedGroups, onPick: pickForBuySlot, onCancel: () => setBuyPickerSlot(null), t: t }))));
+    }
+    if (sellPickerSlot !== null) {
+        return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+                onClose(); } },
+            React.createElement("div", { className: "modal-card inventory-modal-card" },
+                React.createElement("div", { className: "inventory-modal-header" },
+                    React.createElement("p", { className: "modal-title inventory-modal-title" },
+                        t('tradeSellTrayTitle'),
+                        " \u2014 ",
+                        npcName),
+                    React.createElement("button", { onClick: () => setSellPickerSlot(null), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
+                React.createElement(TransferItemPicker, { groups: heroGroups, takenIndexes: takenSellIndexes, itemRarities: itemRarities, getPrice: getSellPrice, getPriceArrow: getSellPriceArrow, onPick: pickForSellSlot, onCancel: () => setSellPickerSlot(null), t: t }))));
+    }
     return (React.createElement("div", { className: "modal-backdrop", onClick: (e) => { if (e.target === e.currentTarget)
             onClose(); } },
-        React.createElement("div", { className: "modal-card trade-card" },
-            React.createElement("h2", { className: "modal-title" },
-                t('tradeModalTitle'),
-                " \u2014 ",
-                npcName),
-            React.createElement("div", { className: "trade-tab-row" },
-                React.createElement("button", { type: "button", className: 'trade-tab-btn' + (tab === 'buy' ? ' trade-tab-btn-active' : ''), onClick: () => setTab('buy') },
-                    React.createElement("span", { className: "trade-tab-btn-label" }, npcName),
+        React.createElement("div", { className: "modal-stack" },
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" },
+                    t('tradeBuyTrayTitle'),
+                    " \u2014 ",
+                    npcName,
+                    " ",
                     React.createElement("span", { className: "trade-currency" },
                         "\uD83E\uDE99 ",
                         npcCurrency)),
-                React.createElement("button", { type: "button", className: 'trade-tab-btn' + (tab === 'sell' ? ' trade-tab-btn-active' : ''), onClick: () => setTab('sell') },
-                    React.createElement("span", { className: "trade-tab-btn-label" }, t('tradeYouLabel')),
+                npcGroups.length === 0 && lockedGroups.length === 0 ? (React.createElement("p", { className: "hint-text hint-text-block" }, t('tradeNpcEmptyText'))) : (React.createElement(TransferTraySlots, { slots: buySlots, groups: npcGroups, itemRarities: itemRarities, getPrice: getBuyPrice, onSlotClick: handleBuySlotClick, t: t }))),
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("h2", { className: "modal-title" },
+                    t('tradeSellTrayTitle'),
+                    " \u2014 ",
+                    npcName,
+                    " ",
                     React.createElement("span", { className: "trade-currency" },
                         "\uD83E\uDE99 ",
-                        gameState.currency))),
-            tab === 'buy' && (React.createElement("div", { className: "trade-grid-wrap" },
-                npcGroups.length === 0 && lockedGroups.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('tradeNpcEmptyText')),
-                (npcGroups.length > 0 || lockedGroups.length > 0) && (React.createElement("div", { className: "trade-grid" },
-                    npcGroups.map((group, gi) => {
-                        const { item, firstIndex, count } = group;
-                        const rarity = findItemRarity(item.name, itemRarities);
-                        const price = computeNpcBuyPrice(item, itemRarities, buyMultiplier);
-                        const affordable = price <= gameState.currency;
-                        const isSpecial = typeof item.factionSpecialTier === 'number';
-                        const icon = getInventoryItemIcon(item);
-                        return (React.createElement("button", { key: gi, type: "button", className: 'trade-cell' + (affordable ? '' : ' trade-cell-disabled'), onClick: () => affordable && onBuy(firstIndex), title: item.name, "aria-label": (isSpecial ? t('tradeSpecialStockBadge') + ' — ' : '') + item.name + ' — ' + (affordable ? t('tradeBuyAria') : t('tradeNotEnoughHeroCurrency')) },
-                            rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
-                            isSpecial && React.createElement("span", { className: "trade-special-badge" }, "\u2728"),
-                            React.createElement("span", { className: "trade-cell-icon" },
-                                React.createElement("span", { className: "inventory-cell-art" }, icon.image
-                                    ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
-                                    : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji))),
-                            count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
-                                "\u00D7",
-                                count),
-                            React.createElement("span", { className: "trade-cell-price" },
-                                "\uD83E\uDE99 ",
-                                price)));
-                    }),
-                    lockedGroups.map((group, gi) => {
-                        const rarity = findItemRarity(group.item.name, itemRarities);
-                        const icon = getInventoryItemIcon(group.item);
-                        return (React.createElement("div", { key: 'locked' + gi, className: "trade-cell trade-cell-locked", title: group.item.name },
-                            rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
-                            React.createElement("span", { className: "trade-cell-lock-badge", "aria-hidden": "true" }, "\uD83D\uDD12"),
-                            React.createElement("span", { className: "trade-cell-icon" },
-                                React.createElement("span", { className: "inventory-cell-art" }, icon.image
-                                    ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
-                                    : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji))),
-                            group.count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
-                                "\u00D7",
-                                group.count),
-                            React.createElement("span", { className: "trade-cell-price trade-price-locked" }, t('tradeNotForSale'))));
-                    }))))),
-            tab === 'sell' && (React.createElement("div", { className: "trade-grid-wrap" },
-                heroGroups.length === 0 && React.createElement("p", { className: "sheet-empty" }, t('tradeHeroEmptyText')),
-                heroGroups.length > 0 && (React.createElement("div", { className: "trade-grid" }, heroGroups.map((group, gi) => {
-                    const { item, firstIndex, count } = group;
-                    const rarity = findItemRarity(item.name, itemRarities);
-                    const multiplier = computeSellMultiplier(item.slot, merchantProfile);
-                    const price = Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * multiplier));
-                    const npcCanAfford = price <= npcCurrency;
-                    const arrow = multiplier > 1 ? '▲' : multiplier < 1 ? '▼' : '';
-                    const arrowClass = multiplier > 1 ? 'trade-arrow-up' : 'trade-arrow-down';
-                    const icon = getInventoryItemIcon(item);
-                    return (React.createElement("button", { key: gi, type: "button", className: 'trade-cell' + (npcCanAfford ? '' : ' trade-cell-disabled'), onClick: () => npcCanAfford && onSell(firstIndex), title: item.name, "aria-label": item.name + ' — ' + (npcCanAfford ? t('tradeSellAria') : t('tradeNotEnoughNpcCurrency')) },
-                        rarity && React.createElement("span", { className: "item-rarity-tag", style: { background: rarityColor(rarity) }, "aria-hidden": "true" }),
-                        React.createElement("span", { className: "trade-cell-icon" },
-                            React.createElement("span", { className: "inventory-cell-art" }, icon.image
-                                ? React.createElement("img", { className: "inventory-cell-img", src: icon.image, alt: "" })
-                                : React.createElement("span", { className: "inventory-cell-emoji", "aria-hidden": "true" }, icon.emoji))),
-                        count > 1 && React.createElement("span", { className: "inventory-cell-count-badge" },
-                            "\u00D7",
-                            count),
-                        React.createElement("span", { className: "trade-cell-price" },
-                            arrow && React.createElement("span", { className: arrowClass }, arrow),
-                            " \uD83E\uDE99 ",
-                            price)));
-                }))))),
-            React.createElement("div", { className: "modal-actions" },
-                React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
+                        gameState.currency)),
+                heroGroups.length === 0 ? (React.createElement("p", { className: "hint-text hint-text-block" }, t('tradeHeroEmptyText'))) : (React.createElement(TransferTraySlots, { slots: sellSlots, groups: heroGroups, itemRarities: itemRarities, getPrice: getSellPrice, getPriceArrow: getSellPriceArrow, onSlotClick: handleSellSlotClick, t: t }))),
+            React.createElement("div", { className: "modal-card" },
+                React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('tradeYouLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        "\uD83E\uDE99 ",
+                        gameState.currency,
+                        " \u2192 ",
+                        nextHeroCurrency)),
+                React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, npcName),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        "\uD83E\uDE99 ",
+                        npcCurrency,
+                        " \u2192 ",
+                        nextNpcCurrency)),
+                !tradeEmpty && !canTrade && React.createElement("p", { className: "hint-text" }, t('tradeCantAffordHint')),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton')),
+                    React.createElement("button", { onClick: handleConfirm, disabled: !canTrade, className: "btn btn-primary", type: "button" }, t('tradeConfirmButton')))))));
 }
 // ---- Equipment ----
 // No longer called anywhere — PartyGearModal (its last remaining caller)
@@ -27769,10 +27992,15 @@ function App() {
             // storage unavailable — model choice just won't persist
         }
     }
-    async function saveGame(nextMessages, nextState, nextItemRarities, nextEquipment, nextNpcReputations, nextParty, nextPartyInventories, nextPartyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies, nextPartyCurrency) {
+    async function saveGame(nextMessages, nextState, nextItemRarities, nextEquipment, nextNpcReputations, nextParty, nextPartyInventories, nextPartyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies, nextPartyCurrency, nextIdentity) {
+        // nextIdentity lets a caller that has JUST set worldSetting/heroName/
+        // heroConcept (a load or a name recovery) save the new values — the
+        // closure here still holds the previous render's state, so without this
+        // a load would overwrite the save with empty identity fields.
+        const identity = nextIdentity || { worldSetting, heroName, heroConcept };
         try {
             await window.storage.set(SAVE_KEY, JSON.stringify({
-                worldSetting, heroName, heroConcept,
+                worldSetting: identity.worldSetting, heroName: identity.heroName, heroConcept: identity.heroConcept,
                 messages: nextMessages,
                 gameState: nextState,
                 itemRarities: nextItemRarities !== undefined ? nextItemRarities : itemRarities,
@@ -27794,6 +28022,16 @@ function App() {
             // storage unavailable — autosave just won't persist; the player can
             // still fall back to a manual export/download.
         }
+    }
+    // Lets the player re-enter a hero name that an older build wiped from the
+    // autosave (see the nextIdentity note on saveGame) — shown in the
+    // character sheet only while heroName is empty.
+    function recoverHeroName(name) {
+        const trimmed = (name || '').trim();
+        if (!trimmed)
+            return;
+        setHeroName(trimmed);
+        saveGame(messages, gameState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, npcInventories, npcCurrencies, partyCurrency, { worldSetting, heroName: trimmed, heroConcept });
     }
     // Applies a fully-loaded save payload (same shape saveGame/buildExportText
     // produce) to live state and mirrors it into the local autosave, so
@@ -27826,7 +28064,7 @@ function App() {
         setPartyCurrency(normalizedPartyCurrency);
         narrativeSummaryRef.current = saved.narrativeSummary || '';
         summarizedUpToRef.current = saved.summarizedUpTo || 0;
-        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {}, normalizedNpcInventories, normalizedNpcCurrencies, normalizedPartyCurrency);
+        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {}, normalizedNpcInventories, normalizedNpcCurrencies, normalizedPartyCurrency, { worldSetting: saved.worldSetting || '', heroName: saved.heroName || '', heroConcept: saved.heroConcept || '' });
         if (saved.messages && saved.messages.length > 0)
             setStage('playing');
     }
@@ -28710,7 +28948,7 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 If no fight is starting: "combat": {"combat": false}.
 If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "role": "melee", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null}.
 "enemies" is an array of 1 to 5 objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry.
-"enemyName" must be in ${narrativeLanguage}, matching how the scene refers to that opponent — give each a distinguishing name or descriptor (e.g. "бандит с топором", "бандит с луком") when several share the same base type, so they read as distinct in the fight. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence.
+"enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
 "role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). A ranged opponent tries to keep its distance once the hero has closed on it, a caster reaches for status effects instead of plain hits, and a tank quietly shrugs off more damage than its raw stats alone would suggest — so this choice does shape how the fight plays, and a reasonable best guess is always fine, but never leave it out or invent a fifth category.
@@ -29679,8 +29917,8 @@ ${chunkText}`;
                 : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, tier: combatRaw.tier, role: combatRaw.role, fearless: combatRaw.fearless, bodyParts: combatRaw.bodyParts }];
             const enemies = rawEnemyList.slice(0, MAX_COMBAT_ENEMIES).map((raw, i) => {
                 const enemyName = typeof raw.enemyName === 'string' && raw.enemyName.trim()
-                    ? raw.enemyName.trim()
-                    : (uiLang === 'en' ? 'Enemy ' + (i + 1) : 'Противник ' + (i + 1));
+                    ? stripEnemyNameOrdinal(raw.enemyName)
+                    : (uiLang === 'en' ? 'Enemy' : 'Противник');
                 const weaponDescription = typeof raw.weaponDescription === 'string' && raw.weaponDescription.trim()
                     ? raw.weaponDescription.trim()
                     : t('combatUnarmedEnemyLabel');
@@ -31447,64 +31685,84 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // marked up from one that doesn't). Specialization never affects buying
     // — only selling, per the design discussion — so a weaponsmith's own
     // wares cost the same as anyone else's would.
-    function buyItemFromNpc(npcName, index) {
+    // Runs a whole trade — however many items were staged into TradeModal's
+    // buy/sell trays — as one atomic step, rather than the old buyItemFromNpc/
+    // sellItemToNpc pair firing once per click. buyIndexes/sellIndexes are
+    // indices into npcInventory/gameState.inventory exactly as they stood
+    // while the trade window was open (nothing else can mutate either array
+    // while a modal is up, so they're still valid here). Currency nets both
+    // directions together — buyTotal comes out of the hero and into the NPC,
+    // sellTotal the reverse — so a sale can fund a purchase in the same
+    // trade; TradeModal's own canTrade guard is what keeps either side from
+    // going negative, but the guard is re-applied here too before anything
+    // actually moves, in case the underlying stock/currency shifted between
+    // render and click.
+    function executeTrade(npcName, buyIndexes, sellIndexes) {
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
-        const npcInventory = npcInventories[key] || [];
-        const item = npcInventory[index];
-        if (!item || !key)
+        if (!key)
             return;
         const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
         const factionName = npc ? findNpcFaction(npc.name, gameState.npcs) : null;
         const factionRep = factionName ? findFactionReputation(factionName, factionReputations || {}) : FACTION_DEFAULT_REPUTATION;
-        const price = computeNpcBuyPrice(item, itemRarities, factionPriceMultiplier(factionRep));
-        if (price > gameState.currency)
-            return;
-        const nextNpcInventory = npcInventory.filter((_, i) => i !== index);
-        const nextNpcInventories = { ...npcInventories, [key]: nextNpcInventory };
-        const nextNpcCurrencies = { ...npcCurrencies, [key]: (npcCurrencies[key] || 0) + price };
-        // Once it's back in the hero's own bag it's just a normal item again —
-        // buybackPrice only means anything while it's sitting in an NPC's
-        // inventory (see computeNpcBuyPrice/TradeModal); selling it a second
-        // time prices it fresh off the usual rarity/specialization rules.
-        const boughtItem = { ...item };
-        delete boughtItem.buybackPrice;
-        const nextState = { ...gameState, currency: gameState.currency - price, inventory: [...gameState.inventory, boughtItem] };
-        setGameState(nextState);
-        setNpcInventories(nextNpcInventories);
-        setNpcCurrencies(nextNpcCurrencies);
-        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies);
-    }
-    // Player selling one of their own items to this NPC — priced off rarity
-    // and computeSellMultiplier (bonus if it's this merchant's specialty,
-    // penalty if it's off-topic equipment, neutral for consumables/junk or
-    // for an ordinary/generalist NPC). The item doesn't vanish: it's tagged
-    // with the price it just sold for (buybackPrice) and dropped into
-    // npcInventories, so it shows up buyable again — at a markup, see
-    // computeNpcBuyPrice — even past the "their own gear stays locked" rule
-    // an ordinary NPC's native belongings are otherwise held to, since this
-    // item was never theirs to begin with. Removing an equipped item from
-    // gameState.inventory here is enough on its own — the existing
-    // equipment-upkeep effect clears the now-dangling slot, same as dropping
-    // or gifting an equipped item already does.
-    function sellItemToNpc(npcName, index) {
-        const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
-        const item = gameState.inventory[index];
-        if (!item || !key || item.questId)
-            return;
-        const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+        const buyMultiplier = factionPriceMultiplier(factionRep);
         const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
-        const price = Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * computeSellMultiplier(item.slot, merchantProfile)));
-        const npcCurrency = npcCurrencies[key] || 0;
-        if (price > npcCurrency)
-            return;
-        const nextInventory = gameState.inventory.filter((_, i) => i !== index);
-        const nextState = { ...gameState, currency: gameState.currency + price, inventory: nextInventory };
-        const nextNpcCurrencies = { ...npcCurrencies, [key]: npcCurrency - price };
         const npcInventory = npcInventories[key] || [];
-        const nextNpcInventories = { ...npcInventories, [key]: [...npcInventory, { ...item, questId: null, buybackPrice: price }] };
+        const buySet = new Set(buyIndexes);
+        const sellSet = new Set(sellIndexes);
+        let buyTotal = 0;
+        const boughtItems = [];
+        npcInventory.forEach((item, i) => {
+            if (!buySet.has(i))
+                return;
+            buyTotal += computeNpcBuyPrice(item, itemRarities, buyMultiplier);
+            // Once it's back in the hero's own bag it's just a normal item again —
+            // buybackPrice only means anything while sitting in an NPC's
+            // inventory (see computeNpcBuyPrice) — selling it a second time
+            // prices it fresh off the usual rarity/specialization rules.
+            const bought = { ...item };
+            delete bought.buybackPrice;
+            boughtItems.push(bought);
+        });
+        let sellTotal = 0;
+        const soldEntries = [];
+        gameState.inventory.forEach((item, i) => {
+            if (!sellSet.has(i) || item.questId)
+                return;
+            const price = Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * computeSellMultiplier(item.slot, merchantProfile)));
+            sellTotal += price;
+            soldEntries.push({ item, price });
+        });
+        if (buyIndexes.length === 0 && sellIndexes.length === 0)
+            return;
+        const npcCurrency = npcCurrencies[key] || 0;
+        const nextHeroCurrency = gameState.currency - buyTotal + sellTotal;
+        const nextNpcCurrency = npcCurrency + buyTotal - sellTotal;
+        if (nextHeroCurrency < 0 || nextNpcCurrency < 0)
+            return;
+        // Sold items don't vanish: each is tagged with the price it just sold
+        // for (buybackPrice) and dropped into the NPC's stock, so it shows up
+        // buyable again — at a markup, see computeNpcBuyPrice — even past the
+        // "their own gear stays locked" rule an ordinary NPC's native
+        // belongings are otherwise held to, since these items were never
+        // theirs to begin with.
+        const nextNpcInventory = [
+            ...npcInventory.filter((_, i) => !buySet.has(i)),
+            ...soldEntries.map(({ item, price }) => ({ ...item, questId: null, buybackPrice: price })),
+        ];
+        // Removing an equipped item from gameState.inventory here is enough on
+        // its own — the existing equipment-upkeep effect clears the now-
+        // dangling slot, same as dropping or gifting an equipped item already
+        // does.
+        const nextInventory = [
+            ...gameState.inventory.filter((_, i) => !sellSet.has(i)),
+            ...boughtItems,
+        ];
+        const nextState = { ...gameState, currency: nextHeroCurrency, inventory: nextInventory };
+        const nextNpcInventories = { ...npcInventories, [key]: nextNpcInventory };
+        const nextNpcCurrencies = { ...npcCurrencies, [key]: nextNpcCurrency };
         setGameState(nextState);
-        setNpcCurrencies(nextNpcCurrencies);
         setNpcInventories(nextNpcInventories);
+        setNpcCurrencies(nextNpcCurrencies);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies);
     }
     // ---- COMBAT HANDLERS ----
@@ -34002,14 +34260,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                             React.createElement("button", { onClick: handleSend, disabled: loading || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
             React.createElement("div", { className: "sidebar" },
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onTradeNpc: openTrade, onOpenEffect: setEffectDetail, t: t }))),
+                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onTradeNpc: openTrade, onOpenEffect: setEffectDetail, t: t }))),
         sheetOpen && (React.createElement("div", { className: "sheet-overlay" },
             React.createElement("div", { className: "sheet-overlay-backdrop", onClick: () => setSheetOpen(false) }),
             React.createElement("div", { className: "sheet-overlay-panel" },
                 React.createElement("div", { className: "sheet-overlay-header" },
                     React.createElement("p", { className: "title-display title-display-small" }, t('sheetOverlayTitle')),
                     React.createElement("button", { onClick: () => setSheetOpen(false), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
-                React.createElement(CharacterSheet, { heroName: heroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onTradeNpc: openTrade, onOpenEffect: setEffectDetail, t: t })))),
+                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: gameState, tokenUsage: lastTokenUsage, itemRarities: itemRarities, equipment: equipment, npcReputations: npcReputations, factionReputations: factionReputations, party: party, onOpenEquipment: () => setEquipmentModalOpen(true), onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onGiftNpc: setGiftTargetNpc, onRecruitNpc: setRecruitTargetNpc, onTradeNpc: openTrade, onOpenEffect: setEffectDetail, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: gameState, equipment: equipment, itemRarities: itemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: openEquipPicker, onOpenItemDetail: openItemDetailFromEquipment, onEquip: equipItemInSlot, onUnequip: unequipSlot, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
@@ -34054,7 +34312,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
-        tradingNpc && (React.createElement(TradeModal, { npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, onBuy: (index) => buyItemFromNpc(tradingNpc, index), onSell: (index) => sellItemToNpc(tradingNpc, index), onClose: closeTrade, t: t })),
+        tradingNpc && (React.createElement(TradeModal, { npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, onTrade: (buyIndexes, sellIndexes) => executeTrade(tradingNpc, buyIndexes, sellIndexes), onClose: closeTrade, t: t })),
         groupModalOpen && (React.createElement(GroupModal, { party: party, npcs: gameState.npcs, narrativeItemSlots: narrativeItemSlots, onDismiss: dismissFromParty, onOpenGear: setPartyGearTarget, onOpenEffect: setEffectDetail, onClose: () => setGroupModalOpen(false), t: t })),
         partyGearTarget && (React.createElement(PartyGearModal, { npcName: partyGearTarget, inventory: partyInventories[partyGearKey] || [], equipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, itemRarities: itemRarities, heldCurrency: partyCurrency[partyGearKey] || 0, npc: (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === partyGearKey), gameState: gameState, onEquip: (slotKey, itemName) => equipPartyItemInSlot(partyGearTarget, slotKey, itemName), onUnequip: slotKey => unequipPartySlot(partyGearTarget, slotKey), onGiveItem: () => setPartyGiveModalOpen(true), onTakeBack: index => takeItemsFromPartyMember(partyGearTarget, [index]), onClose: () => { setPartyGearTarget(null); setPartyGiveModalOpen(false); }, t: t })),
         partyGiveModalOpen && partyGearTarget && (React.createElement(GivePartyItemModal, { npcName: partyGearTarget, gameState: gameState, itemRarities: itemRarities, equipment: equipment, inventory: partyInventories[partyGearKey] || [], onConfirm: indexes => giveItemsToPartyMember(partyGearTarget, indexes), onTakeBack: indexes => takeItemsFromPartyMember(partyGearTarget, indexes), onCancel: () => setPartyGiveModalOpen(false), t: t })),
@@ -34195,6 +34453,7 @@ const APP_STYLES = `
   .trade-cell-icon { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
   .trade-cell-price { font-family: var(--font-mono); font-size: 0.66rem; white-space: nowrap; display: flex; align-items: center; gap: 0.15rem; color: var(--amber-200); }
   .trade-cell-lock-badge { position: absolute; top: -6px; right: -6px; font-size: 0.8rem; filter: drop-shadow(0 0 2px black); }
+  .trade-cell-price-tag { position: absolute; bottom: -2px; left: 2px; right: 2px; justify-content: center; background: var(--stone-950); border-radius: 3px; padding: 0.05rem 0.1rem; z-index: 1; }
   .trade-currency { font-family: var(--font-mono); font-size: 0.8rem; color: var(--amber-400); }
   .trade-special-badge { margin-right: 0.15rem; filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.6)); }
   .trade-price { font-family: var(--font-mono); font-size: 0.78rem; white-space: nowrap; }
