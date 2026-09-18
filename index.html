@@ -17617,6 +17617,26 @@ const TRANSLATIONS = {
         combatChooseDefenseHint: 'Как будешь защищаться?',
         combatWaitingHint: 'Ход противника...',
         combatRoundLabel: 'Раунд',
+        // Combat objectives (see COMBAT_OBJECTIVE_TYPES/combat.objective) — the
+        // objective's own on-screen text ("label") comes straight from the
+        // model in narrativeLanguage, same as an enemy's name; only the small
+        // "Цель:" prefix and the failed-tag suffix are actual UI chrome.
+        combatObjectiveLabel: 'Цель',
+        combatObjectiveFailedTag: 'не выполнено',
+        // Enemy role badges (see ENEMY_ROLES/ENEMY_ROLE_ICONS) — hover/aria text.
+        combatRoleMeleeLabel: 'Ближний бой',
+        combatRoleRangedLabel: 'Дальний бой',
+        combatRoleCasterLabel: 'Колдовство',
+        combatRoleTankLabel: 'Танк',
+        combatProtectTargetLabel: 'Цель защиты',
+        // Role-specific combat log lines (see runAutoTurn's ranged/caster
+        // branches) — combatLogCasterEffectText's {effect} is replaced with one
+        // of the three labels right below it before it ever reaches the log.
+        combatLogRangedRetreatText: 'отступает, увеличивая дистанцию',
+        combatLogCasterEffectText: 'насылает эффект: {effect}',
+        combatCasterPoisonEffectLabel: 'колдовской яд',
+        combatCasterSleepEffectLabel: 'сонная одурь',
+        combatCasterWeaknessEffectLabel: 'колдовская слабость',
         defenseDodgeLabel: 'Уклон',
         defenseBlockLabel: 'Блок',
         defenseParryLabel: 'Парирование',
@@ -17731,6 +17751,13 @@ const TRANSLATIONS = {
         npcAwayLabel: 'В другом месте',
         npcDeadTag: '[мёртв]',
         npcUnyieldingTag: '[неприклонный]',
+        // -- NPC-to-NPC relationship web (see NPC_RELATION_TYPES) --
+        npcRelationsLabel: 'Отношения с другими',
+        npcRelationFriend: 'друг',
+        npcRelationEnemy: 'враг',
+        npcRelationLove: 'любовь',
+        npcRelationFamily: 'семья',
+        npcRelationDebt: 'долг',
         // -- Gift item to NPC --
         giftItemLink: 'Подарить предмет',
         giftModalTitle: 'Подарить предмет',
@@ -18153,6 +18180,26 @@ const TRANSLATIONS = {
         combatChooseDefenseHint: 'How will you defend?',
         combatWaitingHint: "Waiting for the other side's turn...",
         combatRoundLabel: 'Round',
+        // Combat objectives (see COMBAT_OBJECTIVE_TYPES/combat.objective) — the
+        // objective's own on-screen text ("label") comes straight from the
+        // model in narrativeLanguage, same as an enemy's name; only the small
+        // "Objective:" prefix and the failed-tag suffix are actual UI chrome.
+        combatObjectiveLabel: 'Objective',
+        combatObjectiveFailedTag: 'failed',
+        // Enemy role badges (see ENEMY_ROLES/ENEMY_ROLE_ICONS) — hover/aria text.
+        combatRoleMeleeLabel: 'Melee',
+        combatRoleRangedLabel: 'Ranged',
+        combatRoleCasterLabel: 'Caster',
+        combatRoleTankLabel: 'Tank',
+        combatProtectTargetLabel: 'Protect target',
+        // Role-specific combat log lines (see runAutoTurn's ranged/caster
+        // branches) — combatLogCasterEffectText's {effect} is replaced with one
+        // of the three labels right below it before it ever reaches the log.
+        combatLogRangedRetreatText: 'falls back to open the distance',
+        combatLogCasterEffectText: 'casts an effect: {effect}',
+        combatCasterPoisonEffectLabel: 'sorcerous venom',
+        combatCasterSleepEffectLabel: 'sleeping daze',
+        combatCasterWeaknessEffectLabel: 'arcane weakness',
         defenseDodgeLabel: 'Dodge',
         defenseBlockLabel: 'Block',
         defenseParryLabel: 'Parry',
@@ -18267,6 +18314,13 @@ const TRANSLATIONS = {
         npcAwayLabel: 'Elsewhere',
         npcDeadTag: '[dead]',
         npcUnyieldingTag: '[unyielding]',
+        // -- NPC-to-NPC relationship web (see NPC_RELATION_TYPES) --
+        npcRelationsLabel: 'Relationships',
+        npcRelationFriend: 'friend',
+        npcRelationEnemy: 'enemy',
+        npcRelationLove: 'love',
+        npcRelationFamily: 'family',
+        npcRelationDebt: 'debt',
         // -- Gift item to NPC --
         giftItemLink: 'Gift an item',
         giftModalTitle: 'Gift an item',
@@ -19258,9 +19312,14 @@ function normalizeGameState(raw) {
         currency: clampCurrency(raw.currency, EMPTY_STATE.currency),
         // Only a party member ever carries an "effects" array of its own (see
         // reconcileNpcs) — an ordinary npc without one is left completely
-        // untouched here, same looseness as every other npc field.
+        // untouched here, same looseness as every other npc field. "relations"
+        // (see NPC_RELATION_TYPES) is re-validated on every npc regardless,
+        // same reason a faction's own "relations" is re-run through
+        // normalizeFactionRelations on load rather than trusted as-is.
         npcs: Array.isArray(raw.npcs)
-            ? raw.npcs.map(n => (n && typeof n === 'object' && Array.isArray(n.effects)) ? { ...n, effects: normalizeStoredEffects(n.effects) } : n)
+            ? raw.npcs.map(n => (n && typeof n === 'object')
+                ? { ...n, ...(Array.isArray(n.effects) ? { effects: normalizeStoredEffects(n.effects) } : {}), relations: normalizeNpcRelations(n.relations, n.name) }
+                : n)
             : [],
         quests: normalizeQuests(raw.quests),
         pendingSecrets: normalizePendingSecrets(raw.pendingSecrets),
@@ -19298,6 +19357,47 @@ function normalizeFactionRelations(raw, selfName) {
         if (name.toLowerCase() === selfKey)
             continue;
         byKey.set(name.toLowerCase(), { faction: name, stance: r.stance });
+    }
+    return [...byKey.values()];
+}
+// NPC-TO-NPC RELATIONSHIP WEB — the same idea as FACTION_RELATION_STANCES
+// above, one notch more personal: not just the hero's own standing with a
+// character (npcReputations) or one faction's stance toward another
+// (relations on a faction entry), but a declared tie between two named
+// CHARACTERS — a spouse, a childhood friend, a rival, a debt owed, a bitter
+// enemy. Deliberately a small fixed vocabulary rather than a free-text
+// label, so it stays a structured fact the sheet can render consistently
+// (see npcRelationFriend/Enemy/Love/Family/Debt) instead of a second copy
+// of "note" in a different shape. "rival" and shades in between are still
+// available as prose in that same "note" field — this list is only for
+// relationships worth surfacing as their own line.
+const NPC_RELATION_TYPES = ['friend', 'enemy', 'love', 'family', 'debt'];
+// Display-only lookups for the sheet (see NpcInfoModal) — kept next to the
+// type list itself so a new type can't be added to one without the other.
+const NPC_RELATION_ICONS = { friend: '🤝', enemy: '⚔', love: '❤', family: '👪', debt: '💰' };
+const NPC_RELATION_LABEL_KEYS = { friend: 'npcRelationFriend', enemy: 'npcRelationEnemy', love: 'npcRelationLove', family: 'npcRelationFamily', debt: 'npcRelationDebt' };
+// Normalizes one character's own "relations" list — shared by the npcs
+// schema normalization (loading a save) and reconcileNpcs (the model's
+// per-turn restatement) below, same defensive shape as
+// normalizeFactionRelations right above: an unrecognized type is dropped,
+// a character can't declare a relation with themselves, and a target named
+// twice in the same list collapses to its last-declared type. This is
+// ONLY ever between two tracked characters — never the hero, who has their
+// own separate channel (npcReputations) for exactly this purpose.
+function normalizeNpcRelations(raw, selfName) {
+    if (!Array.isArray(raw))
+        return [];
+    const selfKey = typeof selfName === 'string' ? selfName.trim().toLowerCase() : '';
+    const byKey = new Map();
+    for (const r of raw) {
+        if (!r || typeof r.name !== 'string' || !r.name.trim())
+            continue;
+        if (!NPC_RELATION_TYPES.includes(r.type))
+            continue;
+        const name = r.name.trim();
+        if (name.toLowerCase() === selfKey)
+            continue;
+        byKey.set(name.toLowerCase(), { name, type: r.type });
     }
     return [...byKey.values()];
 }
@@ -19461,22 +19561,87 @@ function rollEnemyStatsForTier(tierKey) {
     const rollRange = ([min, max]) => Math.round(min + Math.random() * (max - min));
     return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armor: rollRange(tier.armor) };
 }
-// SCAFFOLD — not wired into any actual combat behavior yet. Every enemy the
-// model generates (see the COMBAT event schema) is now tagged with a
-// "role" alongside its "tier", and that tag is parsed and carried through
-// onto the combat enemy object exactly like "fearless" is — but nothing
-// currently reads ENEMY_ROLES or branches on an enemy's role during a
-// fight. It exists so the data is already flowing (model → parsed enemy →
-// combat.enemies[i].role) by the time ranged weapons/enemy-specific
-// behavior actually get built. Once that lands, this is where per-role
-// combat behavior (an archer enemy holding range instead of closing in, a
-// caster inflicting an effect instead of a plain hit, a tank leaning on
-// innate mitigation) belongs.
+// Every enemy the model generates (see the COMBAT event schema) is tagged
+// with a "role" alongside its "tier" — this is what actually makes that tag
+// change how a fight plays, so a bow-armed enemy, a spellcaster, and a
+// heavily-armored bruiser each call for a different plan instead of every
+// fight reading as "close in and swing" three times over. melee is the
+// fallback for anything else and has no special hooks of its own — it's
+// simply resolved the same way combat always has been.
+//
+//  - ranged: tries to keep its distance. Tracked per-enemy via
+//    combat.enemies[i].engaged (see resolveHeroAttack/runAutoTurn's ally
+//    branch, which set it true the moment the hero or an ally actually
+//    lands a turn's attack on this specific enemy — a rough stand-in for
+//    "the fight has closed in around them" in a game with no real
+//    positioning system). Once engaged, a ranged enemy's own turn first
+//    rolls retreatChance to disengage instead of attacking at all (see
+//    runAutoTurn) — spending the turn falling back rather than loosing a
+//    shot — and only fires anyway the rest of the time, at engagedDamageMult
+//    of its usual damage (a rushed, off-balance shot). Unengaged (no one's
+//    closed with them yet), a ranged enemy just attacks normally at full
+//    effect.
+//  - caster: each of its own turns, effectChance to skip a plain hit
+//    entirely and instead inflict a status effect straight onto the hero
+//    (see runAutoTurn) — one of effectKinds, each an existing EFFECT_DEFS
+//    entry chosen to read as the "poison / sleep / weakness" a spellcaster
+//    should be able to inflict: poison as itself, concussion standing in for
+//    a daze/sleep-like effect, exhaustion standing in for a sapping weakness.
+//    Severity scales with the caster's own tier (see tierEffectSeverity) so
+//    a weak hedge-witch's hex is milder than a legendary sorcerer's curse.
+//    Scoped to the hero only — the game has no per-ally effect tracking
+//    mid-fight (allies share the hero's own effect modifiers, see
+//    runAutoTurn's shared `mods`), so a caster "reaching for" a companion
+//    instead would silently do nothing distinguishable.
+//  - tank: passively mitigates more than its rolled tier stats alone would
+//    — see makeEnemyDefender, which inflates a tank's effective armor by
+//    armorBonusPct before it's ever subtracted from an incoming hit. No
+//    turn-by-turn decision-making, just a quieter damage sponge, matching
+//    the "go around it, don't break it" read from a shielded/armored opponent.
 const ENEMY_ROLES = {
-    melee: {}, // closes in and swings — today's only actual behavior, and every enemy's fallback
-    ranged: {}, // reserved: will want to keep distance once positioning/ranged weapons exist
-    caster: {}, // reserved: will want to apply EFFECT_DEFS-style effects instead of/alongside plain damage
-    tank: {} // reserved: will want extra passive mitigation (armor/block) beyond its rolled tier stats
+    melee: {},
+    ranged: { retreatChance: 55, engagedDamageMult: 0.6 },
+    caster: { effectChance: 45, effectKinds: ['poison', 'concussion', 'exhaustion'] },
+    tank: { armorBonusPct: 40 }
+};
+// The corner badge CombatPortrait shows for each role (see ENEMY_ROLES),
+// and the translation key for its hover tooltip/aria title — matching the
+// icons the design called for: ⚔️ melee, 🏹 ranged, ✨ caster, 🛡️ tank.
+const ENEMY_ROLE_ICONS = { melee: '⚔️', ranged: '🏹', caster: '✨', tank: '🛡️' };
+const COMBAT_ROLE_LABEL_KEYS = {
+    melee: 'combatRoleMeleeLabel',
+    ranged: 'combatRoleRangedLabel',
+    caster: 'combatRoleCasterLabel',
+    tank: 'combatRoleTankLabel'
+};
+// Maps an enemy's own ENEMY_TIERS bracket onto an EFFECT_DEFS severity for
+// whatever a caster of that tier inflicts (see ENEMY_ROLES.caster above) —
+// the same "weak/average → mild, strong/exceptional → moderate, legendary →
+// severe" read used nowhere else numerically, but consistent with how tier
+// already scales an enemy's raw stats.
+function tierEffectSeverity(tier) {
+    if (tier === 'legendary')
+        return 'severe';
+    if (tier === 'strong' || tier === 'exceptional')
+        return 'moderate';
+    return 'mild';
+}
+// The set of distinct win conditions a combat encounter can be given beyond
+// the default "defeat every listed enemy" (see the "objective" field's
+// schema notes near buildStateAndEventsSystemPrompt's EVENT: COMBAT section,
+// and combat.objective below) — "defeatAll" itself is never actually stored
+// as a combat.objective (see its parsing), it's simply what an absent
+// objective already means.
+const COMBAT_OBJECTIVE_TYPES = ['defeatAll', 'surviveTurns', 'protect', 'retreat', 'survive'];
+// Maps each of ENEMY_ROLES.caster's effectKinds onto the translation key for
+// its clientManaged label text (see runAutoTurn's caster branch) — this is
+// the one EffectInstance shape in the whole game the narrative model never
+// writes the label for itself, so the game has to supply one, in whichever
+// of uiLang's two languages t() is currently resolving.
+const CASTER_EFFECT_LABEL_KEYS = {
+    poison: 'combatCasterPoisonEffectLabel',
+    concussion: 'combatCasterSleepEffectLabel',
+    exhaustion: 'combatCasterWeaknessEffectLabel'
 };
 function rarityColor(key) {
     const tier = RARITY_TIERS.find(tr => tr.key === key);
@@ -19928,6 +20093,12 @@ function NpcInfoModal({ name, gameState, npcReputations, factionReputations, t, 
                     reputation,
                     " / 100")),
             npc.note && React.createElement("p", { className: "sheet-npc-note" }, npc.note),
+            Array.isArray(npc.relations) && npc.relations.length > 0 && (React.createElement("div", { className: "npc-relations-block" },
+                React.createElement("p", { className: "sheet-npc-note" }, t('npcRelationsLabel')),
+                React.createElement("ul", { className: "npc-relations-list" }, npc.relations.map(r => (React.createElement("li", { key: r.name + ':' + r.type, className: "npc-relations-item" },
+                    React.createElement("span", { className: "npc-relation-icon" }, NPC_RELATION_ICONS[r.type] || '•'),
+                    React.createElement("span", null, r.name),
+                    React.createElement("span", { className: "npc-relation-type" }, t(NPC_RELATION_LABEL_KEYS[r.type] || 'npcRelationFriend')))))))),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
 }
@@ -22690,6 +22861,34 @@ function pickEnemyTargetPart(targetParts) {
 function isVitalDisabled(parts) {
     return BODY_PARTS.filter(p => p.vital).every(p => !parts[p.key] || parts[p.key].disabled);
 }
+// Finds which combat ally a "protect" objective's protectName refers to —
+// a loose, case-insensitive substring match either way, the same tolerance
+// failQuestsForDeadGiver uses to line up a quest giver's name against an
+// enemy's, since the model's own free-text name for a party member isn't
+// guaranteed to match combat.allies[].name verbatim. Returns undefined if
+// nothing matches (a stale/garbled protectName, or the named companion
+// simply isn't in this fight).
+function findProtectTarget(protectName, allies) {
+    const key = typeof protectName === 'string' ? protectName.trim().toLowerCase() : '';
+    if (!key)
+        return undefined;
+    return allies.find(a => {
+        const n = a.name.trim().toLowerCase();
+        return n === key || n.includes(key) || key.includes(n);
+    });
+}
+// A "protect" objective (see COMBAT_OBJECTIVE_TYPES/combat.objective) is
+// failed the instant its named companion goes down — computed live off
+// combat.allies rather than latched into combat state anywhere, so it's
+// always in sync with whatever just happened and never needs its own
+// reducer-side bookkeeping. Used by CombatModal's objective banner and by
+// buildCombatSummaryTag's post-fight narrative note.
+function isProtectObjectiveFailed(objective, allies) {
+    if (!objective || objective.type !== 'protect')
+        return false;
+    const target = findProtectTarget(objective.protectName, allies);
+    return !!target && isVitalDisabled(target.parts);
+}
 // Copy + styling for each way a fight can end, looked up by combat.result
 // in CombatModal. 'death' is deliberately brief — closing it (onClose,
 // wired to endCombatAndClose) is what hands off to the separate, weightier
@@ -25340,7 +25539,7 @@ function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isFled, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor }) {
+function CombatPortrait({ name, parts, isDown, isFled, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor, role, protectTarget }) {
     const keys = Object.keys(parts);
     const maxHp = keys.reduce((sum, k) => sum + parts[k].maxHp, 0);
     const hp = keys.reduce((sum, k) => sum + Math.max(0, parts[k].hp), 0);
@@ -25389,6 +25588,8 @@ function CombatPortrait({ name, parts, isDown, isFled, isActive, targetable, onC
                 : isFled
                     ? React.createElement("span", { className: "combat-portrait-frame-skull" }, "\uD83C\uDFC3")
                     : React.createElement("img", { className: "combat-portrait-frame-img", src: COMBAT_PORTRAIT_ICON, alt: "" })),
+            role && !isDown && !isFled && (React.createElement("span", { className: "combat-role-badge", title: t(COMBAT_ROLE_LABEL_KEYS[role]), "aria-hidden": "true" }, ENEMY_ROLE_ICONS[role])),
+            protectTarget && !isDown && !isFled && (React.createElement("span", { className: "combat-protect-badge", title: t('combatProtectTargetLabel'), "aria-hidden": "true" }, "\u2764\uFE0F")),
             React.createElement("div", { className: "combat-portrait-overlay" },
                 React.createElement("div", { className: "combat-portrait-note-slot" }, isDown && React.createElement("p", { className: "equip-slot-occupied-note" }, t('combatPartDisabledSuffix'))),
                 React.createElement("p", { className: "combat-portrait-name" }, name),
@@ -25501,6 +25702,14 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
     // filtered out here, before the flanking split, rather than at render
     // time in each of the three JSX spots below.
     const { left: alliesLeft, right: alliesRight } = splitForFlanking(combat.allies.filter(a => !a.fled));
+    // A "protect" objective's target (see combat.objective/findProtectTarget)
+    // — resolved once by id here rather than re-matched per portrait, and
+    // shown as a small badge on that one ally's card below regardless of
+    // which flank they ended up on.
+    const protectTargetId = combat.objective && combat.objective.type === 'protect'
+        ? (findProtectTarget(combat.objective.protectName, combat.allies) || {}).id
+        : null;
+    const objectiveFailed = isProtectObjectiveFailed(combat.objective, combat.allies);
     // ---- In-combat item use (see useConsumableInCombat in App()) ----
     // Two-step flow off the hero's own turn only: opening the panel lists
     // every "consumable" item still in inventory (itemPanelOpen); picking one
@@ -25700,6 +25909,11 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
                 t('combatRoundLabel'),
                 " ",
                 combat.round),
+            !combat.result && combat.objective && (React.createElement("p", { className: 'hint-text combat-objective-indicator' + (objectiveFailed ? ' combat-objective-failed' : '') },
+                t('combatObjectiveLabel'),
+                ": ",
+                combat.objective.label,
+                objectiveFailed ? ' — ' + t('combatObjectiveFailedTag') : '')),
             React.createElement("div", { className: "combat-arena-group" },
                 introActive && (React.createElement("div", { className: "combat-intro-fx", "aria-hidden": "true" },
                     React.createElement("div", { className: "combat-intro-center" },
@@ -25709,11 +25923,11 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
                             React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
                         React.createElement("div", { className: "combat-intro-flash" }),
                         introSparksRef.current.map((s, i) => (React.createElement("span", { key: i, className: "combat-intro-spark", style: { '--dx': s.dx, '--dy': s.dy, animationDelay: s.delay + 'ms' } })))))),
-                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isFled: !!enemy.fled, isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isVitalDisabled(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, t: t })))),
+                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isFled: !!enemy.fled, isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isVitalDisabled(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, role: enemy.role, t: t })))),
                 React.createElement("div", { className: "combat-row combat-row-party" },
-                    alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, t: t }))),
+                    alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))),
                     React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: () => pickHealTarget('hero', null), variant: "hero", fx: fx['hero:hero'], dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armor: heroArmor, t: t }),
-                    alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, t: t }))))),
+                    alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))))),
             React.createElement("div", { className: "combat-log" }, combat.log.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
             !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null ? t('combatUseItemPickTargetHint') : (isHeroTurn && !introActive ? t('combatChooseTargetHint') : t('combatWaitingHint')))),
             !combat.result && pendingItemIndex === null && (React.createElement("div", { className: "combat-flee-row" },
@@ -27256,6 +27470,16 @@ function App() {
     // logic — checked first thing in endCombatAndClose — and reset only when
     // a fresh fight actually begins (startCombat/attemptStealthKill).
     const combatClosingRef = useRef(false);
+    // A caster enemy's turn (see ENEMY_ROLES.caster/runAutoTurn) can decide to
+    // inflict a status effect on the hero instead of a plain hit — but that
+    // needs a separate setGameState call, and setCombat's own updater
+    // shouldn't have side effects of its own (React is free to invoke it more
+    // than once for a single actual turn). So runAutoTurn just stashes the
+    // decided effect here from inside the updater, and applies it to
+    // gameState right after setCombat(...) returns — same idea as
+    // useConsumableInCombat's own `applied` flag, just holding a value instead
+    // of a boolean. Always null outside of that one brief window.
+    const pendingCasterEffectRef = useRef(null);
     const [combatModalOpen, setCombatModalOpen] = useState(false);
     // True for the duration of the pre-battle sword-clash intro (see
     // CombatModal's combat-intro-fx) — single source of truth shared between
@@ -28484,14 +28708,15 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 === EVENT: COMBAT ===
 "combat" detects whether the scene puts the hero into a hostile physical fight right now — an enemy attacking the hero, the hero clearly initiating violence against someone who will fight back, or the hero striking at an unaware target from ambush — calling for turn-based combat, as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile individuals fight the hero at once, list each one separately in "enemies" below (up to 5) rather than collapsing them into one combined opponent — a real group fight is exactly what this system is for. If more than 5 are actually attacking, list the 5 most significant separately and fold the rest into the last entry's description as unnamed backup. By design, the narrative is never supposed to carry the hero's own fight through to a blow, an injury, or any other outcome — it always cuts away right as the violence begins — so a fight the hero is actually part of should essentially never read as "resolved entirely in prose already." Only return {"combat": false} for violence that does NOT involve the hero as a combatant (a fight between other people that the hero merely witnesses or hears about from a distance) or when the context above already contains a "[COMBAT RESULT]" line for this exact encounter (meaning the game's own combat system already resolved it this turn, and the scene you're reading is its aftermath, not a fresh fight).
 If no fight is starting: "combat": {"combat": false}.
-If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "role": "melee", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false}.
+If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "role": "melee", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null}.
 "enemies" is an array of 1 to 5 objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry.
 "enemyName" must be in ${narrativeLanguage}, matching how the scene refers to that opponent — give each a distinguishing name or descriptor (e.g. "бандит с топором", "бандит с луком") when several share the same base type, so they read as distinct in the fight. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
-"role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). This is recorded for future combat variety and has no mechanical effect yet, so a reasonable best guess is always fine — never leave it out or invent a fifth category.
+"role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). A ranged opponent tries to keep its distance once the hero has closed on it, a caster reaches for status effects instead of plain hits, and a tank quietly shrugs off more damage than its raw stats alone would suggest — so this choice does shape how the fight plays, and a reasonable best guess is always fine, but never leave it out or invent a fifth category.
 "fearless" is true only for an opponent that fundamentally cannot be frightened, demoralized, or panicked into fleeing — undead, constructs/automatons, oozes/swarms, or anything else established as mindless or otherwise incapable of fear — and false for absolutely everything else, including dangerous, confident, or fanatical living opponents (a fanatic can still break when things go badly enough; only make this true when the scene or the opponent's nature makes fear itself inapplicable). Default to false whenever genuinely unsure.
-"ambush" is a single top-level flag for the whole encounter — true only when the hero is the one attacking, every listed opponent has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself; only ever set it true when "enemies" has exactly one entry, since a stealth strike is a single decisive blow against a single unaware target, not a group action. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, mutual/open hostility of any kind, and any fight with more than one opponent.${itemOffersSection}
+"ambush" is a single top-level flag for the whole encounter — true only when the hero is the one attacking, every listed opponent has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself; only ever set it true when "enemies" has exactly one entry, since a stealth strike is a single decisive blow against a single unaware target, not a group action. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, mutual/open hostility of any kind, and any fight with more than one opponent.
+"objective" is optional and describes what actually needs to happen for THIS fight to count as won, beyond the default of simply defeating every listed opponent — include it only when the scene itself gives the fight a distinct goal (reinforcements are close, someone else here needs shielding, there is something to grab and escape with rather than a fight to win outright, or the opposition is so far beyond the hero that surviving at all is the only real goal), and otherwise omit the field entirely (or send null) for an ordinary fight where victory just means beating the enemies. When present, "objective" is an object: "type" is exactly one of "surviveTurns" (the hero only needs to hold on for a stretch — a rescue, reinforcements, a collapsing structure, a fuse burning down), "protect" (someone else already in this fight must not go down, whether or not every enemy ends up beaten), "retreat" (the real goal is grabbing something and getting out, not winning the fight outright), or "survive" (the opposition is too much to beat — getting out alive at all is the whole goal); never send "defeatAll" as a type, that is simply what leaving the field out already means. "label" is a short phrase in ${narrativeLanguage}, written the way it would read on a battle-objective banner (e.g. "Продержаться 4 хода — подкрепление на подходе", "Защитить Мерина", "Grab the chest and get out"), and MUST be included whenever "objective" itself is. "turnsRequired" is a small positive integer (2–6 is typical), ONLY for "surviveTurns" — how many full combat rounds the hero has to last. "protectName" is ONLY for "protect" — the exact name of the specific companion (an actual, currently-present party member, never a bystander who is not part of the fight) who must survive.${itemOffersSection}
 
 === EVENT: HIDDEN INFORMATION ===
 "secretsText" is hidden, behind-the-scenes information about the scene that just happened, shown to the player in a separate panel the hero never sees — never prose that belongs in the story itself. Extract ONLY: (1) the private thoughts and intentions of characters present, ONLY where they differ from what was said or shown outwardly; (2) surrounding circumstances the hero can't perceive, ONLY if genuinely needed to understand the scene (skip this entirely if the scene's surface is already the whole picture). Nothing else — no world lore, no foreshadowing, no analysis, no restating what the scene already showed. If a character present has nothing hidden, say so in one short line or omit them. If NOTHING in the scene has a hidden layer at all, set "secretsText" to exactly "(none)".
@@ -29461,12 +29686,13 @@ ${chunkText}`;
                     : t('combatUnarmedEnemyLabel');
                 const tier = ENEMY_TIERS[raw.tier] ? raw.tier : 'average';
                 const rolled = rollEnemyStatsForTier(tier);
-                // "role" is a data-only scaffold for now (see ENEMY_ROLES) — parsed
-                // and carried through even though nothing in combat branches on it
-                // yet, so it's already flowing by the time ranged/role-specific
-                // behavior gets built. "fearless" is live today (see
-                // COMBAT_TUNING's morale* block/rollMoraleBreak) — an enemy flagged
-                // fearless never tracks morale and can never break/flee/surrender.
+                // "role" (see ENEMY_ROLES) shapes this enemy's actual turn-by-turn
+                // behavior during the fight — a ranged enemy holding/breaking
+                // distance, a caster reaching for a status effect instead of a
+                // plain hit, a tank passively shrugging off more damage (see
+                // runAutoTurn/makeEnemyDefender). "fearless" (see COMBAT_TUNING's
+                // morale* block/rollMoraleBreak) — an enemy flagged fearless never
+                // tracks morale and can never break/flee/surrender.
                 const role = ENEMY_ROLES[raw.role] ? raw.role : 'melee';
                 const fearless = raw.fearless === true;
                 return {
@@ -29492,7 +29718,30 @@ ${chunkText}`;
                 // — drives whether the turn shows StealthKillOffer instead of the
                 // plain Fight button (see combatPending's render site). Ambush only
                 // ever applies to a solo target — see the schema notes above.
-                ambush: combatRaw.ambush === true && enemies.length === 1
+                ambush: combatRaw.ambush === true && enemies.length === 1,
+                // See the "objective" field's schema notes above and
+                // COMBAT_OBJECTIVE_TYPES — null (the far more common case) means an
+                // ordinary fight, won simply by beating every listed enemy.
+                // "defeatAll" is deliberately never stored here even if the model
+                // sends it; an absent objective already means exactly that.
+                objective: (() => {
+                    const raw = combatRaw.objective && typeof combatRaw.objective === 'object' ? combatRaw.objective : null;
+                    if (!raw || raw.type === 'defeatAll' || !COMBAT_OBJECTIVE_TYPES.includes(raw.type))
+                        return null;
+                    const label = typeof raw.label === 'string' ? raw.label.trim() : '';
+                    if (!label)
+                        return null;
+                    return {
+                        type: raw.type,
+                        label,
+                        turnsRequired: raw.type === 'surviveTurns' && Number.isFinite(raw.turnsRequired) && raw.turnsRequired > 0
+                            ? Math.round(raw.turnsRequired)
+                            : 3,
+                        protectName: raw.type === 'protect' && typeof raw.protectName === 'string' && raw.protectName.trim()
+                            ? raw.protectName.trim()
+                            : null
+                    };
+                })()
             };
         }
         // --- item offers (was generateItemOffers) ---
@@ -31287,7 +31536,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const encounter = narratorMsg && narratorMsg.combatEncounter;
         if (!encounter || !Array.isArray(encounter.enemies) || encounter.enemies.length === 0)
             return;
-        const enemies = encounter.enemies.map(e => ({ ...e, parts: buildCombatantParts(e.totalHp, e.totalHp, normalizeEnemyBodyParts(e.bodyParts)), morale: COMBAT_TUNING.moraleStart, fearless: !!e.fearless, fled: false }));
+        const enemies = encounter.enemies.map(e => ({ ...e, parts: buildCombatantParts(e.totalHp, e.totalHp, normalizeEnemyBodyParts(e.bodyParts)), morale: COMBAT_TUNING.moraleStart, fearless: !!e.fearless, fled: false, engaged: false }));
         const allies = buildAllyCombatants();
         const order = buildInitiativeOrder(allies, enemies);
         combatClosingRef.current = false;
@@ -31302,7 +31551,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             log: [],
             result: null,
             loot: null,
-            stunned: {}
+            stunned: {},
+            objective: encounter.objective || null,
+            objectiveAchieved: false
         });
         setCombatModalOpen(true);
     }
@@ -31359,7 +31610,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         else {
             log = [{ text: t('stealthKillMissLogText'), kind: 'miss' }];
         }
-        const enemies = [{ ...enemy, parts: enemyParts, morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false }];
+        const enemies = [{ ...enemy, parts: enemyParts, morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false, engaged: false }];
         combatClosingRef.current = false;
         setCombat({
             sourceNarratorIndex: narratorIndex,
@@ -31372,7 +31623,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             log,
             result,
             loot: null,
-            stunned: {}
+            stunned: {},
+            objective: encounter.objective || null,
+            objectiveAchieved: false
         });
         setCombatModalOpen(true);
     }
@@ -31872,7 +32125,11 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         return { name: enemy.enemyName, parts: null, agility: enemy.precision, power: enemy.power, weaponDamage: null, weaponLabel: enemy.weaponDescription, mods: aggregateEffectModifiers([]), isEnemy: false };
     }
     function makeEnemyDefender(enemy) {
-        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, armor: typeof enemy.armor === 'number' ? enemy.armor : 0, fearless: !!enemy.fearless, morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart };
+        const baseArmor = typeof enemy.armor === 'number' ? enemy.armor : 0;
+        // A tank (see ENEMY_ROLES.tank) passively mitigates beyond its rolled
+        // tier stats — no turn-by-turn decisions, just more effective armor.
+        const armor = enemy.role === 'tank' ? Math.round(baseArmor * (1 + ENEMY_ROLES.tank.armorBonusPct / 100)) : baseArmor;
+        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, armor, fearless: !!enemy.fearless, morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart };
     }
     // The hero's own turn: player clicks an enemy portrait, targeting a
     // random body part weighted by pickEnemyTargetPart (same weighting the
@@ -31920,7 +32177,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const defender = makeEnemyDefender(enemy);
             const outcome = resolveOneAttack(attacker, defender, t);
             log = [...log, ...outcome.log];
-            let enemies = prev.enemies.map(e => e.id === enemyId ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak } : e);
+            let enemies = prev.enemies.map(e => e.id === enemyId ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak, engaged: true } : e);
             if (outcome.moraleBreak) {
                 const shock = applyMoraleShockToGroup(enemies, enemyId, COMBAT_TUNING.moraleAllyFleeLoss, t);
                 enemies = shock.enemies;
@@ -31947,7 +32204,21 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const next = findNextTurn(state.order, state.allies, state.enemies, state.turnPos + 1, state.round);
         if (!next)
             return state;
-        return { ...state, turnPos: next.pos, round: next.round };
+        const advanced = { ...state, turnPos: next.pos, round: next.round };
+        // A "surviveTurns" objective (see COMBAT_OBJECTIVE_TYPES/combat.objective)
+        // wins the fight outright the moment the hero has lasted the required
+        // number of full rounds — checked here, the one place a round actually
+        // ticks over, rather than after every individual action. Any enemies
+        // still standing are simply left as-is (reinforcements arriving, the
+        // danger passing, whatever the fiction implied) — this only ever fires
+        // once, and never overrides a result an action already produced this
+        // same turn (state.result is already checked by every call site before
+        // it reaches here, but the guard costs nothing and keeps this safe to
+        // call from new call sites later too).
+        if (!state.result && state.objective && state.objective.type === 'surviveTurns' && next.round > state.objective.turnsRequired) {
+            return { ...advanced, result: 'victory', objectiveAchieved: true };
+        }
+        return advanced;
     }
     // Using a consumable mid-fight (see CombatModal's item panel/target-pick
     // flow) — only ever reachable on the hero's own turn, and only for
@@ -32020,6 +32291,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // turn order lands on a non-hero actor, so the fight keeps moving without
     // the player clicking anything until it's their turn again.
     function runAutoTurn() {
+        pendingCasterEffectRef.current = null;
         setCombat(prev => {
             if (!prev || prev.result)
                 return prev;
@@ -32092,7 +32364,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const attacker = makeAllyActor(ally, mods);
                 const outcome = resolveOneAttack(attacker, makeEnemyDefender(target), t);
                 log = [...log, ...outcome.log];
-                let enemies = prev.enemies.map(e => e.id === target.id ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak } : e);
+                let enemies = prev.enemies.map(e => e.id === target.id ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak, engaged: true } : e);
                 if (outcome.moraleBreak) {
                     const shock = applyMoraleShockToGroup(enemies, target.id, COMBAT_TUNING.moraleAllyFleeLoss, t);
                     enemies = shock.enemies;
@@ -32111,14 +32383,49 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 return advanceTurn({ ...prev, enemies, log, lastAction, stunned });
             }
             // Enemy turn: attacks a random living hero/ally, automatically
-            // defended (see resolveOneAttack/pickAutoDefenseKey).
+            // defended (see resolveOneAttack/pickAutoDefenseKey). Role (see
+            // ENEMY_ROLES) gets first say below, before it ever falls through to
+            // that default.
             const enemy = prev.enemies.find(e => e.id === current.id);
             if (!enemy || isEnemyOut(enemy))
                 return advanceTurn(prev);
+            // ---- ranged: once the fight has closed on them (enemy.engaged, set
+            // true the moment the hero or an ally actually lands a turn's attack
+            // on this specific enemy — see resolveHeroAttack/the ally-attacks-
+            // enemy branch above), tries to fall back and open the distance back
+            // up instead of attacking. The rest of the time it fires anyway, just
+            // at a penalty for the shot being rushed and off-balance (applied
+            // below, via roleDmgMult). Unengaged — no one's closed with them yet
+            // — it just attacks normally like any other enemy. ----
+            if (enemy.role === 'ranged' && enemy.engaged && Math.random() * 100 < ENEMY_ROLES.ranged.retreatChance) {
+                const enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, engaged: false } : e);
+                log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogRangedRetreatText'), kind: 'defended' }];
+                return advanceTurn({ ...prev, enemies, log });
+            }
+            // ---- caster: a chance to skip a plain hit entirely and inflict a
+            // status effect on the hero instead (see ENEMY_ROLES.caster) — always
+            // the hero, never an ally, since the game has no per-ally effect
+            // tracking mid-fight (see ENEMY_ROLES' own comment on why). The
+            // effect itself is only decided here; it's actually applied to
+            // gameState just after this setCombat call returns (see
+            // pendingCasterEffectRef). ----
+            if (enemy.role === 'caster' && Math.random() * 100 < ENEMY_ROLES.caster.effectChance) {
+                const kind = ENEMY_ROLES.caster.effectKinds[Math.floor(Math.random() * ENEMY_ROLES.caster.effectKinds.length)];
+                const severity = tierEffectSeverity(enemy.tier);
+                const label = t(CASTER_EFFECT_LABEL_KEYS[kind]);
+                pendingCasterEffectRef.current = { id: makeEffectId(), kind, label, severity, turnsLeft: EFFECT_DEFS[kind].defaultDuration[severity], clientManaged: true };
+                log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogCasterEffectText').replace('{effect}', label), kind: 'effect' }];
+                return advanceTurn({ ...prev, log });
+            }
             const livingAllies = prev.allies.filter(a => !isAllyOut(a));
             const targets = [{ kind: 'hero' }, ...livingAllies.map(a => ({ kind: 'ally', ally: a }))];
             const targetChoice = targets[Math.floor(Math.random() * targets.length)];
-            const attacker = makeEnemyActor(enemy);
+            // A ranged enemy firing anyway while engaged (see above) does it at
+            // a penalty — folded into a reduced power rather than touching
+            // resolveOneAttack/computeEnemyDamage's own math, since damage there
+            // already scales off attacker.power alone for an enemy attacker.
+            const roleDmgMult = (enemy.role === 'ranged' && enemy.engaged) ? ENEMY_ROLES.ranged.engagedDamageMult : 1;
+            const attacker = roleDmgMult === 1 ? makeEnemyActor(enemy) : { ...makeEnemyActor(enemy), power: Math.max(1, Math.round(enemy.power * roleDmgMult)) };
             if (targetChoice.kind === 'hero') {
                 const defender = makeHeroDefender(prev.heroParts, mods);
                 const outcome = resolveOneAttack(attacker, defender, t);
@@ -32189,6 +32496,16 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 return { ...prev, allies, enemies, log, lastAction, stunned, result: 'victory' };
             return advanceTurn({ ...prev, allies, enemies, log, lastAction, stunned });
         });
+        // A caster's turn (see ENEMY_ROLES.caster above) may have decided to
+        // inflict an effect on the hero — apply it now that setCombat's own
+        // updater has actually settled, same pattern useConsumableInCombat uses
+        // for its own post-updater gameState write.
+        if (pendingCasterEffectRef.current) {
+            const nextGameState = { ...gameState, effects: [...gameState.effects, pendingCasterEffectRef.current] };
+            pendingCasterEffectRef.current = null;
+            setGameState(nextGameState);
+            saveGame(messages, nextGameState, itemRarities, equipment);
+        }
     }
     // Whoever's turn it is gets skipped entirely if they're stunned (see
     // resolveOneAttack's stunApplied, set by a solid head hit) — hero, ally,
@@ -32358,6 +32675,34 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const disabledNote = disabledParts.length > 0
             ? ` The hero's ${disabledParts.join(', ')} took disabling damage during the fight and should be reflected as injured/impaired for now.`
             : '';
+        // A combat.objective (see COMBAT_OBJECTIVE_TYPES) beyond the ordinary
+        // "defeat everyone" default doesn't change what actually happened above
+        // — it changes how the model should read/narrate it. surviveTurns and
+        // retreat/survive only ever add a note when they actually succeeded
+        // (an unmet surviveTurns just means the fight ended some other way —
+        // victory, death, or an ordinary flee — and outcome above already
+        // covers that correctly on its own); protect can fail independently of
+        // how the fight itself ended, so it's checked regardless of result.
+        const objectiveNote = (() => {
+            const objective = finalCombat.objective;
+            if (!objective)
+                return '';
+            if (objective.type === 'protect') {
+                const targetName = objective.protectName || 'their companion';
+                return isProtectObjectiveFailed(objective, finalCombat.allies)
+                    ? ` The hero failed to protect ${targetName} in time.`
+                    : ` The hero also successfully kept ${targetName} safe throughout the fight.`;
+            }
+            if (objective.type === 'surviveTurns' && finalCombat.objectiveAchieved) {
+                return ` The hero held out for as long as was needed — whatever the fight was buying time for (reinforcements, an escape route, a collapsing structure) has now arrived or resolved, and the danger has passed.`;
+            }
+            if ((objective.type === 'retreat' || objective.type === 'survive') && finalCombat.result === 'fled') {
+                return objective.type === 'retreat'
+                    ? ` Getting away with what mattered was the actual goal here, not winning the fight outright — narrate this as the hero pulling off what they came to do, not as a failed retreat.`
+                    : ` Given how outmatched the hero was, simply surviving and getting clear counts as success here, not as a defeat.`;
+            }
+            return '';
+        })();
         const downedAllies = finalCombat.allies.filter(isAllyDown).map(a => a.name);
         const allyNote = downedAllies.length > 0
             ? ` ${downedAllies.join(', ')} ${downedAllies.length > 1 ? 'were' : 'was'} badly hurt and knocked out of the fight.`
@@ -32378,7 +32723,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const questFailNote = failedQuests && failedQuests.length > 0
             ? ` Killing ${defeatedNames.join(', ')} also permanently fails the hero's quest${failedQuests.length > 1 ? 's' : ''} "${failedQuests.map(q => q.title).join('", "')}" — the giver is dead and it can never be turned in.`
             : '';
-        return `[COMBAT RESULT]: ${outcome}${disabledNote}${allyNote}${fledAllyNote}${lootNote}${questFailNote}`;
+        return `[COMBAT RESULT]: ${outcome}${objectiveNote}${disabledNote}${allyNote}${fledAllyNote}${lootNote}${questFailNote}`;
     }
     // If any of the enemies the hero just defeated also happens to be the
     // giver of one of the hero's own active quests, that quest can never be
@@ -34154,6 +34499,13 @@ const APP_STYLES = `
   .combat-card { max-width: 34rem; position: relative; }
   .combat-card-group { max-width: 40rem; }
   .combat-round-indicator { text-align: center; margin: 0.2rem 0 0; font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; color: var(--amber-400); letter-spacing: 0.03em; }
+  /* Combat objective banner (see combat.objective/COMBAT_OBJECTIVE_TYPES) —
+     same rhythm as the round indicator just above it, in a quieter color
+     since it's flavor/context rather than the hard round count. Turns
+     red-ish once a "protect" objective has actually failed, without
+     otherwise disrupting the fight (see isProtectObjectiveFailed). */
+  .combat-objective-indicator { text-align: center; margin: 0.15rem 0 0; font-size: 0.85rem; color: var(--stone-300); }
+  .combat-objective-failed { color: var(--red-400); }
   .combat-arena-group { position: relative; display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem; }
   /* Rows are top-aligned by default so a taller card (hero/boss variants
      below) always grows in one predictable direction instead of shifting
@@ -34191,6 +34543,17 @@ const APP_STYLES = `
   .combat-portrait-frame { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; }
   .combat-portrait-frame-img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; display: block; }
   .combat-portrait-frame-skull { font-size: 1.8rem; line-height: 1; }
+  /* Enemy role badge (see ENEMY_ROLES/ENEMY_ROLE_ICONS) and the ally-side
+     "protect" objective badge (see combat.objective) — both a small corner
+     marker, positioned inside the portrait's own bounds since the card
+     clips via overflow:hidden above (no room for the usual negative-offset
+     equip-slot-badge treatment). z-index 2 keeps it above both the frame
+     (0) and the name/HP overlay (1). */
+  .combat-role-badge, .combat-protect-badge {
+    position: absolute; top: 0.2rem; left: 0.2rem; z-index: 2;
+    font-size: 0.85rem; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+  }
+  .combat-protect-badge { left: auto; right: 0.2rem; }
   /* Name/HP sit on a bottom scrim over the image instead of pushing it
      down, so the frame stays exactly the size of the image (no dead space
      above or below it). */
@@ -34616,6 +34979,13 @@ const APP_STYLES = `
   .sheet-faction-relations { display: flex; flex-wrap: wrap; gap: 0.15rem 0.6rem; font-size: 0.7rem; margin: 0.2rem 0 0; }
   .sheet-faction-relation-war { color: var(--red-400); }
   .sheet-faction-relation-allied { color: var(--emerald-400); }
+  /* NPC-to-NPC relationship web (see NPC_RELATION_TYPES) — NpcInfoModal only,
+     same restrained sizing/spacing as the faction relations line above. */
+  .npc-relations-block { margin-top: 0.4rem; }
+  .npc-relations-list { list-style: none; margin: 0.2rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+  .npc-relations-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--amber-100); }
+  .npc-relation-icon { flex-shrink: 0; }
+  .npc-relation-type { color: var(--stone-500); font-size: 0.7em; text-transform: uppercase; letter-spacing: 0.03em; }
   .sheet-faction-members { margin-top: 0.4rem; padding: 0.4rem 0 0 1.4rem; border-top: 1px solid var(--stone-800); cursor: default; }
   .sheet-faction-member { display: flex; align-items: center; justify-content: space-between; padding: 0.15rem 0; }
   .sheet-set-indicator { color: #22d3ee; font-family: var(--font-mono); font-size: 0.75rem; }
