@@ -19439,12 +19439,22 @@ function rollStartingItemRarity() {
 // initiative shares power's range — an enemy's tier reflects overall combat
 // prowess, and initiative (how quickly it acts in a fight, see the
 // "initiative" stat above) scales with that the same way power/precision do.
+// armor is the one field kept off that hp/power/precision/initiative curve on
+// purpose: it's pure combat math with no narrative reading, so it's set
+// directly against the weapon tier a hero at this enemy's level would
+// plausibly be carrying (see WEAPON_DAMAGE_BY_RARITY) rather than scaled
+// alongside the other stats. It used to grow much faster than weapon damage
+// does (0-2 at weak up to 26-50 at legendary — 20% of a matched weapon's
+// damage at the low end, 83% at the high end), which quietly made higher
+// tiers far less winnable than lower ones even in an otherwise "fair"
+// same-tier match. These ranges instead hold to roughly 15-33% of the
+// matched weapon tier's damage throughout, weak through legendary.
 const ENEMY_TIERS = {
-    weak: { hp: [10, 34], power: [3, 6], precision: [3, 6], initiative: [3, 6], armor: [0, 2] },
+    weak: { hp: [10, 34], power: [3, 6], precision: [3, 6], initiative: [3, 6], armor: [1, 3] },
     average: { hp: [35, 69], power: [7, 13], precision: [7, 13], initiative: [7, 13], armor: [2, 5] },
-    strong: { hp: [70, 149], power: [14, 24], precision: [14, 24], initiative: [14, 24], armor: [5, 12] },
-    exceptional: { hp: [150, 399], power: [25, 54], precision: [25, 54], initiative: [25, 54], armor: [12, 26] },
-    legendary: { hp: [400, 1000], power: [55, 100], precision: [55, 100], initiative: [55, 100], armor: [26, 50] }
+    strong: { hp: [70, 149], power: [14, 24], precision: [14, 24], initiative: [14, 24], armor: [3, 7] },
+    exceptional: { hp: [150, 399], power: [25, 54], precision: [25, 54], initiative: [25, 54], armor: [6, 13] },
+    legendary: { hp: [400, 1000], power: [55, 100], precision: [55, 100], initiative: [55, 100], armor: [9, 20] }
 };
 function rollEnemyStatsForTier(tierKey) {
     const tier = ENEMY_TIERS[tierKey] || ENEMY_TIERS.average;
@@ -21390,7 +21400,7 @@ const COMBAT_TUNING = {
     weaponPowerModifierFloor: 0.5, // a very weak attacker still deals at least half the weapon's rating
     enemyDamageBase: 5, // enemies carry no inventory/rarity, so their damage scales off "power" alone —
     enemyDamagePowerScale: 1.0, // calibrated so an ordinary enemy (power ~10) hits about as hard as a common one-handed weapon
-    hpScale: 10, // multiplies narrative health (1-1000, ordinary ~50) into a combat HP pool sized to match weapon damage — see the calibration note above WEAPON_DAMAGE_BY_RARITY
+    hpScale: 2, // multiplies narrative health (1-1000, ordinary ~50) into a combat HP pool sized to match weapon damage — see the calibration note above WEAPON_DAMAGE_BY_RARITY
     dodgeBase: 35, // pure footwork — no gear bonus, blocked outright by heavy armor (see isHeavyArmorEquipped)
     // Block's own base % now comes from the equipped shield/two-handed
     // weapon's rarity (see BLOCK_CHANCE_BY_RARITY/getBlockChanceForItem)
@@ -21474,21 +21484,56 @@ const COMBAT_TUNING = {
 // computeWeaponDamage) — strength only nudges it. Numbers are per hit,
 // one-handed; a two-handed weapon doubles its tier's number (see
 // getPlayerWeaponInfo). Unarmed sits outside the ladder since a fist is
-// never an inventory item. junk/common/uncommon/rare/unique match the
-// numbers asked for directly; epic/mythic extrapolate the same escalating
-// jump for the two tiers RARITY_TIERS defines but weren't spelled out —
-// they're rarer still, so staying dramatically stronger fits the pattern.
+// never an inventory item. junk/common/uncommon (10/15/20) still match
+// the numbers originally asked for — simulation showed those tiers
+// already landing well against their matched ENEMY_TIERS opposite number,
+// so they were left alone. rare/unique/epic/mythic (55/90/140/220) are
+// raised from the original ask and its extrapolation (40/60/100/160):
+// those tiers weren't just pacing long, several were frequently
+// unwinnable even geared and armored to match, and more armor alone
+// couldn't fix it (see the note above ARMOR_DEFENSE_BY_RARITY) — a top-
+// bracket ENEMY_TIERS roll can out-hit a hero's whole HP pool in one
+// blow regardless of flat damage reduction, so the lever that actually
+// helps is ending the fight before that swing comes around. More weapon
+// damage does exactly that, and it showed in simulation where more armor
+// alone hadn't moved the needle: rare/exceptional's hero win rate rose
+// from 9% to 26%, epic/legendary from 9% to 26%, mythic/legendary from
+// 63% to 77%. unique/legendary barely moved (0% to 4%) even under a
+// bigger increase than this ended up needing elsewhere — that specific
+// matchup is genuinely survival-limited rather than damage-limited (see
+// the same armor note), so it's left as a real, low-odds long shot rather
+// than chased further; unique gear is comfortably favored against its own
+// tier and below; legendary content is meant to ask for epic or mythic.
 //
-// Calibration target: a "fair" fight — a matched weapon tier against an
-// ordinarily-statted opponent — should run about 5-20 hits to down a vital
-// part. COMBAT_TUNING.hpScale (×10 on narrative health) and
-// ARMOR_DEFENSE_BY_RARITY below are both tuned against these numbers: an
-// ordinary opponent's torso lands around 140 HP, so a common weapon (15
-// dmg) needs roughly 9-13 swings once misses and armor are factored in. A
-// badly mismatched fight (great gear vs. a weak foe, or the reverse) is
-// expected to run short or be unwinnable rather than get secretly
-// rebalanced back toward "fair" — fights should be honest; see the note
-// by buildStateAndEventsSystemPrompt.
+// Calibration target: a "fair" fight — a matched weapon+armor tier against
+// a same-tier enemy — should run roughly 8-15 rounds (16-30 individual
+// attacks) to down a vital part, comfortably clear of both a 2-turn stomp
+// and a 60-round slog. Naive HP-divided-by-damage arithmetic badly
+// undercounts this: pickEnemyTargetPart spreads hits across all 6 body
+// parts by hitChance weight, and only head+torso are vital (see
+// isVitalDisabled), so only about a third of landed hits — their combined
+// weight over the full-body total — count toward ending the fight at all;
+// the rest chip away at limbs that don't. hpScale (×2) looks small next to
+// the resulting ~28-56 HP torso across tiers, but it isn't undertuned for
+// it — it was picked by simulating the actual weighted-targeting mechanic,
+// not by dividing a part's HP by a weapon's damage the way this note once
+// did (an earlier pass here read "140 HP torso, 9-13 swings" for a since-
+// replaced ×10 scale, which never accounted for that dilution and was off
+// by roughly 5x in practice).
+//
+// WEAPON_DAMAGE_BY_RARITY above is fixed by spec, so ENEMY_TIERS.armor and
+// ARMOR_DEFENSE_BY_RARITY below are the two levers tuned to hit that
+// target. Simulating all 7 weapon tiers against their nearest ENEMY_TIERS
+// match (junk/weak, common/average, uncommon/strong, rare/exceptional,
+// unique-through-mythic/legendary) gives a hero win rate that eases from
+// ~90-100% at junk/common down to a genuine coin-flip-or-worse by
+// rare/unique, before climbing back up through epic and mythic — legendary
+// enemies are meant to need top-tier gear to be reliably winnable, not just
+// "your current tier's opposite number," in keeping with the deity-tier
+// framing above. A badly mismatched fight (great gear vs. a weak foe, or
+// the reverse) is expected to run short or be unwinnable rather than get
+// secretly rebalanced back toward "fair" — fights should be honest; see the
+// note by buildStateAndEventsSystemPrompt.
 // Chance (%) that a raised shield or braced two-handed weapon stops a hit
 // outright, by rarity tier — the stat shown as the new "🛡️N%" item badge
 // (see getBlockChanceForItem) and the exact number resolveDefense rolls
@@ -21514,23 +21559,27 @@ const WEAPON_DAMAGE_BY_RARITY = {
     junk: 10,
     common: 15,
     uncommon: 20,
-    rare: 40,
-    unique: 60,
-    epic: 100,
-    mythic: 160
+    rare: 55,
+    unique: 90,
+    epic: 140,
+    mythic: 220
 };
-// Worn armor's flat damage reduction per hit, by rarity tier — roughly a
-// third of the matching weapon tier's damage, so gearing up meaningfully
-// extends a fight without making incoming damage disappear outright (a hit
-// always deals at least 1 regardless of armor).
+// Worn armor's flat damage reduction per hit, by rarity tier — roughly
+// 29-35% of the matching weapon tier's damage from uncommon up (35% at
+// uncommon itself, 29-30% rare through mythic), a bit lower at junk/common
+// (20%/27%). These weren't rebalanced when WEAPON_DAMAGE_BY_RARITY's top
+// four tiers were raised (see the note above that table) — the higher
+// weapon numbers pulled rare-through-mythic's ratio back down into a
+// narrow, consistent band on their own, so there was nothing left here to
+// fix. A hit always deals at least 1 regardless of armor.
 const ARMOR_DEFENSE_BY_RARITY = {
     junk: 2,
     common: 4,
     uncommon: 7,
-    rare: 14,
-    unique: 22,
-    epic: 35,
-    mythic: 55
+    rare: 16,
+    unique: 26,
+    epic: 42,
+    mythic: 65
 };
 // Which body part(s) each armor slot protects. Only slots that are
 // physically protective gear are listed — amulet/rings are accessories,
@@ -31475,6 +31524,44 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // isEnemyDown alone (see the victory-loot effect and
     // buildCombatSummaryTag).
     function isEnemyOut(enemy) { return !!enemy.fled || isEnemyDown(enemy); }
+    // A successful parry's riposte (see resolveOneAttack's riposteDamage) is a
+    // free counter-hit on the enemy that just attacked — it always connects
+    // (the parry already succeeded, so there's no separate hit-chance roll
+    // for it), so this just picks a target part the same weighted-random way
+    // any other attack does (see pickEnemyTargetPart) and applies the enemy's
+    // own armor to it, same floor-at-1 math as a normal hit — including the
+    // same morale chip/break check resolveOneAttack's enemy-defender branch
+    // runs on any other landed hit (see COMBAT_TUNING's morale* block), so a
+    // riposte spooks (or finishes off) an enemy exactly as convincingly as a
+    // regular swing would; the caller still owns turning a break into a
+    // group-wide morale shock (applyMoraleShockToGroup) the same way it
+    // already does for a normal hit's outcome.moraleBreak. Returns the
+    // enemy's updated parts/morale plus which part/how much/whether it just
+    // went down or broke, so the caller can log it and merge it into state
+    // the same way it handles every other kind of hit against an enemy.
+    // Returns null when there's no riposte to apply or no enemy left to hit.
+    function applyRiposteDamage(enemy, riposteDamage, t) {
+        if (!riposteDamage || !enemy || isEnemyOut(enemy))
+            return null;
+        const partKey = pickEnemyTargetPart(enemy.parts);
+        const part = BODY_PARTS.find(p => p.key === partKey);
+        const targetState = enemy.parts[partKey];
+        const armor = typeof enemy.armor === 'number' ? enemy.armor : 0;
+        const dmg = Math.max(1, Math.round(riposteDamage - armor));
+        const newHp = Math.max(0, targetState.hp - dmg);
+        const justDisabled = newHp === 0 && !targetState.disabled;
+        const parts = { ...enemy.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
+        const defeated = justDisabled && part.vital;
+        let morale = enemy.morale;
+        let moraleBreak = null;
+        if (!enemy.fearless && !defeated && typeof morale === 'number') {
+            const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (enemy.parts[p.key] ? enemy.parts[p.key].maxHp : 0), 0);
+            const lossFraction = totalMaxHp > 0 ? dmg / totalMaxHp : 0;
+            morale = Math.max(0, morale - lossFraction * COMBAT_TUNING.moraleDamageLossScale);
+            moraleBreak = rollMoraleBreak(morale);
+        }
+        return { parts, dmg, partLabel: t(part.labelKey), justDisabled, defeated, morale, moraleBreak };
+    }
     // One shared turn order for the whole fight, highest initiative first,
     // fixed for the fight's whole duration (a real initiative roll, not
     // re-rolled every round) — exactly what was asked for. Ties keep the
@@ -31595,18 +31682,31 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         });
     }
     // Automatic defense choice for whichever player-side body (hero or ally)
-    // just got hit — no popup anymore (see the section note above), so this
-    // just always reaches for the mechanically strongest option the gear on
-    // hand actually allows: parry (highest skill ceiling, and it can riposte)
-    // over block over dodge over taking the hit bare.
-    function pickAutoDefenseKey(availability) {
-        if (availability.canParry)
-            return 'parry';
-        if (availability.canBlock)
-            return 'block';
+    // just got hit — no popup anymore (see the section note above). Compares
+    // the actual computed chance of every option this defender's gear allows
+    // (parry and block are mutually exclusive — a shield/two-hander disables
+    // parry and enables block, see computeDefenseAvailability — but dodge is
+    // independent of both) and takes whichever is highest, rather than a
+    // fixed parry > block > dodge priority: an armed defender's parry chance
+    // (base 45, scales 1.4/point of agility) is mathematically always at
+    // least as good as their dodge chance (base 35, scales 1.0/point), so a
+    // fixed priority happens to land on the same answer there — but a bare-
+    // handed defender's parry (base 15) is worse than dodge (base 35) up to
+    // very high agility, and a fixed priority always picked parry anyway,
+    // making dodge unreachable in practice however good a build's agility
+    // was. Comparing the real numbers fixes that without changing anything
+    // for an armed defender.
+    function pickAutoDefenseKey(availability, defenderAgility, mods) {
+        const options = [];
         if (availability.canDodge)
-            return 'dodge';
-        return 'none';
+            options.push({ key: 'dodge', chance: computeDefenseChance('dodge', defenderAgility, availability.blockChance, availability.hasParryWeapon, mods) });
+        if (availability.canBlock)
+            options.push({ key: 'block', chance: computeDefenseChance('block', defenderAgility, availability.blockChance, availability.hasParryWeapon, mods) });
+        if (availability.canParry)
+            options.push({ key: 'parry', chance: computeDefenseChance('parry', defenderAgility, availability.blockChance, availability.hasParryWeapon, mods) });
+        if (options.length === 0)
+            return 'none';
+        return options.reduce((best, o) => (o.chance > best.chance ? o : best)).key;
     }
     // Resolves one full attack — attacker's hit roll, and if it lands, the
     // defender's side-appropriate reaction — entirely generically over
@@ -31686,7 +31786,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         // version used, just auto-picked (see pickAutoDefenseKey) instead of
         // waiting on a button.
         const availability = defender.defenseAvailability;
-        const key = pickAutoDefenseKey(availability);
+        const key = pickAutoDefenseKey(availability, defender.agility, defender.mods);
         let outcome = 'fail';
         if (key !== 'none') {
             const chance = computeDefenseChance(key, defender.agility, availability.blockChance, availability.hasParryWeapon, defender.mods);
@@ -32023,11 +32123,34 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const defender = makeHeroDefender(prev.heroParts, mods);
                 const outcome = resolveOneAttack(attacker, defender, t);
                 log = [...log, ...outcome.log];
+                let enemies = prev.enemies;
+                const riposte = applyRiposteDamage(enemy, outcome.riposteDamage, t);
+                if (riposte) {
+                    enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, parts: riposte.parts, morale: riposte.morale, fled: !!riposte.moraleBreak } : e);
+                    log = [...log, { text: defender.name + ' — ' + t('combatLogHitTag') + ': ' + enemy.enemyName + ' ' + riposte.partLabel + ' −' + riposte.dmg + ' HP', kind: 'hit' }];
+                    if (riposte.defeated)
+                        log = [...log, { text: enemy.enemyName + ': ' + riposte.partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
+                    else if (riposte.justDisabled)
+                        log = [...log, { text: enemy.enemyName + ': ' + riposte.partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
+                    if (riposte.moraleBreak) {
+                        log = [...log, { text: enemy.enemyName + ' — ' + t(riposte.moraleBreak === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' }];
+                        const shock = applyMoraleShockToGroup(enemies, enemy.id, COMBAT_TUNING.moraleAllyFleeLoss, t);
+                        enemies = shock.enemies;
+                        log = [...log, ...shock.log];
+                    }
+                    else if (riposte.defeated) {
+                        const shock = applyMoraleShockToGroup(enemies, enemy.id, COMBAT_TUNING.moraleAllyDeathLoss, t);
+                        enemies = shock.enemies;
+                        log = [...log, ...shock.log];
+                    }
+                }
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
                 const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 if (outcome.defeated)
-                    return { ...prev, heroParts: outcome.parts, log, lastAction, stunned, result: 'death', killedBy: enemy.enemyName };
-                return advanceTurn({ ...prev, heroParts: outcome.parts, log, lastAction, stunned });
+                    return { ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, result: 'death', killedBy: enemy.enemyName };
+                if (enemies.every(isEnemyOut))
+                    return { ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, result: 'victory' };
+                return advanceTurn({ ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned });
             }
             const ally = targetChoice.ally;
             const defender = makeAllyDefender(ally, mods);
@@ -32038,10 +32161,33 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             let allies = prev.allies.map(a => a.id === ally.id ? { ...a, parts: outcome.parts, morale: outcome.morale } : a);
             if (outcome.defeated)
                 allies = applyAllyMoraleShock(allies, ally.id, COMBAT_TUNING.moraleAllyDeathLoss);
+            let enemies = prev.enemies;
+            const riposte = applyRiposteDamage(enemy, outcome.riposteDamage, t);
+            if (riposte) {
+                enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, parts: riposte.parts, morale: riposte.morale, fled: !!riposte.moraleBreak } : e);
+                log = [...log, { text: defender.name + ' — ' + t('combatLogHitTag') + ': ' + enemy.enemyName + ' ' + riposte.partLabel + ' −' + riposte.dmg + ' HP', kind: 'hit' }];
+                if (riposte.defeated)
+                    log = [...log, { text: enemy.enemyName + ': ' + riposte.partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
+                else if (riposte.justDisabled)
+                    log = [...log, { text: enemy.enemyName + ': ' + riposte.partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
+                if (riposte.moraleBreak) {
+                    log = [...log, { text: enemy.enemyName + ' — ' + t(riposte.moraleBreak === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' }];
+                    const shock = applyMoraleShockToGroup(enemies, enemy.id, COMBAT_TUNING.moraleAllyFleeLoss, t);
+                    enemies = shock.enemies;
+                    log = [...log, ...shock.log];
+                }
+                else if (riposte.defeated) {
+                    const shock = applyMoraleShockToGroup(enemies, enemy.id, COMBAT_TUNING.moraleAllyDeathLoss, t);
+                    enemies = shock.enemies;
+                    log = [...log, ...shock.log];
+                }
+            }
             const defenderKey = 'ally:' + ally.id;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
             const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
-            return advanceTurn({ ...prev, allies, log, lastAction, stunned });
+            if (enemies.every(isEnemyOut))
+                return { ...prev, allies, enemies, log, lastAction, stunned, result: 'victory' };
+            return advanceTurn({ ...prev, allies, enemies, log, lastAction, stunned });
         });
     }
     // Whoever's turn it is gets skipped entirely if they're stunned (see
