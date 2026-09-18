@@ -17268,7 +17268,7 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
 // of that wiring. This line just pulls the hooks out of the global React
 // object instead of an ES import — everything else below is untouched by
 // the precompile step except JSX syntax itself.
-const { useState, useRef, useEffect, useMemo } = React;
+const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
 // ============================================================================
 // GRIMOIRE — file map
 // ----------------------------------------------------------------------------
@@ -17669,7 +17669,7 @@ const TRANSLATIONS = {
         combatUnarmedLabel: 'кулак',
         combatUnarmedEnemyLabel: 'кулаки',
         combatPartDisabledSuffix: 'не действует',
-        combatVitalHitSuffix: 'получает критическое повреждение — бой окончен',
+        combatVitalHitSuffix: 'получает смертельный удар — здоровье на нуле',
         combatFxBlockLabel: 'БЛОК',
         combatFxParryLabel: 'ПАРИРОВАНИЕ',
         combatFxDodgeLabel: 'УКЛОНЕНИЕ',
@@ -18236,7 +18236,7 @@ const TRANSLATIONS = {
         combatUnarmedLabel: 'fist',
         combatUnarmedEnemyLabel: 'fists',
         combatPartDisabledSuffix: 'disabled',
-        combatVitalHitSuffix: 'takes a critical hit — the fight is over',
+        combatVitalHitSuffix: 'takes a killing blow — health at zero',
         combatFxBlockLabel: 'BLOCK',
         combatFxParryLabel: 'PARRY',
         combatFxDodgeLabel: 'DODGE',
@@ -21652,6 +21652,12 @@ const COMBAT_TUNING = {
     // attacking (see moraleFleeAttemptChance) — succeed and their card leaves
     // the fight, fail and they eat an unopposed punish hit and try again next
     // turn (or simply resume fighting if morale has recovered by then).
+    //
+    // No first-blood, no break: neither side can flee/surrender until at least
+    // one of its own members is actually dead. Morale still drops from damage
+    // and shocks before that (so a side can be primed to crumble the moment
+    // the first one falls), but a rolled break (enemies) or flee attempt
+    // (allies) is simply not allowed while everyone on that side is alive.
     moraleStart: 100,
     moraleDamageLossScale: 70, // morale lost = (damage taken / own max HP) * this, on every hit landed against them
     moraleAllyDeathLoss: 30, // flat morale hit to surviving allies when one of their own is killed
@@ -21686,13 +21692,19 @@ const COMBAT_TUNING = {
 // than chased further; unique gear is comfortably favored against its own
 // tier and below; legendary content is meant to ask for epic or mythic.
 //
+// NOTE: everything below was calibrated back when destroying a single vital
+// part (head or torso) ended a combatant. Death now requires the WHOLE HP
+// pool to hit 0 (see isBodyDestroyed), so fights run noticeably longer than
+// the figures below suggest — retune hpScale/ENEMY_TIERS/weapon damage if
+// the pacing needs to come back down.
+//
 // Calibration target: a "fair" fight — a matched weapon+armor tier against
 // a same-tier enemy — should run roughly 8-15 rounds (16-30 individual
 // attacks) to down a vital part, comfortably clear of both a 2-turn stomp
 // and a 60-round slog. Naive HP-divided-by-damage arithmetic badly
 // undercounts this: pickEnemyTargetPart spreads hits across all 6 body
 // parts by hitChance weight, and only head+torso are vital (see
-// isVitalDisabled), so only about a third of landed hits — their combined
+// isBodyDestroyed — formerly "isVitalDisabled"), so only about a third of landed hits — their combined
 // weight over the full-body total — count toward ending the fight at all;
 // the rest chip away at limbs that don't. hpScale (×2) looks small next to
 // the resulting ~28-56 HP torso across tiers, but it isn't undertuned for
@@ -22433,6 +22445,17 @@ const EFFECT_DEFS = {
 function makeEffectId() {
     return 'eff_' + Math.random().toString(36).slice(2, 10);
 }
+// What a knocked-out HEAD or TORSO leaves behind once the fight ends. These
+// two parts are not lethal on their own (death is only ever a fully empty HP
+// pool — see isBodyDestroyed); they are put out of action like any limb.
+// Unlike a limb's open-ended fracture, though, these are timed (turnsLeft is
+// in narrative turns, see ageEffectsOneTurn): head and torso are by far the
+// most commonly hit parts, so a permanent penalty here would pile up after
+// nearly every fight. Every other part keeps the permanent 'fracture'.
+const VITAL_PART_AFTERMATH = {
+    head: { kind: 'concussion', severity: 'moderate', turnsLeft: EFFECT_DEFS.concussion.defaultDuration.moderate },
+    torso: { kind: 'fracture', severity: 'moderate', turnsLeft: 6 }
+};
 // Pulls one number out of an EFFECT_DEFS[...].someField table for a given
 // severity, defaulting to 'moderate' if severity is missing/unrecognized.
 // Shared by every per-severity table above (hpTickPct, hitChanceDelta, etc).
@@ -22634,14 +22657,16 @@ function tickEffectDamage(effects, scaledMaxHp) {
     return pct > 0 ? Math.max(1, Math.round(scaledMaxHp * pct)) : 0;
 }
 // Applies a DOT tick to a combatant's part pool, targeting the torso first
-// (the "core" body — where blood loss/poison plausibly tells first) and
-// falling back to the head only once the torso is already disabled. Mirrors
-// the same disabled/vital handling ordinary hits use, so a bleed-out or a
-// poison finishing someone off reads exactly like any other vital hit.
+// (the "core" body — where blood loss/poison plausibly tells first), then
+// the head, then whichever other part is still standing. Since a combatant
+// only dies once their WHOLE pool is empty (see isBodyDestroyed), the tick
+// has to be able to keep draining after the torso and head are gone, or a
+// bleed-out could never actually finish anyone off.
 function applyDotToParts(parts, dmg) {
     if (dmg <= 0)
         return { parts, actualDamage: 0, hitPart: null, justDisabled: false };
-    const targetKey = !parts.torso.disabled ? 'torso' : (!parts.head.disabled ? 'head' : null);
+    const order = ['torso', 'head', ...BODY_PARTS.map(p => p.key).filter(k => k !== 'torso' && k !== 'head')];
+    const targetKey = order.find(k => parts[k] && !parts[k].disabled) || null;
     if (!targetKey)
         return { parts, actualDamage: 0, hitPart: null, justDisabled: false };
     const targetState = parts[targetKey];
@@ -22661,8 +22686,8 @@ function applyDotToParts(parts, dmg) {
 // part, the way a potion or bandage plausibly helps overall rather than
 // picking one limb. A part that comes back above 0 HP is un-disabled (a
 // healed arm works again), but this never revives a fight that's already
-// over — a vital part hitting 0 already ends the fight elsewhere (see
-// resolveHeroAttack/runAutoTurn's 'death'/isVitalDisabled checks) before
+// over — a fully emptied HP pool already ends the fight elsewhere (see
+// resolveHeroAttack/runAutoTurn's 'death'/isBodyDestroyed checks) before
 // any heal action would ever be offered. Rounding leftovers from the
 // proportional split are swept into whichever part still has room, so the
 // full amount is never silently lost to rounding — capped at the total
@@ -22824,7 +22849,12 @@ function moraleFleeAttemptChance(morale) {
 // isEnemyDown). Never called at all for a "fearless" enemy (undead,
 // constructs, mindless swarms — see the combat encounter schema) — those
 // never track morale in the first place.
-function rollMoraleBreak(morale) {
+function rollMoraleBreak(morale, canBreak = true) {
+    // No break is possible until the group has already lost someone for real
+    // (see COMBAT_TUNING's "no first-blood, no break" note) — callers pass
+    // whether at least one enemy is dead at the moment of the roll.
+    if (!canBreak)
+        return null;
     const chance = moraleFleeAttemptChance(morale);
     if (chance <= 0)
         return null;
@@ -22860,7 +22890,7 @@ function rollStealthKillOutcome(agility) {
 // The enemy's targeting "AI" for v1: a weighted random pick using the same
 // per-part hitChance figures as the difficulty table (bigger/easier targets
 // get aimed at more often), skipping parts already disabled unless every
-// part is — which shouldn't happen since a disabled vital part ends the
+// part is — which shouldn't happen since a fully destroyed body ends the
 // fight before this is ever called again. Only ever called against the
 // hero's parts, which are always the full six, so every key it looks up
 // is guaranteed to exist.
@@ -22870,7 +22900,7 @@ function rollStealthKillOutcome(agility) {
 // often), skipping parts already disabled, or parts this particular body
 // doesn't even have (see the COMBAT event's "bodyParts" notes — a slime
 // might only have a torso) — unless every part it does have is disabled,
-// which shouldn't happen since a disabled vital part removes this
+// which shouldn't happen since a fully destroyed body removes this
 // combatant from the fight before it's ever targeted again. Used for hero,
 // ally, and enemy bodies alike (see resolveOneAttack).
 function pickEnemyTargetPart(targetParts) {
@@ -22886,14 +22916,18 @@ function pickEnemyTargetPart(targetParts) {
     }
     return pool[pool.length - 1].key;
 }
-// True once every vital part (see BODY_PARTS' `vital` flag) tracked in
-// `parts` is disabled — shared by hero/ally/enemy alike since they all store
-// their body the same buildCombatantParts shape, and used both by
-// CombatModal itself (rendering down/targetable state) and by the
-// App-level combat engine (isAllyDown/isEnemyDown below). A part missing
-// from `parts` (an enemy without arms, say) never counts against it.
-function isVitalDisabled(parts) {
-    return BODY_PARTS.filter(p => p.vital).every(p => !parts[p.key] || parts[p.key].disabled);
+// True once the combatant's WHOLE HP pool is empty — i.e. every body part
+// they actually have sits at 0 HP. That (and only that) is what "down" /
+// "dead" means. Losing the head or the torso on its own is NOT lethal: that
+// part is simply put out of action (see VITAL_PART_AFTERMATH for the debuff
+// it leaves behind), exactly like a limb, and the fight goes on. Shared by
+// hero/ally/enemy alike since they all store their body in the same
+// buildCombatantParts shape, and used both by CombatModal itself (rendering
+// down/targetable state) and by the App-level combat engine
+// (isAllyDown/isEnemyDown below). A part missing from `parts` (an enemy
+// without arms, say) never counts against it.
+function isBodyDestroyed(parts) {
+    return BODY_PARTS.every(p => !parts[p.key] || parts[p.key].disabled || parts[p.key].hp <= 0);
 }
 // Finds which combat ally a "protect" objective's protectName refers to —
 // a loose, case-insensitive substring match either way, the same tolerance
@@ -22921,7 +22955,7 @@ function isProtectObjectiveFailed(objective, allies) {
     if (!objective || objective.type !== 'protect')
         return false;
     const target = findProtectTarget(objective.protectName, allies);
-    return !!target && isVitalDisabled(target.parts);
+    return !!target && isBodyDestroyed(target.parts);
 }
 // Copy + styling for each way a fight can end, looked up by combat.result
 // in CombatModal. 'death' is deliberately brief — closing it (onClose,
@@ -25762,7 +25796,7 @@ function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isFled, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor, role, protectTarget }) {
+function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor, role, protectTarget }) {
     const keys = Object.keys(parts);
     const maxHp = keys.reduce((sum, k) => sum + parts[k].maxHp, 0);
     const hp = keys.reduce((sum, k) => sum + Math.max(0, parts[k].hp), 0);
@@ -25793,7 +25827,7 @@ function CombatPortrait({ name, parts, isDown, isFled, isActive, targetable, onC
     // flying toward its target) ranks above a plain reaction so the attacker
     // reads as in front on the frames where the two overlap.
     const wrapFxCls = fxCls === 'combat-fx-lunge' ? ' combat-portrait-wrap-lunge' : (fxCls ? ' combat-portrait-wrap-reacting' : '');
-    return (React.createElement("div", { className: 'combat-portrait-wrap' + wrapFxCls, ref: portraitRef },
+    return (React.createElement("div", { className: 'combat-portrait-wrap' + wrapFxCls + (isLeaving ? ' combat-portrait-wrap-leaving' : ''), ref: portraitRef },
         React.createElement("button", { type: "button", onClick: () => { if (targetable && onClick)
                 onClick();
             else if (healTargetable && onHealClick)
@@ -25907,6 +25941,10 @@ function CombatLootPanel({ loot, onToggle, t }) {
 // right, hero in the middle" layout that was asked for — e.g. 4 allies
 // becomes 2 on each side; 3 becomes 2 left / 1 right (left takes the extra
 // so the hero never visually drifts left of center).
+// How long a card that has left the fight (see CombatModal's goneKeys) stays
+// on screen playing its exit before it's removed and the rest close ranks —
+// must match the combat-portrait-leave animation duration in the CSS.
+const COMBAT_CARD_LEAVE_MS = 1250;
 function splitForFlanking(list) {
     const half = Math.ceil(list.length / 2);
     return { left: list.slice(0, half), right: list.slice(half) };
@@ -25918,13 +25956,90 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
     const showLoot = combat.result === 'victory' && combat.loot;
     const lootReadyWithItems = showLoot && combat.loot.status === 'ready' && (combat.loot.items.length > 0 || combat.loot.currency > 0);
     const enemyNames = combat.enemies.map(e => e.enemyName).join(', ');
-    // A fled ally (see runAutoTurn's ally branch/COMBAT_TUNING's morale*
-    // block) is kept in combat.allies data-side — the post-combat health
-    // reconciliation still needs it (see nextNpcs) — but its card should
-    // vanish from the arena the instant it runs, per the fled-ally design:
-    // filtered out here, before the flanking split, rather than at render
-    // time in each of the three JSX spots below.
-    const { left: alliesLeft, right: alliesRight } = splitForFlanking(combat.allies.filter(a => !a.fled));
+    // A combatant that has left the fight — an enemy that died, fled or
+    // surrendered, or an ally that fled (see runAutoTurn's ally branch/
+    // COMBAT_TUNING's morale* block) — is kept in combat.enemies/combat.allies
+    // data-side (loot/XP, the narrative summary and the post-combat health
+    // reconciliation all still need it — see nextNpcs) but its CARD leaves the
+    // arena: it first plays a short exit (combat-portrait-wrap-leaving — a
+    // hold so the killing blow's hit reaction and damage popup are still seen,
+    // then a fade and a width collapse) and is then dropped from the render
+    // list altogether, so the remaining cards close ranks and re-centre (both
+    // rows are centred flex rows, and the enemy row's taller centre slot is
+    // picked from the cards still shown). A dead ALLY keeps its card (down
+    // skull) — only fled allies leave. goneKeys ("enemy:id"/"ally:id") holds
+    // the ones whose exit has finished; cards already out when the modal
+    // first mounts (e.g. an enemy killed by a stealth strike before the fight
+    // began) start gone with no animation.
+    const isCardOut = (kind, c) => kind === 'enemy' ? (!!c.fled || isBodyDestroyed(c.parts)) : !!c.fled;
+    const [goneKeys, setGoneKeys] = useState(() => {
+        const init = {};
+        combat.enemies.forEach(e => { if (isCardOut('enemy', e))
+            init['enemy:' + e.id] = true; });
+        combat.allies.forEach(a => { if (isCardOut('ally', a))
+            init['ally:' + a.id] = true; });
+        return init;
+    });
+    const leaveTimersRef = useRef({});
+    useEffect(() => {
+        const check = (kind, c) => {
+            const key = kind + ':' + c.id;
+            if (!isCardOut(kind, c) || goneKeys[key] || leaveTimersRef.current[key])
+                return;
+            leaveTimersRef.current[key] = setTimeout(() => {
+                delete leaveTimersRef.current[key];
+                setGoneKeys(prev => (prev[key] ? prev : { ...prev, [key]: true }));
+            }, COMBAT_CARD_LEAVE_MS);
+        };
+        combat.enemies.forEach(e => check('enemy', e));
+        combat.allies.forEach(a => check('ally', a));
+    }, [combat.enemies, combat.allies, goneKeys]);
+    useEffect(() => () => {
+        Object.values(leaveTimersRef.current).forEach(clearTimeout);
+        leaveTimersRef.current = {};
+    }, []);
+    // "Gone" only counts while the combatant is still out, so a stale key
+    // can never hide a fresh combatant that happens to reuse an id.
+    const visibleEnemies = combat.enemies.filter(e => !(goneKeys['enemy:' + e.id] && isCardOut('enemy', e)));
+    // Sides are decided once from the FULL ally list and only then filtered
+    // to the cards still shown, so an ally never hops across the hero when a
+    // neighbour leaves — the survivors just close ranks on their own side.
+    const allySides = splitForFlanking(combat.allies);
+    const isAllyShown = a => !(goneKeys['ally:' + a.id] && isCardOut('ally', a));
+    const alliesLeft = allySides.left.filter(isAllyShown);
+    const alliesRight = allySides.right.filter(isAllyShown);
+    // The arena itself must never move: cards leaving would otherwise shrink
+    // the enemy row (the taller centre card goes, wrapped rows drop a line,
+    // the row empties out entirely) and everything below — the party row,
+    // the log, the buttons — would slide up with it. So the row's height is
+    // measured and only ever allowed to grow: min-height is pinned to the
+    // tallest it has been (set directly on the element, no re-render), and
+    // the row stays mounted even when it is empty. Re-measured from scratch
+    // if the window is resized, since wrapping can change with the width.
+    const enemyRowRef = useRef(null);
+    const enemyRowMaxHeightRef = useRef(0);
+    useLayoutEffect(() => {
+        const el = enemyRowRef.current;
+        if (!el)
+            return;
+        const h = el.getBoundingClientRect().height;
+        if (h > enemyRowMaxHeightRef.current)
+            enemyRowMaxHeightRef.current = h;
+        el.style.boxSizing = 'border-box';
+        el.style.minHeight = enemyRowMaxHeightRef.current + 'px';
+    });
+    useEffect(() => {
+        const remeasure = () => {
+            const el = enemyRowRef.current;
+            if (!el)
+                return;
+            el.style.minHeight = '';
+            enemyRowMaxHeightRef.current = el.getBoundingClientRect().height;
+            el.style.minHeight = enemyRowMaxHeightRef.current + 'px';
+        };
+        window.addEventListener('resize', remeasure);
+        return () => window.removeEventListener('resize', remeasure);
+    }, []);
     // A "protect" objective's target (see combat.objective/findProtectTarget)
     // — resolved once by id here rather than re-matched per portrait, and
     // shown as a small badge on that one ally's card below regardless of
@@ -26146,11 +26261,11 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
                             React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
                         React.createElement("div", { className: "combat-intro-flash" }),
                         introSparksRef.current.map((s, i) => (React.createElement("span", { key: i, className: "combat-intro-spark", style: { '--dx': s.dx, '--dy': s.dy, animationDelay: s.delay + 'ms' } })))))),
-                React.createElement("div", { className: "combat-row combat-row-enemies" }, combat.enemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isVitalDisabled(enemy.parts), isFled: !!enemy.fled, isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isVitalDisabled(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((combat.enemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, role: enemy.role, t: t })))),
+                React.createElement("div", { className: "combat-row combat-row-enemies", ref: enemyRowRef }, visibleEnemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, role: enemy.role, t: t })))),
                 React.createElement("div", { className: "combat-row combat-row-party" },
-                    alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))),
+                    alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isBodyDestroyed(ally.parts), isFled: !!ally.fled, isLeaving: isCardOut('ally', ally), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))),
                     React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: () => pickHealTarget('hero', null), variant: "hero", fx: fx['hero:hero'], dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armor: heroArmor, t: t }),
-                    alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isVitalDisabled(ally.parts), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isVitalDisabled(ally.parts), onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))))),
+                    alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isBodyDestroyed(ally.parts), isFled: !!ally.fled, isLeaving: isCardOut('ally', ally), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))))),
             React.createElement("div", { className: "combat-log" }, combat.log.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
             !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null ? t('combatUseItemPickTargetHint') : (isHeroTurn && !introActive ? t('combatChooseTargetHint') : t('combatWaitingHint')))),
             !combat.result && pendingItemIndex === null && (React.createElement("div", { className: "combat-flee-row" },
@@ -27712,7 +27827,7 @@ function App() {
     // every time a fresh fight opens (combatModalOpen flips false -> true).
     const [combatIntroActive, setCombatIntroActive] = useState(false);
     // -- Death & resurrection --
-    // Shown after a real death (a vital part destroyed in combat). Tracks
+    // Shown after a real death (HP pool fully emptied in combat). Tracks
     // which narrator message the fatal fight was attached to, so "go back a
     // couple of turns" (see goBackFromDeath) knows where to navigate from —
     // combat itself is already cleared to null by the time this is relevant.
@@ -32018,14 +32133,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // side's dodge/block/parry roll — no defense popup anymore. This trades
     // the old per-hit defense choice for pacing: a crowd fight would otherwise
     // stop for a popup on every single one of a dozen incoming swings.
-    function isAllyDown(ally) { return isVitalDisabled(ally.parts); }
+    function isAllyDown(ally) { return isBodyDestroyed(ally.parts); }
     // Mirrors isEnemyOut on the party side: a fled ally (see runAutoTurn's
     // ally branch) is out of the fight — no turn, not attackable/healable —
     // without being "down" for the narrative summary/reconciliation formula,
     // which both still care whether they were actually beaten unconscious
     // (isAllyDown) or just ran off under their own power.
     function isAllyOut(ally) { return !!ally.fled || isAllyDown(ally); }
-    function isEnemyDown(enemy) { return isVitalDisabled(enemy.parts); }
+    function isEnemyDown(enemy) { return isBodyDestroyed(enemy.parts); }
     // "Down" (dead) is deliberately kept separate from "out of the fight" — a
     // broken enemy that fled or surrendered (see the morale system further
     // down: rollMoraleBreak/applyMoraleShockToGroup) leaves combat alive, so
@@ -32051,7 +32166,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // went down or broke, so the caller can log it and merge it into state
     // the same way it handles every other kind of hit against an enemy.
     // Returns null when there's no riposte to apply or no enemy left to hit.
-    function applyRiposteDamage(enemy, riposteDamage, t) {
+    function applyRiposteDamage(enemy, riposteDamage, t, enemies) {
         if (!riposteDamage || !enemy || isEnemyOut(enemy))
             return null;
         const partKey = pickEnemyTargetPart(enemy.parts);
@@ -32062,14 +32177,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const newHp = Math.max(0, targetState.hp - dmg);
         const justDisabled = newHp === 0 && !targetState.disabled;
         const parts = { ...enemy.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
-        const defeated = justDisabled && part.vital;
+        const defeated = justDisabled && isBodyDestroyed(parts);
         let morale = enemy.morale;
         let moraleBreak = null;
         if (!enemy.fearless && !defeated && typeof morale === 'number') {
             const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (enemy.parts[p.key] ? enemy.parts[p.key].maxHp : 0), 0);
             const lossFraction = totalMaxHp > 0 ? dmg / totalMaxHp : 0;
             morale = Math.max(0, morale - lossFraction * COMBAT_TUNING.moraleDamageLossScale);
-            moraleBreak = rollMoraleBreak(morale);
+            moraleBreak = rollMoraleBreak(morale, (enemies || []).some(isEnemyDown));
         }
         return { parts, dmg, partLabel: t(part.labelKey), justDisabled, defeated, morale, moraleBreak };
     }
@@ -32164,11 +32279,15 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // this shock caused, for the caller to merge into its own log/state.
     function applyMoraleShockToGroup(enemies, sourceId, amount, t) {
         const log = [];
+        // The shock still lowers everyone's morale either way, but nobody can
+        // actually break until at least one enemy is dead (a shock from a kill
+        // arrives with that enemy already down, so it qualifies).
+        const canBreak = enemies.some(isEnemyDown);
         const updated = enemies.map(e => {
             if (e.id === sourceId || e.fearless || isEnemyOut(e))
                 return e;
             const morale = Math.max(0, (typeof e.morale === 'number' ? e.morale : COMBAT_TUNING.moraleStart) - amount);
-            const brk = rollMoraleBreak(morale);
+            const brk = rollMoraleBreak(morale, canBreak);
             if (brk) {
                 log.push({ text: e.enemyName + ' — ' + t(brk === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' });
                 return { ...e, morale, fled: true };
@@ -32262,12 +32381,12 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const parts = { ...defender.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
             const hitTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogHitTag');
             log.push({ text: attacker.name + ' — ' + hitTag + ' (' + attacker.weaponLabel + '): ' + defender.name + ' ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' });
-            const defeated = justDisabled && part.vital;
+            const defeated = justDisabled && isBodyDestroyed(parts);
             // A solid hit to the head — even one that doesn't end the fight —
-            // has a chance to stun (see COMBAT_TUNING.headStunChance). A
-            // fight-ending vital hit skips this: there's no "next turn" left to
-            // cost them.
-            const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
+            // has a chance to stun (see COMBAT_TUNING.headStunChance), and one
+            // that knocks the head out of action always does. A killing blow
+            // skips this: there's no "next turn" left to cost them.
+            const stunApplied = !defeated && partKey === 'head' && (justDisabled || Math.random() * 100 < COMBAT_TUNING.headStunChance);
             if (defeated)
                 log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' });
             else if (justDisabled)
@@ -32285,7 +32404,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (defender.parts[p.key] ? defender.parts[p.key].maxHp : 0), 0);
                 const lossFraction = totalMaxHp > 0 ? dmg / totalMaxHp : 0;
                 morale = Math.max(0, morale - lossFraction * COMBAT_TUNING.moraleDamageLossScale);
-                moraleBreak = rollMoraleBreak(morale);
+                moraleBreak = rollMoraleBreak(morale, defender.canBreak !== false);
                 if (moraleBreak) {
                     log.push({ text: defender.name + ' — ' + t(moraleBreak === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' });
                 }
@@ -32331,8 +32450,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             : outcome === 'partial' ? t('combatLogParryPartialText')
                 : (key === 'none' ? t('combatLogNoDefenseTag') : t('combatLogDefenseFailTag')));
         log.push({ text: defender.name + ' — ' + tag + ' (' + attacker.weaponLabel + '): ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' });
-        const defeated = justDisabled && part.vital;
-        const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
+        const defeated = justDisabled && isBodyDestroyed(parts);
+        const stunApplied = !defeated && partKey === 'head' && (justDisabled || Math.random() * 100 < COMBAT_TUNING.headStunChance);
         if (defeated)
             log.push({ text: defender.name + ': ' + partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' });
         else if (justDisabled)
@@ -32382,12 +32501,12 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     function makeEnemyActor(enemy) {
         return { name: enemy.enemyName, parts: null, agility: enemy.precision, power: enemy.power, weaponDamage: null, weaponLabel: enemy.weaponDescription, mods: aggregateEffectModifiers([]), isEnemy: false };
     }
-    function makeEnemyDefender(enemy) {
+    function makeEnemyDefender(enemy, enemies) {
         const baseArmor = typeof enemy.armor === 'number' ? enemy.armor : 0;
         // A tank (see ENEMY_ROLES.tank) passively mitigates beyond its rolled
         // tier stats — no turn-by-turn decisions, just more effective armor.
         const armor = enemy.role === 'tank' ? Math.round(baseArmor * (1 + ENEMY_ROLES.tank.armorBonusPct / 100)) : baseArmor;
-        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, armor, fearless: !!enemy.fearless, morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart };
+        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, armor, fearless: !!enemy.fearless, canBreak: (enemies || []).some(isEnemyDown), morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart };
     }
     // The hero's own turn: player clicks an enemy portrait, targeting a
     // random body part weighted by pickEnemyTargetPart (same weighting the
@@ -32423,7 +32542,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                     const dotPart = BODY_PARTS.find(p => p.key === dot.hitPart);
                     log = [...log, { text: dotEffects.map(e => e.label).join(', ') + ': ' + t(dotPart.labelKey) + ' −' + dot.actualDamage + ' HP', kind: 'effect' }];
                     if (dot.justDisabled) {
-                        if (dotPart.vital) {
+                        if (isBodyDestroyed(heroParts)) {
                             log = [...log, { text: t(dotPart.labelKey) + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
                             return { ...prev, heroParts, log, result: 'death' };
                         }
@@ -32432,7 +32551,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 }
             }
             const attacker = makeHeroActor(mods);
-            const defender = makeEnemyDefender(enemy);
+            const defender = makeEnemyDefender(enemy, prev.enemies);
             const outcome = resolveOneAttack(attacker, defender, t);
             log = [...log, ...outcome.log];
             let enemies = prev.enemies.map(e => e.id === enemyId ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak, engaged: true } : e);
@@ -32563,11 +32682,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 if (!ally || isAllyOut(ally))
                     return advanceTurn(prev);
                 // Low-morale party member tries to flee instead of attacking (see
-                // COMBAT_TUNING's morale* block/moraleFleeAttemptChance) — checked
+                // COMBAT_TUNING's morale* block/moraleFleeAttemptChance) — but only
+                // once at least one party member has actually died (see the "no
+                // first-blood, no break" note there); until then they hold the
+                // line however low their morale has dropped. Checked
                 // fresh every time it's their turn, so if morale has since climbed
                 // back above the threshold (a rally effect, a heal, whatever) they
                 // just skip this and fight normally below instead.
-                if (typeof ally.morale === 'number' && ally.morale < COMBAT_TUNING.moraleFleeThreshold) {
+                if (typeof ally.morale === 'number' && ally.morale < COMBAT_TUNING.moraleFleeThreshold && prev.allies.some(isAllyDown)) {
                     const fleeChance = moraleFleeAttemptChance(ally.morale);
                     const fleeSucceeded = Math.random() * 100 < fleeChance;
                     if (fleeSucceeded) {
@@ -32603,7 +32725,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                     const newHp = Math.max(0, targetState.hp - dmg);
                     const justDisabled = newHp === 0 && !targetState.disabled;
                     const newParts = { ...ally.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
-                    const defeated = justDisabled && part.vital;
+                    const defeated = justDisabled && isBodyDestroyed(newParts);
                     const punishTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogAllyFleeFailText');
                     log = [...log, { text: ally.name + ' — ' + punishTag + ' (' + punisher.weaponDescription + '): ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' }];
                     let punishedAllies = prev.allies.map(a => a.id === ally.id ? { ...a, parts: newParts } : a);
@@ -32620,7 +32742,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 if (!target)
                     return { ...prev, log, result: 'victory' };
                 const attacker = makeAllyActor(ally, mods);
-                const outcome = resolveOneAttack(attacker, makeEnemyDefender(target), t);
+                const outcome = resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t);
                 log = [...log, ...outcome.log];
                 let enemies = prev.enemies.map(e => e.id === target.id ? { ...e, parts: outcome.parts, morale: outcome.morale, fled: !!outcome.moraleBreak, engaged: true } : e);
                 if (outcome.moraleBreak) {
@@ -32689,7 +32811,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const outcome = resolveOneAttack(attacker, defender, t);
                 log = [...log, ...outcome.log];
                 let enemies = prev.enemies;
-                const riposte = applyRiposteDamage(enemy, outcome.riposteDamage, t);
+                const riposte = applyRiposteDamage(enemy, outcome.riposteDamage, t, prev.enemies);
                 if (riposte) {
                     enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, parts: riposte.parts, morale: riposte.morale, fled: !!riposte.moraleBreak } : e);
                     log = [...log, { text: defender.name + ' — ' + t('combatLogHitTag') + ': ' + enemy.enemyName + ' ' + riposte.partLabel + ' −' + riposte.dmg + ' HP', kind: 'hit' }];
@@ -32727,7 +32849,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             if (outcome.defeated)
                 allies = applyAllyMoraleShock(allies, ally.id, COMBAT_TUNING.moraleAllyDeathLoss);
             let enemies = prev.enemies;
-            const riposte = applyRiposteDamage(enemy, outcome.riposteDamage, t);
+            const riposte = applyRiposteDamage(enemy, outcome.riposteDamage, t, prev.enemies);
             if (riposte) {
                 enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, parts: riposte.parts, morale: riposte.morale, fled: !!riposte.moraleBreak } : e);
                 log = [...log, { text: defender.name + ' — ' + t('combatLogHitTag') + ': ' + enemy.enemyName + ' ' + riposte.partLabel + ' −' + riposte.dmg + ' HP', kind: 'hit' }];
@@ -32885,10 +33007,10 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const newHp = Math.max(0, targetState.hp - dmg);
             const justDisabled = newHp === 0 && !targetState.disabled;
             const heroParts = { ...prev.heroParts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
-            const defeated = justDisabled && part.vital;
+            const defeated = justDisabled && isBodyDestroyed(heroParts);
             // Same head-stun chance as a normal swing (see resolveOneAttack) — an
             // unopposed punish hit is still just a hit.
-            const stunApplied = !defeated && partKey === 'head' && Math.random() * 100 < COMBAT_TUNING.headStunChance;
+            const stunApplied = !defeated && partKey === 'head' && (justDisabled || Math.random() * 100 < COMBAT_TUNING.headStunChance);
             const punishTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogFleeFailTag');
             log = [...log, { text: punishTag + ' (' + punisher.weaponDescription + '): ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' }];
             const stunned = stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
@@ -32929,7 +33051,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         else {
             outcome = `The hero was killed by ${finalCombat.killedBy || finalCombat.enemies.map(e => e.enemyName).join(', ')} in a fight.`;
         }
-        const disabledParts = BODY_PARTS.filter(p => !p.vital && finalCombat.heroParts[p.key] && finalCombat.heroParts[p.key].disabled).map(p => p.key);
+        // (A dead hero has every part disabled — that's already covered by the
+        // "was killed" outcome above, so it isn't repeated as an injury list.)
+        const disabledParts = finalCombat.result === 'death' ? [] : BODY_PARTS.filter(p => finalCombat.heroParts[p.key] && finalCombat.heroParts[p.key].disabled).map(p => p.key);
         const disabledNote = disabledParts.length > 0
             ? ` The hero's ${disabledParts.join(', ')} took disabling damage during the fight and should be reflected as injured/impaired for now.`
             : '';
@@ -33009,9 +33133,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // Reconciles the fight back into the tracked game state — health scaled
     // by the fraction of total part HP the hero (and each surviving ally) has
     // left for a win or an escape, or dropped to a real 0 (plus a "death"
-    // effect) for an actual hero death, since a destroyed vital part is meant
-    // to be lethal, not just a bad scrape — and any disabled limb recorded as
-    // an effect. A downed ally (a vital part destroyed) is left alive but
+    // effect) for an actual hero death (whole HP pool empty) — and any disabled
+    // body part recorded as an effect (timed for head/torso, see
+    // VITAL_PART_AFTERMATH). A downed ally (whole pool empty) is left alive but
     // badly wounded (health 1) rather than killed off outright — full
     // companion-death bookkeeping (removal from the party, narrative
     // reaction, etc.) is out of scope here; this only reconciles HP. Marks
@@ -33037,14 +33161,23 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         // mid-game) and are never touched by the narrative model's own
         // reconciliation — only this function and tryResurrection ever add or
         // remove them.
-        const newEffects = [...gameState.effects];
-        for (const p of BODY_PARTS) {
-            if (!p.vital && combat.heroParts[p.key] && combat.heroParts[p.key].disabled && !newEffects.some(e => e.kind === 'fracture' && e.partKey === p.key)) {
-                newEffects.push({
-                    id: makeEffectId(), kind: 'fracture', partKey: p.key,
-                    label: t('combatEffectDisabledPrefix') + t(p.labelKey),
-                    severity: 'severe', turnsLeft: null, clientManaged: true
-                });
+        let newEffects = [...gameState.effects];
+        // A dead hero has every part at 0 by definition, so stacking a debuff
+        // per part on top of the death marker would just leave a wall of
+        // penalties behind after a resurrection — skip those on a death.
+        for (const p of (isDeath ? [] : BODY_PARTS)) {
+            if (!(combat.heroParts[p.key] && combat.heroParts[p.key].disabled))
+                continue;
+            const label = t('combatEffectDisabledPrefix') + t(p.labelKey);
+            const aftermath = VITAL_PART_AFTERMATH[p.key];
+            if (aftermath) {
+                // Timed: a fresh knockout of the same part restarts the clock
+                // instead of stacking a second copy.
+                newEffects = newEffects.filter(e => !(e.clientManaged && e.kind === aftermath.kind && e.partKey === p.key));
+                newEffects.push({ id: makeEffectId(), kind: aftermath.kind, partKey: p.key, label, severity: aftermath.severity, turnsLeft: aftermath.turnsLeft, clientManaged: true });
+            }
+            else if (!newEffects.some(e => e.kind === 'fracture' && e.partKey === p.key)) {
+                newEffects.push({ id: makeEffectId(), kind: 'fracture', partKey: p.key, label, severity: 'severe', turnsLeft: null, clientManaged: true });
             }
         }
         if (isDeath && !newEffects.some(e => e.kind === 'death')) {
@@ -34858,6 +34991,18 @@ const APP_STYLES = `
      than the arena as a whole. flex-shrink:0 keeps it from being squashed
      by the row when a neighbor's fx transform briefly changes width. */
   .combat-portrait-wrap { position: relative; display: flex; flex-shrink: 0; }
+  /* Exit of a card that has left the fight (died / fled / surrendered) —
+     hold for the first half so the killing blow's reaction and damage
+     popup are still readable, then fade + shrink while the width collapses
+     to nothing (the -0.3rem side margins cancel the row's 0.6rem gap for
+     the now-empty slot), so the remaining cards glide together. Total
+     duration must match COMBAT_CARD_LEAVE_MS in the JS, which is what
+     actually removes the card afterwards. */
+  .combat-portrait-wrap-leaving { pointer-events: none; animation: combat-portrait-leave 1.25s ease-in forwards; }
+  @keyframes combat-portrait-leave {
+    0%, 45% { opacity: 1; max-width: 4.4rem; margin-left: 0; margin-right: 0; transform: none; }
+    100% { opacity: 0; max-width: 0; min-width: 0; margin-left: -0.3rem; margin-right: -0.3rem; transform: scale(0.8); }
+  }
   /* Raises the whole card (button + spark + popup) above its row siblings
      while it's mid-animation, regardless of which position (left/center/
      right) it happens to sit in — see the wrapFxCls comment in
