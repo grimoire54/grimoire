@@ -41,14 +41,14 @@ jobs:
           with open(manifest_path, 'r', encoding='utf-8') as f:
               manifest = f.read()
           meta_data = '<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id" />'
-          manifest = re.sub(r'(<application\b[^>]*>)', r'\1\n        ' + meta_data, manifest, count=1)
+          manifest = re.sub(r'(<application\b[^>]*>)', r'\1\n ' + meta_data, manifest, count=1)
           with open(manifest_path, 'w', encoding='utf-8') as f:
               f.write(manifest)
 
           strings_path = 'android/app/src/main/res/values/strings.xml'
           with open(strings_path, 'r', encoding='utf-8') as f:
               strings = f.read()
-          admob_string = '    <string name="admob_app_id">ca-app-pub-6984929241398787~9526945696</string>\n'
+          admob_string = ' <string name="admob_app_id">ca-app-pub-6984929241398787~9526945696</string>\n'
           strings = strings.replace('</resources>', admob_string + '</resources>')
           with open(strings_path, 'w', encoding='utf-8') as f:
               f.write(strings)
@@ -60,13 +60,30 @@ jobs:
       - name: Copy the game files into the native project
         run: npx cap sync android
 
-      - name: Build a debug APK
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/grimoire.keystore
+
+      - name: Build signed AAB (Play Store)
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=$PWD/grimoire.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEYSTORE_PASSWORD }}
 
-      - name: Upload the APK
+      - name: Upload AAB for Play Store
+        uses: actions/upload-artifact@v4
+        with:
+          name: grimoire-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Build debug APK (for direct install on phone)
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: grimoire-debug-apk
