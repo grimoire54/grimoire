@@ -17631,6 +17631,14 @@ const TRANSLATIONS = {
         combatRoleCasterLabel: 'Колдовство',
         combatRoleTankLabel: 'Танк',
         combatProtectTargetLabel: 'Цель защиты',
+        // Enemy rank chevrons (see ENEMY_TIER_RANKS/EnemyRankBadge) — hover/aria
+        // text, read as "Ранг 3: Сильный".
+        combatRankLabel: 'Ранг',
+        combatTierWeakLabel: 'Слабый',
+        combatTierAverageLabel: 'Обычный',
+        combatTierStrongLabel: 'Сильный',
+        combatTierExceptionalLabel: 'Исключительный',
+        combatTierLegendaryLabel: 'Легендарный',
         // Role-specific combat log lines (see runAutoTurn's ranged/caster
         // branches) — combatLogCasterEffectText's {effect} is replaced with one
         // of the three labels right below it before it ever reaches the log.
@@ -17862,6 +17870,21 @@ const TRANSLATIONS = {
         mapLegendAlliedTerritory: 'Территория союзной фракции',
         mapLegendDanger: 'Возможна опасность',
         mapDangerLabel: 'Возможна опасность',
+        // -- World reactivity: day/night, faction territory drift, tavern rumors --
+        dayPhaseDayLabel: 'День',
+        dayPhaseNightLabel: 'Ночь',
+        mapLegendRecentBattle: 'Здесь недавно шёл бой',
+        rumorsButtonLabel: 'Послушать разговоры',
+        rumorsHeading: 'Слухи',
+        rumorWarTemplate1: 'Говорят, {faction1} и {faction2} никак не поделят землю. Сейчас за {faction1} — {count1} мест, за {faction2} — {count2}.',
+        rumorWarTemplate2: 'Кто-то божится, что война между {faction1} и {faction2} только разгорается. {faction1}, поговаривают, держит уже {count1} земель, {faction2} — {count2}.',
+        rumorBattleTemplate1: 'Слыхал про {location}? Там была настоящая резня — {winner} выбили оттуда {loser}.',
+        rumorBattleTemplate2: 'Говорят, у {location} была битва. {loser} потеряли город — теперь там хозяйничают {winner}.',
+        rumorDeedTemplate1: 'Слышал про чужака у {location}? Говорят, он в одиночку прикончил то ли {count}, то ли больше.',
+        rumorDeedTemplate2: 'Кто-то видел героя у {location} на днях. Болтают, будто он положил там {count} человек — а может, и приврали.',
+        rumorGenericTemplate1: 'Старик-кузнец вроде как получил письмо от брата из столицы.',
+        rumorGenericTemplate2: 'Цены на хлеб опять подскочили — кто-то винит засуху, кто-то торговцев.',
+        rumorGenericTemplate3: 'Ходят слухи, что в трактире на окраине видели человека в чёрном плаще — назвался чужим именем.',
         // -- Suggestions & regenerate --
         suggestionsLabel: 'Возможные действия',
         regenerateButton: 'Повтор',
@@ -18198,6 +18221,14 @@ const TRANSLATIONS = {
         combatRoleCasterLabel: 'Caster',
         combatRoleTankLabel: 'Tank',
         combatProtectTargetLabel: 'Protect target',
+        // Enemy rank chevrons (see ENEMY_TIER_RANKS/EnemyRankBadge) — hover/aria
+        // text, read as "Rank 3: Strong".
+        combatRankLabel: 'Rank',
+        combatTierWeakLabel: 'Weak',
+        combatTierAverageLabel: 'Average',
+        combatTierStrongLabel: 'Strong',
+        combatTierExceptionalLabel: 'Exceptional',
+        combatTierLegendaryLabel: 'Legendary',
         // Role-specific combat log lines (see runAutoTurn's ranged/caster
         // branches) — combatLogCasterEffectText's {effect} is replaced with one
         // of the three labels right below it before it ever reaches the log.
@@ -18429,6 +18460,21 @@ const TRANSLATIONS = {
         mapLegendAlliedTerritory: 'Territory of an allied faction',
         mapLegendDanger: 'Possible danger',
         mapDangerLabel: 'Possible danger',
+        // -- World reactivity: day/night, faction territory drift, tavern rumors --
+        dayPhaseDayLabel: 'Day',
+        dayPhaseNightLabel: 'Night',
+        mapLegendRecentBattle: 'A battle happened here recently',
+        rumorsButtonLabel: 'Listen to rumors',
+        rumorsHeading: 'Rumors',
+        rumorWarTemplate1: "They say {faction1} and {faction2} are at each other's throats again. {faction1} holds {count1} places now, {faction2} holds {count2}.",
+        rumorWarTemplate2: "Word is the war between {faction1} and {faction2} is only getting worse. {faction1}'s said to hold {count1} places now, {faction2} just {count2}.",
+        rumorBattleTemplate1: 'Heard about {location}? There was real fighting there — {winner} drove {loser} clean out.',
+        rumorBattleTemplate2: 'They say there was a battle at {location}. {loser} lost the place — {winner} run it now.',
+        rumorDeedTemplate1: 'Heard about the stranger near {location}? Word is they took down {count} all on their own, maybe more.',
+        rumorDeedTemplate2: 'Someone spotted the hero near {location} a few days back. Rumor has it they left {count} bodies behind — though who knows, could be exaggeration.',
+        rumorGenericTemplate1: 'The old blacksmith apparently got a letter from his brother in the capital.',
+        rumorGenericTemplate2: 'Bread prices jumped again — some blame the drought, some blame the merchants.',
+        rumorGenericTemplate3: 'Word is someone in a black cloak was seen at the tavern on the edge of town, going by a name that wasn\'t theirs.',
         // -- Suggestions & regenerate --
         suggestionsLabel: 'Possible actions',
         regenerateButton: 'Retry',
@@ -18473,7 +18519,24 @@ const EMPTY_STATE = {
     quests: [],
     pendingSecrets: [],
     map: { nodes: [], currentId: null, visitedEdges: [] },
-    factions: []
+    factions: [],
+    // -- World reactivity: see the WORLD REACTIVITY section below --
+    // Narrator-declared, exactly like `time` above (same reasoning: only the
+    // narrator knows how much story-time a scene actually spans, so a rigid
+    // turn-count clock would drift out of sync with the prose). Defaults to
+    // 'day' so a fresh game and every pre-existing save load into daylight
+    // rather than an undefined state.
+    dayPhase: 'day',
+    // A short, capped log of background faction territory flips — see
+    // pickWorldTickEvent. Entirely code-driven, never narrator-declared,
+    // which is what lets a war the hero walked away from keep moving on its
+    // own instead of freezing the moment the scene's attention shifts
+    // elsewhere.
+    worldEvents: [],
+    // A short, capped log of the hero's own notable kills, for the tavern
+    // rumor mill and the narrator's own "the world remembers what you did"
+    // rule — see generateRumors and the WORLD KEEPS MOVING system-prompt rule.
+    heroDeeds: []
 };
 function clampStat(value, fallback) {
     const n = Number(value);
@@ -19332,7 +19395,15 @@ function normalizeGameState(raw) {
         quests: normalizeQuests(raw.quests),
         pendingSecrets: normalizePendingSecrets(raw.pendingSecrets),
         map: normalizeMapState(raw.map),
-        factions: normalizeFactions(raw.factions)
+        factions: normalizeFactions(raw.factions),
+        // A save from before any of this existed has none of these three
+        // fields at all — same "degrade gracefully" spirit as maxHealth/level
+        // above: dayPhase falls back to 'day' (EMPTY_STATE's own default)
+        // rather than crashing on undefined, and the two logs just fall back to
+        // empty rather than dropping the whole save.
+        dayPhase: raw.dayPhase === 'night' ? 'night' : 'day',
+        worldEvents: normalizeWorldEvents(raw.worldEvents),
+        heroDeeds: normalizeHeroDeeds(raw.heroDeeds)
     };
 }
 // A faction's own declared stance toward another known faction — "war"
@@ -19420,6 +19491,166 @@ function normalizeFactions(raw) {
     return raw
         .filter(f => f && typeof f.name === 'string' && f.name.trim())
         .map(f => ({ name: f.name.trim(), note: typeof f.note === 'string' ? f.note.trim() : '', relations: normalizeFactionRelations(f.relations, f.name) }));
+}
+// ==============================================================================
+// WORLD REACTIVITY — background faction drift, day/night echo, rumor mill
+// ==============================================================================
+// The narrator's attention is always on the CURRENT scene, so nothing makes
+// an off-screen war between two factions advance on its own — left alone it
+// simply freezes wherever the story last looked at it. The pieces below
+// exist so the map is visibly different after enough turns pass even if the
+// hero never went near the fighting (see pickWorldTickEvent, called once
+// per turn from callGameMaster before the narrative itself is generated),
+// and so a settlement's tavern has something real to gossip about (see
+// generateRumors, called from PlaceInfoModal) — both built entirely from
+// state already tracked elsewhere (factions' declared war/allied relations,
+// which map node belongs to which faction, which tracked NPCs the hero has
+// killed), never from a separate world model of their own.
+// How often, on average, a turn with at least one active faction war
+// attempts a genuine territory flip. Deliberately well under 1 — most turns
+// spent near a war should do nothing here at all, so a handful of turns in
+// one place never reads as an unbelievable run of daily battles.
+const WORLD_TICK_CHANCE = 0.3;
+// How many background territory-flip events (see worldEvents on state) are
+// kept around for the map badge / system prompt / rumor mill to draw on.
+// Old ones roll off rather than growing the save file forever — a map
+// node's own .faction field is the permanent record of who controls it
+// now; this log is only ever "what changed recently."
+const WORLD_EVENTS_LIMIT = 20;
+const HERO_DEEDS_LIMIT = 10;
+// A worldEvent only counts as "recent" for the map's battle badge and the
+// rumor mill among the last this many logged events — there's no stored
+// turn-count clock here (see dayPhase's own comment on EMPTY_STATE for
+// why), so "recent" means "recent among what's been logged," not "recent
+// in turns."
+const WORLD_EVENT_RECENT_COUNT = 5;
+function normalizeWorldEvents(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    return raw
+        .filter(e => e && typeof e.locationId === 'string' && e.locationId && typeof e.fromFaction === 'string' && typeof e.toFaction === 'string')
+        .map(e => ({
+        id: typeof e.id === 'string' && e.id ? e.id : `we-${Math.random().toString(36).slice(2, 9)}`,
+        locationId: e.locationId,
+        locationName: typeof e.locationName === 'string' ? e.locationName : '',
+        fromFaction: e.fromFaction,
+        toFaction: e.toFaction
+    }))
+        .slice(-WORLD_EVENTS_LIMIT);
+}
+function normalizeHeroDeeds(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    return raw
+        .filter(d => d && typeof d.npcName === 'string' && d.npcName.trim())
+        .map(d => ({
+        npcName: d.npcName.trim(),
+        locationName: typeof d.locationName === 'string' ? d.locationName.trim() : ''
+    }))
+        .slice(-HERO_DEEDS_LIMIT);
+}
+// Territory is deliberately never stored as a number on the faction object
+// itself (see normalizeFactions) — it's always "how many map nodes
+// currently name this faction in their own .faction field," recomputed
+// fresh here, the same way the rest of the file treats a faction's
+// territory as an emergent property of the map rather than a duplicated
+// count that could quietly drift out of sync with it.
+function computeFactionTerritoryCounts(factions, mapNodes) {
+    const nodes = Array.isArray(mapNodes) ? mapNodes : [];
+    return (Array.isArray(factions) ? factions : []).map(f => ({
+        name: f.name,
+        count: nodes.filter(n => n && typeof n.faction === 'string' && n.faction.trim().toLowerCase() === f.name.trim().toLowerCase()).length
+    }));
+}
+// The one place real randomness enters the faction-war system, called once
+// per turn from callGameMaster with the state as of the START of the turn
+// (before this turn's own narrative can touch it). Pure — returns an event
+// or null, never mutates anything; callGameMaster applies the returned
+// event to the next state itself, once, after generateStateAndEvents has
+// already produced it, so a flip here can never collide with whatever the
+// narrator itself just resolved for the hero's own current scene.
+// Deliberately blind to plot: it only ever moves a node already flying one
+// of two factions' flags that are already declared 'war' with each other
+// (see FACTION_RELATION_STANCES), so it can never start a war or hand
+// territory to a faction with no stake in the fight, and it never touches
+// the hero's own current location — a flip happening literally under the
+// hero's feet belongs to the scene itself, not to this background system.
+function pickWorldTickEvent(factions, mapNodes, currentLocationId) {
+    const nodes = Array.isArray(mapNodes) ? mapNodes : [];
+    const warPairs = [];
+    const seenPairs = new Set();
+    for (const f of (Array.isArray(factions) ? factions : [])) {
+        for (const r of (f.relations || [])) {
+            if (r.stance !== 'war')
+                continue;
+            const pairKey = [f.name.trim().toLowerCase(), r.faction.trim().toLowerCase()].sort().join('__');
+            if (seenPairs.has(pairKey))
+                continue;
+            seenPairs.add(pairKey);
+            warPairs.push([f.name, r.faction]);
+        }
+    }
+    if (warPairs.length === 0 || Math.random() >= WORLD_TICK_CHANCE)
+        return null;
+    const [sideA, sideB] = warPairs[Math.floor(Math.random() * warPairs.length)];
+    const [attacker, defender] = Math.random() < 0.5 ? [sideA, sideB] : [sideB, sideA];
+    const candidates = nodes.filter(n => n && n.id !== currentLocationId &&
+        typeof n.faction === 'string' &&
+        n.faction.trim().toLowerCase() === defender.trim().toLowerCase());
+    if (candidates.length === 0)
+        return null;
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    return { id: `we-${Date.now()}-${target.id}`, locationId: target.id, locationName: target.name, fromFaction: defender, toFaction: attacker };
+}
+// Client-side rumor mill for PlaceInfoModal's "listen to rumors" action —
+// deliberately never its own API call: this is ambient color built from
+// facts already sitting in state, and a settlement the hero can revisit
+// often shouldn't cost a request (or a wait) every time it's pressed.
+// Always returns exactly 3 lines, mixing whatever's actually available:
+// faction-war territory, a recent background battle (see worldEvents/
+// WORLD_EVENT_RECENT_COUNT), a distorted retelling of the hero's own most
+// notable recent kill (see heroDeeds — the count told back to the hero is
+// deliberately fuzzed, never the real number, matching "sometimes
+// exaggerated, sometimes wrong" rather than a reliable readout), and
+// generic ambient filler to round out an early game where none of that
+// exists yet.
+function generateRumors(state, t) {
+    const pool = [];
+    const factionsWithWar = (state.factions || []).filter(f => (f.relations || []).some(r => r.stance === 'war'));
+    if (factionsWithWar.length > 0) {
+        const f = factionsWithWar[Math.floor(Math.random() * factionsWithWar.length)];
+        const rival = f.relations.find(r => r.stance === 'war');
+        const counts = computeFactionTerritoryCounts(state.factions, state.map ? state.map.nodes : []);
+        const c1 = (counts.find(c => c.name === f.name) || {}).count || 0;
+        const c2 = (counts.find(c => c.name === rival.faction) || {}).count || 0;
+        const key = Math.random() < 0.5 ? 'rumorWarTemplate1' : 'rumorWarTemplate2';
+        pool.push(t(key).replace('{faction1}', f.name).replace('{count1}', c1).replace('{faction2}', rival.faction).replace('{count2}', c2));
+    }
+    const recentEvents = (state.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT);
+    if (recentEvents.length > 0) {
+        const e = recentEvents[Math.floor(Math.random() * recentEvents.length)];
+        const key = Math.random() < 0.5 ? 'rumorBattleTemplate1' : 'rumorBattleTemplate2';
+        pool.push(t(key).replace('{location}', e.locationName).replace('{winner}', e.toFaction).replace('{loser}', e.fromFaction));
+    }
+    if ((state.heroDeeds || []).length > 0) {
+        const deeds = state.heroDeeds;
+        const lastSpot = deeds[deeds.length - 1].locationName || deeds[deeds.length - 1].npcName;
+        const realCount = deeds.filter(d => d.locationName === deeds[deeds.length - 1].locationName).length;
+        // The distortion itself: never the true count, always nudged off it.
+        const toldCount = Math.max(1, realCount + (Math.floor(Math.random() * 3) - 1));
+        const key = Math.random() < 0.5 ? 'rumorDeedTemplate1' : 'rumorDeedTemplate2';
+        pool.push(t(key).replace('{location}', lastSpot).replace('{count}', toldCount));
+    }
+    if (pool.length < 3) {
+        const genericKeys = ['rumorGenericTemplate1', 'rumorGenericTemplate2', 'rumorGenericTemplate3'].sort(() => Math.random() - 0.5);
+        for (const key of genericKeys) {
+            if (pool.length >= 3)
+                break;
+            pool.push(t(key));
+        }
+    }
+    // Shuffle so a given category doesn't always land in the same slot.
+    return pool.slice(0, 3).sort(() => Math.random() - 0.5);
 }
 // ==============================================================================
 // STORAGE KEYS & SESSION CONSTANTS
@@ -19621,6 +19852,22 @@ const COMBAT_ROLE_LABEL_KEYS = {
     ranged: 'combatRoleRangedLabel',
     caster: 'combatRoleCasterLabel',
     tank: 'combatRoleTankLabel'
+};
+// Enemy rank chevrons — the top-right corner insignia CombatPortrait shows on
+// every enemy (see EnemyRankBadge), read like a military sleeve stripe: the
+// more chevrons, the tougher the opponent. The count is simply the enemy's
+// ENEMY_TIERS bracket in order (weak = 1 ... legendary = 5), derived from
+// that table's own key order so a tier added there later gets its chevron
+// count for free — only its label key below needs adding by hand. The
+// hover/aria text reads "Rank N: <tier name>".
+const ENEMY_TIER_RANKS = {};
+Object.keys(ENEMY_TIERS).forEach((key, i) => { ENEMY_TIER_RANKS[key] = i + 1; });
+const COMBAT_TIER_LABEL_KEYS = {
+    weak: 'combatTierWeakLabel',
+    average: 'combatTierAverageLabel',
+    strong: 'combatTierStrongLabel',
+    exceptional: 'combatTierExceptionalLabel',
+    legendary: 'combatTierLegendaryLabel'
 };
 // Maps an enemy's own ENEMY_TIERS bracket onto an EFFECT_DEFS severity for
 // whatever a caster of that tier inflicts (see ENEMY_ROLES.caster above) —
@@ -20115,9 +20362,17 @@ function NpcInfoModal({ name, gameState, npcReputations, factionReputations, t, 
 // render rather than snapshotted at click time.
 function PlaceInfoModal({ name, gameState, factionReputations, t, onClose }) {
     const node = (gameState.map && Array.isArray(gameState.map.nodes) ? gameState.map.nodes : []).find(n => n && n.name.trim().toLowerCase() === name.trim().toLowerCase());
+    // null until the player actually asks — generateRumors is re-rolled fresh
+    // each time the button is pressed (see its own comment), never cached, so
+    // reopening this modal always offers a chance at a different mix.
+    const [rumors, setRumors] = useState(null);
     if (!node)
         return null;
     const factionRep = node.faction ? findFactionReputation(node.faction, factionReputations || {}) : null;
+    // Only offered for a settlement the hero is actually standing in right
+    // now — this is meant to read as walking into the local tavern or market
+    // and catching the talk, not a remote lookup from across the map.
+    const canListenForRumors = node.kind === 'settlement' && gameState.map && gameState.map.currentId === node.id;
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card" },
@@ -20136,6 +20391,13 @@ function PlaceInfoModal({ name, gameState, factionReputations, t, onClose }) {
                     factionRep !== null ? ` (${factionRep})` : ''))),
             node.description && React.createElement("p", { className: "sheet-npc-note" }, node.description),
             isMapNodeCleared(node) && React.createElement("p", { className: "map-node-cleared-tag" }, t('mapNodeClearedLabel')),
+            canListenForRumors && (React.createElement("div", { className: "rumors-section" }, !rumors ? (React.createElement("button", { onClick: () => setRumors(generateRumors(gameState, t)), className: "btn btn-ghost", type: "button" },
+                "\uD83D\uDDE3 ",
+                t('rumorsButtonLabel'))) : (React.createElement("div", { className: "rumors-list" },
+                React.createElement("p", { className: "item-type-label" }, t('rumorsHeading')),
+                rumors.map((line, i) => React.createElement("p", { key: i, className: "sheet-npc-note rumor-line" },
+                    "\u2014 ",
+                    line)))))),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
 }
@@ -23972,7 +24234,10 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
                     gameState.maxPsyche)),
             gameState.time && (React.createElement("div", { className: "sheet-vital-row" },
                 React.createElement("span", { className: "sheet-stat-label" }, t('timeLabel')),
-                React.createElement("span", { className: "sheet-vital-value" }, gameState.time)))),
+                React.createElement("span", { className: "sheet-vital-value", title: t(gameState.dayPhase === 'night' ? 'dayPhaseNightLabel' : 'dayPhaseDayLabel') },
+                    gameState.dayPhase === 'night' ? '🌙' : '☀️',
+                    " ",
+                    gameState.time)))),
         React.createElement("div", { className: "sheet-section" },
             React.createElement("p", { className: "sheet-heading" }, t('statsHeading')),
             React.createElement("div", { className: "sheet-stat-row" },
@@ -25784,6 +26049,44 @@ function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
                 React.createElement("button", { onClick: onConfirm, className: "btn btn-danger", type: "button" }, t('dropConfirmButton'))))));
 }
 // ---- Combat ----
+// Rank insignia for one enemy — 1 to 5 gold chevrons (Λ) stacked like a
+// military sleeve stripe: the more chevrons, the tougher the opponent, so the
+// player can size up a fight at a glance instead of guessing from the name.
+// The count is the enemy's ENEMY_TIERS bracket (see ENEMY_TIER_RANKS). Inline
+// SVG so it stays crisp at any zoom/DPR, and absolutely positioned inside the
+// portrait (see .combat-rank-badge) so a taller or shorter stack never
+// changes the card's footprint — same rule as the role/protect badges beside
+// it. Every chevron is drawn twice: a dark, slightly fatter copy underneath
+// as a thin outline (bare gold vanishes against the gold-toned portrait
+// art), then the gold shape on top.
+function EnemyRankBadge({ tier, t }) {
+    const rank = ENEMY_TIER_RANKS[tier];
+    if (!rank)
+        return null;
+    const label = t('combatRankLabel') + ' ' + rank + ': ' + t(COMBAT_TIER_LABEL_KEYS[tier]);
+    // SVG user units: each chevron is a band whose arms run 8 across x 5 down
+    // with a 2.6 vertical thickness, stacked 5 apart — thick stripes with a
+    // thin gap between rows, like the woven bands on a real insignia. 1.2 of
+    // padding above the first apex and ~1.4 below the last row leave room for
+    // the outline.
+    const vbWidth = 20;
+    const step = 5;
+    const thick = 2.6;
+    // Rounded so float noise (13.799999999999999) never lands in the DOM.
+    const r = n => Math.round(n * 100) / 100;
+    const vbHeight = r(10.2 + (rank - 1) * step);
+    const remPerUnit = 1.3 / vbWidth;
+    const shapes = [];
+    for (let i = 0; i < rank; i++) {
+        const y = r(1.2 + i * step);
+        const pts = '2,' + r(y + 5) + ' 10,' + y + ' 18,' + r(y + 5) + ' 18,' + r(y + 5 + thick) + ' 10,' + r(y + thick) + ' 2,' + r(y + 5 + thick);
+        shapes.push(React.createElement("polygon", { key: i, points: pts }));
+    }
+    return (React.createElement("span", { className: "combat-rank-badge", role: "img", "aria-label": label, title: label },
+        React.createElement("svg", { viewBox: '0 0 ' + vbWidth + ' ' + vbHeight, style: { width: (vbWidth * remPerUnit).toFixed(3) + 'rem', height: (vbHeight * remPerUnit).toFixed(3) + 'rem' }, "aria-hidden": "true" },
+            React.createElement("g", { className: "combat-rank-outline" }, shapes),
+            React.createElement("g", { className: "combat-rank-fill" }, shapes))));
+}
 // One combatant's "portrait" — a tall rectangle (exactly the shape asked
 // for: room for a future hero/ally/enemy portrait image later) showing
 // name, an aggregate HP bar summed across every body part (see
@@ -25796,7 +26099,7 @@ function DropConfirmModal({ itemName, onConfirm, onCancel, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor, role, protectTarget }) {
+function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isActive, targetable, onClick, healTargetable, onHealClick, t, variant, fx, dmgPopup, portraitRef, armor, role, tier, protectTarget }) {
     const keys = Object.keys(parts);
     const maxHp = keys.reduce((sum, k) => sum + parts[k].maxHp, 0);
     const hp = keys.reduce((sum, k) => sum + Math.max(0, parts[k].hp), 0);
@@ -25847,6 +26150,7 @@ function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isActive, targ
                     : React.createElement("img", { className: "combat-portrait-frame-img", src: COMBAT_PORTRAIT_ICON, alt: "" })),
             role && !isDown && !isFled && (React.createElement("span", { className: "combat-role-badge", title: t(COMBAT_ROLE_LABEL_KEYS[role]), "aria-hidden": "true" }, ENEMY_ROLE_ICONS[role])),
             protectTarget && !isDown && !isFled && (React.createElement("span", { className: "combat-protect-badge", title: t('combatProtectTargetLabel'), "aria-hidden": "true" }, "\u2764\uFE0F")),
+            tier && !isDown && !isFled && React.createElement(EnemyRankBadge, { tier: tier, t: t }),
             React.createElement("div", { className: "combat-portrait-overlay" },
                 React.createElement("div", { className: "combat-portrait-note-slot" }, isDown && React.createElement("p", { className: "equip-slot-occupied-note" }, t('combatPartDisabledSuffix'))),
                 React.createElement("p", { className: "combat-portrait-name" }, name),
@@ -26261,7 +26565,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
                             React.createElement("img", { src: COMBAT_INTRO_SWORD_ICON, alt: "" })),
                         React.createElement("div", { className: "combat-intro-flash" }),
                         introSparksRef.current.map((s, i) => (React.createElement("span", { key: i, className: "combat-intro-spark", style: { '--dx': s.dx, '--dy': s.dy, animationDelay: s.delay + 'ms' } })))))),
-                React.createElement("div", { className: "combat-row combat-row-enemies", ref: enemyRowRef }, visibleEnemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, role: enemy.role, t: t })))),
+                React.createElement("div", { className: "combat-row combat-row-enemies", ref: enemyRowRef }, visibleEnemies.map((enemy, i) => (React.createElement(CombatPortrait, { key: enemy.id, name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isActive: !combat.result && current && current.type === 'enemy' && current.id === enemy.id, targetable: isHeroTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: () => onAttack(enemy.id), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, role: enemy.role, tier: enemy.tier, t: t })))),
                 React.createElement("div", { className: "combat-row combat-row-party" },
                     alliesLeft.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isBodyDestroyed(ally.parts), isFled: !!ally.fled, isLeaving: isCardOut('ally', ally), isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, t: t }))),
                     React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: () => pickHealTarget('hero', null), variant: "hero", fx: fx['hero:hero'], dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armor: heroArmor, t: t }),
@@ -26555,7 +26859,14 @@ const MAP_KIND_LABEL_KEYS = { settlement: 'mapKindSettlement', wilderness: 'mapK
 // pixel of drag. Node layout itself (gx/gy) is plain data and rendered
 // normally through React; only the transform that pans/zooms the world is
 // pushed straight to the DOM.
-function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, onCancelTravel, onDismissArrow, pendingMapTravel, t }) {
+function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onClose, onRequestTravel, onCancelTravel, onDismissArrow, pendingMapTravel, t }) {
+    // Which nodes get the battle badge below — see WORLD_EVENT_RECENT_COUNT
+    // above EMPTY_STATE for why this is "recent among logged events" rather
+    // than a turn-count window. A node can appear here whether or not it's
+    // been discovered yet (see the fog-node rendering block below) — the
+    // hero doesn't need to have been there for the war to have moved through
+    // it.
+    const recentBattleNodeIds = new Set((worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId));
     const viewportRef = useRef(null);
     const worldRef = useRef(null);
     const centerOnHeroRef = useRef(() => { });
@@ -27084,7 +27395,10 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card map-card" },
-            React.createElement("h2", { className: "modal-title" }, t('mapModalTitle')),
+            React.createElement("h2", { className: "modal-title" },
+                t('mapModalTitle'),
+                " ",
+                React.createElement("span", { className: "map-day-phase-indicator", title: t(dayPhase === 'night' ? 'dayPhaseNightLabel' : 'dayPhaseDayLabel'), "aria-hidden": "true" }, dayPhase === 'night' ? '🌙' : '☀️')),
             React.createElement("button", { type: "button", className: 'map-legend-toggle' + (legendOpen ? ' map-legend-toggle-open' : ''), onClick: () => setLegendOpen(v => !v), "aria-expanded": legendOpen },
                 React.createElement("span", { className: "map-legend-toggle-arrow", "aria-hidden": "true" }, "\u25B8"),
                 t('mapLegendToggle')),
@@ -27117,7 +27431,10 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                             t('mapLegendDanger')),
                         React.createElement("span", { className: "map-legend-item" },
                             React.createElement("span", { className: "map-node-stairs-badge map-legend-stairs-badge", "aria-hidden": "true" }, "\u21C5"),
-                            t('mapLegendVerticalLink'))))),
+                            t('mapLegendVerticalLink')),
+                        React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-node-battle-badge map-legend-battle-badge", "aria-hidden": "true" }, "\u2694"),
+                            t('mapLegendRecentBattle'))))),
             React.createElement("form", { className: "map-search-row", onSubmit: handleMapSearch },
                 React.createElement("input", { type: "text", className: "map-search-input", value: searchQuery, onChange: e => { setSearchQuery(e.target.value); setSearchMissed(false); }, placeholder: t('mapSearchPlaceholder'), "aria-label": t('mapSearchAria') }),
                 React.createElement("button", { type: "submit", className: "map-search-btn", "aria-label": t('mapSearchAria'), title: t('mapSearchAria') }, "\uD83D\uDD0D")),
@@ -27179,7 +27496,8 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                                     React.createElement("span", null)),
                                 React.createElement("span", { className: 'map-node-icon' + (isCurrent ? ' map-node-icon-hero' : quest ? ' map-node-icon-quest' : '') + (territoryHostile ? ' map-node-icon-hostile-territory' : territoryResentful ? ' map-node-icon-resentful-territory' : territoryAllied ? ' map-node-icon-allied-territory' : territoryFriendly ? ' map-node-icon-friendly-territory' : ''), title: n.faction || undefined }, isCurrent ? '' : (MAP_KIND_ICONS[n.kind] || '📍')),
                                 n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!"),
-                                hasVerticalLink && React.createElement("span", { className: "map-node-stairs-badge", title: t('mapVerticalLinkAria'), "aria-hidden": "true" }, "\u21C5")),
+                                hasVerticalLink && React.createElement("span", { className: "map-node-stairs-badge", title: t('mapVerticalLinkAria'), "aria-hidden": "true" }, "\u21C5"),
+                                recentBattleNodeIds.has(n.id) && React.createElement("span", { className: "map-node-battle-badge", title: t('mapLegendRecentBattle'), "aria-hidden": "true" }, "\u2694")),
                             React.createElement("span", { className: 'map-node-label' + (isCurrent ? ' map-node-label-hero' : '') }, n.name),
                             open && (n.description || n.danger || isMapNodeCleared(n) || progressPct !== null) && (React.createElement("div", { className: "map-node-desc", onClick: e => e.stopPropagation() },
                                 progressPct !== null && React.createElement("p", { className: "map-node-progress-tag" }, `[${n.name} — ${progressPct}%]`),
@@ -27201,7 +27519,8 @@ function MapModal({ map, quests, factionReputations, onClose, onRequestTravel, o
                             } } },
                             React.createElement("span", { className: "map-node-icon-wrap" },
                                 React.createElement("span", { className: "map-node-icon map-node-icon-fog" }, "?"),
-                                n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!")),
+                                n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!"),
+                                recentBattleNodeIds.has(n.id) && React.createElement("span", { className: "map-node-battle-badge", title: t('mapLegendRecentBattle'), "aria-hidden": "true" }, "\u2694")),
                             open && (React.createElement("div", { className: "map-node-desc" },
                                 n.danger && React.createElement("p", { className: "map-node-danger-text" },
                                     "\u26A0 ",
@@ -28691,7 +29010,7 @@ THE PLAYER'S HERO: ${heroName}${heroConcept ? ', ' + heroConcept : ''}${summaryS
 CURRENT GAME STATE (take this into account and do not contradict it):
 ${JSON.stringify(state)}${partySection}` };
     }
-    function buildNarrativeSystemPrompt(state, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck) {
+    function buildNarrativeSystemPrompt(state, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck, worldTickEvent) {
         const { narrativeLanguage, context, partyMemberNames } = sharedContext(state);
         const isOpeningTurn = state === EMPTY_STATE;
         let ruleNum = 10;
@@ -28862,6 +29181,45 @@ ${JSON.stringify(state)}${partySection}` };
         const factionTrustGateRule = knownFactionReputations.length > 0
             ? `\n${factionTrustGateRuleNum}. FACTION TRUST GATES ACCESS: standing with a faction (see "HERO'S STANDING WITH FACTIONS" above) isn't just a number merchants price off of — it gates what its own members are willing to offer. For a faction where the hero's standing hasn't reached Ally yet, its members keep the hero at arm's length: ordinary, public-facing tasks and dealings only, never the faction's real secrets, inner jobs, or anything reserved for someone they actually trust — no matter how the hero asks or what's offered in return.${alliedFactionNames.length > 0 ? ` With ${alliedFactionNames.join(', ')}, the hero has earned real trust — members of ${alliedFactionNames.length > 1 ? 'these factions' : 'this faction'} may now offer their genuinely exclusive, higher-stakes work (a real job for the guild itself, privileged information, access an ordinary outsider never gets) when the scene calls for it.` : ''}`
             : '';
+        // Always present (dayPhase always resolves to 'day' or 'night', even on
+        // a save from before this field existed — see EMPTY_STATE/
+        // normalizeGameState) rather than gated like the rules around it.
+        const dayPhaseRuleNum = ++ruleNum;
+        const isNight = state.dayPhase === 'night';
+        const dayPhaseRule = `\n${dayPhaseRuleNum}. TIME OF DAY — it is currently ${isNight ? 'NIGHT' : 'DAY'} in the story: ${isNight
+            ? `most ordinary shops, stalls, and public services are shut for the night, and any character not already established as active after dark defaults to being asleep, off duty, or simply not around if the hero goes looking for them. Roads and wild places carry more risk than by day — bandits, predators, and patrols on edge are more plausible here than at noon. Guards and watchmen are more suspicious of anyone found abroad and quicker to challenge them.`
+            : `ordinary daytime activity — shops open, streets and roads busier, most people going about their business as usual.`} None of this is absolute — a specific character's own habits, or something the story genuinely needs, can override the default — but it's the default unless the scene has a real reason to break it. If the scene's own events plausibly carry the story from day into night or back again (a long journey, hours spent somewhere, a night's rest passing), let that show naturally in the prose; there's no need to announce the shift explicitly.`;
+        // Background world state the hero isn't necessarily present for — see
+        // the WORLD REACTIVITY section (pickWorldTickEvent/
+        // computeFactionTerritoryCounts) above EMPTY_STATE. worldTickEvent is
+        // this turn's own background flip, if pickWorldTickEvent rolled one;
+        // state.heroDeeds is the hero's own recent kill log. Gated on actually
+        // having something to say — most turns, none of these three fire.
+        const factionsAtWarForBriefing = (Array.isArray(state.factions) ? state.factions : []).filter(f => (f.relations || []).some(r => r.stance === 'war'));
+        const territoryCountsForBriefing = factionsAtWarForBriefing.length > 0 ? computeFactionTerritoryCounts(state.factions, state.map ? state.map.nodes : []) : [];
+        const warSummaryParts = [];
+        const reportedWarPairs = new Set();
+        for (const f of factionsAtWarForBriefing) {
+            for (const r of f.relations) {
+                if (r.stance !== 'war')
+                    continue;
+                const pairKey = [f.name.toLowerCase(), r.faction.toLowerCase()].sort().join('__');
+                if (reportedWarPairs.has(pairKey))
+                    continue;
+                reportedWarPairs.add(pairKey);
+                const c1 = (territoryCountsForBriefing.find(c => c.name === f.name) || {}).count || 0;
+                const c2 = (territoryCountsForBriefing.find(c => c.name === r.faction) || {}).count || 0;
+                warSummaryParts.push(`${f.name} (${c1} location${c1 === 1 ? '' : 's'}) vs ${r.faction} (${c2} location${c2 === 1 ? '' : 's'})`);
+            }
+        }
+        const recentEventText = worldTickEvent ? `${worldTickEvent.toFaction} just took ${worldTickEvent.locationName} from ${worldTickEvent.fromFaction} — entirely off-page, without the hero present.` : '';
+        const recentDeedsText = (state.heroDeeds && state.heroDeeds.length > 0)
+            ? state.heroDeeds.slice(-3).map(d => `killed ${d.npcName}${d.locationName ? ` near ${d.locationName}` : ''}`).join('; ')
+            : '';
+        const worldRuleNum = (warSummaryParts.length > 0 || recentEventText || recentDeedsText) ? ++ruleNum : null;
+        const worldRule = (warSummaryParts.length > 0 || recentEventText || recentDeedsText)
+            ? `\n${worldRuleNum}. THE WORLD KEEPS MOVING: events keep happening beyond whatever the hero is doing right now — territory can already change hands off-page, before this scene even starts.${warSummaryParts.length > 0 ? ` Current standing of an ongoing war: ${warSummaryParts.join('; ')}.` : ''}${recentEventText ? ` JUST HAPPENED, THIS TURN, ENTIRELY OFF-PAGE: ${recentEventText} The hero wasn't there and doesn't automatically know about it — only reflect it directly in the scene if the hero is actually arriving at or already in ${worldTickEvent.locationName} right now (show the aftermath: signs of fighting, a changed garrison, a shaken populace), or if a character present would plausibly have heard and mentions it in passing. Otherwise leave it unmentioned this turn; it'll still be there to discover later.` : ''}${recentDeedsText ? ` The hero has recently: ${recentDeedsText}. When it genuinely fits the scene — never forced — a character who's heard of this may reference it: a rumor, a changed reputation, a wary glance, even a nickname the hero has picked up locally. This should be occasional color, not something every scene leans on.` : ''}`
+            : '';
         const partyRuleNum = partyMemberNames.length > 0 ? ++ruleNum : null;
         const partyRule = partyMemberNames.length > 0
             ? `\n${partyRuleNum}. PARTY MEMBERS: everyone named above under "CURRENT PARTY" travels with the hero as an established companion. Give them real presence in the scene — their own reactions, initiative, and dialogue — rather than reducing them to silent background or forgetting they're there. If the scene puts the hero in danger, a companion can be threatened, hurt, exhausted, or otherwise affected too, exactly like the hero can; reflect that naturally in the prose rather than treating them as invulnerable set dressing.`
@@ -28911,7 +29269,7 @@ GAME MASTER RULES:
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
 8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands. The one exception: a merchant or vendor buying or selling their ordinary goods from/to the hero is never written as a completed exchange here at all, with or without a number — see the trade rule below.
 9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.
-10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${partyRule}${pendingSecretsRule}
+10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${worldRule}${partyRule}${pendingSecretsRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own — just the scene itself.`;
     }
@@ -29024,10 +29382,11 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "unyielding": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "dayPhase": "day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "unyielding": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
+"dayPhase" is EXACTLY "day" or "night" — a coarse, mechanical reading of "time" above, not a separate judgment call. Toggle it only when the scene you just read genuinely crosses that line (dusk settling in, dawn breaking, a night passing during rest) — on every other turn, simply repeat whatever "dayPhase" the state above already carries, unchanged.
 "health" is an integer from 1 to 1000 representing the hero's CURRENT physical condition right now — how banged up, exhausted, or healed-up they are THIS turn — and must never exceed "maxHealth" (below). Calibrate against this anchor: an ordinary healthy adult sits around 50 — treat that as the normal baseline, not a low score. 1 is at death's door. Values climb above 50 only for genuinely superior physical condition (a seasoned soldier, a battle-hardened veteran, a powerful monster), reaching into the hundreds solely for truly exceptional beings, with 1000 reserved for an actual deity or equivalent cosmic-tier being. Adjust it plausibly, relative to that baseline, based on injury, healing, exhaustion, etc. — it moves scene to scene, dropping with harm and rising back up toward "maxHealth" with rest, healing, or recovery, but never past it.
 "maxHealth" is an integer from 1 to 1000 representing the hero's overall physical CAPACITY at their best — the ceiling "health" recovers toward, not their condition in this exact moment. Use the exact same 1-1000 scale and baseline-50 calibration as "health" above, but treat it like "stats" below: a lasting trait, not a momentary reading. Do NOT lower it for a temporary injury, a hard fight, or ordinary exhaustion — that's what dragging "health" below it is for. Change "maxHealth" only for a real, lasting reason: significant training or conditioning over time, a permanent crippling injury, a major magical or physical transformation, or similar genuine long-term growth or decline established by the story. On the large majority of turns, simply repeat the value already tracked in the state above unchanged.
 "psyche" is an integer from 1 to 1000 representing the hero's CURRENT mental/spiritual state right now — in settings with magic, this doubles as their currently available magical reserve (spend it on spellcasting, replenish it with rest) — and must never exceed "maxPsyche" (below). Use the same calibration as health: an ordinary person sits around 50, the hundreds are for truly exceptional willpower or magical power, and 1000 is reserved for a deity-tier being. Adjust it based on emotional strain, trauma, willpower, fear, or spellcasting — it moves scene to scene, dropping with strain or spent magic and rising back up toward "maxPsyche" with rest or recovery, but never past it.
@@ -29105,7 +29464,7 @@ Rules:
 - "healthAfter" is an integer from 1 to 1000, using the same calibration as the hero's health elsewhere: someone freshly brought back from death is usually weak, generally well below the ordinary baseline of 50, unless the resurrection is especially potent.`;
     }
     // ---- NARRATIVE GENERATION ----
-    async function generateNarrative(historyMessages, currentState, actionCheck) {
+    async function generateNarrative(historyMessages, currentState, actionCheck, worldTickEvent) {
         // Always covers at least RECENT_TURN_WINDOW, but never less than
         // "everything since the last narrativeSummary fold-in" — see
         // SUMMARY_BATCH_SIZE: updateNarrativeSummary only runs every few turns
@@ -29147,7 +29506,7 @@ Rules:
         pendingTravelEventRef.current = [];
         const justPartyEvents = pendingPartyEventsRef.current;
         pendingPartyEventsRef.current = [];
-        const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck);
+        const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck, worldTickEvent);
         setStreamingText('');
         try {
             const text = await callGeminiStreaming(system, apiMessages, setStreamingText);
@@ -29950,6 +30309,7 @@ ${chunkText}`;
             : currentState.effects;
         const state = {
             time: parsed.time || currentState.time,
+            dayPhase: (parsed.dayPhase === 'day' || parsed.dayPhase === 'night') ? parsed.dayPhase : (currentState.dayPhase || 'day'),
             health: Math.min(clampVital(parsed.health, currentState.health), maxHealth),
             maxHealth,
             psyche: Math.min(clampVital(parsed.psyche, currentState.psyche), maxPsyche),
@@ -29969,6 +30329,18 @@ ${chunkText}`;
             quests,
             map,
             factions: reconcileFactions(parsed.factions, currentState.factions),
+            // worldEvents just carries forward here — callGameMaster appends this
+            // turn's own background tick (if pickWorldTickEvent rolled one) as a
+            // post-step, since that's computed from currentState (before this
+            // turn) rather than anything the model parsed above.
+            worldEvents: currentState.worldEvents || [],
+            // New entries built from this turn's justKilled (see reconcileNpcs
+            // above) — this log only ever grows from an actual confirmed kill,
+            // never from anything the model merely narrates without it landing
+            // in "dead": true.
+            heroDeeds: justKilled.length > 0
+                ? normalizeHeroDeeds([...(currentState.heroDeeds || []), ...justKilled.map(name => ({ npcName: name, locationName: currentLocationName || '' }))])
+                : (currentState.heroDeeds || []),
             // Reconciled from the SAME response as everything else above now —
             // "secretsText" is extracted from this scene's hidden layer, so it's
             // naturally the same call that decides whether one of its plans is
@@ -30895,11 +31267,32 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const combatStillPending = !!(precedingNarrator && precedingNarrator.combatEncounter && !precedingNarrator.combatResolved);
         const lastPlayerMessage = (isOpeningTurn || combatStillPending) ? null : [...historyMessages].reverse().find(m => m.role === 'player');
         const actionCheck = lastPlayerMessage ? await generateActionCheck(lastPlayerMessage.text, currentState, precedingNarrator) : null;
-        const narrative = await generateNarrative(historyMessages, currentState, actionCheck);
+        // Rolled from currentState — i.e. the world exactly as of the START of
+        // this turn, before anything below can touch it — so a flip here can
+        // never depend on (or collide with) whatever this same turn's own
+        // narrative and state extraction are about to decide. See the WORLD
+        // REACTIVITY section (pickWorldTickEvent) above EMPTY_STATE. Skipped
+        // entirely on the opening turn: currentState.map has no nodes yet.
+        const worldTickEvent = isOpeningTurn ? null : pickWorldTickEvent(currentState.factions, currentState.map.nodes, currentState.map.currentId);
+        const narrative = await generateNarrative(historyMessages, currentState, actionCheck, worldTickEvent);
         const combined = await withRateLimitRetry(() => generateStateAndEvents(narrative, currentState, precedingNarrator, isOpeningTurn, turnIndex)).catch(e => {
             console.error('[Grimoire] generateStateAndEvents failed, character sheet NOT updated this turn:', e);
             return EMPTY_STATE_AND_EVENTS_FALLBACK(currentState, precedingNarrator, isOpeningTurn);
         });
+        // Applied here, once, after generateStateAndEvents has already produced
+        // its own next-turn map/worldEvents — rather than inside that function
+        // or folded into pickWorldTickEvent itself — so this turn's own
+        // narrator-driven map changes (travel, discovery, an in-scene faction
+        // handover) are never overwritten by this unrelated background system,
+        // only added to. See pickWorldTickEvent's own comment for why it's
+        // already guaranteed not to target the hero's current location.
+        const finalState = worldTickEvent
+            ? {
+                ...combined.state,
+                map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldTickEvent.locationId ? { ...n, faction: worldTickEvent.toFaction } : n) },
+                worldEvents: normalizeWorldEvents([...(combined.state.worldEvents || []), worldTickEvent])
+            }
+            : combined.state;
         const tokenUsage = usageAccumulatorRef.current.output;
         const declaredOffers = combined.itemOffers;
         // A "surprise" item might also have its own proper declared offer this
@@ -30918,7 +31311,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         return {
             narrative,
             secrets: combined.secretsText || '',
-            state: combined.state,
+            state: finalState,
             suggestions: combined.suggestions,
             itemOffers: surpriseGroup ? [...declaredOffers, surpriseGroup] : declaredOffers,
             questOffers: combined.questOffers,
@@ -34441,7 +34834,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
         cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
-        mapModalOpen && (React.createElement(MapModal, { map: gameState.map, quests: gameState.quests, factionReputations: factionReputations, onClose: () => setMapModalOpen(false), onRequestTravel: requestMapTravel, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: pendingMapTravel, t: t })),
+        mapModalOpen && (React.createElement(MapModal, { map: gameState.map, quests: gameState.quests, factionReputations: factionReputations, worldEvents: gameState.worldEvents, dayPhase: gameState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: requestMapTravel, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: pendingMapTravel, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
@@ -34946,6 +35339,22 @@ const APP_STYLES = `
     font-size: 0.85rem; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
   }
   .combat-protect-badge { left: auto; right: 0.2rem; }
+  /* Enemy rank chevrons (see EnemyRankBadge) — 1-5 bare gold chevrons in the
+     portrait's top-right corner, mirroring the role badge in the top-left.
+     Absolutely positioned inside the portrait like its siblings, so a rank-1
+     vs rank-5 stack never changes the card's footprint. Only enemies get
+     one, so it can share the corner with the ally-only .combat-protect-badge
+     without ever colliding. No backing plate — the dark outline layer and
+     the drop shadow are what keep the gold readable over the portrait art,
+     which is itself gold-toned. */
+  .combat-rank-badge {
+    position: absolute; top: 0.25rem; right: 0.25rem; z-index: 2;
+    display: block; line-height: 0; color: #e0b010;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+  }
+  .combat-rank-badge svg { display: block; }
+  .combat-rank-outline { fill: var(--stone-950); stroke: var(--stone-950); stroke-width: 2; stroke-linejoin: round; }
+  .combat-rank-fill { fill: currentColor; stroke: none; }
   /* Name/HP sit on a bottom scrim over the image instead of pushing it
      down, so the frame stays exactly the size of the image (no dead space
      above or below it). */
@@ -35602,6 +36011,15 @@ const APP_STYLES = `
   .map-node-stairs-badge { position: absolute; top: -4px; left: -4px; width: 13px; height: 13px; border-radius: 50%; background: var(--sky-700, #0369a1); color: var(--amber-50); font-family: var(--font-mono); font-size: 8px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 3px rgba(0,0,0,0.7); z-index: 3; }
   .map-legend-stairs-badge { position: static; display: inline-flex; }
   .map-legend-danger-badge { position: static; display: inline-flex; }
+  /* Bottom-right — the one remaining free corner once danger (top-right)
+     and stairs (top-left) are accounted for, so a node can show all three
+     badges at once without any of them overlapping. */
+  .map-node-battle-badge { position: absolute; bottom: -4px; right: -4px; width: 13px; height: 13px; border-radius: 50%; background: var(--orange-700); color: var(--amber-50); font-family: var(--font-mono); font-size: 8px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 3px rgba(0,0,0,0.7); z-index: 3; }
+  .map-legend-battle-badge { position: static; display: inline-flex; }
+  .map-day-phase-indicator { display: inline-block; font-size: 0.8em; margin-left: 0.3rem; vertical-align: middle; }
+  .rumors-section { margin-top: 0.6rem; }
+  .rumors-list { display: flex; flex-direction: column; gap: 0.35rem; }
+  .rumor-line { font-style: italic; }
   .map-travel-offer { margin: 0.6rem 0 0; }
   .map-travel-toggle-btn { font-size: 1.1rem; }
   .map-travel-queued-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--amber-400); margin: 0.3rem 0 0; }
