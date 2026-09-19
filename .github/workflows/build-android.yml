@@ -36,7 +36,6 @@ jobs:
         run: |
           python3 - <<'PY'
           import re
-
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           with open(manifest_path, 'r', encoding='utf-8') as f:
               manifest = f.read()
@@ -44,7 +43,6 @@ jobs:
           manifest = re.sub(r'(<application\b[^>]*>)', r'\1\n ' + meta_data, manifest, count=1)
           with open(manifest_path, 'w', encoding='utf-8') as f:
               f.write(manifest)
-
           strings_path = 'android/app/src/main/res/values/strings.xml'
           with open(strings_path, 'r', encoding='utf-8') as f:
               strings = f.read()
@@ -60,18 +58,24 @@ jobs:
       - name: Copy the game files into the native project
         run: npx cap sync android
 
-      - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/grimoire.keystore
-
-      - name: Build signed AAB (Play Store)
+      - name: Create keystore and build signed AAB
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         working-directory: android
         run: |
+          keytool -genkeypair \
+            -alias grimoire \
+            -keypass "$KEYSTORE_PASSWORD" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keystore grimoire.keystore \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=GrimoireRPG,OU=GrimoireRPG,O=GrimoireRPG,L=Unknown,S=Unknown,C=DE"
           chmod +x gradlew
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=$PWD/grimoire.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEYSTORE_PASSWORD }}
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias=grimoire \
+            -Pandroid.injected.signing.key.password="$KEYSTORE_PASSWORD"
 
       - name: Upload AAB for Play Store
         uses: actions/upload-artifact@v4
@@ -79,7 +83,7 @@ jobs:
           name: grimoire-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
 
-      - name: Build debug APK (for direct install on phone)
+      - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
 
