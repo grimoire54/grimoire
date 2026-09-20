@@ -17401,6 +17401,12 @@ const TRANSLATIONS = {
         cloudOverwriteConfirmButton: 'Да, перезаписать',
         cloudLoadConfirmButton: 'Да, загрузить',
         cloudDeleteConfirmButton: 'Да, удалить',
+        cloudDeleteAccountButton: 'Удалить аккаунт',
+        cloudDeleteAccountConfirmTitle: 'Удалить аккаунт?',
+        cloudDeleteAccountConfirm: 'Аккаунт и все облачные сохранения будут удалены навсегда. Сохранения на этом устройстве останутся. Отменить это действие невозможно.',
+        cloudDeleteAccountConfirmButton: 'Да, удалить аккаунт',
+        cloudAccountDeletedNotice: 'Аккаунт и облачные сохранения удалены.',
+        privacyLink: 'Политика конфиденциальности',
         cloudCheckEmailNotice: 'Проверь почту и подтверди адрес — после этого сможешь войти.',
         cloudErrorPrefix: 'Ошибка: ',
         cloudLoadingLabel: 'Загрузка…',
@@ -18027,6 +18033,12 @@ const TRANSLATIONS = {
         cloudOverwriteConfirmButton: 'Yes, overwrite',
         cloudLoadConfirmButton: 'Yes, load',
         cloudDeleteConfirmButton: 'Yes, delete',
+        cloudDeleteAccountButton: 'Delete account',
+        cloudDeleteAccountConfirmTitle: 'Delete your account?',
+        cloudDeleteAccountConfirm: "Your account and all cloud saves will be permanently deleted. Saves stored on this device will remain. This can't be undone.",
+        cloudDeleteAccountConfirmButton: 'Yes, delete account',
+        cloudAccountDeletedNotice: 'Your account and cloud saves have been deleted.',
+        privacyLink: 'Privacy Policy',
         cloudCheckEmailNotice: 'Check your email to confirm your address — then you can sign in.',
         cloudErrorPrefix: 'Error: ',
         cloudLoadingLabel: 'Loading…',
@@ -19779,6 +19791,7 @@ const RECENT_TURN_WINDOW = 40;
 // narrator temporarily runs a little past RECENT_TURN_WINDOW while a batch
 // is pending, shrinking back down right after each summary update lands.
 const SUMMARY_BATCH_SIZE = 10;
+const PRIVACY_URL = 'https://grimoire54.github.io/grimoire/privacy.html';
 const SAVE_PREFIX = 'GRIMOIRE-RPG-SAVE-v1:';
 const SAVE_PREFIX_V2 = 'GRIMOIRE-RPG-SAVE-v2:';
 const OPENING_TRIGGER = 'Begin the story: describe the setup and the first scene, and introduce the hero into the world.';
@@ -28976,7 +28989,7 @@ function SettingsModal({ uiLang, onSetLanguage, itemInteractionEnabled, onSetIte
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
-function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSetEmail, cloudPassword, onSetPassword, cloudAuthLoading, cloudAuthError, cloudAuthNotice, onSignInEmail, onSignUpEmail, onSignInGoogle, onSignOut, cloudSaves, cloudSavesLoading, cloudActionSlot, cloudActionError, onSaveSlot, onLoadSlot, onDeleteSlot, cloudConfirm, onConfirmCloudAction, onCancelCloudAction, onClose, t }) {
+function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSetEmail, cloudPassword, onSetPassword, cloudAuthLoading, cloudAuthError, cloudAuthNotice, onSignInEmail, onSignUpEmail, onSignInGoogle, onSignOut, onDeleteAccount, cloudAccountDeleting, cloudSaves, cloudSavesLoading, cloudActionSlot, cloudActionError, onSaveSlot, onLoadSlot, onDeleteSlot, cloudConfirm, onConfirmCloudAction, onCancelCloudAction, onClose, t }) {
     if (!window.supabaseClient) {
         return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
                 onClose(); } },
@@ -28993,12 +29006,13 @@ function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSet
     // GroupModal's dismiss confirm and PartyGearModal's take-back confirm
     // do it that way.
     if (cloudConfirm) {
-        const titleKey = cloudConfirm.action === 'overwrite' ? 'cloudOverwriteConfirmTitle'
-            : cloudConfirm.action === 'load' ? 'cloudLoadConfirmTitle' : 'cloudDeleteConfirmTitle';
-        const textKey = cloudConfirm.action === 'overwrite' ? 'cloudOverwriteConfirm'
-            : cloudConfirm.action === 'load' ? 'cloudLoadConfirm' : 'cloudDeleteConfirm';
-        const buttonKey = cloudConfirm.action === 'overwrite' ? 'cloudOverwriteConfirmButton'
-            : cloudConfirm.action === 'load' ? 'cloudLoadConfirmButton' : 'cloudDeleteConfirmButton';
+        const confirmKeys = {
+            overwrite: ['cloudOverwriteConfirmTitle', 'cloudOverwriteConfirm', 'cloudOverwriteConfirmButton'],
+            load: ['cloudLoadConfirmTitle', 'cloudLoadConfirm', 'cloudLoadConfirmButton'],
+            delete: ['cloudDeleteConfirmTitle', 'cloudDeleteConfirm', 'cloudDeleteConfirmButton'],
+            deleteAccount: ['cloudDeleteAccountConfirmTitle', 'cloudDeleteAccountConfirm', 'cloudDeleteAccountConfirmButton']
+        }[cloudConfirm.action] || ['cloudDeleteConfirmTitle', 'cloudDeleteConfirm', 'cloudDeleteConfirmButton'];
+        const [titleKey, textKey, buttonKey] = confirmKeys;
         return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
                 onCancelCloudAction(); } },
             React.createElement("div", { className: "modal-card" },
@@ -29006,7 +29020,7 @@ function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSet
                 React.createElement("p", { className: "hint-text hint-text-block warning-text" }, t(textKey)),
                 React.createElement("div", { className: "modal-actions" },
                     React.createElement("button", { onClick: onCancelCloudAction, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
-                    React.createElement("button", { onClick: onConfirmCloudAction, className: cloudConfirm.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary', type: "button" }, t(buttonKey))))));
+                    React.createElement("button", { onClick: onConfirmCloudAction, className: (cloudConfirm.action === 'delete' || cloudConfirm.action === 'deleteAccount') ? 'btn btn-danger' : 'btn btn-primary', type: "button" }, t(buttonKey))))));
     }
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
@@ -29045,9 +29059,12 @@ function CloudModal({ cloudUser, cloudAuthMode, onSetAuthMode, cloudEmail, onSet
                             React.createElement("button", { onClick: () => onDeleteSlot(slot), disabled: busy || !save, className: "chip-btn", type: "button" }, t('cloudDeleteButton')))));
                 }),
                 React.createElement("div", { className: "modal-actions" },
-                    React.createElement("button", { onClick: onSignOut, className: "btn btn-ghost", type: "button" }, t('cloudSignOutButton'))),
+                    React.createElement("button", { onClick: onSignOut, disabled: cloudAccountDeleting, className: "btn btn-ghost", type: "button" }, t('cloudSignOutButton')),
+                    React.createElement("button", { onClick: onDeleteAccount, disabled: cloudAccountDeleting, className: "btn btn-danger", type: "button" }, cloudAccountDeleting ? t('cloudLoadingLabel') : t('cloudDeleteAccountButton'))),
                 React.createElement("div", { className: "modal-actions" },
-                    React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))))));
+                    React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))),
+            React.createElement("p", { className: "privacy-footer" },
+                React.createElement("a", { href: PRIVACY_URL, target: "_blank", rel: "noopener noreferrer" }, t('privacyLink'))))));
 }
 function DirectorModal({ value, onChange, onSave, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -29156,6 +29173,7 @@ function App() {
     // other destructive/replacing action in the app (drop item, dismiss
     // companion, restart, ...).
     const [cloudConfirm, setCloudConfirm] = useState(null);
+    const [cloudAccountDeleting, setCloudAccountDeleting] = useState(false);
     const [initializing, setInitializing] = useState(true);
     const [stage, setStage] = useState('setup');
     // -- Setup form: world & hero --
@@ -29925,6 +29943,46 @@ function App() {
             setCloudActionSlot(null);
         }
     }
+    // Permanently deletes the signed-in player's account and every cloud save
+    // with it. The browser can't delete an auth user directly (that needs the
+    // service role), so this calls the delete_my_account() SQL function in
+    // Supabase — a SECURITY DEFINER function that removes only auth.uid()'s
+    // own saves and auth.users row. Local (on-device) saves are left alone.
+    function requestDeleteAccount() {
+        if (!cloudUser)
+            return;
+        setCloudConfirm({ action: 'deleteAccount', slot: null });
+    }
+    async function performDeleteAccount() {
+        if (!cloudUser || !window.supabaseClient)
+            return;
+        setCloudAccountDeleting(true);
+        setCloudActionError(null);
+        try {
+            const { error } = await window.supabaseClient.rpc('delete_my_account');
+            if (error)
+                throw error;
+            try {
+                await window.supabaseClient.auth.signOut({ scope: 'local' });
+            }
+            catch (e) {
+                // the account is already gone server-side; a failed local sign-out
+                // just leaves a dead session that the next auth refresh clears
+            }
+            setCloudSaves([]);
+            setCloudEmail('');
+            setCloudPassword('');
+            setCloudAuthMode('signin');
+            setCloudAuthError(null);
+            setCloudAuthNotice(t('cloudAccountDeletedNotice'));
+        }
+        catch (e) {
+            setCloudActionError(t('cloudErrorPrefix') + e.message);
+        }
+        finally {
+            setCloudAccountDeleting(false);
+        }
+    }
     function confirmCloudAction() {
         if (!cloudConfirm)
             return;
@@ -29936,6 +29994,8 @@ function App() {
             performLoadFromCloudSlot(slot);
         else if (action === 'delete')
             performDeleteCloudSlot(slot);
+        else if (action === 'deleteAccount')
+            performDeleteAccount();
     }
     function cancelCloudAction() {
         setCloudConfirm(null);
@@ -36614,11 +36674,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                     React.createElement("button", { onClick: handleStart, disabled: loading, className: "btn btn-primary btn-large" }, loading ? (React.createElement(React.Fragment, null,
                         React.createElement(Spinner, { size: 18 }),
                         " ",
-                        t('openingBookLoading'))) : t('openBookButton')))),
+                        t('openingBookLoading'))) : t('openBookButton'))),
+                React.createElement("p", { className: "privacy-footer" },
+                    React.createElement("a", { href: PRIVACY_URL, target: "_blank", rel: "noopener noreferrer" }, t('privacyLink')))),
             importModalOpen && (React.createElement(ImportModal, { value: importText, onChange: setImportText, error: importError, onLoad: handleImportSave, onCancel: () => { setImportModalOpen(false); setImportText(''); setImportError(null); }, t: t })),
             settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
             apiKeyGuideOpen && (React.createElement(ApiKeyGuideModal, { apiKey: geminiApiKey, onSetApiKey: setApiKey, onClose: () => setApiKeyGuideOpen(false), t: t })),
-            cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t }))));
+            cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t }))));
     }
     const secretsText = currentTurn && currentTurn.narrator.secrets
         ? currentTurn.narrator.secrets
@@ -36795,7 +36857,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         dropConfirmIndex !== null && (React.createElement(DropConfirmModal, { itemName: (gameState.inventory[dropConfirmIndex] || {}).name || '', onConfirm: () => dropItem(dropConfirmIndex), onCancel: () => setDropConfirmIndex(null), t: t })),
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
-        cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
+        cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
         mapModalOpen && (React.createElement(MapModal, { map: gameState.map, quests: gameState.quests, factionReputations: factionReputations, worldEvents: gameState.worldEvents, dayPhase: gameState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: requestMapTravel, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: pendingMapTravel, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
@@ -36895,6 +36957,9 @@ const APP_STYLES = `
   .party-picker-options { display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .party-picker-hint { margin: 0; }
   .hint-text { font-family: var(--font-mono); font-size: 0.7rem; color: var(--stone-600); margin: 0.5rem 0 0; }
+  .privacy-footer { text-align: center; margin: 1.25rem 0 0; font-family: var(--font-mono); font-size: 0.7rem; }
+  .privacy-footer a { color: var(--stone-600); text-decoration: underline; }
+  .privacy-footer a:hover { color: var(--amber-100); }
   .hint-text-block { margin: 0 0 0.75rem; line-height: 1.5; }
   .warning-text { color: var(--red-400); }
   .export-textarea { font-family: var(--font-mono); font-size: 0.75rem; color: var(--stone-400); background: var(--stone-950); word-break: break-all; }
