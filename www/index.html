@@ -38271,7 +38271,7 @@ async function initAds() {
     } catch (e) { console.warn('AdMob init failed', e); }
 }
 async function maybeShowAd(turnIndex) {
-    if (!isNativeApp() || !admobInterstitialReady || !turnIndex || turnIndex % 5 !== 0) return;
+    if (!isNativeApp() || !admobInterstitialReady || !turnIndex || turnIndex % 4 !== 0) return;
     try {
         const { AdMob } = window.Capacitor.Plugins;
         admobInterstitialReady = false;
