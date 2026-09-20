@@ -58,23 +58,29 @@ jobs:
       - name: Copy the game files into the native project
         run: npx cap sync android
 
-      - name: Create keystore and build signed AAB
+      - name: Decode keystore and detect alias
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android/grimoire.keystore
+          ALIAS=$(keytool -list -keystore android/grimoire.keystore \
+            -storepass "$KEYSTORE_PASSWORD" 2>/dev/null \
+            | grep "PrivateKeyEntry\|SecretKeyEntry\|trustedCertEntry" \
+            | head -1 | awk -F',' '{print $1}' | xargs)
+          echo "Detected alias: $ALIAS"
+          echo "KEY_ALIAS_DETECTED=$ALIAS" >> $GITHUB_ENV
+
+      - name: Build signed AAB
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         working-directory: android
         run: |
-          keytool -genkeypair \
-            -alias grimoire \
-            -keypass "$KEYSTORE_PASSWORD" \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -keystore grimoire.keystore \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=GrimoireRPG,OU=GrimoireRPG,O=GrimoireRPG,L=Unknown,S=Unknown,C=DE"
           chmod +x gradlew
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=$PWD/grimoire.keystore \
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias=grimoire \
+            -Pandroid.injected.signing.key.alias="${{ env.KEY_ALIAS_DETECTED }}" \
             -Pandroid.injected.signing.key.password="$KEYSTORE_PASSWORD"
 
       - name: Upload AAB for Play Store
