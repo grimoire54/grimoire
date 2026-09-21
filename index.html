@@ -17463,6 +17463,11 @@ const TRANSLATIONS = {
         sendTurnButton: 'Дальше',
         sendFailedPrefix: 'Мастер игры не ответил: ',
         rateLimitError: 'У ключа закончились доступные сейчас запросы к нейросети (лимит Gemini API) — он сбрасывается примерно раз в 24 часа. Попробуй вернуться через сутки или используй другой аккаунт с другим ключом.',
+        busyTurnNotice: 'Подожди, пока рассказчик закончит ход.',
+        autosaveFailedNotice: 'Автосохранение не удалось — экспортируй сохранение вручную, чтобы не потерять прогресс.',
+        autosaveUnreadableNotice: 'Не удалось прочитать автосохранение. Его копия сохранена отдельно и не будет затёрта новой игрой.',
+        importReplaceWarning: 'Текущая игра и её автосохранение будут заменены.',
+        importReplaceButton: 'Да, заменить',
         authError: 'Ключ Gemini API не принят — проверь, что он вставлен правильно, в настройках.',
         // -- Turn labels & play-screen menu items --
         playerLabel: 'Ты',
@@ -18095,6 +18100,11 @@ const TRANSLATIONS = {
         sendTurnButton: 'Next',
         sendFailedPrefix: "The game master didn't respond: ",
         rateLimitError: "This key is out of available AI requests for now (Gemini API limit) — it resets roughly once every 24 hours. Try again in a day, or use a different account with a different key.",
+        busyTurnNotice: "Wait for the narrator to finish this turn first.",
+        autosaveFailedNotice: "Autosave failed — export your save manually so you don't lose progress.",
+        autosaveUnreadableNotice: "Couldn't read the autosave. A copy was kept aside, and a new game won't overwrite it.",
+        importReplaceWarning: "The current game and its autosave will be replaced.",
+        importReplaceButton: 'Yes, replace',
         authError: "The Gemini API key wasn't accepted — check that it's entered correctly in settings.",
         // -- Turn labels & play-screen menu items --
         playerLabel: 'You',
@@ -19762,6 +19772,9 @@ const EDIT_WARNING_SKIP_KEY = 'grimoire-rpg-skip-edit-warning';
 // confirm screen.
 const GIFT_CONFIRM_SKIP_KEY = 'grimoire-rpg-skip-gift-confirm';
 const SAVE_KEY = 'grimoire-rpg-save';
+// Raw copy of an autosave that existed but couldn't be read at startup, kept
+// out of reach of the next autosave/new game — see the startup effect in App().
+const SAVE_BACKUP_KEY = 'grimoire-rpg-save-unreadable';
 const API_KEY_STORAGE_KEY = 'grimoire-rpg-gemini-api-key';
 const MODEL_STORAGE_KEY = 'grimoire-rpg-gemini-model';
 // Cache of narrative-belonging classifications — see
@@ -20847,6 +20860,24 @@ function computeSellMultiplier(itemSlot, merchantProfile) {
 function computeHeroSellPrice(item, itemRarities, merchantProfile) {
     const condition = getConditionMultiplierByName(item, itemRarities, CONDITION_MIN_PRICE_MULT);
     return Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * computeSellMultiplier(item.slot, merchantProfile) * condition));
+}
+// The most a merchant will pay for something the hero bought from THAT SAME
+// merchant earlier: a fixed share of what the hero paid. Without it a
+// specialist — who pays 1.4x base for their own line of goods while selling
+// it at 1x, or at 0.7x once the hero's standing with their faction is high —
+// is a money machine: buy an item off the shelf, sell it straight back for
+// more, repeat until the purse runs dry. The record of what was paid lives
+// in shopClock.heroBought[merchant] (see executeTrade), keyed by lowercase
+// item name. Used by both TradeModal's displayed price and executeTrade's
+// payout, exactly like computeHeroSellPrice itself, so the two can't drift.
+const TRADE_RESALE_CAP = 0.85;
+function capResalePrice(price, item, paidLedger) {
+    if (!paidLedger || !item || typeof item.name !== 'string')
+        return price;
+    const paid = paidLedger[item.name.trim().toLowerCase()];
+    if (!Number.isFinite(paid))
+        return price;
+    return Math.min(price, Math.max(1, Math.floor(paid * TRADE_RESALE_CAP)));
 }
 // Buying back something the hero themselves sold this NPC a moment ago
 // (see executeTrade in App(), which tags the item with buybackPrice on its
@@ -22221,6 +22252,28 @@ function normalizeShopClock(raw) {
             if (!normalizedKey || !entry || !Number.isFinite(Number(entry.morning)) || !Number.isFinite(Number(entry.turn)))
                 continue;
             clock.stocked[normalizedKey] = { morning: Math.max(0, Math.round(Number(entry.morning))), turn: Math.max(0, Math.round(Number(entry.turn))) };
+        }
+    }
+    // What the hero paid each merchant for the things they bought there, by
+    // lowercase item name — see capResalePrice. Optional: absent on saves from
+    // before it existed and on a clock that never saw a purchase.
+    if (raw.heroBought && typeof raw.heroBought === 'object') {
+        for (const key of Object.keys(raw.heroBought)) {
+            const ledger = raw.heroBought[key];
+            const normalizedKey = key.trim().toLowerCase();
+            if (!normalizedKey || !ledger || typeof ledger !== 'object')
+                continue;
+            const clean = {};
+            for (const name of Object.keys(ledger)) {
+                const paid = Number(ledger[name]);
+                const nameKey = name.trim().toLowerCase();
+                if (nameKey && Number.isFinite(paid) && paid >= 0)
+                    clean[nameKey] = Math.round(paid);
+            }
+            if (Object.keys(clean).length > 0) {
+                clock.heroBought = clock.heroBought || {};
+                clock.heroBought[normalizedKey] = clean;
+            }
         }
     }
     return clock;
@@ -26454,7 +26507,7 @@ function RestockIcon() {
         React.createElement("path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" }),
         React.createElement("path", { d: "M21 3v5h-5" })));
 }
-function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, equipment, dayPhase, onTrade, onClose, t }) {
+function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, equipment, dayPhase, heroBoughtHere, onTrade, onClose, t }) {
     const npcKey = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
     const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === npcKey);
     const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
@@ -26510,8 +26563,11 @@ function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRar
             setSellPickerSlot(slotIdx);
     }
     const getBuyPrice = (item) => computeNpcBuyPrice(item, itemRarities, buyMultiplier);
-    const getSellPrice = (item) => computeHeroSellPrice(item, itemRarities, merchantProfile);
+    const getSellPrice = (item) => capResalePrice(computeHeroSellPrice(item, itemRarities, merchantProfile), item, heroBoughtHere);
     const getSellPriceArrow = (item) => {
+        // Something bought from this very merchant fetches less than it cost.
+        if (getSellPrice(item) < computeHeroSellPrice(item, itemRarities, merchantProfile))
+            return 'down';
         // Specialty fit AND condition both move the price off the standard one.
         const m = computeSellMultiplier(item.slot, merchantProfile) * getConditionMultiplierByName(item, itemRarities, CONDITION_MIN_PRICE_MULT);
         return m > 1 ? 'up' : (m < 1 ? 'down' : null);
@@ -26797,14 +26853,26 @@ function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, isSlot
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
 // ---- Item detail & drop ----
-function ItemDetailModal({ itemIndex, emptySlotKey, hideDropButton, gameState, itemRarities, equipment, party, partyInventories, onDrop, onUse, onEquip, onUnequip, onUnequipSlot, onReplace, onClose, t }) {
+// Wrapper only: bails out when neither the item nor the empty slot this popup
+// was opened for still exists (e.g. the item left the bag while the popup was
+// open). That early return can't live inside ItemDetailModalContent itself —
+// it would sit above the component's hooks, and a render that bailed after
+// earlier renders had run them throws "rendered fewer hooks than expected"
+// and blanks the whole app. Split out here, the content component simply
+// unmounts instead.
+function ItemDetailModal(props) {
+    const { itemIndex, emptySlotKey, gameState } = props;
+    const item = itemIndex != null ? gameState.inventory[itemIndex] : null;
+    if (!item && !emptySlotKey)
+        return null;
+    return React.createElement(ItemDetailModalContent, { ...props });
+}
+function ItemDetailModalContent({ itemIndex, emptySlotKey, hideDropButton, gameState, itemRarities, equipment, party, partyInventories, onDrop, onUse, onEquip, onUnequip, onUnequipSlot, onReplace, onClose, t }) {
     // itemIndex is null when this popup was opened straight from an EMPTY
     // paper-doll slot (see EquipmentModal) — emptySlotKey carries which slot
     // that was instead. Either itemIndex or emptySlotKey must be set; if
     // neither resolves to anything real, there's nothing to show.
     const item = itemIndex != null ? gameState.inventory[itemIndex] : null;
-    if (!item && !emptySlotKey)
-        return null;
     // The paper-doll slot this popup is anchored to — captured once at mount
     // rather than re-derived on every render. That keeps the carousel below
     // anchored to the same slot (e.g. "boots") for the whole time this popup
@@ -29102,17 +29170,25 @@ function ExportModal({ exportText, generating, copyFeedback, onCopy, onDownload,
                 React.createElement("button", { onClick: onDownload, disabled: generating, className: "btn btn-ghost export-action-btn", type: "button" }, t('downloadButton')),
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary export-copy-btn", type: "button" }, t('closeButton'))))));
 }
-function ImportModal({ value, onChange, error, onLoad, onCancel, t }) {
+function ImportModal({ value, onChange, error, onLoad, onCancel, replacesCurrentGame, t }) {
+    // Importing replaces the game in progress AND its autosave, so when there is
+    // one the first press only asks; the second one goes ahead. Editing the text
+    // starts the question over.
+    const [confirming, setConfirming] = useState(false);
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onCancel(); } },
         React.createElement("div", { className: "modal-card" },
             React.createElement("h2", { className: "modal-title" }, t('importTitle')),
             React.createElement("p", { className: "hint-text hint-text-block" }, t('importExplain')),
-            React.createElement("textarea", { value: value, onChange: e => onChange(e.target.value), placeholder: "GRIMOIRE-RPG-SAVE-v2:...", rows: 6, className: "text-field textarea-field", autoFocus: true }),
+            React.createElement("textarea", { value: value, onChange: e => { setConfirming(false); onChange(e.target.value); }, placeholder: "GRIMOIRE-RPG-SAVE-v2:...", rows: 6, className: "text-field textarea-field", autoFocus: true }),
+            replacesCurrentGame && React.createElement("p", { className: confirming ? 'error-text' : 'hint-text hint-text-block' }, t('importReplaceWarning')),
             error && React.createElement("div", { className: "error-text" }, error),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
-                React.createElement("button", { onClick: onLoad, disabled: !value.trim(), className: "btn btn-primary", type: "button" }, t('loadButton'))))));
+                React.createElement("button", { onClick: () => { if (replacesCurrentGame && !confirming) {
+                        setConfirming(true);
+                        return;
+                    } onLoad(); }, disabled: !value.trim(), className: confirming ? 'btn btn-danger' : 'btn btn-primary', type: "button" }, confirming ? t('importReplaceButton') : t('loadButton'))))));
 }
 // ---- Confirmation dialogs ----
 function RestartConfirmModal({ onConfirm, onCancel, t }) {
@@ -29193,6 +29269,20 @@ function App() {
     const [gameState, setGameState] = useState(EMPTY_STATE);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    // Short notice chip at the bottom of the screen — holds a translation key,
+    // or null. See flashNotice.
+    const [noticeKey, setNoticeKey] = useState(null);
+    const noticeTimer = useRef(null);
+    // Set once an autosave failure has been reported and cleared by the next
+    // write that lands, so a full or unavailable storage says so once instead
+    // of on every single turn (see saveGame).
+    const saveFailureShownRef = useRef(false);
+    // Bumped whenever the running summary is thrown away (restart, load, a
+    // regenerate that discards turns the summary had already folded in) so a
+    // summarization that was already in flight can tell its result is stale
+    // and drop it instead of writing the old campaign's summary into the new
+    // one (see updateNarrativeSummary).
+    const summaryEpochRef = useRef(0);
     const [error, setError] = useState(null);
     // -- Character sheet UI --
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -29306,11 +29396,60 @@ function App() {
     const [tradingNpc, setTradingNpc] = useState(null);
     const [repairingNpc, setRepairingNpc] = useState(null);
     // -- Pending turn-resolution refs (cleared each turn) --
-    const pendingJustEquippedRef = useRef([]);
     const pendingJustUsedRef = useRef([]);
     const pendingQuestEventsRef = useRef([]);
     const pendingTravelEventRef = useRef([]);
-    const pendingPartyEventsRef = useRef([]);
+    // The party roster (array of normalized name-keys, same format as `party`)
+    // exactly as the narrator last knew it. Recruit/dismiss no longer log a
+    // note per click (they used to push one into a pending list, so
+    // recruit -> dismiss -> recruit before sending an action put three
+    // contradictory lines into the same prompt). Instead, at the moment the
+    // player actually starts a new turn, generateNarrative diffs the CURRENT
+    // `party` against this baseline and reports only the net change: whoever
+    // is in the party now and wasn't before "joined", whoever was and isn't
+    // now "left", and anyone who round-tripped back to where they started
+    // produces nothing. Kept in sync everywhere the roster changes outside of
+    // a click: seeded by handleStart (starting companions were already
+    // introduced in the opening scene) and applyLoadedSave, cleared by
+    // confirmRestart, and relocated by migratePartyKeys when a companion's
+    // placeholder name is replaced by their real one. null means "no
+    // baseline yet" — generateNarrative then just records one without
+    // reporting anything.
+    const partyRosterSnapshotRef = useRef(null);
+    // While regenerateTurn/regenerateTurnWithEdits has a request in flight,
+    // holds the reputation maps as they will stand once the turns being
+    // discarded are undone: { npcReputations, factionReputations,
+    // npcKindnessCooldowns } (see undoDiscardedTurnsEffects, which computes
+    // them without touching state). The regenerate handlers can't commit that
+    // undo up front — a request that fails would leave the discarded turns on
+    // screen with their effects already reversed, and the retry would reverse
+    // them a second time — and the render closure the request runs in never
+    // sees a state update made mid-handler anyway. So the two places the fresh
+    // attempt itself reads these maps (the narrator prompt, and the kindness
+    // cooldown check in reconcileReputationHits) consult this whenever it is
+    // set, and the handlers commit the result themselves once the request has
+    // succeeded. null the rest of the time.
+    const regenViewRef = useRef(null);
+    // Baseline snapshot of each party member's narrative inventory
+    // (gameState.npcs[key].inventory), taken right after the previous turn's
+    // justPartyEvents were computed — see generateNarrative below. Item
+    // give/take no longer pushes a note per click;
+    // instead, at the moment the player actually starts a new turn,
+    // generateNarrative diffs the CURRENT state against this baseline and
+    // reports only the net change. This way, giving an item, taking it back,
+    // and giving it again in the same turn — before ever sending an action —
+    // nets to a single "gave" note (or none at all, if it round-trips back to
+    // where it started), instead of three separate, noisy, partly-contradictory
+    // log lines all landing in the same prompt. null means "no baseline yet"
+    // (first turn ever, or nothing to diff against) — see generateNarrative for
+    // how that's handled.
+    const partyItemSnapshotRef = useRef(null);
+    // Same diffing idea as partyItemSnapshotRef, for the hero's OWN equipped
+    // gear — see equipItemInSlot: equip/unequip write straight to `equipment`
+    // (React state) with no per-click log anymore. A Set of item names
+    // currently in any equipment slot, taken right after the previous turn's
+    // justEquipped was computed; null means no baseline yet (first turn ever).
+    const heroEquippedSnapshotRef = useRef(null);
     // Set when the player confirms a map-click trip (see requestMapTravel) —
     // holds the destination node id so generateStateAndEvents can force
     // map.currentId to it once this turn resolves, guaranteeing arrival even
@@ -29570,7 +29709,25 @@ function App() {
             try {
                 const saveResult = await window.storage.get(SAVE_KEY, false);
                 if (!cancelled && saveResult && saveResult.value) {
-                    applyLoadedSave(JSON.parse(saveResult.value));
+                    try {
+                        applyLoadedSave(JSON.parse(saveResult.value));
+                    }
+                    catch (loadError) {
+                        // A save is there but it couldn't be read or applied. Swallowing
+                        // that just lands the player on an empty setup screen — and the
+                        // first new game (or the next autosave) would then overwrite the
+                        // only copy. Keep the raw text under its own key first, wipe
+                        // whatever applyLoadedSave managed to set before it threw, and
+                        // say so.
+                        try {
+                            await window.storage.set(SAVE_BACKUP_KEY, saveResult.value, false);
+                        }
+                        catch (backupError) { /* nothing more that can be done */ }
+                        resetCampaignData();
+                        setMessages([]);
+                        setGameState(EMPTY_STATE);
+                        flashNotice('autosaveUnreadableNotice', 9000);
+                    }
                 }
             }
             catch (e) {
@@ -29676,7 +29833,7 @@ function App() {
         // a load would overwrite the save with empty identity fields.
         const identity = nextIdentity || { worldSetting, heroName, heroConcept };
         try {
-            await window.storage.set(SAVE_KEY, JSON.stringify({
+            const stored = await window.storage.set(SAVE_KEY, JSON.stringify({
                 worldSetting: identity.worldSetting, heroName: identity.heroName, heroConcept: identity.heroConcept,
                 messages: nextMessages,
                 gameState: nextState,
@@ -29692,13 +29849,24 @@ function App() {
                 npcCurrencies: nextNpcCurrencies !== undefined ? nextNpcCurrencies : npcCurrencies,
                 shopClock: nextShopClock !== undefined ? nextShopClock : shopClock,
                 partyCurrency: nextPartyCurrency !== undefined ? nextPartyCurrency : partyCurrency,
+                startingPartySize: identity.startingPartySize !== undefined ? identity.startingPartySize : startingPartySize,
                 narrativeSummary: narrativeSummaryRef.current,
                 summarizedUpTo: summarizedUpToRef.current
             }), false);
+            // The storage API reports a write that didn't happen as null rather
+            // than always throwing.
+            if (stored === null)
+                throw new Error('storage write returned null');
+            saveFailureShownRef.current = false;
         }
         catch (e) {
-            // storage unavailable — autosave just won't persist; the player can
-            // still fall back to a manual export/download.
+            // Storage unavailable or full — the game carries on in memory, but the
+            // player has to be told the autosave isn't landing (they can still
+            // export manually). Said once per failure streak, not on every turn.
+            if (!saveFailureShownRef.current) {
+                saveFailureShownRef.current = true;
+                flashNotice('autosaveFailedNotice', 7000);
+            }
         }
     }
     // Lets the player re-enter a hero name that an older build wiped from the
@@ -29711,11 +29879,69 @@ function App() {
         setHeroName(trimmed);
         saveGame(messages, gameState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, npcInventories, npcCurrencies, partyCurrency, { worldSetting, heroName: trimmed, heroConcept });
     }
+    // Per-campaign bookkeeping that lives in refs (and one bit of UI state)
+    // rather than in the saved payload: the notes queued for the next
+    // narrator call (an item just used, a quest just accepted or declined, a
+    // trip just taken), the baselines the party/equipment diffs compare
+    // against, a queued map trip, and the prices a merchant quoted in the
+    // narration. None of it is saved, so a restart or an in-session load has
+    // to clear it by hand — otherwise the previous campaign's leftovers get
+    // sent to the model as part of the new one's very first prompt. A null
+    // baseline just means "nothing to diff against yet" (see
+    // generateNarrative), the same state a fresh launch starts in.
+    function resetPerGameTracking() {
+        summaryEpochRef.current += 1;
+        pendingJustUsedRef.current = [];
+        pendingQuestEventsRef.current = [];
+        pendingTravelEventRef.current = [];
+        pendingMapDestinationRef.current = null;
+        setPendingMapTravel(null);
+        narrativeAskingPricesRef.current = {};
+        heroEquippedSnapshotRef.current = null;
+        partyItemSnapshotRef.current = null;
+        partyRosterSnapshotRef.current = null;
+    }
+    // The data half of a restart: every per-campaign map and counter back to
+    // its empty starting value — none of the setup-screen fields (world, hero)
+    // and none of the screen navigation. Shared by confirmRestart, by
+    // regenerating the opening turn (which discards the whole story after it),
+    // and by the startup load when a save turns out to be unreadable.
+    function resetCampaignData() {
+        setItemRarities({});
+        setNpcReputations({});
+        // Not just mirroring npcReputations' own reset — a stale cooldown entry
+        // surviving into a new game (turnIndex restarting at 1) could otherwise
+        // block that name's very first kindness gain for several turns, since
+        // the cooldown check has no way to know a new game began.
+        setNpcKindnessCooldowns({});
+        setFactionReputations({});
+        setEquipment(EMPTY_EQUIPMENT);
+        setParty([]);
+        setPartyInventories({});
+        setPartyEquipment({});
+        // Companions' own gold is keyed by name like everything above — same
+        // leak into a new campaign if it isn't cleared here.
+        setPartyCurrency({});
+        // Same leak risk, but for trading: without this, an NPC's shop stock/
+        // restock turn and gold purse (and what the hero paid them) from the
+        // PREVIOUS campaign survive in this still-mounted component and silently
+        // attach to any new-game NPC that happens to reuse that name/key — a
+        // real possibility with generic names a fresh setting is likely to reuse.
+        setNpcInventories({});
+        setNpcCurrencies({});
+        setShopClock({ morning: 0, dawnTurn: 0, stocked: {} });
+        narrativeSummaryRef.current = '';
+        summarizedUpToRef.current = 0;
+        // Pending next-turn notes, queued map trip, the diff baselines — see
+        // resetPerGameTracking.
+        resetPerGameTracking();
+    }
     // Applies a fully-loaded save payload (same shape saveGame/buildExportText
     // produce) to live state and mirrors it into the local autosave, so
     // loading from an import, a cloud slot, or the local autosave on startup
     // all leave the app in an identical state afterward.
     function applyLoadedSave(saved) {
+        resetPerGameTracking();
         setWorldSetting(saved.worldSetting || '');
         setHeroName(saved.heroName || '');
         setHeroConcept(saved.heroConcept || '');
@@ -29728,6 +29954,7 @@ function App() {
         setFactionReputations(saved.factionReputations || {});
         const normalizedParty = normalizeParty(saved.party);
         setParty(normalizedParty);
+        partyRosterSnapshotRef.current = [...normalizedParty];
         const normalizedEquipment = normalizeEquipment(saved.equipment);
         setEquipment(normalizedEquipment);
         const normalizedPartyInventories = normalizePartyInventories(saved.partyInventories);
@@ -29742,9 +29969,15 @@ function App() {
         setShopClock(normalizedShopClock);
         const normalizedPartyCurrency = normalizePartyCurrency(saved.partyCurrency);
         setPartyCurrency(normalizedPartyCurrency);
+        // How many starting companions the setup screen asked for — only matters
+        // if the opening turn is regenerated later (see commitOpening); saves
+        // from before it was stored read as 0.
+        const restoredPartySize = Math.round(Number(saved.startingPartySize));
+        const normalizedStartingPartySize = Number.isFinite(restoredPartySize) ? Math.max(0, Math.min(MAX_PARTY_SIZE, restoredPartySize)) : 0;
+        setStartingPartySize(normalizedStartingPartySize);
         narrativeSummaryRef.current = saved.narrativeSummary || '';
         summarizedUpToRef.current = saved.summarizedUpTo || 0;
-        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {}, normalizedNpcInventories, normalizedNpcCurrencies, normalizedPartyCurrency, { worldSetting: saved.worldSetting || '', heroName: saved.heroName || '', heroConcept: saved.heroConcept || '' }, normalizedShopClock);
+        saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {}, normalizedNpcInventories, normalizedNpcCurrencies, normalizedPartyCurrency, { worldSetting: saved.worldSetting || '', heroName: saved.heroName || '', heroConcept: saved.heroConcept || '', startingPartySize: normalizedStartingPartySize }, normalizedShopClock);
         if (saved.messages && saved.messages.length > 0)
             setStage('playing');
     }
@@ -29873,7 +30106,8 @@ function App() {
                 messages: stripEphemeralForExport(messages),
                 gameState,
                 itemRarities, npcReputations, npcKindnessCooldowns, factionReputations, equipment,
-                party, partyInventories, partyEquipment, npcInventories, npcCurrencies, shopClock,
+                party, partyInventories, partyEquipment, partyCurrency, npcInventories, npcCurrencies, shopClock,
+                startingPartySize,
                 narrativeSummary: narrativeSummaryRef.current,
                 summarizedUpTo: summarizedUpToRef.current
             };
@@ -30048,11 +30282,13 @@ function App() {
     // platform bridge handling auth for us. The key travels straight from this
     // browser to generativelanguage.googleapis.com in a request header and
     // nowhere else — there's no backend server in this architecture to send it
-    // through. maxOutputTokens is set to 8192 with thinkingConfig.thinkingBudget
-    // capped at 1024 — Gemini's hidden "thinking" tokens are drawn from the
-    // same budget as the visible output, so leaving maxOutputTokens low (the
-    // old value was 2048, sized for non-thinking models) let thinking alone
-    // eat the whole ceiling and left nothing for the actual scene/JSON. (Gemini
+    // through. maxOutputTokens has gone through several bumps (2048, sized for
+    // non-thinking models -> 8192 -> 32768) and now sits at the model's actual
+    // ceiling, 65536 — Gemini's hidden "thinking" tokens are drawn from the
+    // same budget as the visible output, so leaving maxOutputTokens low let
+    // thinking alone eat the whole ceiling and left nothing for the actual
+    // scene/JSON; thinkingConfig.thinkingBudget is capped at 1024 to bound that
+    // separately. (Gemini
     // 3.x models officially prefer thinkingLevel over thinkingBudget, but
     // thinkingBudget is what's been tested here and it works — if a future
     // model rejects it, that's the first thing to try switching.) The turn is
@@ -30100,6 +30336,36 @@ function App() {
             return t('authError');
         return t(prefixKey) + e.message;
     }
+    // Shared by both callGemini and callGeminiStreaming. maxOutputTokens is now
+    // set to the model's actual ceiling (65536 for the 3.x Flash line — see
+    // DEFAULT_GEMINI_MODEL) rather than leaving half of it unused; Gemini only
+    // bills for tokens actually generated, not for the ceiling itself, so
+    // there's no cost to leaving the full headroom in place. thinkingBudget is
+    // still capped at 1024 so hidden reasoning can't eat the scene's budget —
+    // see the comment further up for that history.
+    //
+    // safetySettings is here for a different failure mode than MAX_TOKENS: a
+    // dark-fantasy narrative (violence, threat, peril) can trip Gemini's
+    // *default* safety thresholds well before it runs out of tokens. When that
+    // happens the response comes back with finishReason "SAFETY" (or
+    // "PROHIBITED_CONTENT" on newer models) instead of "MAX_TOKENS" — the
+    // MAX_TOKENS continuation logic below does nothing for that case, and
+    // without an explicit safetySettings block Google's defaults apply, which
+    // are tuned for general-purpose chat, not narrative fiction with combat
+    // and threat in it. Setting every category's threshold to BLOCK_NONE asks
+    // Gemini to stop cutting the story short over its own genre content; it
+    // does not disable the account-level abuse review Google does separately.
+    // If truncation is still happening after this change, check the browser
+    // console for the "[Grimoire RPG] Gemini finishReason was ..." warning
+    // logged below — that tells you definitively which of the two causes it
+    // still is.
+    const GEMINI_SAFETY_SETTINGS = [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+    ];
+    const GEMINI_GENERATION_CONFIG = { maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 1024 } };
     async function callGemini(system, messages, retriesLeft) {
         if (retriesLeft === undefined)
             retriesLeft = 2;
@@ -30109,17 +30375,8 @@ function App() {
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: system }] },
                 contents: toGeminiContents(messages),
-                // thinkingBudget caps Gemini's hidden reasoning spend so it can't
-                // silently consume the whole maxOutputTokens ceiling and leave
-                // nothing for the actual scene/JSON — see the comment above this
-                // section for the full story. maxOutputTokens itself is raised well
-                // past the old 8192: the default model (see DEFAULT_GEMINI_MODEL)
-                // supports up to 65536, and Gemini only bills for tokens actually
-                // generated, not for the ceiling itself, so there's no cost to
-                // leaving far more headroom than an ordinary turn needs — it only
-                // matters on the rare turn whose state (many npcs/quests/locations
-                // after a long campaign) genuinely runs long.
-                generationConfig: { maxOutputTokens: 32768, thinkingConfig: { thinkingBudget: 1024 } }
+                safetySettings: GEMINI_SAFETY_SETTINGS,
+                generationConfig: GEMINI_GENERATION_CONFIG
             })
         });
         const data = await response.json();
@@ -30175,7 +30432,8 @@ function App() {
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: system }] },
                 contents: toGeminiContents(messages),
-                generationConfig: { maxOutputTokens: 32768, thinkingConfig: { thinkingBudget: 1024 } }
+                safetySettings: GEMINI_SAFETY_SETTINGS,
+                generationConfig: GEMINI_GENERATION_CONFIG
             })
         });
         if (!response.ok) {
@@ -30368,11 +30626,16 @@ ${JSON.stringify(state)}${partySection}` };
         if (activeQuests.length > 0) {
             gearContext += `\n\nHERO'S ACTIVE QUESTS: ${activeQuests.map(q => q.giver ? `"${q.title}" for ${q.giver} (promised reward: ${q.reward || 'unspecified'})` : `"${q.title}" (self-started, no giver, no promised reward)`).join('; ')}.`;
         }
-        const knownReputations = Object.keys(npcReputations);
-        const hostileNpcNames = knownReputations.filter(k => isHostileReputation(npcReputations[k]));
-        const resentfulNpcNames = knownReputations.filter(k => isResentfulReputation(npcReputations[k]));
+        // While a regenerate is in flight, read the reputation maps as they will
+        // stand once the discarded turns' effects are undone (see regenViewRef)
+        // rather than the pre-undo render-closure values.
+        const npcRepView = (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations;
+        const factionRepView = (regenViewRef.current && regenViewRef.current.factionReputations) || factionReputations;
+        const knownReputations = Object.keys(npcRepView);
+        const hostileNpcNames = knownReputations.filter(k => isHostileReputation(npcRepView[k]));
+        const resentfulNpcNames = knownReputations.filter(k => isResentfulReputation(npcRepView[k]));
         if (knownReputations.length > 0) {
-            gearContext += `\n\nHERO'S STANDING WITH CHARACTERS THEY HAVE HISTORY WITH (roughly -100 to 100; a character the hero has only just met starts around 10, wary and unsure what to expect from them — that is the low baseline, not a comfortable middle ground; a high score means they remember the hero fondly and may, when it fits the scene, spontaneously offer a small gift or favor out of gratitude; any negative score means they've turned against the hero, graduated in two steps — see the rules below): ${knownReputations.map(k => `${k}: ${npcReputations[k]}`).join(', ')}.`;
+            gearContext += `\n\nHERO'S STANDING WITH CHARACTERS THEY HAVE HISTORY WITH (roughly -100 to 100; a character the hero has only just met starts around 10, wary and unsure what to expect from them — that is the low baseline, not a comfortable middle ground; a high score means they remember the hero fondly and may, when it fits the scene, spontaneously offer a small gift or favor out of gratitude; any negative score means they've turned against the hero, graduated in two steps — see the rules below): ${knownReputations.map(k => `${k}: ${npcRepView[k]}`).join(', ')}.`;
             if (resentfulNpcNames.length > 0) {
                 gearContext += `\n\nRESENTFUL OF THE HERO, standing negative but above ${HOSTILE_REPUTATION_THRESHOLD} — see the resentful-character rule below: ${resentfulNpcNames.join(', ')}.`;
             }
@@ -30390,10 +30653,10 @@ ${JSON.stringify(state)}${partySection}` };
         // to standing with any one tracked person.
         const currentMapNode = state.map && state.map.currentId ? (state.map.nodes || []).find(n => n.id === state.map.currentId) : null;
         const currentFactionName = currentMapNode && currentMapNode.faction ? currentMapNode.faction : null;
-        const currentFactionRep = currentFactionName ? findFactionReputation(currentFactionName, factionReputations) : null;
-        const knownFactionReputations = Object.keys(factionReputations);
+        const currentFactionRep = currentFactionName ? findFactionReputation(currentFactionName, factionRepView) : null;
+        const knownFactionReputations = Object.keys(factionRepView);
         if (knownFactionReputations.length > 0) {
-            gearContext += `\n\nHERO'S STANDING WITH FACTIONS THEY HAVE HISTORY WITH (roughly -100 to 100; 0 is true neutral — the hero simply isn't known to this GROUP yet, distinct from an individual character's wary baseline; unlike one person, a whole faction's opinion moves only from events significant enough for the group as a whole to notice, and moves slowly): ${knownFactionReputations.map(k => `${k}: ${factionReputations[k]}`).join(', ')}.`;
+            gearContext += `\n\nHERO'S STANDING WITH FACTIONS THEY HAVE HISTORY WITH (roughly -100 to 100; 0 is true neutral — the hero simply isn't known to this GROUP yet, distinct from an individual character's wary baseline; unlike one person, a whole faction's opinion moves only from events significant enough for the group as a whole to notice, and moves slowly): ${knownFactionReputations.map(k => `${k}: ${factionRepView[k]}`).join(', ')}.`;
         }
         if (currentFactionName) {
             gearContext += `\n\nTHE HERO IS CURRENTLY IN TERRITORY CONTROLLED BY: ${currentFactionName} (standing: ${currentFactionRep}) — see the territory rules below for how this shapes ordinary members of this faction encountered here.`;
@@ -30412,7 +30675,7 @@ ${JSON.stringify(state)}${partySection}` };
             gearContext += `\n\n[TRAVEL DECISION FROM PREVIOUS TURN — RESOLVE THIS FIRST, BEFORE ANYTHING ELSE]: The hero just ${justTravelEvents.join('; ')}. Open THIS scene by actually carrying that out: if they chose to go, the very first thing you write is the journey and their arrival at the new place — do not open back in the old location and do not silently skip the travel. If they declined, open with them simply remaining where they were instead. Resolve this before introducing anything new.`;
         }
         if (justPartyEvents && justPartyEvents.length > 0) {
-            gearContext += `\n\n[PARTY DECISION FROM PREVIOUS TURN]: The hero just ${justPartyEvents.join('; ')}. Reflect this naturally near the start of the scene: someone who just joined is now traveling alongside the hero and should be treated as present going forward; someone who just left is no longer accompanying them.`;
+            gearContext += `\n\n[PARTY DECISION FROM PREVIOUS TURN]: The hero just ${justPartyEvents.join('; ')}. Reflect each of these naturally near the start of the scene, judging by what kind of event it is: someone who just joined is now traveling alongside the hero and should be treated as present going forward; someone who just left is no longer accompanying them; an item taken away from a companion means that companion no longer has it — do not describe them carrying, wearing, wielding, or reaching for that specific item again in this scene or any later one, and if they need a weapon or piece of gear of that kind going forward, that has to be shown happening on-scene first (found, given, bought, looted) rather than assumed to still be there; an item given to a companion means they now genuinely have it in hand or on their person from this scene onward — work it into the scene naturally (a nod of thanks, tucking it away, testing its weight), and from now on it is exactly as available to them narratively as anything else already established in their inventory.`;
         }
         const openingGearRuleNum = isOpeningTurn ? ++ruleNum : null;
         const openingGearRule = isOpeningTurn
@@ -30476,7 +30739,7 @@ ${JSON.stringify(state)}${partySection}` };
         // code, and the model is just handed the finished list — same reason,
         // so a run can't be talked into unlocking faction-exclusive content the
         // hero hasn't actually earned.
-        const alliedFactionNames = knownFactionReputations.filter(k => isFactionAllied(factionReputations[k]));
+        const alliedFactionNames = knownFactionReputations.filter(k => isFactionAllied(factionRepView[k]));
         const factionTrustGateRuleNum = knownFactionReputations.length > 0 ? ++ruleNum : null;
         const factionTrustGateRule = knownFactionReputations.length > 0
             ? `\n${factionTrustGateRuleNum}. FACTION TRUST GATES ACCESS: standing with a faction (see "HERO'S STANDING WITH FACTIONS" above) isn't just a number merchants price off of — it gates what its own members are willing to offer. For a faction where the hero's standing hasn't reached Ally yet, its members keep the hero at arm's length: ordinary, public-facing tasks and dealings only, never the faction's real secrets, inner jobs, or anything reserved for someone they actually trust — no matter how the hero asks or what's offered in return.${alliedFactionNames.length > 0 ? ` With ${alliedFactionNames.join(', ')}, the hero has earned real trust — members of ${alliedFactionNames.length > 1 ? 'these factions' : 'this faction'} may now offer their genuinely exclusive, higher-stakes work (a real job for the guild itself, privileged information, access an ordinary outsider never gets) when the scene calls for it.` : ''}`
@@ -30697,8 +30960,8 @@ Nothing else belongs in "stats" — no other attributes, skills, or invented cha
 Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded" and "shield". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; judge each item relative to typical examples of its own slot, never against other slots).
 Only include an item in "inventory" if the scene explicitly settles the hero as now possessing it — already carried over from before, explicitly handed over and accepted, explicitly picked up, or (opening scene only) established as starting kit. An item that was merely offered, noticed, or nearby but not yet resolved does NOT belong in "inventory" yet — leave it out rather than assuming the hero took it.
 "currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity, ALREADY settled and done — a payment received, a price paid, money found and picked up, a bribe or toll, winnings or a loss from a wager, an outright theft. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. Do NOT use this field for a price a character has just named as something the hero can still accept or decline (an innkeeper's rate, a fare, a demanded bribe not yet handed over) — that belongs in a priced "itemOffers" entry instead (see its "cost" field above), so the app only ever charges the hero once they actually confirm. Also never use this field for a merchant or vendor buying or selling their ordinary goods, in either direction, even if the scene described it as already completed — that transaction is never resolved through state here, only through a separate trade-window interface, so it should never produce a "currencyChange" (or an "inventory" change) of its own. "reason" is a short, dry phrase for what happened (e.g. "found on the road", "paid the ferryman"), omitted along with the rest of the field when amount is 0.
-"npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. That starting inventory is held to the same mandatory-gear floor used for the hero's own opening kit and for party members: unless this character is established as destitute, stripped of belongings, or otherwise plainly without possessions (a beggar, a prisoner, and the like — the existing case where an empty list is fine), give them their own one "armor"-slot item and one "boots"-slot item, ordinary and modest, fitting who they are, alongside whatever weapon or role-specific gear suits them — these two count as real equipment slots, not the "ordinary clothing" that's otherwise skipped as flavor below, so don't omit them by default the way incidental clothing is waved off. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. For a character clearly acting as a merchant, vendor, or shopkeeper in the scene — someone running a shop, stall, or trade of their own — every item they specifically name or point to as something they have for sale counts as them gaining it into this same inventory the moment the scene first shows it, whether or not the hero actually buys it that turn; list it under the same name the dialogue used, alongside anything else already established for them — but always as a single item in the singular grammatical form (e.g. "a leather helmet"/"кожаный шлем"), even if the dialogue phrased it as a plural category of stock ("leather helmets"/"кожаные шлемы" as a general kind of goods on offer); if the dialogue is clear the merchant is offering more than one distinct copy of the same item, add that many separate singular entries rather than one plural-named entry. If the scene's dialogue also gave an exact price for that item, report it as an object instead of a plain string — {"name": "item name", "cost": N} using the precise number spoken — and that becomes exactly what the trade window charges for it later, verbatim, with no rounding, markup, or recomputation of any kind; only do this when a specific number was genuinely spoken aloud for that item in the scene, never a guess or a rough figure, and leave it as a plain string with no "cost" for anything mentioned without one. This "cost" is unrelated to the "cost" field on a priced "itemOffers" entry above — that one is for a service the hero can still accept or decline right now; this one is a price attached to a merchant's ordinary stock, purely for the separate trade window to charge later. This is the only way such an item ever reaches the separate trade window the hero buys from later — buying or selling it is never itself resolved through "itemOffers", "currencyChange", or anywhere else in this state (see the "cost" field notes above), only tracked here as part of what this character has. This only applies to what the character is themselves offering to sell — never to something of the HERO's that a character merely expresses interest in buying; that stays out of this list entirely, and out of the rest of this state too, no matter how the scene describes the offer. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "factionLeader": true — set it only once the story has clearly established this specific character as the acknowledged head of their own tracked "faction" (a warlord commanding a war band, a guild's master, a cult's high priest, a don running a syndicate), never for an ordinary member, deputy, or lieutenant who merely answers to someone else; only meaningful together with "faction", so never set it for a character with no faction of their own. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" below — restate "factionLeader": false explicitly only if the story itself later shows this specific character actually losing that position (deposed, stepped down, replaced by someone else), the same way "dead": false is reserved for an actual depicted resurrection. Each entry also has an optional "unyielding": true — set it only for a character the story establishes as genuinely pivotal and immovable: the acknowledged ruler of a land, the head of a major faction, or another figure of similarly high standing whose position makes it simply implausible that they would ever drop everything to wander off with the hero as a traveling companion. This must stay RARE — most named characters, including most who have "faction" or even "factionLeader" set, should NOT have this flag; reserve it for the small handful of top-tier figures in the whole story where recruiting them would break plausibility outright. This is a narrative refusal, not a reputation gate: it applies no matter how high the hero's standing with this character climbs, and no matter how warm the relationship between them becomes — a beloved, trusted, even close ally can still be "unyielding" if their station makes leaving unthinkable. Once set, it stays true automatically on every later turn even if omitted, exactly like "factionLeader" above — restate "unyielding": false explicitly only if the story itself later shows this specific character genuinely giving up that position or standing (abdication, downfall, retirement from power) such that traveling with the hero becomes plausible. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
-Every character named above under CURRENT PARTY is a traveling companion, not just an ordinary tracked NPC — treat their entry in "npcs" differently in two ways. First, they MUST appear in "npcs" every single turn without exception, even a turn where they didn't speak or act — never drop a party member from this list the way an ordinary NPC can be dropped once no longer relevant — and their "presentNow" must be true unless the scene just played explicitly, deliberately separated them from the hero. Second, for a party member ONLY — never for any other character — also include "health", "maxHealth", "psyche", "maxPsyche", "stats" (an object with "strength", "agility", "intelligence", "initiative"), and "effects" in their entry, using the exact same 1-1000/1-1000/1-100 scales, calibration, and judgment described above for the hero's own fields of the same name: a companion can be hurt, exhausted, healed, or emboldened by the scene just played exactly like the hero can, while "maxHealth"/"maxPsyche" stay stable the same restrained way the hero's own do. The very first turn a character has these fields (the turn they're recruited), judge them fresh from how the scene and story have portrayed that character so far; on every later turn, carry them forward and adjust only as much as this scene's events actually warrant, the same restrained way the hero's own vitals move turn to turn — never reset them arbitrarily. Omit all six of these fields entirely for every character who is not currently a party member. Third, a party member's "inventory" is held to the same mandatory-gear floor as the hero's own opening starting kit: unless this specific companion has been explicitly established as destitute, stripped of belongings, or otherwise deliberately without gear, their inventory must include their own one "armor"-slot item and one "boots"-slot item alongside whatever weapon fits them — the turn a character first becomes a party member (whether introduced already traveling with the hero or recruited later) is exactly the "first time added" moment the general inventory rule above already covers, so invent modest, ordinary versions of any of these two pieces not already established for them, rather than leaving a companion effectively bare-torsoed or barefoot by omission. Beyond that floor, a companion can plainly have other ordinary worn or carried items the same as anyone else (a cloak, an amulet, a ring, a backpack, and the like) wherever the scene or their portrayal calls for it — never required, just as available to them as to the hero.${openingPartyInstruction}
+"npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. That starting inventory is held to the same mandatory-gear floor used for the hero's own opening kit and for party members: unless this character is established as destitute, stripped of belongings, or otherwise plainly without possessions (a beggar, a prisoner, and the like — the existing case where an empty list is fine), give them their own one "armor"-slot item, one "boots"-slot item, AND one weapon, ordinary and modest, fitting who they are, alongside any other role-specific gear that suits them — these three count as real equipment slots, not the "ordinary clothing" that's otherwise skipped as flavor below, so don't omit them by default the way incidental clothing is waved off. If the scene's own prose has already shown this character carrying, wielding, or wearing a specific weapon — even mentioned only in passing (slung over a shoulder, tucked in a belt, resting nearby) rather than actually drawn or used — record that exact weapon here; only invent a generic one if the prose gave no weapon at all. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. For a character clearly acting as a merchant, vendor, or shopkeeper in the scene — someone running a shop, stall, or trade of their own — every item they specifically name or point to as something they have for sale counts as them gaining it into this same inventory the moment the scene first shows it, whether or not the hero actually buys it that turn; list it under the same name the dialogue used, alongside anything else already established for them — but always as a single item in the singular grammatical form (e.g. "a leather helmet"/"кожаный шлем"), even if the dialogue phrased it as a plural category of stock ("leather helmets"/"кожаные шлемы" as a general kind of goods on offer); if the dialogue is clear the merchant is offering more than one distinct copy of the same item, add that many separate singular entries rather than one plural-named entry. If the scene's dialogue also gave an exact price for that item, report it as an object instead of a plain string — {"name": "item name", "cost": N} using the precise number spoken — and that becomes exactly what the trade window charges for it later, verbatim, with no rounding, markup, or recomputation of any kind; only do this when a specific number was genuinely spoken aloud for that item in the scene, never a guess or a rough figure, and leave it as a plain string with no "cost" for anything mentioned without one. This "cost" is unrelated to the "cost" field on a priced "itemOffers" entry above — that one is for a service the hero can still accept or decline right now; this one is a price attached to a merchant's ordinary stock, purely for the separate trade window to charge later. This is the only way such an item ever reaches the separate trade window the hero buys from later — buying or selling it is never itself resolved through "itemOffers", "currencyChange", or anywhere else in this state (see the "cost" field notes above), only tracked here as part of what this character has. This only applies to what the character is themselves offering to sell — never to something of the HERO's that a character merely expresses interest in buying; that stays out of this list entirely, and out of the rest of this state too, no matter how the scene describes the offer. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch), only once the scene has actually established one; omit it for a character with no clear profession or title, never guess one. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "factionLeader": true — set it only once the story has clearly established this specific character as the acknowledged head of their own tracked "faction" (a warlord commanding a war band, a guild's master, a cult's high priest, a don running a syndicate), never for an ordinary member, deputy, or lieutenant who merely answers to someone else; only meaningful together with "faction", so never set it for a character with no faction of their own. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" below — restate "factionLeader": false explicitly only if the story itself later shows this specific character actually losing that position (deposed, stepped down, replaced by someone else), the same way "dead": false is reserved for an actual depicted resurrection. Each entry also has an optional "unyielding": true — set it only for a character the story establishes as genuinely pivotal and immovable: the acknowledged ruler of a land, the head of a major faction, or another figure of similarly high standing whose position makes it simply implausible that they would ever drop everything to wander off with the hero as a traveling companion. This must stay RARE — most named characters, including most who have "faction" or even "factionLeader" set, should NOT have this flag; reserve it for the small handful of top-tier figures in the whole story where recruiting them would break plausibility outright. This is a narrative refusal, not a reputation gate: it applies no matter how high the hero's standing with this character climbs, and no matter how warm the relationship between them becomes — a beloved, trusted, even close ally can still be "unyielding" if their station makes leaving unthinkable. Once set, it stays true automatically on every later turn even if omitted, exactly like "factionLeader" above — restate "unyielding": false explicitly only if the story itself later shows this specific character genuinely giving up that position or standing (abdication, downfall, retirement from power) such that traveling with the hero becomes plausible. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. This field is returned in full each turn: carry forward existing entries (inventory included) that are still relevant, update a "note" or "inventory" only as described above, and drop anyone who's no longer relevant — don't just keep appending.
+Every character named above under CURRENT PARTY is a traveling companion, not just an ordinary tracked NPC — treat their entry in "npcs" differently in two ways. First, they MUST appear in "npcs" every single turn without exception, even a turn where they didn't speak or act — never drop a party member from this list the way an ordinary NPC can be dropped once no longer relevant — and their "presentNow" must be true unless the scene just played explicitly, deliberately separated them from the hero. Second, for a party member ONLY — never for any other character — also include "health", "maxHealth", "psyche", "maxPsyche", "stats" (an object with "strength", "agility", "intelligence", "initiative"), and "effects" in their entry, using the exact same 1-1000/1-1000/1-100 scales, calibration, and judgment described above for the hero's own fields of the same name: a companion can be hurt, exhausted, healed, or emboldened by the scene just played exactly like the hero can, while "maxHealth"/"maxPsyche" stay stable the same restrained way the hero's own do. The very first turn a character has these fields (the turn they're recruited), judge them fresh from how the scene and story have portrayed that character so far; on every later turn, carry them forward and adjust only as much as this scene's events actually warrant, the same restrained way the hero's own vitals move turn to turn — never reset them arbitrarily. Omit all six of these fields entirely for every character who is not currently a party member. Third, a party member's "inventory" is held to the same mandatory-gear floor as the hero's own opening starting kit: unless this specific companion has been explicitly established as destitute, stripped of belongings, or otherwise deliberately without gear, their inventory must include their own one "armor"-slot item, one "boots"-slot item, AND one weapon — the turn a character first becomes a party member (whether introduced already traveling with the hero or recruited later) is exactly the "first time added" moment the general inventory rule above already covers, so invent modest, ordinary versions of any of these three pieces not already established for them, rather than leaving a companion effectively bare-torsoed, barefoot, or weaponless by omission. If the scene's own prose has already described this companion carrying, wielding, or wearing a specific weapon — even only in passing (slung over a shoulder, tucked in a belt, resting against a wall beside them) rather than actually drawn or used — record that exact weapon here rather than inventing a different one. Beyond that floor, a companion can plainly have other ordinary worn or carried items the same as anyone else (a cloak, an amulet, a ring, a backpack, and the like) wherever the scene or their portrayal calls for it — never required, just as available to them as to the hero.${openingPartyInstruction}
 "quests" tracks the active list above (by their given id) and feeds a quest journal, so keep entries short and factual, like a log, not narrated prose. "status" is set ONLY when the scene clearly shows that quest now resolved: "completed" if the hero achieved what it asked, "failed" if it's now impossible or was abandoned for good — omit "status" entirely if it's still simply ongoing (don't repeat "active" for everything). "progress" is a SEPARATE, optional one-line note — telegraphic, dry, a few words to one short sentence, no more (e.g. "Learned the gate is guarded at night", "Reached the abandoned mill") — include it ONLY when the scene meaningfully moved that specific quest forward (a lead found, a step completed, a setback); omit it on turns where the quest wasn't meaningfully touched, and never restate the objective itself or pad it with atmosphere. Skip a quest's entry entirely (all fields) if nothing about it changed this turn. NEVER invent a new quest here or use an id that isn't in the active list; new quests go in "newQuestOffers" below instead.
 This same entry is also where a quest GROWS (see questDepthRule) — a plain errand can skip all three of the following fields forever and that's the normal case, not a gap to fill. "npcs" names any character (already tracked in "npcs" above) who just became meaningfully tied to THIS quest's story specifically, beyond its own giver — include a name here only the first turn it's true for this quest, never restate one already listed above. "newStages" is for when the scene reveals a genuinely distinct next step, complication, or fresh thread within this quest — something concrete enough to track as its own objective, not just atmosphere or flavor. Give each a fresh "id" that doesn't collide with a stage id already listed above, a short evocative "title" the same way a quest's own title reads, and a dry one-sentence "description" the same way a quest's own description reads. A stage is tracked the moment it appears here — there's no separate accept step the way a whole new quest has, since it's simply the next part of a commitment the hero already made. "stageUpdates" is for a stage that ALREADY exists (its id already given above): "status" is set only when the scene clearly resolves that ONE stage — "completed" if its own objective was met, "failed" if it's now impossible or was abandoned, "moot" if the hero's own choice closed it off by committing to a different path within the same quest instead (a road not taken is not a failure — never use "failed" for that); "progress" works exactly like the quest-level field above, but scoped to this one stage. A stage resolving does NOT automatically resolve the quest itself, and a quest resolving does NOT require every stage to have resolved first — the quest's own top-level "status" above is always its own separate, deliberate call.
 "reputationHits" flags any named character (matching how they appear in "HERO'S STANDING WITH CHARACTERS..." or the npcs list above) that the hero insulted, threatened, mocked, acted with outright hostility toward, showed real unprompted kindness to, or helped in some meaningful way, IN THE SCENE JUST PLAYED. Each entry has "name" and "type": "insult" for verbal disrespect, mockery, or threats; "hostile" for actual violence, betrayal, sabotage, or an attack; "kindness" for a genuine, notable act of warmth, respect, or generosity that clearly goes beyond ordinary politeness (a real compliment that visibly moves them, comforting them through genuine distress, standing up for them at some cost to the hero); "help" for something substantial done in their favor — saving them from real danger, a costly sacrifice on their behalf, solving a serious problem for them outside of an active quest. Only include a character here if the scene just played genuinely shows the HERO doing this to THEM — never for a character who is simply unfriendly, refuses a request, or negotiates hard back at the hero, and never for the hero merely disagreeing or being blunt; likewise never for routine courtesy, a passing "thank you," or cooperating because the scene calls for it — "kindness" and "help" are for moments that clearly stand out, not everyday pleasantness. This is a rare event in both directions: leave the list empty on the large majority of turns where nothing like this happened.
@@ -30833,16 +31096,82 @@ Rules:
             // non-empty without ever surfacing in the UI.
             return { role, content: (role === 'user' && !content.trim()) ? '[continue]' : content };
         });
-        const justEquipped = pendingJustEquippedRef.current;
-        pendingJustEquippedRef.current = [];
+        // Net equip diff — same reasoning as the party item-transfer diff below:
+        // equip/unequip no longer logs each click (see equipItemInSlot); instead
+        // compare current `equipment` against the baseline from last time this
+        // ran. Equip-then-unequip within the same turn cancels out to nothing;
+        // only an item that's actually still worn now, and wasn't before this
+        // window, gets reported.
+        const currentEquippedNames = new Set(Object.values(equipment).filter(Boolean));
+        const previousEquippedNames = heroEquippedSnapshotRef.current;
+        const justEquipped = previousEquippedNames
+            ? [...currentEquippedNames].filter(nm => !previousEquippedNames.has(nm))
+            : [];
+        heroEquippedSnapshotRef.current = currentEquippedNames;
         const justUsed = pendingJustUsedRef.current;
         pendingJustUsedRef.current = [];
         const justQuestEvents = pendingQuestEventsRef.current;
         pendingQuestEventsRef.current = [];
         const justTravelEvents = pendingTravelEventRef.current;
         pendingTravelEventRef.current = [];
-        const justPartyEvents = pendingPartyEventsRef.current;
-        pendingPartyEventsRef.current = [];
+        // Net item-transfer diff — see partyItemSnapshotRef's own comment for why
+        // this is a diff against a baseline rather than a per-click log. Take a
+        // fresh snapshot of every current party member's narrative inventory
+        // (from currentState.npcs, which give/take already keep in sync) and
+        // compare it, name-for-name (as a multiset — an item can appear more
+        // than once), against whatever was there the last time this ran. Only
+        // the net difference becomes a note; anything that moved back and forth
+        // to where it started cancels out and produces nothing.
+        const currentPartyItemSnapshot = {};
+        party.forEach(key => {
+            const npc = (currentState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+            currentPartyItemSnapshot[key] = (npc && Array.isArray(npc.inventory)) ? npc.inventory : [];
+        });
+        const partyItemChangeNotes = [];
+        const previousPartyItemSnapshot = partyItemSnapshotRef.current;
+        if (previousPartyItemSnapshot) {
+            Object.keys(currentPartyItemSnapshot).forEach(key => {
+                // A key not in the previous snapshot is a companion who joined the
+                // party THIS window — their starting narrative gear was invented by
+                // the state-extraction step, not handed over by the player, so it
+                // must never be reported as a "gave" event. Skip diffing them this
+                // turn; the baseline set below picks them up for next time.
+                if (!(key in previousPartyItemSnapshot))
+                    return;
+                const before = previousPartyItemSnapshot[key];
+                const after = currentPartyItemSnapshot[key];
+                const npcName = ((currentState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key) || {}).name || key;
+                const countByName = list => list.reduce((counts, nm) => { counts[nm] = (counts[nm] || 0) + 1; return counts; }, {});
+                const beforeCounts = countByName(before);
+                const afterCounts = countByName(after);
+                const allNames = new Set([...Object.keys(beforeCounts), ...Object.keys(afterCounts)]);
+                allNames.forEach(name => {
+                    const delta = (afterCounts[name] || 0) - (beforeCounts[name] || 0);
+                    for (let i = 0; i < delta; i++)
+                        partyItemChangeNotes.push(`gave the ${name} to ${npcName}, who now has it`);
+                    for (let i = 0; i < -delta; i++)
+                        partyItemChangeNotes.push(`took the ${name} away from ${npcName}, who no longer has it`);
+                });
+            });
+        }
+        partyItemSnapshotRef.current = currentPartyItemSnapshot;
+        // Net roster diff — see partyRosterSnapshotRef's own comment. Compared
+        // as plain sets of name-keys, so however many times the player recruited
+        // or dismissed the same companion since the last turn, only where they
+        // ended up matters, and only if that differs from where they started.
+        const partyRosterNotes = [];
+        const previousPartyRoster = partyRosterSnapshotRef.current;
+        if (previousPartyRoster) {
+            const rosterDisplayName = key => ((currentState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key) || {}).name || key;
+            party.filter(key => !previousPartyRoster.includes(key)).forEach(key => {
+                partyRosterNotes.push(`invited ${rosterDisplayName(key)} to join them as a traveling companion, and they agreed`);
+            });
+            previousPartyRoster.filter(key => !party.includes(key)).forEach(key => {
+                partyRosterNotes.push(`asked ${rosterDisplayName(key)} to part ways for now, and they went off on their own`);
+            });
+        }
+        partyRosterSnapshotRef.current = [...party];
+        const justPartyEvents = [...partyRosterNotes, ...partyItemChangeNotes];
         const system = buildNarrativeSystemPrompt(currentState, justEquipped, justUsed, justQuestEvents, justTravelEvents, justPartyEvents, actionCheck, worldTickEvent);
         setStreamingText('');
         try {
@@ -30870,16 +31199,19 @@ Rules:
     // advance, so nothing is lost — the same chunk just gets folded in on a
     // later call alongside whatever aged out since (and generateNarrative's
     // own slice keeps covering it verbatim in the meantime — see there).
-    // extraSaveArgs (optional) are forwarded straight to saveGame's own
-    // nextItemRarities../nextNpcCurrencies parameters — needed because this
-    // fires fire-and-forget, well after its caller's own render, so without
-    // them saveGame's fallback would silently reach for this closure's own
-    // (by-then possibly stale) npcReputations/party/etc. and could overwrite
-    // an already-fresher autosave with old data. See the callers.
-    async function updateNarrativeSummary(fullHistory, currentState, extraSaveArgs) {
+    // Deliberately does NOT save. It used to, with the turn-end snapshot it was
+    // handed — but it lands seconds later, by which time the player may have
+    // done something (or a whole further turn may have finished) and saved
+    // again, so that write could replace a fresher autosave with an older one.
+    // The summary lives in the two refs and is picked up by the next ordinary
+    // saveGame; if the app is closed before then the stored summary is merely
+    // one step behind (generateNarrative's windowSize keeps everything the
+    // summary hasn't caught up to in the prompt verbatim), which is harmless.
+    async function updateNarrativeSummary(fullHistory, currentState) {
         const cutoff = fullHistory.length - RECENT_TURN_WINDOW;
         if (cutoff - summarizedUpToRef.current < SUMMARY_BATCH_SIZE)
             return;
+        const epoch = summaryEpochRef.current;
         const freshlyAged = fullHistory.slice(summarizedUpToRef.current, cutoff);
         const chunkText = freshlyAged.map(m => {
             if (m.role === 'director')
@@ -30906,10 +31238,15 @@ NEW EXCERPT TO FOLD IN:
 ${chunkText}`;
         try {
             const updated = await callGemini(system, [{ role: 'user', content: userMsg }]);
+            // The campaign this was written for may be gone by now — restarted,
+            // another save loaded, or the turns it covered thrown away by a
+            // regenerate (see summaryEpochRef): drop the result rather than let it
+            // overwrite the new campaign's summary.
+            if (epoch !== summaryEpochRef.current)
+                return;
             if (updated && updated.trim()) {
                 narrativeSummaryRef.current = updated.trim();
                 summarizedUpToRef.current = cutoff;
-                saveGame(fullHistory, currentState, ...(extraSaveArgs || []));
             }
         }
         catch (e) {
@@ -31465,7 +31802,7 @@ ${chunkText}`;
                 continue;
             const key = hit.name.trim().toLowerCase();
             if (hit.type === 'kindness') {
-                const lastGrantedTurn = npcKindnessCooldowns[key];
+                const lastGrantedTurn = ((regenViewRef.current && regenViewRef.current.npcKindnessCooldowns) || npcKindnessCooldowns)[key];
                 if (typeof lastGrantedTurn === 'number' && turnIndex - lastGrantedTurn < KINDNESS_REPUTATION_COOLDOWN_TURNS)
                     continue;
                 kindnessCooldownNpcs.add(key);
@@ -32208,7 +32545,7 @@ Rules:
             }, REPUTATION_TOAST_EXIT_MS);
         }, REPUTATION_TOAST_DISPLAY_MS);
     }
-    function applyReputationDeltas(deltas, base) {
+    function applyReputationDeltas(deltas, base, dryRun) {
         const current = base !== undefined ? base : npcReputations;
         if (!deltas || Object.keys(deltas).length === 0)
             return current;
@@ -32220,6 +32557,10 @@ Rules:
             applied[key] = clamped - currentRep;
             next[key] = clamped;
         }
+        // dryRun: just hand back the resulting map — no state change, no toasts
+        // (used by the undo helpers below, which only need the number).
+        if (dryRun)
+            return next;
         setNpcReputations(next);
         pushReputationToasts(applied, false);
         return next;
@@ -32306,22 +32647,31 @@ Rules:
         const prev = party;
         if (!renames || renames.length === 0)
             return prev;
-        let next = prev;
-        for (const { from, to } of renames) {
-            const oldKey = typeof from === 'string' ? from.trim().toLowerCase() : '';
-            const newKey = typeof to === 'string' ? to.trim().toLowerCase() : '';
-            if (!oldKey || !newKey || oldKey === newKey)
-                continue;
-            const idx = next.indexOf(oldKey);
-            if (idx === -1)
-                continue;
-            if (next === prev)
-                next = [...prev];
-            if (next.includes(newKey))
-                next.splice(idx, 1);
-            else
-                next[idx] = newKey;
-        }
+        const relocate = list => {
+            let out = list;
+            for (const { from, to } of renames) {
+                const oldKey = typeof from === 'string' ? from.trim().toLowerCase() : '';
+                const newKey = typeof to === 'string' ? to.trim().toLowerCase() : '';
+                if (!oldKey || !newKey || oldKey === newKey)
+                    continue;
+                const idx = out.indexOf(oldKey);
+                if (idx === -1)
+                    continue;
+                if (out === list)
+                    out = [...list];
+                if (out.includes(newKey))
+                    out.splice(idx, 1);
+                else
+                    out[idx] = newKey;
+            }
+            return out;
+        };
+        const next = relocate(prev);
+        // The roster baseline (see partyRosterSnapshotRef) has to follow the
+        // same rename, otherwise the very next turn would read the swapped key
+        // as one companion leaving and a different one joining.
+        if (partyRosterSnapshotRef.current)
+            partyRosterSnapshotRef.current = relocate(partyRosterSnapshotRef.current);
         if (next !== prev)
             setParty(next);
         return next;
@@ -32396,13 +32746,13 @@ Rules:
     // applied (see appliedReputationDeltas, stored on every narrator
     // message) before the fresh result's own deltas go on — see both
     // regenerateTurn and regenerateTurnWithEdits.
-    function undoReputationDeltas(deltas) {
+    function undoReputationDeltas(deltas, base) {
         if (!deltas || Object.keys(deltas).length === 0)
-            return;
+            return base;
         const negated = {};
         for (const [key, delta] of Object.entries(deltas))
             negated[key] = -delta;
-        applyReputationDeltas(negated);
+        return applyReputationDeltas(negated, base, true);
     }
     // Records, for each character reconcileReputationHits just granted a
     // kindness-driven gain to, the turn index that grant happened on — this
@@ -32433,20 +32783,18 @@ Rules:
     // matches the turn being undone, so an unrelated, later grant for the
     // same character — recorded on a turn that isn't the one being undone —
     // is never clobbered.
-    function undoKindnessCooldowns(npcKeys, turnIndex) {
+    function undoKindnessCooldowns(npcKeys, turnIndex, base) {
         if (!npcKeys || npcKeys.length === 0 || typeof turnIndex !== 'number')
-            return;
-        setNpcKindnessCooldowns(prev => {
-            let next = prev;
-            for (const key of npcKeys) {
-                if (prev[key] === turnIndex) {
-                    if (next === prev)
-                        next = { ...prev };
-                    delete next[key];
-                }
+            return base;
+        let next = base;
+        for (const key of npcKeys) {
+            if (base[key] === turnIndex) {
+                if (next === base)
+                    next = { ...base };
+                delete next[key];
             }
-            return next;
-        });
+        }
+        return next;
     }
     // Faction mirrors of applyReputationDeltas/undoReputationDeltas immediately
     // above — same rationale, same shape, just against factionReputations/
@@ -32464,7 +32812,7 @@ Rules:
     // regenerateTurnWithEdits, and the gift handlers' rippleGiftToFaction) can
     // hand the freshly-updated value straight to saveGame in the same tick
     // instead of the stale pre-update closure value.
-    function applyFactionReputationDeltas(deltas, base) {
+    function applyFactionReputationDeltas(deltas, base, dryRun) {
         const current = base !== undefined ? base : factionReputations;
         if (!deltas || Object.keys(deltas).length === 0)
             return current;
@@ -32481,17 +32829,19 @@ Rules:
             applied[key] = clamped - currentRep;
             next[key] = clamped;
         }
+        if (dryRun)
+            return next;
         setFactionReputations(next);
         pushReputationToasts(applied, true);
         return next;
     }
-    function undoFactionReputationDeltas(deltas) {
+    function undoFactionReputationDeltas(deltas, base) {
         if (!deltas || Object.keys(deltas).length === 0)
-            return;
+            return base;
         const negated = {};
         for (const [key, delta] of Object.entries(deltas))
             negated[key] = -delta;
-        applyFactionReputationDeltas(negated);
+        return applyFactionReputationDeltas(negated, base, true);
     }
     // Regenerating turnIndex doesn't just replace that one turn — every turn
     // AFTER it is discarded too (see regenerateTurn/regenerateTurnWithEdits,
@@ -32517,6 +32867,15 @@ Rules:
     // before. Takes the turns actually being discarded (see
     // buildTurns/turns.slice) rather than a single turn, so both callers stay
     // one line each.
+    // Pure: computes the three maps as they will stand once those turns'
+    // effects are gone and RETURNS them — { npcReputations, factionReputations,
+    // npcKindnessCooldowns } — without touching state or queueing toasts.
+    // Committing them is the caller's job, and only once the fresh request has
+    // succeeded (see regenViewRef and regenerateTurn): the fresh result's own
+    // deltas have to be applied on top of THESE (the `base` argument of the
+    // apply helpers), not on the pre-undo closure values, or the undo is
+    // silently overwritten; and a request that fails must leave the discarded
+    // turns' effects exactly where they were.
     function undoDiscardedTurnsEffects(discardedTurns) {
         const mergedReputationDeltas = {};
         const mergedFactionReputationDeltas = {};
@@ -32533,11 +32892,15 @@ Rules:
             addAll(mergedFactionReputationDeltas, n.appliedFactionReputationDeltas);
             addAll(mergedFactionReputationDeltas, n.appliedCombatFactionReputationDeltas);
         }
-        undoReputationDeltas(mergedReputationDeltas);
-        undoFactionReputationDeltas(mergedFactionReputationDeltas);
+        let kindnessCooldownsAfter = npcKindnessCooldowns;
         for (const turn of discardedTurns) {
-            undoKindnessCooldowns(turn.narrator.appliedKindnessCooldownNpcs, turn.narrator.appliedKindnessCooldownTurn);
+            kindnessCooldownsAfter = undoKindnessCooldowns(turn.narrator.appliedKindnessCooldownNpcs, turn.narrator.appliedKindnessCooldownTurn, kindnessCooldownsAfter);
         }
+        return {
+            npcReputations: undoReputationDeltas(mergedReputationDeltas, npcReputations),
+            factionReputations: undoFactionReputationDeltas(mergedFactionReputationDeltas, factionReputations),
+            npcKindnessCooldowns: kindnessCooldownsAfter
+        };
     }
     // Wraps one of the parallel per-turn sub-calls (secrets, state, quest
     // offers, suggestions, combat setup, item offers — see callGameMaster)
@@ -33171,11 +33534,10 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         }
         setEquipment(next);
         setEquipPickerSlot(null);
-        // Remembered so the next narrative call can prompt an NPC reaction to
-        // this specific item — consumed and cleared once that call happens.
-        if (itemName && !pendingJustEquippedRef.current.includes(itemName)) {
-            pendingJustEquippedRef.current = [...pendingJustEquippedRef.current, itemName];
-        }
+        // No per-click log here anymore — see heroEquippedSnapshotRef and the
+        // diff in generateNarrative, which reports only the item(s) still
+        // actually worn at the moment the next turn is submitted, net of
+        // however much equip/unequip happened in between.
         saveGame(messages, gameState, itemRarities, next);
     }
     function unequipSlot(slotKey) {
@@ -33219,6 +33581,32 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         if (slotKey)
             unequipSlot(slotKey);
     }
+    // Anything that edits the hero's inventory, currency or health directly
+    // (dropping or using an item, gifting, trading, repairing, handing gear to
+    // a companion) is refused while a turn is being generated. sendBatch,
+    // regenerateTurn and handleStart all build their result from a snapshot of
+    // gameState taken BEFORE the request went out and commit it with
+    // setGameState(result.state) once it lands, so anything changed in between
+    // — a potion drunk, an item given away — would simply be overwritten (and
+    // for a gift or a sale the other side keeps its copy: a duplicated item).
+    // Shows a short chip rather than failing silently, since these are
+    // reachable from inside modals. Returns true when the action must be
+    // skipped.
+    function blockedWhileTurnRuns() {
+        if (!loading)
+            return false;
+        flashNotice('busyTurnNotice');
+        return true;
+    }
+    // Shows the bottom-of-screen notice chip for a moment. `key` is a
+    // translation key (resolved at render time, so it follows the current
+    // language even when raised from an effect created before the language
+    // preference loaded).
+    function flashNotice(key, ms) {
+        setNoticeKey(key);
+        window.clearTimeout(noticeTimer.current);
+        noticeTimer.current = window.setTimeout(() => setNoticeKey(null), ms || 2200);
+    }
     // Manually removes an item the player chose to drop (see DropConfirmModal
     // — this only ever runs after that confirmation). Removes by array index,
     // not name, so dropping one of a pair of identically-named items (a spare
@@ -33227,6 +33615,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // slot on the next render the same way it already does when the
     // narrative model itself drops an item from the inventory list.
     function dropItem(index) {
+        if (blockedWhileTurnRuns())
+            return;
         if (!gameState.inventory[index]) {
             setDropConfirmIndex(null);
             return;
@@ -33272,6 +33662,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // through every companion's gear while a kit is being applied). The kit
     // itself always comes out of the hero's bag.
     function applyRepairKitToIndex(target) {
+        if (blockedWhileTurnRuns())
+            return;
         const kit = repairKitIndex !== null ? gameState.inventory[repairKitIndex] : null;
         const owner = target ? target.owner : null;
         const targetIndex = target ? target.index : -1;
@@ -33305,6 +33697,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         setRepairKitIndex(null);
     }
     function useConsumable(index) {
+        if (blockedWhileTurnRuns())
+            return;
         const item = gameState.inventory[index];
         if (!item) {
             closeItemDetail();
@@ -33404,6 +33798,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // future gifts skip straight past the confirmation screen (mirrors
     // confirmEditWarning's own dontShowAgain persistence exactly).
     async function confirmGiftBundle(payload, dontShowAgainChecked) {
+        if (blockedWhileTurnRuns())
+            return;
         const key = typeof giftTargetNpc === 'string' ? giftTargetNpc.trim().toLowerCase() : '';
         const indexSet = new Set(Array.isArray(payload.indexes) ? payload.indexes : []);
         const currencyAmount = Math.max(0, Math.min(gameState.currency, Math.round(Number(payload.currencyAmount)) || 0));
@@ -33458,11 +33854,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     }
     // ---- PARTY / GROUP HANDLERS ----
     // Recruiting and dismissing are direct player actions (no model round trip
-    // needed to decide them — reputation already gates who's eligible), but
-    // each one still leaves a one-line note in pendingPartyEventsRef so the
-    // very next narrative call (see gearContext in buildNarrativeSystemPrompt)
-    // opens the scene already reflecting the new roster instead of the story
-    // catching up a turn late. Confirmed via RecruitModal, which is why this
+    // needed to decide them — reputation already gates who's eligible). Neither
+    // logs anything per click: generateNarrative diffs the current roster
+    // against partyRosterSnapshotRef when the player actually starts the next
+    // turn, so the very next narrative call (see gearContext in
+    // buildNarrativeSystemPrompt) still opens the scene already reflecting the
+    // net change, however many times the roster was toggled in between.
+    // Confirmed via RecruitModal, which is why this
     // never re-checks reputation itself — CharacterSheet already gated the
     // recruit link on it — but it still re-checks capacity/duplicates, since
     // the modal can be sitting open from a moment when the roster was smaller.
@@ -33473,7 +33871,6 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             return;
         const nextParty = [...party, key];
         setParty(nextParty);
-        pendingPartyEventsRef.current = [...pendingPartyEventsRef.current, `invited ${npcName} to join them as a traveling companion, and they agreed`];
         saveGame(messages, gameState, itemRarities, equipment, npcReputations, nextParty);
     }
     function dismissFromParty(npcName) {
@@ -33482,7 +33879,6 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             return;
         const nextParty = party.filter(k => k !== key);
         setParty(nextParty);
-        pendingPartyEventsRef.current = [...pendingPartyEventsRef.current, `asked ${npcName} to part ways for now, and they went off on their own`];
         saveGame(messages, gameState, itemRarities, equipment, npcReputations, nextParty);
         // Deliberately NOT touched here: partyInventories/partyEquipment for
         // this key are left exactly as they are, same as dismissing already
@@ -33504,6 +33900,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // caller already has the name on hand (n.name), so normalizing once in
     // here is one less thing every call site needs to get right.
     function giveItemsToPartyMember(npcName, indexes) {
+        if (blockedWhileTurnRuns())
+            return;
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
         const indexSet = new Set(Array.isArray(indexes) ? indexes : []);
         if (!key || indexSet.size === 0) {
@@ -33514,6 +33912,29 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const nextInventory = gameState.inventory.filter((_, i) => !indexSet.has(i));
         const nextState = { ...gameState, inventory: nextInventory };
         const nextPartyInventories = { ...partyInventories, [key]: [...(partyInventories[key] || []), ...givenItems] };
+        // Mirror of takeItemsFromPartyMember's own npcs-sync below: without this,
+        // the narrative model never learns the item exists on this companion at
+        // all — neither through the CURRENT GAME STATE dump (state.npcs[...]
+        // .inventory would stay stale) nor through the next turn's party-event
+        // note (see gearContext in buildNarrativeSystemPrompt for how that note
+        // reads) — so the very next scene could carry on as if the
+        // hand-over never happened, or even contradict it.
+        // Sync gameState.npcs[key].inventory too, purely so the CURRENT GAME
+        // STATE dump handed to the narrative model is never stale — but no
+        // per-click note here: see partyItemSnapshotRef and the diff
+        // in generateNarrative, which reports only the NET change across
+        // however many times items moved back and forth this turn, computed
+        // once, right when the player actually submits the next action.
+        const npcIndex = gameState.npcs.findIndex(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+        let nextNpcs = gameState.npcs;
+        if (npcIndex !== -1 && Array.isArray(gameState.npcs[npcIndex].inventory)) {
+            const existingNames = gameState.npcs[npcIndex].inventory;
+            const newNarrativeNames = givenItems.map(it => it.name).filter(nm => !existingNames.includes(nm));
+            if (newNarrativeNames.length > 0) {
+                nextNpcs = gameState.npcs.map((n, i) => i === npcIndex ? { ...n, inventory: [...n.inventory, ...newNarrativeNames] } : n);
+            }
+        }
+        nextState.npcs = nextNpcs;
         setGameState(nextState);
         setPartyInventories(nextPartyInventories);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, nextPartyInventories);
@@ -33531,6 +33952,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // pre-removal partyInventories/partyEquipment snapshot from this render,
     // so only the last removal in the batch would actually stick.
     function takeItemsFromPartyMember(npcName, indexes) {
+        if (blockedWhileTurnRuns())
+            return;
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
         const indexSet = new Set(Array.isArray(indexes) ? indexes : []);
         if (!key || indexSet.size === 0)
@@ -33562,16 +33985,19 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const nextInventory = [...gameState.inventory, ...takenItems];
         // Same narrative-belongings strip the single-item version used to do,
         // just folded over every taken item instead of one — a companion who
-        // loses several narratively-established things in the same batch still
-        // gets one pendingPartyEventsRef note per item (same mechanism recruit/
-        // dismiss use), so the very next scene picks all of it up at once.
+        // loses several narratively-established things in the same batch is
+        // handled correctly, since the net change is computed once from the
+        // whole batch rather than per item.
+        // Sync gameState.npcs[key].inventory (same reasoning as
+        // giveItemsToPartyMember's own comment above) — no per-click note
+        // here either; see partyItemSnapshotRef and the diff in
+        // generateNarrative for how the net change actually gets reported.
         const npcIndex = gameState.npcs.findIndex(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
         let nextNpcs = gameState.npcs;
         if (npcIndex !== -1 && Array.isArray(gameState.npcs[npcIndex].inventory)) {
             const narrativeNames = takenItems.map(it => it.name).filter(nm => gameState.npcs[npcIndex].inventory.includes(nm));
             if (narrativeNames.length > 0) {
                 nextNpcs = gameState.npcs.map((n, i) => i === npcIndex ? { ...n, inventory: n.inventory.filter(nm => !narrativeNames.includes(nm)) } : n);
-                pendingPartyEventsRef.current = [...pendingPartyEventsRef.current, ...narrativeNames.map(nm => `took the ${nm} away from ${gameState.npcs[npcIndex].name}, who no longer has it`)];
             }
         }
         const nextState = { ...gameState, inventory: nextInventory, npcs: nextNpcs };
@@ -33633,6 +34059,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // shown — same reasoning as giftItemToNpc computing its own reputation
     // delta rather than taking one from the modal.
     function openTrade(npcName) {
+        if (blockedWhileTurnRuns())
+            return;
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
         if (!key)
             return;
@@ -33717,6 +34145,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // Opened from an NPC row in CharacterSheet for characters whose role reads
     // as a smith / tailor / jeweler (see inferNpcRepairSkills).
     function openRepair(npcName) {
+        if (blockedWhileTurnRuns())
+            return;
         setRepairingNpc(npcName);
     }
     function closeRepair() {
@@ -33727,6 +34157,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // `targets` is a list of { owner, index }: owner null = the hero's own
     // bag, otherwise a companion's key in partyInventories.
     function repairItems(targets) {
+        if (blockedWhileTurnRuns())
+            return;
         const heroSet = new Set(targets.filter(tg => tg.owner === null).map(tg => tg.index));
         const allySets = {};
         for (const tg of targets) {
@@ -33779,6 +34211,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // actually moves, in case the underlying stock/currency shifted between
     // render and click.
     function executeTrade(npcName, buyIndexes, sellIndexes) {
+        if (blockedWhileTurnRuns())
+            return;
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
         if (!key)
             return;
@@ -33790,12 +34224,16 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const npcInventory = npcInventories[key] || [];
         const buySet = new Set(buyIndexes);
         const sellSet = new Set(sellIndexes);
+        const heroBoughtHere = (shopClock.heroBought || {})[key];
         let buyTotal = 0;
         const boughtItems = [];
+        const paidByName = [];
         npcInventory.forEach((item, i) => {
             if (!buySet.has(i))
                 return;
-            buyTotal += computeNpcBuyPrice(item, itemRarities, buyMultiplier);
+            const paid = computeNpcBuyPrice(item, itemRarities, buyMultiplier);
+            buyTotal += paid;
+            paidByName.push([item.name, paid]);
             // Once it's back in the hero's own bag it's just a normal item again —
             // buybackPrice only means anything while sitting in an NPC's
             // inventory (see computeNpcBuyPrice) — selling it a second time
@@ -33809,7 +34247,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         gameState.inventory.forEach((item, i) => {
             if (!sellSet.has(i) || item.questId)
                 return;
-            const price = computeHeroSellPrice(item, itemRarities, merchantProfile);
+            const price = capResalePrice(computeHeroSellPrice(item, itemRarities, merchantProfile), item, heroBoughtHere);
             sellTotal += price;
             soldEntries.push({ item, price });
         });
@@ -33840,13 +34278,25 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             ...gameState.inventory.filter((_, i) => !sellSet.has(i)),
             ...boughtItems,
         ];
+        // Remember what was paid for everything bought here (and forget anything
+        // just sold back) so a later sale of it to this same merchant is capped —
+        // see capResalePrice.
+        const nextHeroBoughtHere = { ...(heroBoughtHere || {}) };
+        for (const { item } of soldEntries)
+            delete nextHeroBoughtHere[item.name.trim().toLowerCase()];
+        for (const [name, paid] of paidByName) {
+            const nameKey = name.trim().toLowerCase();
+            nextHeroBoughtHere[nameKey] = Number.isFinite(nextHeroBoughtHere[nameKey]) ? Math.min(nextHeroBoughtHere[nameKey], paid) : paid;
+        }
+        const nextShopClock = { ...shopClock, heroBought: { ...(shopClock.heroBought || {}), [key]: nextHeroBoughtHere } };
         const nextState = { ...gameState, currency: nextHeroCurrency, inventory: nextInventory };
         const nextNpcInventories = { ...npcInventories, [key]: nextNpcInventory };
         const nextNpcCurrencies = { ...npcCurrencies, [key]: nextNpcCurrency };
         setGameState(nextState);
         setNpcInventories(nextNpcInventories);
         setNpcCurrencies(nextNpcCurrencies);
-        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies);
+        setShopClock(nextShopClock);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies, undefined, undefined, nextShopClock);
     }
     // ---- COMBAT HANDLERS ----
     // The hero's own present-and-able companions, snapshotted into combatants
@@ -36021,6 +36471,103 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         saveGame(messages, gameState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, npcInventories, npcCurrencies, undefined, undefined, nextClock);
     }, [gameState.dayPhase]);
     // ---- TURN SUBMISSION ----
+    // Everything that happens once the opening scene has come back: the first
+    // message, starting gear (auto-equipped, with rolled rarities), starting
+    // companions and their reputation, and the baselines the party/equipment
+    // diffs start from. Shared by handleStart and by regenerating turn 1
+    // (regenerateTurn) — which throws away the whole story after the opening,
+    // so it is simply a fresh start with the same world and hero. Builds the
+    // campaign's data up from EMPTY maps, never from render-closure values
+    // (after a restart or an opening regenerate those still hold the old
+    // campaign's until the next render); a caller with an old campaign to
+    // clear does it first with resetCampaignData.
+    function commitOpening(result) {
+        const openingMessages = [{ role: 'narrator', text: result.narrative, secrets: result.secrets, suggestions: result.suggestions, itemOffers: result.itemOffers, questOffers: result.questOffers, rewardOffers: result.rewardOffers, travelOffer: result.travelOffer, combatEncounter: result.combatEncounter, appliedReputationDeltas: result.reputationDeltas, appliedFactionReputationDeltas: result.factionReputationDeltas, appliedKindnessCooldownNpcs: result.kindnessCooldownNpcs, appliedKindnessCooldownTurn: result.turnIndex, stateBefore: EMPTY_STATE, tokenUsage: result.tokenUsage }];
+        const startingEquipment = autoEquipStartingGear(result.state.inventory);
+        const startingRarities = {};
+        for (const item of result.state.inventory) {
+            const key = item.name.trim().toLowerCase();
+            if (!startingRarities[key])
+                startingRarities[key] = rollStartingItemRarity();
+        }
+        setItemRarities(startingRarities);
+        setMessages(openingMessages);
+        setGameState(result.state);
+        setEquipment(startingEquipment);
+        // The starting kit was already worn in the opening scene itself — seed
+        // the equipment baseline with it so the first real turn doesn't report
+        // it as "just equipped" (see heroEquippedSnapshotRef).
+        heroEquippedSnapshotRef.current = new Set(Object.values(startingEquipment).filter(Boolean));
+        setLastTokenUsage(result.tokenUsage);
+        // Chain each helper's returned value into the next, rather than
+        // letting every call independently re-read its own state from the
+        // render closure — otherwise migrateNpcReputations (etc.) would act on
+        // the value from BEFORE applyReputationDeltas just ran, silently
+        // dropping this same turn's own deltas. See the comments on
+        // applyReputationDeltas/migrateNpcReputations for the full rationale.
+        let nextNpcReputations = applyReputationDeltas(result.reputationDeltas, {});
+        const nextFactionReputations = applyFactionReputationDeltas(result.factionReputationDeltas, {});
+        let nextNpcKindnessCooldowns = applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex, {});
+        nextNpcReputations = migrateNpcReputations(result.npcRenames, nextNpcReputations);
+        nextNpcKindnessCooldowns = migrateNpcKindnessCooldowns(result.npcRenames, nextNpcKindnessCooldowns);
+        // A new campaign has no party or party gear to migrate; starting from
+        // literal empties (not the render closure's) matters when this runs for
+        // a regenerated opening, where the closure still holds the old story's.
+        let nextParty = [];
+        // Starting companions requested on the setup screen (see
+        // startingPartySize and the "🤝 Группа" picker below) — the model
+        // just introduced them by name in the opening scene, already
+        // carrying health/psyche/stats (see OPENING PARTY in
+        // buildStateAndEventsSystemPrompt). Resolve those names against the
+        // npcs actually returned (defensively, in case one was dropped or
+        // misspelled) and start the party and its reputation right away, at
+        // the same floor an ordinary mid-story recruit requires — building on
+        // top of nextNpcReputations (this turn's own deltas/renames already
+        // folded in) rather than the pre-turn npcReputations, since saveGame
+        // right below needs the actual next value in hand rather than a
+        // pending one, precisely because there's no second turn yet to
+        // quietly catch a stale save up the way there normally would be.
+        const startingPartyKeys = (result.startingPartyMembers || [])
+            .map(n => n.trim().toLowerCase())
+            .filter(key => result.state.npcs.some(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key))
+            .slice(0, MAX_PARTY_SIZE);
+        const startingNpcReputations = startingPartyKeys.length > 0
+            ? { ...nextNpcReputations, ...Object.fromEntries(startingPartyKeys.map(key => [key, PARTY_REPUTATION_THRESHOLD])) }
+            : nextNpcReputations;
+        if (startingPartyKeys.length > 0) {
+            nextParty = startingPartyKeys;
+            setParty(startingPartyKeys);
+            setNpcReputations(startingNpcReputations);
+        }
+        // Starting companions were already introduced as travelling with the
+        // hero in the opening scene itself — seed the roster baseline with
+        // them so the first real turn doesn't report them as "just invited".
+        partyRosterSnapshotRef.current = [...nextParty];
+        // Everything not built above is explicitly the empty starting value —
+        // never the render closure's, which after a restart or an opening
+        // regenerate still holds the previous campaign's.
+        saveGame(openingMessages, result.state, startingRarities, startingEquipment, startingNpcReputations, nextParty, {}, {}, nextFactionReputations, nextNpcKindnessCooldowns, {}, {}, {}, undefined, { morning: 0, dawnTurn: 0, stocked: {} });
+        updateNarrativeSummary(openingMessages, result.state).catch(() => { });
+    }
+    // The running summary (narrativeSummaryRef) folds in every message up to
+    // summarizedUpToRef. Regenerating or editing a turn throws away everything
+    // from that turn on, so if the summary already reaches past the part that
+    // survives, it now describes a story that no longer exists — and would keep
+    // feeding the narrator events from the discarded timeline. In that case
+    // drop it (generateNarrative's windowSize then sends the surviving history
+    // verbatim until updateNarrativeSummary builds a new one) and return the
+    // old values so a failed request can put them back; null when the summary
+    // was still valid. `survivingCount` = how many leading messages stay
+    // untouched.
+    function invalidateSummaryPastSurviving(survivingCount) {
+        if (summarizedUpToRef.current <= survivingCount)
+            return null;
+        const backup = { text: narrativeSummaryRef.current, upTo: summarizedUpToRef.current };
+        narrativeSummaryRef.current = '';
+        summarizedUpToRef.current = 0;
+        summaryEpochRef.current += 1;
+        return backup;
+    }
     async function handleStart() {
         if (!worldSetting.trim() || !heroName.trim()) {
             setError(t('missingFieldsError'));
@@ -36039,59 +36586,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const stateBefore = EMPTY_STATE;
             const opening = { role: 'player', text: OPENING_TRIGGER };
             const result = await callGameMaster([opening], stateBefore, true);
-            const openingMessages = [{ role: 'narrator', text: result.narrative, secrets: result.secrets, suggestions: result.suggestions, itemOffers: result.itemOffers, questOffers: result.questOffers, rewardOffers: result.rewardOffers, travelOffer: result.travelOffer, combatEncounter: result.combatEncounter, appliedReputationDeltas: result.reputationDeltas, appliedFactionReputationDeltas: result.factionReputationDeltas, appliedKindnessCooldownNpcs: result.kindnessCooldownNpcs, appliedKindnessCooldownTurn: result.turnIndex, stateBefore, tokenUsage: result.tokenUsage }];
-            const startingEquipment = autoEquipStartingGear(result.state.inventory);
-            const startingRarities = { ...itemRarities };
-            for (const item of result.state.inventory) {
-                const key = item.name.trim().toLowerCase();
-                if (!startingRarities[key])
-                    startingRarities[key] = rollStartingItemRarity();
-            }
-            setItemRarities(startingRarities);
-            setMessages(openingMessages);
-            setGameState(result.state);
-            setEquipment(startingEquipment);
-            setLastTokenUsage(result.tokenUsage);
-            // Chain each helper's returned value into the next, rather than
-            // letting every call independently re-read its own state from the
-            // render closure — otherwise migrateNpcReputations (etc.) would act on
-            // the value from BEFORE applyReputationDeltas just ran, silently
-            // dropping this same turn's own deltas. See the comments on
-            // applyReputationDeltas/migrateNpcReputations for the full rationale.
-            let nextNpcReputations = applyReputationDeltas(result.reputationDeltas);
-            const nextFactionReputations = applyFactionReputationDeltas(result.factionReputationDeltas);
-            let nextNpcKindnessCooldowns = applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
-            nextNpcReputations = migrateNpcReputations(result.npcRenames, nextNpcReputations);
-            nextNpcKindnessCooldowns = migrateNpcKindnessCooldowns(result.npcRenames, nextNpcKindnessCooldowns);
-            let nextParty = migratePartyKeys(result.npcRenames);
-            const nextPartyGear = migratePartyGearKeys(result.npcRenames);
-            // Starting companions requested on the setup screen (see
-            // startingPartySize and the "🤝 Группа" picker below) — the model
-            // just introduced them by name in the opening scene, already
-            // carrying health/psyche/stats (see OPENING PARTY in
-            // buildStateAndEventsSystemPrompt). Resolve those names against the
-            // npcs actually returned (defensively, in case one was dropped or
-            // misspelled) and start the party and its reputation right away, at
-            // the same floor an ordinary mid-story recruit requires — building on
-            // top of nextNpcReputations (this turn's own deltas/renames already
-            // folded in) rather than the pre-turn npcReputations, since saveGame
-            // right below needs the actual next value in hand rather than a
-            // pending one, precisely because there's no second turn yet to
-            // quietly catch a stale save up the way there normally would be.
-            const startingPartyKeys = (result.startingPartyMembers || [])
-                .map(n => n.trim().toLowerCase())
-                .filter(key => result.state.npcs.some(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key))
-                .slice(0, MAX_PARTY_SIZE);
-            const startingNpcReputations = startingPartyKeys.length > 0
-                ? { ...nextNpcReputations, ...Object.fromEntries(startingPartyKeys.map(key => [key, PARTY_REPUTATION_THRESHOLD])) }
-                : nextNpcReputations;
-            if (startingPartyKeys.length > 0) {
-                nextParty = startingPartyKeys;
-                setParty(startingPartyKeys);
-                setNpcReputations(startingNpcReputations);
-            }
-            saveGame(openingMessages, result.state, startingRarities, startingEquipment, startingNpcReputations, nextParty, nextPartyGear.partyInventories, nextPartyGear.partyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, npcInventories, npcCurrencies, nextPartyGear.partyCurrency);
-            updateNarrativeSummary(openingMessages, result.state, [startingRarities, startingEquipment, startingNpcReputations, nextParty, nextPartyGear.partyInventories, nextPartyGear.partyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, npcInventories, npcCurrencies, nextPartyGear.partyCurrency]).catch(() => { });
+            commitOpening(result);
         }
         catch (e) {
             setError(describeError(e, 'startFailedPrefix'));
@@ -36151,7 +36646,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const nextParty = migratePartyKeys(result.npcRenames);
             const nextPartyGear = migratePartyGearKeys(result.npcRenames);
             saveGame(updatedMessages, result.state, itemRarities, equipment, nextNpcReputations, nextParty, nextPartyGear.partyInventories, nextPartyGear.partyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, npcInventories, npcCurrencies, nextPartyGear.partyCurrency);
-            updateNarrativeSummary(updatedMessages, result.state, [itemRarities, equipment, nextNpcReputations, nextParty, nextPartyGear.partyInventories, nextPartyGear.partyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, npcInventories, npcCurrencies, nextPartyGear.partyCurrency]).catch(() => { });
+            updateNarrativeSummary(updatedMessages, result.state).catch(() => { });
         }
         catch (e) {
             // Roll back the optimistic add above: without this, a failed send
@@ -36315,14 +36810,19 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const turn = turns[turnIndex - 1];
         if (!turn)
             return;
-        const stateBefore = turn.narrator.stateBefore || EMPTY_STATE;
         const isOpeningTurn = turnIndex === 1;
+        // The opening's state-before is by definition EMPTY_STATE itself — the prompt
+        // builders recognise the opening by identity (see isOpeningTurn in
+        // buildNarrativeSystemPrompt), and the copy stored in a message stops being
+        // that object once a save has been through JSON.
+        const stateBefore = isOpeningTurn ? EMPTY_STATE : (turn.narrator.stateBefore || EMPTY_STATE);
         const historyUpToAction = isOpeningTurn
             ? [{ role: 'player', text: OPENING_TRIGGER }]
             : messages.slice(0, turn.narratorIndex);
         setLoading(true);
         setError(null);
         requestWakeLock();
+        let summaryBackup = null;
         try {
             // Every turn from turnIndex onward is being discarded (see the
             // comment above this function) — undo all of their combined
@@ -36330,26 +36830,56 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             // own, or a later discarded turn's effects (including anything a
             // resolved combat applied — see appliedCombatReputationDeltas in
             // endCombatAndClose) would silently survive into the fresh retelling.
-            undoDiscardedTurnsEffects(turns.slice(turnIndex - 1));
+            // Computed now, committed only after the request succeeds — see
+            // undoDiscardedTurnsEffects. regenViewRef makes the fresh attempt's own
+            // prompt and kindness-cooldown check read the undone values too.
+            const undone = undoDiscardedTurnsEffects(turns.slice(turnIndex - 1));
+            // A regenerated opening is a fresh start: its prompt must not see the old story's standing either.
+            regenViewRef.current = isOpeningTurn ? { npcReputations: {}, factionReputations: {}, npcKindnessCooldowns: {} } : undone;
+            // The running summary may already describe turns this is about to discard.
+            summaryBackup = invalidateSummaryPastSurviving(turn.narratorIndex);
             const result = await callGameMaster(historyUpToAction, stateBefore, isOpeningTurn);
+            if (isOpeningTurn) {
+                // Regenerating the opening throws away the whole story after it, so it is
+                // a fresh start with the same world and hero: clear the campaign's data
+                // and set the new opening up exactly the way handleStart does.
+                resetCampaignData();
+                commitOpening(result);
+                return;
+            }
             const updatedMessages = [...historyUpToAction, { role: 'narrator', text: result.narrative, secrets: result.secrets, suggestions: result.suggestions, itemOffers: result.itemOffers, questOffers: result.questOffers, rewardOffers: result.rewardOffers, travelOffer: result.travelOffer, combatEncounter: result.combatEncounter, appliedReputationDeltas: result.reputationDeltas, appliedFactionReputationDeltas: result.factionReputationDeltas, appliedKindnessCooldownNpcs: result.kindnessCooldownNpcs, appliedKindnessCooldownTurn: result.turnIndex, stateBefore, tokenUsage: result.tokenUsage }];
             setMessages(updatedMessages);
             setGameState(result.state);
             setLastTokenUsage(result.tokenUsage);
             // See the matching comment in sendBatch — same chaining, same reason.
-            let nextNpcReputations = applyReputationDeltas(result.reputationDeltas);
-            const nextFactionReputations = applyFactionReputationDeltas(result.factionReputationDeltas);
-            let nextNpcKindnessCooldowns = applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
+            // Built on top of the UNDONE maps (not the pre-undo closure values, which
+            // would silently discard the undo), then committed explicitly — a base
+            // that comes back unchanged (this turn had no deltas of its own) is
+            // never committed by the helpers themselves.
+            let nextNpcReputations = applyReputationDeltas(result.reputationDeltas, undone.npcReputations);
+            const nextFactionReputations = applyFactionReputationDeltas(result.factionReputationDeltas, undone.factionReputations);
+            let nextNpcKindnessCooldowns = applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex, undone.npcKindnessCooldowns);
             nextNpcReputations = migrateNpcReputations(result.npcRenames, nextNpcReputations);
             nextNpcKindnessCooldowns = migrateNpcKindnessCooldowns(result.npcRenames, nextNpcKindnessCooldowns);
+            if (nextNpcReputations !== npcReputations)
+                setNpcReputations(nextNpcReputations);
+            if (nextFactionReputations !== factionReputations)
+                setFactionReputations(nextFactionReputations);
+            if (nextNpcKindnessCooldowns !== npcKindnessCooldowns)
+                setNpcKindnessCooldowns(nextNpcKindnessCooldowns);
             const nextParty = migratePartyKeys(result.npcRenames);
             const nextPartyGear = migratePartyGearKeys(result.npcRenames);
             saveGame(updatedMessages, result.state, itemRarities, equipment, nextNpcReputations, nextParty, nextPartyGear.partyInventories, nextPartyGear.partyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, npcInventories, npcCurrencies, nextPartyGear.partyCurrency);
         }
         catch (e) {
+            if (summaryBackup) {
+                narrativeSummaryRef.current = summaryBackup.text;
+                summarizedUpToRef.current = summaryBackup.upTo;
+            }
             setError(describeError(e, 'sendFailedPrefix'));
         }
         finally {
+            regenViewRef.current = null;
             setLoading(false);
             setStreamingText('');
             releaseWakeLock();
@@ -36366,7 +36896,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const turn = turns[turnIndex - 1];
         if (!turn)
             return;
-        const stateBefore = turn.narrator.stateBefore || EMPTY_STATE;
+        const stateBefore = turnIndex === 1 ? EMPTY_STATE : (turn.narrator.stateBefore || EMPTY_STATE);
         const actionsStartIndex = turn.narratorIndex - turn.actions.length;
         const historyBeforeActions = messages.slice(0, actionsStartIndex);
         const newActionMessages = [];
@@ -36381,31 +36911,54 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         setLoading(true);
         setError(null);
         requestWakeLock();
+        let summaryBackup = null;
         try {
             // Every turn from turnIndex onward is being discarded (same reasoning
             // as regenerateTurn above) — undo all of their combined
             // reputation/faction/kindness-cooldown impact, not just turnIndex's
             // own.
-            undoDiscardedTurnsEffects(turns.slice(turnIndex - 1));
+            // Computed now, committed only after the request succeeds — see
+            // undoDiscardedTurnsEffects. regenViewRef makes the fresh attempt's own
+            // prompt and kindness-cooldown check read the undone values too.
+            const undone = undoDiscardedTurnsEffects(turns.slice(turnIndex - 1));
+            // A regenerated opening is a fresh start: its prompt must not see the old story's standing either.
+            regenViewRef.current = isOpeningTurn ? { npcReputations: {}, factionReputations: {}, npcKindnessCooldowns: {} } : undone;
+            // The running summary may already describe turns this is about to discard.
+            summaryBackup = invalidateSummaryPastSurviving(historyBeforeActions.length);
             const result = await callGameMaster(historyUpToAction, stateBefore, isOpeningTurn);
             const updatedMessages = [...historyUpToAction, { role: 'narrator', text: result.narrative, secrets: result.secrets, suggestions: result.suggestions, itemOffers: result.itemOffers, questOffers: result.questOffers, rewardOffers: result.rewardOffers, travelOffer: result.travelOffer, combatEncounter: result.combatEncounter, appliedReputationDeltas: result.reputationDeltas, appliedFactionReputationDeltas: result.factionReputationDeltas, appliedKindnessCooldownNpcs: result.kindnessCooldownNpcs, appliedKindnessCooldownTurn: result.turnIndex, stateBefore, tokenUsage: result.tokenUsage }];
             setMessages(updatedMessages);
             setGameState(result.state);
             setLastTokenUsage(result.tokenUsage);
             // See the matching comment in sendBatch — same chaining, same reason.
-            let nextNpcReputations = applyReputationDeltas(result.reputationDeltas);
-            const nextFactionReputations = applyFactionReputationDeltas(result.factionReputationDeltas);
-            let nextNpcKindnessCooldowns = applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex);
+            // Built on top of the UNDONE maps (not the pre-undo closure values, which
+            // would silently discard the undo), then committed explicitly — a base
+            // that comes back unchanged (this turn had no deltas of its own) is
+            // never committed by the helpers themselves.
+            let nextNpcReputations = applyReputationDeltas(result.reputationDeltas, undone.npcReputations);
+            const nextFactionReputations = applyFactionReputationDeltas(result.factionReputationDeltas, undone.factionReputations);
+            let nextNpcKindnessCooldowns = applyKindnessCooldowns(result.kindnessCooldownNpcs, result.turnIndex, undone.npcKindnessCooldowns);
             nextNpcReputations = migrateNpcReputations(result.npcRenames, nextNpcReputations);
             nextNpcKindnessCooldowns = migrateNpcKindnessCooldowns(result.npcRenames, nextNpcKindnessCooldowns);
+            if (nextNpcReputations !== npcReputations)
+                setNpcReputations(nextNpcReputations);
+            if (nextFactionReputations !== factionReputations)
+                setFactionReputations(nextFactionReputations);
+            if (nextNpcKindnessCooldowns !== npcKindnessCooldowns)
+                setNpcKindnessCooldowns(nextNpcKindnessCooldowns);
             const nextParty = migratePartyKeys(result.npcRenames);
             const nextPartyGear = migratePartyGearKeys(result.npcRenames);
             saveGame(updatedMessages, result.state, itemRarities, equipment, nextNpcReputations, nextParty, nextPartyGear.partyInventories, nextPartyGear.partyEquipment, nextFactionReputations, nextNpcKindnessCooldowns, npcInventories, npcCurrencies, nextPartyGear.partyCurrency);
         }
         catch (e) {
+            if (summaryBackup) {
+                narrativeSummaryRef.current = summaryBackup.text;
+                summarizedUpToRef.current = summaryBackup.upTo;
+            }
             setError(describeError(e, 'sendFailedPrefix'));
         }
         finally {
+            regenViewRef.current = null;
             setLoading(false);
             setStreamingText('');
             releaseWakeLock();
@@ -36429,6 +36982,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             npcInventories,
             npcCurrencies,
             shopClock,
+            startingPartySize,
             narrativeSummary: narrativeSummaryRef.current,
             summarizedUpTo: summarizedUpToRef.current
         };
@@ -36518,33 +37072,11 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         setStartingPartyPickerOpen(false);
         setMessages([]);
         setGameState(EMPTY_STATE);
-        setItemRarities({});
-        setItemWeights({});
-        setNpcReputations({});
-        // Not just mirroring npcReputations' own reset — a stale cooldown
-        // entry surviving into a new game (turnIndex restarting at 1) could
-        // otherwise block that name's very first kindness gain for several
-        // turns, since the cooldown check has no way to know a new game began.
-        setNpcKindnessCooldowns({});
-        setFactionReputations({});
-        setEquipment(EMPTY_EQUIPMENT);
-        setParty([]);
-        setPartyInventories({});
-        setPartyEquipment({});
-        // Same leak risk as npcKindnessCooldowns above, but for trading: without
-        // this, an NPC's shop stock/restockTurn and gold purse from the PREVIOUS
-        // campaign survive in this still-mounted component and silently attach
-        // to any new-game NPC that happens to reuse that same name/key — a real
-        // possibility with generic names a fresh setting is likely to reuse.
-        setNpcInventories({});
-        setNpcCurrencies({});
-        setShopClock({ morning: 0, dawnTurn: 0, stocked: {} });
+        resetCampaignData();
         setGroupModalOpen(false);
         setRecruitTargetNpc(null);
         setPartyGearTarget(null);
         setPartyGiveModalOpen(false);
-        narrativeSummaryRef.current = '';
-        summarizedUpToRef.current = 0;
         setInput('');
         setError(null);
         setSheetOpen(false);
@@ -36677,7 +37209,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                         t('openingBookLoading'))) : t('openBookButton'))),
                 React.createElement("p", { className: "privacy-footer" },
                     React.createElement("a", { href: PRIVACY_URL, target: "_blank", rel: "noopener noreferrer" }, t('privacyLink')))),
-            importModalOpen && (React.createElement(ImportModal, { value: importText, onChange: setImportText, error: importError, onLoad: handleImportSave, onCancel: () => { setImportModalOpen(false); setImportText(''); setImportError(null); }, t: t })),
+            importModalOpen && (React.createElement(ImportModal, { value: importText, onChange: setImportText, error: importError, replacesCurrentGame: messages.length > 0, onLoad: handleImportSave, onCancel: () => { setImportModalOpen(false); setImportText(''); setImportError(null); }, t: t })),
             settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
             apiKeyGuideOpen && (React.createElement(ApiKeyGuideModal, { apiKey: geminiApiKey, onSetApiKey: setApiKey, onClose: () => setApiKeyGuideOpen(false), t: t })),
             cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t }))));
@@ -36705,6 +37237,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         React.createElement("style", null, APP_STYLES),
         React.createElement(ReputationToastStack, { toasts: reputationToasts, t: t }),
         React.createElement(CurrencyToastStack, { toasts: currencyToasts, t: t }),
+        noticeKey && React.createElement("div", { className: "notice-chip", role: "status", "aria-live": "polite" }, t(noticeKey)),
         React.createElement("div", { className: "play-header" },
             React.createElement("div", { className: "play-brand" },
                 React.createElement("span", null,
@@ -36862,7 +37395,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
-        tradingNpc && (React.createElement(TradeModal, { dayPhase: gameState.dayPhase, npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, onTrade: (buyIndexes, sellIndexes) => executeTrade(tradingNpc, buyIndexes, sellIndexes), onClose: closeTrade, t: t })),
+        tradingNpc && (React.createElement(TradeModal, { dayPhase: gameState.dayPhase, npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, heroBoughtHere: (shopClock.heroBought || {})[tradingNpc.trim().toLowerCase()], onTrade: (buyIndexes, sellIndexes) => executeTrade(tradingNpc, buyIndexes, sellIndexes), onClose: closeTrade, t: t })),
         repairingNpc && (() => {
             const repairKey = repairingNpc.trim().toLowerCase();
             const repairNpc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === repairKey);
@@ -37211,6 +37744,12 @@ const APP_STYLES = `
   .currency-toast-label { color: var(--amber-200); }
   .currency-toast-delta { font-weight: 600; color: var(--amber-400); }
   @media (prefers-reduced-motion: reduce) { .currency-toast, .currency-toast-exit { animation: none !important; } }
+  /* Short notice chip — see flashNotice (busy-turn, autosave problems).
+     Fixed above the modals (their backdrop is z-index 50) so it reads from
+     inside one too. */
+  .notice-chip { position: fixed; bottom: 1.4rem; left: 50%; transform: translateX(-50%); z-index: 80; max-width: calc(100vw - 1.5rem); padding: 0.4rem 0.85rem; border-radius: 999px; background: var(--stone-900); border: 1px solid rgba(251, 191, 36, 0.5); box-shadow: 0 4px 14px rgba(0,0,0,0.45); font-family: var(--font-mono); font-size: 0.75rem; color: var(--amber-100); text-align: center; pointer-events: none; animation: notice-chip-in 0.25s ease-out; }
+  @keyframes notice-chip-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @media (prefers-reduced-motion: reduce) { .notice-chip { animation: none !important; } }
   .sheet-quest { margin-bottom: 0.5rem; }
   .sheet-quest-title { color: var(--amber-100); font-size: 0.85rem; margin: 0; }
   .sheet-quest-meta { color: var(--stone-500); font-size: 0.75rem; margin: 0.1rem 0 0; }
