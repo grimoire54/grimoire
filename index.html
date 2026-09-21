@@ -17464,8 +17464,10 @@ const TRANSLATIONS = {
         sendFailedPrefix: 'Мастер игры не ответил: ',
         rateLimitError: 'У ключа закончились доступные сейчас запросы к нейросети (лимит Gemini API) — он сбрасывается примерно раз в 24 часа. Попробуй вернуться через сутки или используй другой аккаунт с другим ключом.',
         busyTurnNotice: 'Подожди, пока рассказчик закончит ход.',
+        giftedItemNotice: 'Это подарок — обратно его не забрать.',
         autosaveFailedNotice: 'Автосохранение не удалось — экспортируй сохранение вручную, чтобы не потерять прогресс.',
         autosaveUnreadableNotice: 'Не удалось прочитать автосохранение. Его копия сохранена отдельно и не будет затёрта новой игрой.',
+        autosaveUnreadableNoCopyNotice: 'Не удалось прочитать автосохранение, и отдельную копию сделать тоже не вышло — новая игра его затрёт.',
         importReplaceWarning: 'Текущая игра и её автосохранение будут заменены.',
         importReplaceButton: 'Да, заменить',
         authError: 'Ключ Gemini API не принят — проверь, что он вставлен правильно, в настройках.',
@@ -18101,8 +18103,10 @@ const TRANSLATIONS = {
         sendFailedPrefix: "The game master didn't respond: ",
         rateLimitError: "This key is out of available AI requests for now (Gemini API limit) — it resets roughly once every 24 hours. Try again in a day, or use a different account with a different key.",
         busyTurnNotice: "Wait for the narrator to finish this turn first.",
+        giftedItemNotice: "That was a gift — it can't be taken back.",
         autosaveFailedNotice: "Autosave failed — export your save manually so you don't lose progress.",
         autosaveUnreadableNotice: "Couldn't read the autosave. A copy was kept aside, and a new game won't overwrite it.",
+        autosaveUnreadableNoCopyNotice: "Couldn't read the autosave, and a separate copy couldn't be kept either — a new game will overwrite it.",
         importReplaceWarning: "The current game and its autosave will be replaced.",
         importReplaceButton: 'Yes, replace',
         authError: "The Gemini API key wasn't accepted — check that it's entered correctly in settings.",
@@ -18797,6 +18801,16 @@ function normalizeInventoryItem(raw) {
     // A repair kit's remaining charge (absent = a full, unused kit) — see REPAIR KITS.
     if (slot === 'repairKit' && Number.isFinite(raw.charge) && raw.charge >= 0)
         item.charge = Math.round(raw.charge * 100) / 100;
+    // What the hero PAID for this very copy (absent = it was found, rewarded or
+    // starting kit) — the cost basis capResalePrice holds any later sale to, so
+    // nothing bought can ever be resold for more than it cost. Set only where
+    // money actually changes hands (executeTrade, a priced item offer).
+    if (Number.isFinite(raw.paid) && raw.paid > 0)
+        item.paid = Math.round(raw.paid);
+    // Set on an item the hero GIFTED to a character (see confirmGiftBundle): a
+    // gift is theirs for good, so it can't be taken back out of their gear.
+    if (raw.gifted === true)
+        item.gifted = true;
     return item;
 }
 // An item's "quest gold signature" is live ONLY while the quest it's tagged
@@ -20861,23 +20875,23 @@ function computeHeroSellPrice(item, itemRarities, merchantProfile) {
     const condition = getConditionMultiplierByName(item, itemRarities, CONDITION_MIN_PRICE_MULT);
     return Math.max(1, Math.round(computeItemValue(item.name, itemRarities) * computeSellMultiplier(item.slot, merchantProfile) * condition));
 }
-// The most a merchant will pay for something the hero bought from THAT SAME
-// merchant earlier: a fixed share of what the hero paid. Without it a
-// specialist — who pays 1.4x base for their own line of goods while selling
-// it at 1x, or at 0.7x once the hero's standing with their faction is high —
-// is a money machine: buy an item off the shelf, sell it straight back for
-// more, repeat until the purse runs dry. The record of what was paid lives
-// in shopClock.heroBought[merchant] (see executeTrade), keyed by lowercase
-// item name. Used by both TradeModal's displayed price and executeTrade's
+// Nothing the hero BOUGHT can ever be resold for more than it cost: whatever
+// a merchant would otherwise pay is held to a fixed share of what the hero
+// paid for that very copy (item.paid, stamped by executeTrade and by a
+// priced item offer, carried along with the item everywhere — see
+// normalizeInventoryItem / carryOverItemDurability). Without this, buying
+// and selling are separately priced and the gap is free money: a specialist
+// pays 1.4x base for their own line of goods while an allied faction sells
+// at 0.7x, so buy anywhere, sell to a specialist, repeat — or simply buy
+// off a shelf and sell it straight back. Free finds (loot, rewards, starting
+// kit) carry no cost basis and sell at the normal price: that's income, not
+// a loop. Used by both TradeModal's displayed price and executeTrade's
 // payout, exactly like computeHeroSellPrice itself, so the two can't drift.
 const TRADE_RESALE_CAP = 0.85;
-function capResalePrice(price, item, paidLedger) {
-    if (!paidLedger || !item || typeof item.name !== 'string')
+function capResalePrice(price, item) {
+    if (!item || !Number.isFinite(item.paid) || item.paid <= 0)
         return price;
-    const paid = paidLedger[item.name.trim().toLowerCase()];
-    if (!Number.isFinite(paid))
-        return price;
-    return Math.min(price, Math.max(1, Math.floor(paid * TRADE_RESALE_CAP)));
+    return Math.min(price, Math.max(1, Math.floor(item.paid * TRADE_RESALE_CAP)));
 }
 // Buying back something the hero themselves sold this NPC a moment ago
 // (see executeTrade in App(), which tags the item with buybackPrice on its
@@ -22254,28 +22268,6 @@ function normalizeShopClock(raw) {
             clock.stocked[normalizedKey] = { morning: Math.max(0, Math.round(Number(entry.morning))), turn: Math.max(0, Math.round(Number(entry.turn))) };
         }
     }
-    // What the hero paid each merchant for the things they bought there, by
-    // lowercase item name — see capResalePrice. Optional: absent on saves from
-    // before it existed and on a clock that never saw a purchase.
-    if (raw.heroBought && typeof raw.heroBought === 'object') {
-        for (const key of Object.keys(raw.heroBought)) {
-            const ledger = raw.heroBought[key];
-            const normalizedKey = key.trim().toLowerCase();
-            if (!normalizedKey || !ledger || typeof ledger !== 'object')
-                continue;
-            const clean = {};
-            for (const name of Object.keys(ledger)) {
-                const paid = Number(ledger[name]);
-                const nameKey = name.trim().toLowerCase();
-                if (nameKey && Number.isFinite(paid) && paid >= 0)
-                    clean[nameKey] = Math.round(paid);
-            }
-            if (Object.keys(clean).length > 0) {
-                clock.heroBought = clock.heroBought || {};
-                clock.heroBought[normalizedKey] = clean;
-            }
-        }
-    }
     return clock;
 }
 // A deliberately deterministic sub-system: once a fight's opponent is
@@ -22960,11 +22952,12 @@ function buildHeroStrikeWearOps({ equipment, inventory, itemRarities }) {
 function buildHeroBlockWearOps({ equipment, inventory, itemRarities, enemyTier }) {
     return collectWearOps(['weaponRight', 'weaponLeft'], equipment, inventory, itemRarities, { type: 'block', tier: enemyTier });
 }
-// Carries durability across a state-model inventory rewrite: the state model
-// re-lists the whole inventory each turn as plain {name, slot, ...} objects
-// and knows nothing about durability, so anything it hands back without the
-// field gets it re-attached from the previous inventory by name (in order,
-// so two copies of the same item keep their own values).
+// Carries durability (and charge, and the price the hero paid — see
+// normalizeInventoryItem) across a state-model inventory rewrite: the state
+// model re-lists the whole inventory each turn as plain {name, slot, ...}
+// objects and knows nothing about any of it, so anything it hands back
+// without the field gets it re-attached from the previous inventory by name
+// (in order, so two copies of the same item keep their own values).
 function carryOverItemDurability(nextInventory, priorInventory) {
     if (!Array.isArray(nextInventory) || !Array.isArray(priorInventory) || priorInventory.length === 0)
         return nextInventory;
@@ -22990,6 +22983,8 @@ function carryOverItemDurability(nextInventory, priorInventory) {
             next = { ...next, durability: prior.durability };
         if (!Number.isFinite(it.charge) && Number.isFinite(prior.charge))
             next = { ...next, charge: prior.charge };
+        if (!Number.isFinite(it.paid) && Number.isFinite(prior.paid))
+            next = { ...next, paid: prior.paid };
         return next;
     });
 }
@@ -24397,8 +24392,13 @@ function fromBase64Utf8(b64) {
     return new TextDecoder().decode(bytes);
 }
 function bytesToBase64(bytes) {
+    // Same output as building the binary string one byte at a time, just in
+    // chunks — the byte-by-byte loop is noticeably slow on a multi-megabyte
+    // autosave (see encodeAutosave).
     let binary = '';
-    bytes.forEach(b => { binary += String.fromCharCode(b); });
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
     return btoa(binary);
 }
 function base64ToBytes(b64) {
@@ -24417,6 +24417,47 @@ async function gzipDecompress(bytes) {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
     const blob = await new Response(stream).blob();
     return await blob.text();
+}
+// ---- Autosave storage format ----
+// The autosave is one JSON string, and every narrator message in it carries a
+// full copy of the game state as it stood at the start of that turn (that's
+// what lets a turn be regenerated), so it grows with every turn and is
+// mostly repetition. Anything over AUTOSAVE_COMPRESS_MIN_CHARS is therefore
+// stored gzip-compressed — the same built-in streams the V2 export already
+// uses — as this prefix + base64, typically about 5x smaller. Smaller saves,
+// and every save on a device without the compression streams, stay exactly
+// as before: plain JSON. decodeAutosave reads both, so saves written by any
+// earlier version load unchanged.
+const AUTOSAVE_GZ_PREFIX = 'GRIMOIRE-RPG-AUTOSAVE-GZ1:';
+const AUTOSAVE_COMPRESS_MIN_CHARS = 150000;
+// Never throws: anything that keeps compression from working just yields the
+// plain JSON, i.e. a bigger save, never a lost or corrupt one.
+async function encodeAutosave(json) {
+    if (json.length < AUTOSAVE_COMPRESS_MIN_CHARS)
+        return json;
+    if (typeof CompressionStream === 'undefined' || typeof DecompressionStream === 'undefined')
+        return json;
+    try {
+        const bytes = await gzipCompress(json);
+        // Trust nothing: unpack what was just packed and compare, so a compressor
+        // that misbehaves in some WebView costs a bigger save instead of a bad one.
+        if ((await gzipDecompress(bytes)) !== json)
+            return json;
+        const packed = AUTOSAVE_GZ_PREFIX + bytesToBase64(bytes);
+        return packed.length < json.length ? packed : json;
+    }
+    catch (e) {
+        return json;
+    }
+}
+// Throws on anything unreadable (corrupt or truncated data, or a compressed
+// save on a device that can no longer decompress) — the caller treats that
+// as an unreadable save.
+async function decodeAutosave(text) {
+    if (typeof text === 'string' && text.startsWith(AUTOSAVE_GZ_PREFIX)) {
+        return JSON.parse(await gzipDecompress(base64ToBytes(text.slice(AUTOSAVE_GZ_PREFIX.length))));
+    }
+    return JSON.parse(text);
 }
 // Pulls the first JSON object out of a model response, defensively. The
 // prompts all say "ONLY valid JSON, nothing else", but in practice a reply
@@ -24566,7 +24607,7 @@ function groupInventoryByName(inventory) {
         const stackable = item.slot === 'consumable' || item.slot === 'repairKit' || item.slot === 'none';
         // A partly-used repair kit (see item.charge) never folds into a fresh one
         // of the same name — each charge level is its own stack.
-        const stackKey = item.slot === 'repairKit' ? item.name + '|' + (Number.isFinite(item.charge) ? item.charge : 'full') : item.name;
+        const stackKey = (item.slot === 'repairKit' ? item.name + '|' + (Number.isFinite(item.charge) ? item.charge : 'full') : item.name) + (item.gifted ? '|gift' : '');
         if (stackable && indexByName.has(stackKey)) {
             groups[indexByName.get(stackKey)].count += 1;
         }
@@ -26274,12 +26315,13 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
                         const weaponDamage = getWeaponDamageForSlot(item.slot, rarity || 'common', item.twoHanded);
                         const blockChance = getBlockChanceForItem(item, rarity || 'common');
                         const statBadge = buildStatBadge(armorDefense, weaponDamage, blockChance);
-                        return (React.createElement("p", { key: gi, className: "sheet-list-item sheet-list-item-clickable", style: rarity ? { color: rarityColor(rarity) } : undefined, onClick: () => setTakeBackIndex(firstIndex) },
+                        return (React.createElement("p", { key: gi, className: 'sheet-list-item' + (item.gifted ? '' : ' sheet-list-item-clickable'), style: rarity ? { color: rarityColor(rarity) } : undefined, onClick: item.gifted ? undefined : () => setTakeBackIndex(firstIndex) },
                             "[",
                             item.name,
                             weaponHandTag(item.slot, item.twoHanded, t) ? ' ' + weaponHandTag(item.slot, item.twoHanded, t) : '',
                             "]",
                             isEquipped ? ' ✓' : '',
+                            item.gifted ? ' 🎁' : '',
                             React.createElement("span", { className: "sheet-item-meta" },
                                 statBadge && ' · ',
                                 statBadge && statBadge.map((part, pi) => (React.createElement(React.Fragment, { key: pi },
@@ -26337,7 +26379,7 @@ function GivePartyItemModal({ npcName, gameState, itemRarities, equipment, inven
     // stay eligible, exactly like their belongings list in PartyGearModal.
     const equippedCounts = countEquippedByName(equipment);
     const giveGroups = excludeEquipped(groupInventoryByName(gameState.inventory), equippedCounts);
-    const takeGroups = groupInventoryByName(inventory || []);
+    const takeGroups = groupInventoryByName(inventory || []).filter(g => !g.item.gifted);
     const takenGiveIndexes = new Set(giveSlots.filter(s => s !== null));
     const takenTakeIndexes = new Set(takeSlots.filter(s => s !== null));
     function pickForGiveSlot(invIndex) {
@@ -26507,7 +26549,7 @@ function RestockIcon() {
         React.createElement("path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" }),
         React.createElement("path", { d: "M21 3v5h-5" })));
 }
-function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, equipment, dayPhase, heroBoughtHere, onTrade, onClose, t }) {
+function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRarities, factionReputations, equipment, dayPhase, onTrade, onClose, t }) {
     const npcKey = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
     const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === npcKey);
     const merchantProfile = npc ? inferNpcMerchantProfile(npc.role) : null;
@@ -26563,9 +26605,9 @@ function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRar
             setSellPickerSlot(slotIdx);
     }
     const getBuyPrice = (item) => computeNpcBuyPrice(item, itemRarities, buyMultiplier);
-    const getSellPrice = (item) => capResalePrice(computeHeroSellPrice(item, itemRarities, merchantProfile), item, heroBoughtHere);
+    const getSellPrice = (item) => capResalePrice(computeHeroSellPrice(item, itemRarities, merchantProfile), item);
     const getSellPriceArrow = (item) => {
-        // Something bought from this very merchant fetches less than it cost.
+        // Something the hero bought fetches less than it cost.
         if (getSellPrice(item) < computeHeroSellPrice(item, itemRarities, merchantProfile))
             return 'down';
         // Specialty fit AND condition both move the price off the standard one.
@@ -29277,6 +29319,8 @@ function App() {
     // write that lands, so a full or unavailable storage says so once instead
     // of on every single turn (see saveGame).
     const saveFailureShownRef = useRef(false);
+    // The autosave write queue — see queueAutosave.
+    const autosaveWriterRef = useRef({ pending: null, running: null });
     // Bumped whenever the running summary is thrown away (restart, load, a
     // regenerate that discards turns the summary had already folded in) so a
     // summarization that was already in flight can tell its result is stale
@@ -29710,7 +29754,7 @@ function App() {
                 const saveResult = await window.storage.get(SAVE_KEY, false);
                 if (!cancelled && saveResult && saveResult.value) {
                     try {
-                        applyLoadedSave(JSON.parse(saveResult.value));
+                        applyLoadedSave(await decodeAutosave(saveResult.value));
                     }
                     catch (loadError) {
                         // A save is there but it couldn't be read or applied. Swallowing
@@ -29719,14 +29763,15 @@ function App() {
                         // only copy. Keep the raw text under its own key first, wipe
                         // whatever applyLoadedSave managed to set before it threw, and
                         // say so.
+                        let keptCopy = false;
                         try {
-                            await window.storage.set(SAVE_BACKUP_KEY, saveResult.value, false);
+                            keptCopy = (await window.storage.set(SAVE_BACKUP_KEY, saveResult.value, false)) !== null;
                         }
-                        catch (backupError) { /* nothing more that can be done */ }
+                        catch (backupError) { /* no room for a copy either */ }
                         resetCampaignData();
                         setMessages([]);
                         setGameState(EMPTY_STATE);
-                        flashNotice('autosaveUnreadableNotice', 9000);
+                        flashNotice(keptCopy ? 'autosaveUnreadableNotice' : 'autosaveUnreadableNoCopyNotice', 9000);
                     }
                 }
             }
@@ -29832,8 +29877,9 @@ function App() {
         // closure here still holds the previous render's state, so without this
         // a load would overwrite the save with empty identity fields.
         const identity = nextIdentity || { worldSetting, heroName, heroConcept };
+        let json;
         try {
-            const stored = await window.storage.set(SAVE_KEY, JSON.stringify({
+            json = JSON.stringify({
                 worldSetting: identity.worldSetting, heroName: identity.heroName, heroConcept: identity.heroConcept,
                 messages: nextMessages,
                 gameState: nextState,
@@ -29852,7 +29898,47 @@ function App() {
                 startingPartySize: identity.startingPartySize !== undefined ? identity.startingPartySize : startingPartySize,
                 narrativeSummary: narrativeSummaryRef.current,
                 summarizedUpTo: summarizedUpToRef.current
-            }), false);
+            });
+        }
+        catch (e) {
+            // Building the snapshot itself failed (not expected) — as visible as a
+            // write that doesn't land.
+            reportAutosaveFailure();
+            return;
+        }
+        return queueAutosave(json);
+    }
+    // Autosave writes go through this single-file queue rather than straight to
+    // storage.set. A big save is compressed first (see encodeAutosave), which
+    // takes a moment, and two of those in flight can finish out of order — an
+    // older snapshot landing last would silently replace a newer one. So a
+    // snapshot waits here: while one is being packed and written, any later
+    // one simply replaces whatever was waiting (only the latest state matters)
+    // and is written next. confirmRestart cancels the waiting one and lets the
+    // running one land BEFORE it deletes the save, so a discarded campaign's
+    // write can never turn up after the delete.
+    function queueAutosave(json) {
+        const writer = autosaveWriterRef.current;
+        writer.pending = json;
+        if (writer.running)
+            return writer.running;
+        writer.running = (async () => {
+            try {
+                while (writer.pending !== null) {
+                    const next = writer.pending;
+                    writer.pending = null;
+                    await writeAutosave(next);
+                }
+            }
+            finally {
+                writer.running = null;
+            }
+        })();
+        return writer.running;
+    }
+    async function writeAutosave(json) {
+        try {
+            const stored = await window.storage.set(SAVE_KEY, await encodeAutosave(json), false);
             // The storage API reports a write that didn't happen as null rather
             // than always throwing.
             if (stored === null)
@@ -29860,14 +29946,17 @@ function App() {
             saveFailureShownRef.current = false;
         }
         catch (e) {
-            // Storage unavailable or full — the game carries on in memory, but the
-            // player has to be told the autosave isn't landing (they can still
-            // export manually). Said once per failure streak, not on every turn.
-            if (!saveFailureShownRef.current) {
-                saveFailureShownRef.current = true;
-                flashNotice('autosaveFailedNotice', 7000);
-            }
+            reportAutosaveFailure();
         }
+    }
+    // Storage unavailable or full — the game carries on in memory, but the
+    // player has to be told the autosave isn't landing (they can still export
+    // manually). Said once per failure streak, not on every turn.
+    function reportAutosaveFailure() {
+        if (saveFailureShownRef.current)
+            return;
+        saveFailureShownRef.current = true;
+        flashNotice('autosaveFailedNotice', 7000);
     }
     // Lets the player re-enter a hero name that an older build wiped from the
     // autosave (see the nextIdentity note on saveGame) — shown in the
@@ -31879,7 +31968,14 @@ ${chunkText}`;
         }
         // --- state (unchanged from the old generateStateAndEvents) ---
         const parsedStats = parsed.stats && typeof parsed.stats === 'object' && !Array.isArray(parsed.stats) ? parsed.stats : null;
-        const rawInventory = Array.isArray(parsed.inventory) ? normalizeInventory(parsed.inventory) : currentState.inventory;
+        // Whatever the model hands back is stripped of any cost basis (item.paid)
+        // it may have echoed from the state dump it was shown: what the hero paid
+        // is the client's record alone, re-attached from the previous inventory by
+        // carryOverItemDurability below — never something the model can set or
+        // change.
+        const rawInventory = Array.isArray(parsed.inventory)
+            ? normalizeInventory(parsed.inventory).map(it => { const copy = { ...it }; delete copy.paid; return copy; })
+            : currentState.inventory;
         const { inventory, surpriseItems, justTakenCount } = reconcileInventory(rawInventory, currentState, precedingNarrator, isOpeningTurn);
         const currency = reconcileCurrency(parsed.currencyChange, currentState);
         const rawQuests = Array.isArray(parsed.quests) ? parsed.quests.filter(q => q && typeof q.id === 'string') : [];
@@ -33203,7 +33299,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         let nextItemRarities = itemRarities;
         if (takenItem) {
             const cost = takenItem.cost && takenItem.cost > 0 ? takenItem.cost : 0;
-            nextState = { ...gameState, inventory: [...gameState.inventory, { name: takenItem.label, slot: takenItem.slot, twoHanded: takenItem.twoHanded, shield: takenItem.shield, weightCategory: takenItem.weightCategory, questId: takenItem.questId || null }], currency: Math.max(0, gameState.currency - cost) };
+            nextState = { ...gameState, inventory: [...gameState.inventory, { name: takenItem.label, slot: takenItem.slot, twoHanded: takenItem.twoHanded, shield: takenItem.shield, weightCategory: takenItem.weightCategory, questId: takenItem.questId || null, ...(cost > 0 ? { paid: cost } : {}) }], currency: Math.max(0, gameState.currency - cost) };
             setGameState(nextState);
             if (takenItem.rarity) {
                 const key = takenItem.label.trim().toLowerCase();
@@ -33837,7 +33933,10 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const currentReputation = typeof npcReputations[key] === 'number' ? npcReputations[key] : DEFAULT_REPUTATION;
         const clampedReputation = clampReputation(currentReputation + delta);
         const nextNpcReputations = { ...npcReputations, [key]: clampedReputation };
-        const nextPartyInventories = givenItems.length > 0 ? { ...partyInventories, [key]: [...(partyInventories[key] || []), ...givenItems] } : partyInventories;
+        // Marked gifted: a gift earned reputation, so it must not be retrievable — handing it back and forth would be an endless
+        // reputation (and, through the faction ripple, price-discount) farm. Only gear handed over through the party screen,
+        // which earns nothing, can be taken back.
+        const nextPartyInventories = givenItems.length > 0 ? { ...partyInventories, [key]: [...(partyInventories[key] || []), ...givenItems.map(it => ({ ...it, gifted: true }))] } : partyInventories;
         const nextPartyCurrency = currencyAmount > 0 ? { ...partyCurrency, [key]: (partyCurrency[key] || 0) + currencyAmount } : partyCurrency;
         setGameState(nextState);
         setNpcReputations(nextNpcReputations);
@@ -33955,10 +34054,18 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         if (blockedWhileTurnRuns())
             return;
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
-        const indexSet = new Set(Array.isArray(indexes) ? indexes : []);
-        if (!key || indexSet.size === 0)
+        if (!key)
             return;
         const memberInventory = partyInventories[key] || [];
+        const requested = Array.isArray(indexes) ? indexes : [];
+        // A gift is the character's now — only what was handed over as plain gear
+        // can come back (see confirmGiftBundle). The party screen doesn't offer
+        // gifts for taking in the first place; this is the backstop.
+        const indexSet = new Set(requested.filter(i => memberInventory[i] && !memberInventory[i].gifted));
+        if (requested.some(i => memberInventory[i] && memberInventory[i].gifted))
+            flashNotice('giftedItemNotice');
+        if (indexSet.size === 0)
+            return;
         const takenItems = memberInventory.filter((_, i) => indexSet.has(i));
         if (takenItems.length === 0)
             return;
@@ -34224,22 +34331,21 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const npcInventory = npcInventories[key] || [];
         const buySet = new Set(buyIndexes);
         const sellSet = new Set(sellIndexes);
-        const heroBoughtHere = (shopClock.heroBought || {})[key];
         let buyTotal = 0;
         const boughtItems = [];
-        const paidByName = [];
         npcInventory.forEach((item, i) => {
             if (!buySet.has(i))
                 return;
             const paid = computeNpcBuyPrice(item, itemRarities, buyMultiplier);
             buyTotal += paid;
-            paidByName.push([item.name, paid]);
             // Once it's back in the hero's own bag it's just a normal item again —
-            // buybackPrice only means anything while sitting in an NPC's
-            // inventory (see computeNpcBuyPrice) — selling it a second time
-            // prices it fresh off the usual rarity/specialization rules.
-            const bought = { ...item };
+            // buybackPrice / askingPrice only mean anything while sitting in an
+            // NPC's inventory (see computeNpcBuyPrice) — but it now carries what
+            // the hero paid for it (paid), which caps any later resale of this
+            // copy anywhere, whoever the buyer (see capResalePrice).
+            const bought = { ...item, paid };
             delete bought.buybackPrice;
+            delete bought.askingPrice;
             boughtItems.push(bought);
         });
         let sellTotal = 0;
@@ -34247,7 +34353,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         gameState.inventory.forEach((item, i) => {
             if (!sellSet.has(i) || item.questId)
                 return;
-            const price = capResalePrice(computeHeroSellPrice(item, itemRarities, merchantProfile), item, heroBoughtHere);
+            const price = capResalePrice(computeHeroSellPrice(item, itemRarities, merchantProfile), item);
             sellTotal += price;
             soldEntries.push({ item, price });
         });
@@ -34268,7 +34374,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         // until the merchant's next restock — see openTrade/isRestockDue.)
         const nextNpcInventory = [
             ...npcInventory.filter((_, i) => !buySet.has(i)),
-            ...soldEntries.map(({ item, price }) => ({ ...item, questId: null, buybackPrice: price })),
+            // (paid is the hero's own cost basis — it stays behind with the hero, not
+            // on the merchant's shelf.)
+            ...soldEntries.map(({ item, price }) => { const { paid, ...rest } = item; return { ...rest, questId: null, buybackPrice: price }; }),
         ];
         // Removing an equipped item from gameState.inventory here is enough on
         // its own — the existing equipment-upkeep effect clears the now-
@@ -34278,25 +34386,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             ...gameState.inventory.filter((_, i) => !sellSet.has(i)),
             ...boughtItems,
         ];
-        // Remember what was paid for everything bought here (and forget anything
-        // just sold back) so a later sale of it to this same merchant is capped —
-        // see capResalePrice.
-        const nextHeroBoughtHere = { ...(heroBoughtHere || {}) };
-        for (const { item } of soldEntries)
-            delete nextHeroBoughtHere[item.name.trim().toLowerCase()];
-        for (const [name, paid] of paidByName) {
-            const nameKey = name.trim().toLowerCase();
-            nextHeroBoughtHere[nameKey] = Number.isFinite(nextHeroBoughtHere[nameKey]) ? Math.min(nextHeroBoughtHere[nameKey], paid) : paid;
-        }
-        const nextShopClock = { ...shopClock, heroBought: { ...(shopClock.heroBought || {}), [key]: nextHeroBoughtHere } };
         const nextState = { ...gameState, currency: nextHeroCurrency, inventory: nextInventory };
         const nextNpcInventories = { ...npcInventories, [key]: nextNpcInventory };
         const nextNpcCurrencies = { ...npcCurrencies, [key]: nextNpcCurrency };
         setGameState(nextState);
         setNpcInventories(nextNpcInventories);
         setNpcCurrencies(nextNpcCurrencies);
-        setShopClock(nextShopClock);
-        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies, undefined, undefined, nextShopClock);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, nextNpcInventories, nextNpcCurrencies);
     }
     // ---- COMBAT HANDLERS ----
     // The hero's own present-and-able companions, snapshotted into combatants
@@ -37095,6 +37191,17 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         setResurrectionDenied(false);
         setCurrentTurnIndex(1);
         setLastTokenUsage(null);
+        // A write still queued (or mid-compression) belongs to the campaign being
+        // thrown away: cancel the queued one and let the running one land first,
+        // or it would put the old save back right after the delete.
+        const writer = autosaveWriterRef.current;
+        writer.pending = null;
+        if (writer.running) {
+            try {
+                await writer.running;
+            }
+            catch (e) { /* the loop swallows its own errors */ }
+        }
         try {
             await window.storage.delete(SAVE_KEY, false);
         }
@@ -37395,7 +37502,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: gameState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
-        tradingNpc && (React.createElement(TradeModal, { dayPhase: gameState.dayPhase, npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, heroBoughtHere: (shopClock.heroBought || {})[tradingNpc.trim().toLowerCase()], onTrade: (buyIndexes, sellIndexes) => executeTrade(tradingNpc, buyIndexes, sellIndexes), onClose: closeTrade, t: t })),
+        tradingNpc && (React.createElement(TradeModal, { dayPhase: gameState.dayPhase, npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, onTrade: (buyIndexes, sellIndexes) => executeTrade(tradingNpc, buyIndexes, sellIndexes), onClose: closeTrade, t: t })),
         repairingNpc && (() => {
             const repairKey = repairingNpc.trim().toLowerCase();
             const repairNpc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === repairKey);
