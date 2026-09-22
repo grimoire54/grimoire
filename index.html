@@ -17273,7 +17273,10 @@ const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
 // Grimoire RPG — file map
 // ----------------------------------------------------------------------------
 // 1. TRANSLATIONS               — every UI string, ru + en, grouped by screen
-// 2. GAME STATE                 — schema, defaults, normalization
+// 2. GAME STATE                 — schema, defaults, normalization; includes
+//                                  ACTIVE ABILITIES & LEVEL-UP CHOICES
+//                                  (ABILITY_DEFS/pendingLevelUps), whose
+//                                  combat hooks live in section 10
 // 3. STORAGE KEYS & SESSION CONSTANTS
 // 4. FALLBACK CONTENT           — used when a model call comes back empty
 // 5. ITEM ECONOMY               — rarity, weight, carry capacity, healing
@@ -17534,6 +17537,42 @@ const TRANSLATIONS = {
         levelLabel: 'Уровень',
         xpLabel: 'Опыт',
         effectsHeading: 'Эффекты',
+        // -- Character sheet: abilities --
+        abilitiesHeading: 'Умения',
+        abilityTypePassive: 'пассивное',
+        abilityTypeActive: 'активное',
+        abilityFreqPerFight: 'раз за бой',
+        abilityFreqPerRounds: 'раз в {n} раунда боя',
+        abilityFreqAuto: 'срабатывает само, без кнопки',
+        abilityName_bladeMaster: 'Мастер клинка',
+        abilityDesc_bladeMaster: 'Постоянный бонус к шансу критического удара в бою.',
+        abilityName_quickReflexes: 'Быстрые рефлексы',
+        abilityDesc_quickReflexes: 'Постоянный бонус к шансу попадания собственных атак.',
+        abilityName_steadfast: 'Несгибаемость',
+        abilityDesc_steadfast: 'Постоянный бонус к шансу увернуться, заблокировать или парировать удар.',
+        abilityName_silentStep: 'Тихий шаг',
+        abilityDesc_silentStep: 'Повышает шанс на успешное скрытое убийство и помогает оставаться незамеченным.',
+        abilityName_berserkerFury: 'Ярость берсерка',
+        abilityDesc_berserkerFury: 'Чем меньше остаётся здоровья, тем сильнее становятся удары.',
+        abilityName_resilientBody: 'Живучесть',
+        abilityDesc_resilientBody: 'После победы в бою восстанавливает чуть больше здоровья, чем обычно.',
+        abilityName_coldBlood: 'Хладнокровие',
+        abilityDesc_coldBlood: 'Постоянный бонус к шансу вырваться из проигрышного боя.',
+        abilityName_scavengerEye: 'Чутьё добычи',
+        abilityDesc_scavengerEye: 'Из побеждённых противников достаётся больше монет.',
+        abilityName_bloodlust: 'Жажда крови',
+        abilityDesc_bloodlust: 'Первое попадание в каждом бою наносит повышенный урон.',
+        abilityName_resilience: 'Стойкость',
+        abilityDesc_resilience: 'Раз в бой можно полностью поглотить один входящий удар.',
+        abilityName_intimidation: 'Устрашение',
+        abilityDesc_intimidation: 'Одним взглядом подрывает боевой дух всех врагов разом.',
+        abilityName_secondWind: 'Второе дыхание',
+        abilityDesc_secondWind: 'Раз в бой можно немедленно восстановить часть здоровья прямо в разгар боя.',
+        // -- Level-up modal (see ABILITY_DEFS/pendingLevelUps) --
+        levelUpTitle: 'Уровень {n}',
+        levelUpSubtitle: 'Выбери новое умение',
+        levelUpNoOptionsText: 'Все доступные умения уже изучены — герой просто становится опытнее.',
+        levelUpContinueButton: 'Продолжить',
         // -- Effect detail popup (tap an effect on the sheet) --
         effectKindLabel_bleed: 'Кровотечение',
         effectKindLabel_poison: 'Отравление',
@@ -17553,6 +17592,7 @@ const TRANSLATIONS = {
         effectMechanicFleeChance: 'Шанс побега из боя',
         effectMechanicDamage: 'Наносимый урон',
         effectMechanicHpTick: 'Потеря здоровья за раунд боя',
+        effectMechanicCheck: 'Проверки действий (бросок d20)',
         effectMechanicDurationTurns: 'Длится примерно {n} ход(а/ов)',
         effectMechanicDurationUntilResolved: 'Проходит только когда это вылечат или разрешится по сюжету — само по себе не пройдёт',
         effectMechanicNone: 'Никак не влияет на бой — это чисто повествовательная деталь.',
@@ -17607,7 +17647,7 @@ const TRANSLATIONS = {
         armorWeightMediumLabel: 'средняя броня',
         armorWeightHeavyLabel: 'тяжёлая броня',
         itemWeightLabel: 'Вес предмета',
-        itemHealLabel: 'Восстановит здоровья',
+        itemHealLabel: 'Лечит всё, здоровье',
         itemCapacityBonusLabel: 'Бонус к переносимому весу',
         itemDefenseLabel: 'Защита',
         itemDamageLabel: 'Урон',
@@ -17742,6 +17782,7 @@ const TRANSLATIONS = {
         combatUseItemPickTargetHint: 'Выбери, на кого применить предмет',
         combatUseItemCancelLabel: 'Отмена',
         combatItemUsedLogVerb: 'использует',
+        combatItemCuredSuffix: 'недуги сняты: {n}',
         combatLogFleeSuccessText: 'Побег удаётся!',
         combatLogFleeFailTag: 'Побег не удался',
         combatFledTitle: 'Побег',
@@ -17754,6 +17795,15 @@ const TRANSLATIONS = {
         lootDamagedTag: '[повреждено]',
         lootBrokenTag: '[сломано]',
         lootContinueButton: 'Забрать и продолжить',
+        // -- Combat: active abilities (see ABILITY_DEFS/onUseAbility) --
+        combatAbilityReadyHint: 'готово',
+        combatAbilityUsedHint: 'использовано в этом бою',
+        combatAbilityCooldownHint: 'перезарядка: {n}',
+        combatLogBloodlustText: 'Жажда крови усиливает первый удар',
+        combatLogResilienceActivateText: 'собирается поглотить следующий удар',
+        combatLogResilienceAbsorbText: 'Стойкость полностью поглощает удар — урона нет',
+        combatLogIntimidationText: 'Устрашающий взгляд героя сотрясает боевой дух врагов',
+        combatLogSecondWindText: 'Второе дыхание возвращает силы',
         // -- Death & game over --
         deathModalTitle: 'Ваш персонаж погиб',
         deathModalText: 'Это конец вашего приключения.',
@@ -18173,6 +18223,42 @@ const TRANSLATIONS = {
         levelLabel: 'Level',
         xpLabel: 'XP',
         effectsHeading: 'Effects',
+        // -- Character sheet: abilities --
+        abilitiesHeading: 'Abilities',
+        abilityTypePassive: 'passive',
+        abilityTypeActive: 'active',
+        abilityFreqPerFight: 'once per fight',
+        abilityFreqPerRounds: 'once every {n} rounds of combat',
+        abilityFreqAuto: 'triggers automatically, no button',
+        abilityName_bladeMaster: 'Blade Master',
+        abilityDesc_bladeMaster: 'A permanent bonus to your critical-hit chance in combat.',
+        abilityName_quickReflexes: 'Quick Reflexes',
+        abilityDesc_quickReflexes: "A permanent bonus to your own attacks' chance to land.",
+        abilityName_steadfast: 'Steadfast',
+        abilityDesc_steadfast: 'A permanent bonus to your chance to dodge, block, or parry an incoming blow.',
+        abilityName_silentStep: 'Silent Step',
+        abilityDesc_silentStep: 'Improves your odds on a stealth kill and helps you go unnoticed.',
+        abilityName_berserkerFury: "Berserker's Fury",
+        abilityDesc_berserkerFury: 'The less health you have left, the harder your blows land.',
+        abilityName_resilientBody: 'Resilient Body',
+        abilityDesc_resilientBody: 'Recovers a little extra health after every fight you win.',
+        abilityName_coldBlood: 'Cold Blood',
+        abilityDesc_coldBlood: 'A permanent bonus to your chance of breaking off from a losing fight.',
+        abilityName_scavengerEye: "Scavenger's Eye",
+        abilityDesc_scavengerEye: 'Defeated enemies yield noticeably more coin.',
+        abilityName_bloodlust: 'Bloodlust',
+        abilityDesc_bloodlust: 'The first hit you land in every fight deals extra damage.',
+        abilityName_resilience: 'Resilience',
+        abilityDesc_resilience: 'Once per fight, you can fully absorb one incoming blow.',
+        abilityName_intimidation: 'Intimidation',
+        abilityDesc_intimidation: "A single glance shakes every enemy's resolve at once.",
+        abilityName_secondWind: 'Second Wind',
+        abilityDesc_secondWind: 'Once per fight, instantly recover part of your health mid-battle.',
+        // -- Level-up modal (see ABILITY_DEFS/pendingLevelUps) --
+        levelUpTitle: 'Level {n}',
+        levelUpSubtitle: 'Choose a new ability',
+        levelUpNoOptionsText: 'Every available ability is already learned — the hero simply grows more experienced.',
+        levelUpContinueButton: 'Continue',
         // -- Effect detail popup (tap an effect on the sheet) --
         effectKindLabel_bleed: 'Bleeding',
         effectKindLabel_poison: 'Poisoned',
@@ -18192,6 +18278,7 @@ const TRANSLATIONS = {
         effectMechanicFleeChance: 'Chance to flee combat',
         effectMechanicDamage: 'Damage dealt',
         effectMechanicHpTick: 'Health lost per combat round',
+        effectMechanicCheck: 'Action checks (d20 roll)',
         effectMechanicDurationTurns: 'Lasts roughly {n} turn(s)',
         effectMechanicDurationUntilResolved: "Only ends once it's actually treated or resolved by the story — it won't wear off on its own",
         effectMechanicNone: "Has no mechanical effect on combat — it's flavor only.",
@@ -18246,7 +18333,7 @@ const TRANSLATIONS = {
         armorWeightMediumLabel: 'medium armor',
         armorWeightHeavyLabel: 'heavy armor',
         itemWeightLabel: 'Item weight',
-        itemHealLabel: 'Restores health',
+        itemHealLabel: 'Cures all, health',
         itemCapacityBonusLabel: 'Carry capacity bonus',
         itemDefenseLabel: 'Defense',
         itemDamageLabel: 'Damage',
@@ -18381,6 +18468,7 @@ const TRANSLATIONS = {
         combatUseItemPickTargetHint: 'Choose who to use it on',
         combatUseItemCancelLabel: 'Cancel',
         combatItemUsedLogVerb: 'uses',
+        combatItemCuredSuffix: 'ailments cured: {n}',
         combatLogFleeSuccessText: 'The escape succeeds!',
         combatLogFleeFailTag: 'Escape failed',
         combatFledTitle: 'Escape',
@@ -18393,6 +18481,15 @@ const TRANSLATIONS = {
         lootDamagedTag: '[damaged]',
         lootBrokenTag: '[broken]',
         lootContinueButton: 'Take and continue',
+        // -- Combat: active abilities (see ABILITY_DEFS/onUseAbility) --
+        combatAbilityReadyHint: 'ready',
+        combatAbilityUsedHint: 'used this fight',
+        combatAbilityCooldownHint: 'cooldown: {n}',
+        combatLogBloodlustText: 'Bloodlust empowers the first strike',
+        combatLogResilienceActivateText: 'braces to absorb the next blow',
+        combatLogResilienceAbsorbText: 'Resilience fully absorbs the blow — no damage taken',
+        combatLogIntimidationText: "The hero's withering glare shakes the enemies' resolve",
+        combatLogSecondWindText: 'Second Wind restores your strength',
         // -- Death & game over --
         deathModalTitle: 'Your character has died',
         deathModalText: 'This is the end of your adventure.',
@@ -18624,9 +18721,11 @@ const EMPTY_STATE = {
     map: { nodes: [], currentId: null, visitedEdges: [] },
     factions: [],
     // -- World reactivity: see the WORLD REACTIVITY section below --
-    // Narrator-declared, exactly like `time` above (same reasoning: only the
-    // narrator knows how much story-time a scene actually spans, so a rigid
-    // turn-count clock would drift out of sync with the prose). Defaults to
+    // Derived locally from `time` above (see inferDayPhaseFromTime) — the model
+    // declares only the time text, since only the narrator knows how much
+    // story-time a scene actually spans (a rigid turn-count clock would drift
+    // out of sync with the prose); the day/night reading of that text is plain
+    // code. With no phase word or clock in the text it keeps its value. Defaults to
     // 'day' so a fresh game and every pre-existing save load into daylight
     // rather than an undefined state.
     dayPhase: 'day',
@@ -18639,7 +18738,14 @@ const EMPTY_STATE = {
     // A short, capped log of the hero's own notable kills, for the tavern
     // rumor mill and the narrator's own "the world remembers what you did"
     // rule — see generateRumors and the WORLD KEEPS MOVING system-prompt rule.
-    heroDeeds: []
+    heroDeeds: [],
+    // See ACTIVE ABILITIES & LEVEL-UP CHOICES below: `abilities` is the
+    // hero's owned ABILITY_DEFS ids (order = pick order); `pendingLevelUps`
+    // is the queue of level numbers reached but not yet resolved into a pick
+    // (see computeNewlyGainedLevels, pushed onto here by both addXp call
+    // sites).
+    abilities: [],
+    pendingLevelUps: []
 };
 function clampStat(value, fallback) {
     const n = Number(value);
@@ -18748,6 +18854,215 @@ function computeXpBarInfo(level, xp) {
     const needed = xpRequiredForLevel(level);
     const percent = needed > 0 ? Math.max(0, Math.min(100, Math.round((xp / needed) * 100))) : 0;
     return { percent, current: xp, needed, maxed: false };
+}
+// ----------------------------------------------------------------------------
+// ACTIVE ABILITIES & LEVEL-UP CHOICES
+// ----------------------------------------------------------------------------
+// Every level gained (see computeNewlyGainedLevels, called from both addXp
+// call sites — endCombatAndClose's combat XP and generateStateAndEvents'
+// quest XP) queues one entry onto gameState.pendingLevelUps rather than
+// changing anything by itself. LevelUpModal (see PRESENTATIONAL COMPONENTS)
+// shows the lowest queued level and offers 3 randomly-drawn not-yet-owned
+// abilities from the pool below (see pickLevelUpOptions); picking one adds
+// its id to gameState.abilities (see chooseLevelUpAbility in App) and pops
+// that entry off the queue. Once every ability is owned, further level-ups
+// resolve with no card at all (see LevelUpModal) — there's nothing left to
+// offer, so the hero simply keeps leveling in the background like before
+// this system existed.
+//
+// Each entry's own fields double as its exact mechanical hook — nothing
+// elsewhere hardcodes a bonus number, it's always read off ABILITY_DEFS[id]:
+//  - type 'passive': a permanent combat modifier, folded into the hero's
+//    own mods object by applyHeroAbilityMods (see COMBAT PURE HELPERS)
+//    everywhere the hero's mods are computed (attack, defense, flee), or
+//    into rollStealthKillOutcome for silentStep specifically.
+//  - type 'active': has a per-fight or per-N-round usage limit (frequency/
+//    cooldownRounds), tracked in combat.abilityState (see
+//    createAbilityFightState). trigger 'auto' means it fires on its own
+//    the moment its condition is met (bloodlust: the first hit landed) —
+//    no button, just the status strip in CombatModal; trigger 'manual'
+//    means the player spends their turn on it via onUseAbility.
+//
+// promptLabel/promptHint are deliberately plain, hand-written English,
+// independent of nameKey/descKey's localized UI text — see the "hidden
+// prompts are always English" note above TRANSLATIONS. They're what
+// buildNarrativeSystemPrompt actually hands the AI game master (see its
+// abilitiesContext) so it can lean on an owned ability the way the design
+// calls for (a hero with Intimidation gets offered a scare-them-off angle
+// in a tense scene, Silent Step lets a guard plausibly miss the hero
+// sneaking past, Blade Master's hits read as precise rather than brutish).
+const ABILITY_DEFS = {
+    bladeMaster: {
+        icon: '⚔️', nameKey: 'abilityName_bladeMaster', descKey: 'abilityDesc_bladeMaster',
+        type: 'passive',
+        critChanceDelta: 10,
+        promptLabel: 'Blade Master',
+        promptHint: "Fights with unusual precision and lands a noticeably higher share of clean, telling blows. Favor describing the hero's strikes as precise and elegant rather than brute or clumsy."
+    },
+    quickReflexes: {
+        icon: '💨', nameKey: 'abilityName_quickReflexes', descKey: 'abilityDesc_quickReflexes',
+        type: 'passive',
+        hitChanceDelta: 6,
+        promptLabel: 'Quick Reflexes',
+        promptHint: 'Reacts and strikes with unusual speed — quicker than an ordinary person to close distance or get a blow in first.'
+    },
+    steadfast: {
+        icon: '🔰', nameKey: 'abilityName_steadfast', descKey: 'abilityDesc_steadfast',
+        type: 'passive',
+        defenseChanceDelta: 8,
+        promptLabel: 'Steadfast',
+        promptHint: 'Defends with unusual poise — rarely caught flat-footed, and holds a line or a guard longer than most.'
+    },
+    silentStep: {
+        icon: '🥷', nameKey: 'abilityName_silentStep', descKey: 'abilityDesc_silentStep',
+        type: 'passive',
+        stealthKillChanceBonus: 15,
+        promptLabel: 'Silent Step',
+        promptHint: "Moves without a sound and reads shadows and sightlines well. Guards and watchers can plausibly fail to notice the hero sneaking past, hiding, or closing in unseen — let stealthy attempts go more smoothly than an ordinary person's would."
+    },
+    berserkerFury: {
+        icon: '💢', nameKey: 'abilityName_berserkerFury', descKey: 'abilityDesc_berserkerFury',
+        type: 'passive',
+        berserkMaxBonus: 0.5,
+        promptLabel: "Berserker's Fury",
+        promptHint: 'Grows more dangerous, not less, the more hurt the hero is — badly wounded, they fight with a reckless, heightened ferocity rather than flagging.'
+    },
+    resilientBody: {
+        icon: '🩹', nameKey: 'abilityName_resilientBody', descKey: 'abilityDesc_resilientBody',
+        type: 'passive',
+        bonusHealFraction: 0.08,
+        promptLabel: 'Resilient Body',
+        promptHint: 'Recovers from wounds a little faster than an ordinary person.'
+    },
+    coldBlood: {
+        icon: '🧊', nameKey: 'abilityName_coldBlood', descKey: 'abilityDesc_coldBlood',
+        type: 'passive',
+        fleeChanceDelta: 12,
+        promptLabel: 'Cold Blood',
+        promptHint: 'Stays level-headed under pressure and reads the moment to disengage better than most, making a fighting withdrawal look calculated rather than panicked.'
+    },
+    scavengerEye: {
+        icon: '💰', nameKey: 'abilityName_scavengerEye', descKey: 'abilityDesc_scavengerEye',
+        type: 'passive',
+        lootCurrencyBonusFraction: 0.2,
+        promptLabel: "Scavenger's Eye",
+        promptHint: 'Has a sharp eye for anything valuable a defeated enemy is carrying.'
+    },
+    bloodlust: {
+        icon: '🩸', nameKey: 'abilityName_bloodlust', descKey: 'abilityDesc_bloodlust',
+        type: 'active', trigger: 'auto', frequency: 'perFight',
+        bloodlustDamageMultiplier: 1.6,
+        promptLabel: 'Bloodlust',
+        promptHint: 'The first blow landed in any fight comes unusually hard, almost feral in its force — that opening strike can read as especially brutal or decisive.'
+    },
+    resilience: {
+        icon: '🛡️', nameKey: 'abilityName_resilience', descKey: 'abilityDesc_resilience',
+        type: 'active', trigger: 'manual', frequency: 'perFight',
+        promptLabel: 'Resilience',
+        promptHint: "Can, once in a dangerous fight, brace and shrug off a blow that would otherwise land hard — a moment of the hero's sheer toughness worth calling out when it happens."
+    },
+    intimidation: {
+        icon: '😨', nameKey: 'abilityName_intimidation', descKey: 'abilityDesc_intimidation',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3,
+        intimidationMoraleShock: 35,
+        promptLabel: 'Intimidation',
+        promptHint: "Carries real, physical menace — a hard stare, a cold word, or a show of confidence can visibly unsettle lesser enemies (bandits, thugs, common guards). This is a legitimate way for the hero to try talking or staring down a threat instead of fighting it — reputation and presence work in the hero's favor here. NPCs and the game master can proactively suggest or react to this when a scene calls for backing someone down rather than fighting them."
+    },
+    secondWind: {
+        icon: '🌬️', nameKey: 'abilityName_secondWind', descKey: 'abilityDesc_secondWind',
+        type: 'active', trigger: 'manual', frequency: 'perFight',
+        secondWindHealFraction: 0.3,
+        promptLabel: 'Second Wind',
+        promptHint: 'Can dig deep and recover mid-fight, catching a genuine second wind under pressure rather than steadily wearing down.'
+    }
+};
+// How many levels a level-up spans, as a plain list of the level numbers
+// just crossed (e.g. 3 -> 5 returns [4, 5]) — almost always length 1, but a
+// single large XP award (a big quest turn-in, a tough combat win) can cross
+// more than one threshold at once, and each still gets its own level-up
+// card rather than being silently collapsed into one.
+function computeNewlyGainedLevels(prevLevel, nextLevel) {
+    const from = clampLevel(prevLevel, 1);
+    const to = clampLevel(nextLevel, 1);
+    const gained = [];
+    for (let l = from + 1; l <= to; l++)
+        gained.push(l);
+    return gained;
+}
+// Save-load hygiene for gameState.abilities — see normalizeGameState. Drops
+// anything that isn't a recognized ABILITY_DEFS id (an old id renamed or
+// retired since the save was made) and de-duplicates, same spirit as
+// normalizeStoredEffects for the unrelated status-effect list.
+function normalizeAbilityIds(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    const seen = new Set();
+    const out = [];
+    for (const id of raw) {
+        if (typeof id === 'string' && ABILITY_DEFS[id] && !seen.has(id)) {
+            seen.add(id);
+            out.push(id);
+        }
+    }
+    return out;
+}
+// Save-load hygiene for gameState.pendingLevelUps — see normalizeGameState.
+// Keeps only positive integers at or below the hero's own (already-
+// normalized) level, de-duplicated and sorted ascending, so the queue is
+// always resolved lowest-level-first and can never reference a level the
+// hero hasn't actually reached.
+function normalizePendingLevelUps(raw, currentLevel) {
+    if (!Array.isArray(raw))
+        return [];
+    const seen = new Set();
+    const out = [];
+    for (const v of raw) {
+        const n = Math.round(Number(v));
+        if (Number.isFinite(n) && n >= 1 && n <= currentLevel && !seen.has(n)) {
+            seen.add(n);
+            out.push(n);
+        }
+    }
+    return out.sort((a, b) => a - b);
+}
+// Fresh per-fight bookkeeping for the once-per-fight/once-per-N-round
+// active abilities (bloodlust/resilience/secondWind/intimidation) — stashed
+// on combat.abilityState by both startCombat and attemptStealthKill so it
+// always exists for the lifetime of a fight, regardless of which entry
+// point opened it. intimidationReadyAtRound starts at 1 (combat's own
+// round counter also starts at 1 — see startCombat) so it reads as usable
+// from the very first round rather than needing a full cooldown up front.
+function createAbilityFightState() {
+    return { bloodlustUsed: false, resilienceUsed: false, resilienceActive: false, secondWindUsed: false, intimidationReadyAtRound: 1 };
+}
+// The 3 (or fewer, once the pool is nearly exhausted — see LevelUpModal)
+// choices a level-up card offers: a random draw from every ABILITY_DEFS id
+// the hero doesn't already own. Order is shuffled (Fisher-Yates) rather
+// than however Object.keys happens to enumerate, so the same 3 abilities
+// don't always cluster in the same left-to-right order.
+function pickLevelUpOptions(ownedIds, count) {
+    const owned = new Set(ownedIds || []);
+    const pool = Object.keys(ABILITY_DEFS).filter(id => !owned.has(id));
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = pool[i];
+        pool[i] = pool[j];
+        pool[j] = tmp;
+    }
+    return pool.slice(0, count);
+}
+// Shared "how often does this work" line for an active ability, used by
+// both LevelUpModal's option cards and CharacterSheet's abilities block so
+// the two descriptions never drift out of sync with each other. Passives
+// have nothing to say here (LevelUpModal/CharacterSheet both just show the
+// passive/active tag alone in that case).
+function abilityFrequencyLabel(def, t) {
+    if (!def || def.type !== 'active')
+        return '';
+    const base = def.frequency === 'perRounds'
+        ? t('abilityFreqPerRounds').replace('{n}', def.cooldownRounds)
+        : t('abilityFreqPerFight');
+    return def.trigger === 'auto' ? base + ' · ' + t('abilityFreqAuto') : base;
 }
 // Valid equipment slot types a state-tracked inventory item can carry.
 // "none" covers ordinary non-equippable items (potions, keys, documents,
@@ -19525,7 +19840,17 @@ function normalizeGameState(raw) {
         // empty rather than dropping the whole save.
         dayPhase: raw.dayPhase === 'night' ? 'night' : 'day',
         worldEvents: normalizeWorldEvents(raw.worldEvents),
-        heroDeeds: normalizeHeroDeeds(raw.heroDeeds)
+        heroDeeds: normalizeHeroDeeds(raw.heroDeeds),
+        // A save from before abilities existed has neither field at all — both
+        // degrade gracefully to empty, same spirit as everything else above.
+        // Unknown ability ids (an old id renamed/removed since the save was
+        // made) are silently dropped rather than kept as a dead entry the
+        // sheet/combat UI wouldn't know how to render. pendingLevelUps is also
+        // bounded to the hero's own (already-normalized) level just above — a
+        // corrupted or hand-edited save can't queue a level-up for a level the
+        // hero hasn't actually reached.
+        abilities: normalizeAbilityIds(raw.abilities),
+        pendingLevelUps: normalizePendingLevelUps(raw.pendingLevelUps, level)
     };
 }
 // A faction's own declared stance toward another known faction — "war"
@@ -19677,6 +20002,78 @@ function normalizeHeroDeeds(raw) {
 // fresh here, the same way the rest of the file treats a faction's
 // territory as an emergent property of the map rather than a duplicated
 // count that could quietly drift out of sync with it.
+// ---- DAY PHASE, READ LOCALLY FROM THE "time" TEXT ----------------------------
+// "dayPhase" used to be a second field the state model had to fill in on
+// every turn, even though its own prompt called it "a coarse, mechanical
+// reading of \"time\"" — i.e. a pure function of a string the app already
+// has. This is that function: no model call, no tokens, and the same time
+// text always gives the same answer (the model's own toggling was
+// inconsistent turn to turn, and a flip night->day is what triggers the
+// merchants' morning restock, see the prevDayPhaseRef effect in App()).
+//
+// Returns 'day', 'night', or null when the text says nothing about the time
+// of day ("Third day since departure") — callers then simply keep whatever
+// phase the state already has. Order of evidence:
+//  1. an explicit clock reading (14:30, 10 PM, 3 часа ночи) — the most
+//     precise thing a time string can carry;
+//  2. otherwise the FIRST phase word in the text, because a time string
+//     leads with its phase ("Night, third day...", "Morning after a
+//     sleepless night" -> morning wins). "day"/"день" on their own are
+//     deliberately NOT phase words: "third day" counts days, it doesn't
+//     say it's daytime.
+// Plain evening is still day (shops are open); dusk, twilight, sunset,
+// nightfall and "late evening" are night — the same line the model's own
+// prompt used ("dusk settling in").
+const DAY_PHASE_NIGHT_FROM_HOUR = 20;
+const DAY_PHASE_NIGHT_UNTIL_HOUR = 6;
+const DAY_PHASE_WORD_PATTERNS = [
+    // Phrases that start with a day word but mean night — listed as their own
+    // night patterns so the earliest-match rule below sees them first.
+    { phase: 'night', re: /(?<![a-zа-яё])(?:before\s+dawn|pre-?dawn|перед\s+рассвет[а-яё]*|до\s+рассвет[а-яё]*)/ },
+    { phase: 'night', re: /(?<![a-zа-яё])(?:late\s+(?:at\s+night|evening)|поздн[а-яё]*\s+вечер[а-яё]*|глубок[а-яё]*\s+ноч[а-яё]*)/ },
+    { phase: 'night', re: /(?<![a-zа-яё])(?:midnight|tonight|night(?:time|fall)?|dusk|twilight|sunset|after\s+dark|small\s+hours)(?![a-zа-яё])/ },
+    { phase: 'night', re: /(?<![a-zа-яё])(?:полноч[а-яё]*|ночь|ночи|ночью|ночн[а-яё]+|сумерк[а-яё]*|закат[а-яё]{0,3})(?![а-яё])/ },
+    { phase: 'day', re: /(?<![a-zа-яё])(?:early\s+morning|morning|dawn|sunrise|daybreak|noon|midday|afternoon|evening|daytime)(?![a-zа-яё])/ },
+    { phase: 'day', re: /(?<![a-zа-яё])(?:утр[а-яё]*|рассвет[а-яё]*|восход[а-яё]*|полд[а-яё]*|днём|днем|обед[а-яё]*|послеобеденн[а-яё]*|вечер[а-яё]*)/ }
+];
+function inferDayPhaseFromTime(timeText) {
+    if (typeof timeText !== 'string')
+        return null;
+    const text = timeText.toLowerCase();
+    if (!text.trim())
+        return null;
+    const isNightHour = h => h >= DAY_PHASE_NIGHT_FROM_HOUR || h < DAY_PHASE_NIGHT_UNTIL_HOUR;
+    // 1a. 12-hour clock with am/pm ("10 pm", "3:45 a.m.")
+    let m = text.match(/(?<![\d:.])(\d{1,2})(?:[:.](\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/);
+    if (m) {
+        let h = parseInt(m[1], 10) % 12;
+        if (m[3].startsWith('p'))
+            h += 12;
+        return isNightHour(h) ? 'night' : 'day';
+    }
+    // 1b. Russian "N часов/часа утра|дня|вечера|ночи"
+    m = text.match(/(?<![\d:.])(\d{1,2})(?:[:.]\d{2})?\s*(?:час[а-яё]*\s*)?(утра|дня|вечера|ночи)(?![а-яё])/);
+    if (m) {
+        const h = parseInt(m[1], 10);
+        if (m[2] === 'ночи')
+            return 'night';
+        if (m[2] === 'вечера')
+            return h >= 8 && h <= 12 ? 'night' : 'day';
+        return 'day';
+    }
+    // 1c. 24-hour clock ("23:15")
+    m = text.match(/(?<![\d:.])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])/);
+    if (m)
+        return isNightHour(parseInt(m[1], 10)) ? 'night' : 'day';
+    // 2. first phase word wins
+    let best = null;
+    for (const { phase, re } of DAY_PHASE_WORD_PATTERNS) {
+        const hit = re.exec(text);
+        if (hit && (best === null || hit.index < best.index))
+            best = { phase, index: hit.index };
+    }
+    return best ? best.phase : null;
+}
 function computeFactionTerritoryCounts(factions, mapNodes) {
     const nodes = Array.isArray(mapNodes) ? mapNodes : [];
     return (Array.isArray(factions) ? factions : []).map(f => ({
@@ -21211,6 +21608,37 @@ function rollHealAmount(rarity) {
     const [min, max] = HEAL_RANGE_BY_RARITY[rarity] || HEAL_RANGE_BY_RARITY.common;
     return rollIntInRange(min, max);
 }
+// A healing consumable cures EVERYTHING — bleeding, fractures, concussion,
+// exhaustion, poison, curses and narrative-only conditions alike — no matter
+// how much (or how little) health it restores and whether or not the hero is
+// at full health afterwards. The only entries that survive are the
+// game-managed markers that have their own dedicated resolution path:
+// "death" (tryResurrection) and "captivity" (the model's own
+// "captivityResolved" report) — a potion can neither raise the dead nor
+// unlock a cell — and every BENEFICIAL effect (see below): healing cures
+// afflictions, it never strips a buff off the one who drank it. Pure
+// array-in, array-out, used for the hero and for a party member's own
+// npc.effects alike, in and out of combat.
+const UNCURABLE_EFFECT_KINDS = ['death', 'captivity'];
+// Effect kinds that HELP whoever carries them (see EFFECT_DEFS — each has
+// only positive deltas). Per the "effects" schema in the state prompt,
+// "adrenaline" is the one such kind today; any future buff kind (a
+// blessing, a haste) must be listed here so no consumable ever cures it.
+// "other" is deliberately NOT here: it's the narrative-only bucket, which
+// the schema restricts to afflictions (a rash, a phobia, a broken heart).
+const BENEFICIAL_EFFECT_KINDS = ['adrenaline'];
+function isBeneficialEffect(e) {
+    return !!e && BENEFICIAL_EFFECT_KINDS.includes(e.kind);
+}
+function isCurableEffect(e) {
+    return !!e && !UNCURABLE_EFFECT_KINDS.includes(e.kind) && !isBeneficialEffect(e);
+}
+function cureAllEffects(effects) {
+    return (Array.isArray(effects) ? effects : []).filter(e => e && !isCurableEffect(e));
+}
+function countCurableEffects(effects) {
+    return (Array.isArray(effects) ? effects : []).filter(isCurableEffect).length;
+}
 // Which paper-doll slot key an inventory item's "slot" type maps to when
 // equipped from the item detail popup (see ItemDetailModal): the single
 // matching slot for most types, or a side-picking rule for the two types
@@ -21783,7 +22211,7 @@ function grantFactionSpecialStock(npcInventory, merchantProfile, factionRep, lan
 // in App()) but nothing ever ages back out, so a merchant visited on turn 3
 // and again on turn 300 has the exact same shelf plus whatever got bolted
 // on since. This gives a confirmed merchant's ordinary stock a shelf life:
-// every story MORNING (the narrator's dayPhase flipping from night to day —
+// every story MORNING (dayPhase flipping from night to day, as read from the narrator's time text —
 // see the dawn effect in App()) whatever was on the shelf before that dawn
 // quietly rotates out (sold onward/returned to a supplier, narratively
 // speaking) and a small fresh batch takes its place — so walking back into
@@ -22330,6 +22758,23 @@ const COMBAT_TUNING = {
     damageVariance: 0.3, // +/- fraction of base damage applied as randomness
     weaponPowerModifierScale: 0.02, // +/-2% weapon damage per point of attacker power above baseline
     weaponPowerModifierFloor: 0.5, // a very weak attacker still deals at least half the weapon's rating
+    // Ceiling/floor on the COMBINED damageMultiplier (status effects ×
+    // ability bonuses — see aggregateEffectModifiers/applyHeroAbilityMods)
+    // right before it's applied in computeWeaponDamage. Each individual
+    // source is already reasonable on its own (e.g. severe adrenaline ×1.3,
+    // berserkerFury up to ×1.5, bloodlust ×1.6), and the legitimate maximum
+    // combo — berserkerFury at max bonus, bloodlust's first-hit bonus, and
+    // one severe adrenaline all at once — lands around ×3.1, so the ceiling
+    // below leaves room for that without capping it. What it's actually
+    // guarding against is multiple *distinct-labeled* status effects of the
+    // SAME kind being active together (e.g. two separately-described
+    // "adrenaline" surges) — aggregateEffectModifiers has no per-kind dedupe,
+    // so nothing else stops damageMultiplier from compounding without limit
+    // if the narrator ever reports that. The floor exists for the same
+    // reason on the low end (stacked exhaustion/fracture), independent of
+    // the dmg >= 1 floor already applied after variance/crit.
+    damageMultiplierMin: 0.3,
+    damageMultiplierMax: 4,
     enemyDamageBase: 5, // enemies carry no inventory/rarity, so their damage scales off "power" alone —
     enemyDamagePowerScale: 1.0, // calibrated so an ordinary enemy (power ~10) hits about as hard as a common one-handed weapon
     hpScale: 2, // multiplies narrative health (1-1000, ordinary ~50) into a combat HP pool sized to match weapon damage — see the calibration note above WEAPON_DAMAGE_BY_RARITY
@@ -22605,6 +23050,13 @@ function getWeaponDamageForSlot(slotType, rarity, twoHanded) {
 // null for anything that's neither a shield nor a two-handed weapon.
 function getBlockChanceForItem(item, rarity) {
     if (!item || item.slot !== 'weapon')
+        return null;
+    // A bow/crossbow/gun is stored as twoHanded (it occupies both hands — see
+    // normalizeInventoryItem), but that must NOT turn it into a blocking
+    // implement: you can't hold off a blow with a drawn bow. The same rule is
+    // mirrored in computeDefenseAvailability / hasParryWeaponEquipped below,
+    // so the badge shown here and the Block button in combat always agree.
+    if (isRangedWeaponItem(item))
         return null;
     const isShield = item.shield === true || (item.shield === undefined && isShieldItemName(item.name));
     if (!isShield && item.twoHanded !== true)
@@ -23157,7 +23609,9 @@ function getEquippedWeaponSlotItems(equipment, inventory, itemRarities) {
 // A "real" (non-shield) weapon in hand — what parry actually needs to have
 // something more than a fist to deflect with.
 function hasParryWeaponEquipped(equipment, inventory, itemRarities) {
-    return getEquippedWeaponSlotItems(equipment, inventory, itemRarities).some(it => !(it.shield === true || (it.shield === undefined && isShieldItemName(it.name))));
+    // A bow is a weapon but not something to deflect a blade with, so it
+    // doesn't count as a parry weapon either (parry falls back to bare-handed).
+    return getEquippedWeaponSlotItems(equipment, inventory, itemRarities).some(it => !(it.shield === true || (it.shield === undefined && isShieldItemName(it.name))) && !isRangedWeaponItem(it));
 }
 // Heavy body armor (plate, cuirasses, anything the model or the player
 // calls "heavy") trades mobility for protection — it stays in
@@ -23211,7 +23665,7 @@ function isHeavyArmorEquipped(equipment, inventory) {
 function computeDefenseAvailability(equipment, inventory, itemRarities) {
     const equippedWeapons = getEquippedWeaponSlotItems(equipment, inventory, itemRarities);
     const shieldItem = equippedWeapons.find(it => it.shield === true || (it.shield === undefined && isShieldItemName(it.name)));
-    const twoHandedItem = equippedWeapons.find(it => it.twoHanded === true);
+    const twoHandedItem = equippedWeapons.find(it => it.twoHanded === true && !isRangedWeaponItem(it));
     const blockItem = shieldItem || twoHandedItem || null;
     return {
         canDodge: !isHeavyArmorEquipped(equipment, inventory),
@@ -23473,6 +23927,15 @@ function computeTotalWeaponDamage(equipment, inventory, itemRarities) {
 function clampPercent(n) {
     return Math.max(COMBAT_TUNING.minHitChance, Math.min(COMBAT_TUNING.maxHitChance, n));
 }
+// See COMBAT_TUNING.damageMultiplierMin/Max's own comment — this is the
+// damageMultiplier equivalent of clampPercent above, applied once, right
+// where computeWeaponDamage actually uses the aggregated mods, so it
+// covers every source that can feed into that number (status effects,
+// hero ability bonuses, any future one) regardless of how many of them
+// are stacked together.
+function clampDamageMultiplier(n) {
+    return Math.max(COMBAT_TUNING.damageMultiplierMin, Math.min(COMBAT_TUNING.damageMultiplierMax, n));
+}
 // Splits a combatant's HP pool across body parts by their configured
 // share, after applying COMBAT_TUNING.hpScale to bring the narrative health
 // scale (1-1000, ordinary ~50) up to a range that plays out sensibly
@@ -23593,6 +24056,26 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
 function makeEnemyCombatant(enemy) {
     return { ...enemy, parts: buildCombatantParts(enemy.totalHp, enemy.totalHp, normalizeEnemyBodyParts(enemy.bodyParts)), morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false, engaged: false };
 }
+// True for an opponent that physically can't have been carrying anything the
+// hero could take: no arm on its body at all (a wolf, a snake, a slime — see
+// the "bodyParts" notes in the COMBAT schema) and not one of the two
+// top tiers (a dragon's hoard is still worth asking the model about). For
+// these the model's loot call always came back empty anyway ("a mindless
+// beast or ooze has nothing worth taking"), and generateCombatLoot then
+// substituted the tier's fallback coin — so skipping the call and going
+// straight to that fallback gives the exact same result, minus a network
+// round-trip per kill (three wolves = three calls before). An enemy whose
+// bodyParts weren't specified at all defaults to all six parts (see
+// normalizeEnemyBodyParts), so it has arms here and is NOT skipped.
+const LOOT_MODEL_SKIP_TIERS = ['weak', 'average', 'strong'];
+function enemyCarriesNoLoot(enemy) {
+    if (!enemy || !LOOT_MODEL_SKIP_TIERS.includes(enemy.tier))
+        return false;
+    const parts = Array.isArray(enemy.bodyParts) ? enemy.bodyParts : (enemy.parts ? Object.keys(enemy.parts) : null);
+    if (!parts || parts.length === 0)
+        return false;
+    return !parts.includes('leftArm') && !parts.includes('rightArm');
+}
 // Inserts one or more freshly-arrived order entries (a reinforcement wave —
 // see checkReinforcementWaves) into an already-running initiative order,
 // each at the position its own initiative value earns it (same high-to-low,
@@ -23674,37 +24157,48 @@ const EFFECT_ICONS = {
 const EFFECT_DEFS = {
     bleed: {
         hpTickPct: { mild: 0.01, moderate: 0.02, severe: 0.04 },
+        checkDelta: { mild: 0, moderate: -1, severe: -2 },
         defaultDuration: { mild: 3, moderate: 4, severe: 6 }
     },
     poison: {
         hpTickPct: { mild: 0.015, moderate: 0.03, severe: 0.06 },
         hitChanceDelta: { mild: -2, moderate: -5, severe: -10 },
+        checkDelta: { mild: -1, moderate: -2, severe: -3 },
         defaultDuration: { mild: 4, moderate: 5, severe: 7 }
     },
     fracture: {
         hitChanceDelta: { mild: -5, moderate: -12, severe: -25 },
         damageMultiplier: { mild: 0.9, moderate: 0.75, severe: 0.55 },
+        checkDelta: { mild: -1, moderate: -2, severe: -4 },
+        checkStats: ['strength', 'agility'],
         defaultDuration: { mild: null, moderate: null, severe: null }
     },
     concussion: {
         hitChanceDelta: { mild: -6, moderate: -15, severe: -28 },
         defenseChanceDelta: { mild: -6, moderate: -15, severe: -28 },
+        checkDelta: { mild: -2, moderate: -4, severe: -6 },
+        checkStats: ['agility', 'intelligence', 'initiative'],
         defaultDuration: { mild: 2, moderate: 3, severe: 5 }
     },
     exhaustion: {
         damageMultiplier: { mild: 0.95, moderate: 0.85, severe: 0.7 },
         defenseChanceDelta: { mild: -4, moderate: -10, severe: -18 },
         fleeChanceDelta: { mild: -5, moderate: -12, severe: -22 },
+        checkDelta: { mild: -1, moderate: -3, severe: -5 },
+        checkStats: ['strength', 'agility'],
         defaultDuration: { mild: 3, moderate: 5, severe: null }
     },
     curse: {
         hitChanceDelta: { mild: -4, moderate: -8, severe: -15 },
         defenseChanceDelta: { mild: -4, moderate: -8, severe: -15 },
+        checkDelta: { mild: -1, moderate: -2, severe: -3 },
         defaultDuration: { mild: null, moderate: null, severe: null }
     },
     adrenaline: {
         hitChanceDelta: { mild: 4, moderate: 10, severe: 18 },
         damageMultiplier: { mild: 1.05, moderate: 1.15, severe: 1.3 },
+        checkDelta: { mild: 1, moderate: 2, severe: 3 },
+        checkStats: ['strength', 'agility'],
         defaultDuration: { mild: 1, moderate: 2, severe: 3 }
     }
     // "other" deliberately has no entry here — it's the narrative-only bucket,
@@ -23890,6 +24384,10 @@ function describeEffectMechanics(effect, t) {
         lines.push(t('effectMechanicFleeChance') + ': ' + pct(effectSeverityValue(def.fleeChanceDelta, severity)));
     if (def.damageMultiplier)
         lines.push(t('effectMechanicDamage') + ': ×' + effectSeverityValue(def.damageMultiplier, severity));
+    if (def.checkDelta && effectSeverityValue(def.checkDelta, severity) !== 0) {
+        const v = effectSeverityValue(def.checkDelta, severity);
+        lines.push(t('effectMechanicCheck') + ': ' + (v > 0 ? '+' : '') + v);
+    }
     if (def.hpTickPct)
         lines.push(t('effectMechanicHpTick') + ': ' + Math.round(effectSeverityValue(def.hpTickPct, severity) * 100) + '%');
     if (lines.length === 0)
@@ -23906,7 +24404,12 @@ function describeEffectMechanics(effect, t) {
 // unrecognized kind) contributes nothing — same as the old plain-text
 // system, just no longer silently true for EVERY entry.
 function aggregateEffectModifiers(effects) {
-    const mods = { hitChanceDelta: 0, damageMultiplier: 1, defenseChanceDelta: 0, fleeChanceDelta: 0 };
+    // critChanceDelta is never set by a status effect (EFFECT_DEFS has no such
+    // field) — it exists here purely so the shape already matches what
+    // applyHeroAbilityMods below folds bladeMaster into, and so every
+    // consumer (computeWeaponDamage) can read mods.critChanceDelta
+    // unconditionally regardless of which of the two ever populated it.
+    const mods = { hitChanceDelta: 0, damageMultiplier: 1, defenseChanceDelta: 0, fleeChanceDelta: 0, critChanceDelta: 0, stealthKillChanceBonus: 0 };
     for (const e of (effects || [])) {
         const def = EFFECT_DEFS[e.kind];
         if (!def)
@@ -23921,6 +24424,87 @@ function aggregateEffectModifiers(effects) {
             mods.fleeChanceDelta += effectSeverityValue(def.fleeChanceDelta, e.severity);
     }
     return mods;
+}
+// Folds the hero's owned ABILITY_DEFS passives (plus bloodlust/berserker's
+// conditional bonuses) into an existing mods object — same shape
+// aggregateEffectModifiers returns, so every call site that already knows
+// how to consume mods (computeHitChance/computeWeaponDamage/
+// computeDefenseChance/computeFleeChance) needs no changes of its own to
+// benefit from it, and reads back only whichever one field is relevant to
+// it regardless of what this adds to the others. Always call this with the
+// hero's OWN effect-mods (never an ally's or an enemy's) — every call site
+// is one of the four places in the file that computes mods specifically
+// for the hero's own attack, defense, or flee roll.
+// `fightState` is this fight's combat.abilityState (see
+// createAbilityFightState) — passed null wherever no fight exists yet
+// (attemptStealthKill's pre-combat ambush strike), which simply skips
+// bloodlust's conditional bonus rather than throwing. `healthRatio`
+// (current/max health, 0-1) drives berserkerFury and is likewise optional —
+// omitted wherever a caller has no ready health figure to hand.
+function applyHeroAbilityMods(mods, abilityIds, fightState, healthRatio) {
+    const out = { ...mods };
+    const ids = abilityIds || [];
+    if (ids.includes('bladeMaster'))
+        out.critChanceDelta = (out.critChanceDelta || 0) + ABILITY_DEFS.bladeMaster.critChanceDelta;
+    if (ids.includes('quickReflexes'))
+        out.hitChanceDelta += ABILITY_DEFS.quickReflexes.hitChanceDelta;
+    if (ids.includes('steadfast'))
+        out.defenseChanceDelta += ABILITY_DEFS.steadfast.defenseChanceDelta;
+    if (ids.includes('coldBlood'))
+        out.fleeChanceDelta += ABILITY_DEFS.coldBlood.fleeChanceDelta;
+    if (ids.includes('silentStep'))
+        out.stealthKillChanceBonus = (out.stealthKillChanceBonus || 0) + ABILITY_DEFS.silentStep.stealthKillChanceBonus;
+    if (ids.includes('berserkerFury') && typeof healthRatio === 'number') {
+        const missing = Math.max(0, Math.min(1, 1 - healthRatio));
+        out.damageMultiplier *= 1 + missing * ABILITY_DEFS.berserkerFury.berserkMaxBonus;
+    }
+    if (ids.includes('bloodlust') && fightState && !fightState.bloodlustUsed) {
+        out.damageMultiplier *= ABILITY_DEFS.bloodlust.bloodlustDamageMultiplier;
+    }
+    return out;
+}
+// ---- SINGLE SOURCES OF TRUTH FOR COMBAT MODIFIERS ---------------------------
+// Every place that rolls something for the hero (an attack, a defense, a
+// flee attempt, a stealth strike) must build its mods through
+// computeHeroMods, and every place that rolls for a party member must use
+// computeAllyMods. Assembling them by hand at each call site is how the two
+// drifted apart before: allies used to be handed the HERO's status effects
+// (a hero's fracture crippled the whole party, a hero's adrenaline buffed
+// it), and each hand-built site remembered a different subset of the
+// hero's abilities. Any new modifier source (encumbrance, psyche, set
+// bonuses...) is added HERE, once, and every roll picks it up.
+//
+// `state` is the hero's gameState (effects, abilities, health, maxHealth);
+// `fightState` is combat.abilityState, or null outside a fight (the
+// pre-combat ambush strike), which just skips bloodlust's conditional
+// bonus. Berserker's Fury is always fed the live health ratio here, so no
+// caller can forget it.
+function computeHeroMods(state, fightState, healthRatioOverride) {
+    // Mid-fight the hero's real condition lives in combat.heroParts, not in
+    // state.health (which only catches up when the fight closes) — callers
+    // inside a fight pass heroPartsHealthRatio(...) so Berserker's Fury
+    // reacts to wounds taken THIS fight instead of the pre-fight figure.
+    const ratio = typeof healthRatioOverride === 'number' ? healthRatioOverride : state.health / Math.max(1, state.maxHealth);
+    return applyHeroAbilityMods(aggregateEffectModifiers(state.effects), state.abilities, fightState || null, ratio);
+}
+// A party member's mods come from THEIR OWN tracked effects (the npc record
+// in gameState.npcs — see reconcileNpcs) and never from the hero's. A
+// reinforcement ally with no npc record simply has none. Companions have no
+// abilities (yet), so nothing else folds in.
+function heroPartsHealthRatio(parts) {
+    let hp = 0, max = 0;
+    for (const p of BODY_PARTS) {
+        if (parts && parts[p.key]) {
+            hp += parts[p.key].hp;
+            max += parts[p.key].maxHp;
+        }
+    }
+    return max > 0 ? hp / max : 1;
+}
+function computeAllyMods(npcs, allyName) {
+    const key = typeof allyName === 'string' ? allyName.trim().toLowerCase() : '';
+    const npc = key ? (npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key) : null;
+    return aggregateEffectModifiers(npc && Array.isArray(npc.effects) ? npc.effects : []);
 }
 // One combat round's worth of bleed/poison damage — summed flat (not
 // stacked multiplicatively) across every DOT-capable effect currently
@@ -24017,8 +24601,8 @@ function computeHitChance(part, attackerPrecision, mods) {
 // swinging) to come down as a critical strike — see COMBAT_TUNING.critChance/
 // critMultiplier and computeWeaponDamage/computeEnemyDamage below, which are
 // what actually apply the multiplier.
-function rollCritical() {
-    return Math.random() * 100 < COMBAT_TUNING.critChance;
+function rollCritical(bonus) {
+    return Math.random() * 100 < COMBAT_TUNING.critChance + (bonus || 0);
 }
 // Averages two independent rolls instead of one flat uniform spread, which
 // pulls the result toward the middle of the variance band (roughly
@@ -24050,10 +24634,11 @@ function damageVarianceFraction(attackerPrecision) {
 // multiplier is already folded into dmg.
 function computeWeaponDamage(weaponDamage, attackerPower, mods, attackerPrecision) {
     const powerModifier = 1 + (attackerPower - COMBAT_TUNING.powerBaseline) * COMBAT_TUNING.weaponPowerModifierScale;
-    const base = weaponDamage * Math.max(COMBAT_TUNING.weaponPowerModifierFloor, powerModifier) * (mods ? mods.damageMultiplier : 1);
+    const dmgMultiplier = clampDamageMultiplier(mods ? mods.damageMultiplier : 1);
+    const base = weaponDamage * Math.max(COMBAT_TUNING.weaponPowerModifierFloor, powerModifier) * dmgMultiplier;
     const variance = base * damageVarianceFraction(attackerPrecision);
     const raw = base + rollVarianceFactor() * variance;
-    const isCrit = rollCritical();
+    const isCrit = rollCritical(mods ? mods.critChanceDelta : 0);
     return { dmg: Math.max(1, Math.round(isCrit ? raw * COMBAT_TUNING.critMultiplier : raw)), isCrit };
 }
 // An enemy's damage: enemies carry no inventory/rarity, so their hits scale
@@ -24152,9 +24737,9 @@ function rollMoraleBreak(morale, canBreak = true) {
 // both is the damage-only band. If kill+miss would otherwise eat the entire
 // roll at extreme agility values, both are scaled down proportionally so
 // there's always at least some chance of the damage-only outcome.
-function rollStealthKillOutcome(agility) {
+function rollStealthKillOutcome(agility, bonusChance) {
     const agilityDelta = agility - COMBAT_TUNING.precisionBaseline;
-    let killChance = clampPercent(COMBAT_TUNING.stealthKillBaseChance + agilityDelta * COMBAT_TUNING.stealthKillAgilityScale);
+    let killChance = clampPercent(COMBAT_TUNING.stealthKillBaseChance + agilityDelta * COMBAT_TUNING.stealthKillAgilityScale + (bonusChance || 0));
     let missChance = clampPercent(COMBAT_TUNING.stealthMissBaseChance - agilityDelta * COMBAT_TUNING.stealthMissAgilityScale);
     if (killChance + missChance > 90) {
         const scale = 90 / (killChance + missChance);
@@ -24294,16 +24879,119 @@ const ACTION_CHECK_TUNING = {
     partialBand: 5, // a total up to this many points UNDER the difficulty still counts as a partial success, not an outright failure
     criticalBand: 10 // a total this many points OVER the difficulty counts as a critical success outright
 };
+// ---- LOCAL PRE-FILTER: ACTIONS THAT NEVER NEED A CHECK ------------------------
+// generateActionCheck asks the referee model about EVERY ordinary turn, and
+// it's an extra network round-trip that runs BEFORE the narrative call, so it
+// adds its full latency to each turn — yet its own prompt tells it to answer
+// "no check" for anything ordinary or safe, which is most turns. This skips
+// the call for the plainest of those: a SHORT action whose leading verb is
+// one of a small set of harmless ones (look around, wait, walk, eat, greet,
+// thank, sit down...) and that contains none of the words that would make
+// even those risky (sneaking, forcing, lying, searching carefully, hurrying
+// past something...). It is deliberately conservative — anything it doesn't
+// recognize still goes to the model exactly as before, and a wrongly skipped
+// turn just means no hidden check that turn (the narrator falls back to its
+// ordinary GAME MASTER RULE 4, i.e. the game as it was before checks existed).
+const TRIVIAL_ACTION_MAX_WORDS = 6;
+// Leading verbs, matched against the FIRST word only. Long, unambiguous
+// Russian stems match by prefix; everything short or ambiguous is an exact
+// word (so "restrain" / "поединок" / "лягнуть" / "направить (оружие)" can
+// never be mistaken for rest / eat / lie down / head off).
+const TRIVIAL_ACTION_VERB_PREFIXES = [
+    'осмотр', 'огляд', 'подожд', 'отдохн', 'отдыха', 'поспат', 'выспат', 'позавтрак', 'пообедат', 'поужинат',
+    'поблагодар', 'поздоров', 'попрощ', 'кивн', 'улыбн', 'согласи', 'продолж', 'подойд', 'подойти', 'присяд', 'присес', 'помаха', 'подума'
+];
+const TRIVIAL_ACTION_VERB_WORDS = [
+    // ru
+    'ждать', 'жду', 'лечь', 'поесть', 'идти', 'иду', 'пойти', 'пойду', 'пойдём', 'пойдем', 'войти', 'войду', 'зайти', 'зайду',
+    'сесть', 'сяду', 'сядь', 'направиться', 'отправиться', 'отправляюсь', 'отправимся',
+    // en (the base word and its plain -s/-ing/-ed forms are accepted)
+    'look', 'wait', 'rest', 'sleep', 'eat', 'thank', 'greet', 'nod', 'smile', 'agree', 'continue', 'go', 'walk', 'head', 'enter', 'approach', 'sit', 'wave',
+    'hello', 'hi', 'goodbye', 'farewell'
+];
+function isTrivialActionVerb(word) {
+    if (TRIVIAL_ACTION_VERB_PREFIXES.some(p => word.startsWith(p)))
+        return true;
+    return TRIVIAL_ACTION_VERB_WORDS.some(v => word === v || word === v + 's' || word === v + 'ing' || word === v + 'ed' || word === v + 'ting');
+}
+const TRIVIAL_ACTION_RISK_MARKERS = [
+    // ru
+    'незаметн', 'тих', 'тайк', 'скрыт', 'крад', 'украд', 'взлом', 'вскр', 'силой', 'вылом', 'слом', 'обман', 'соблазн', 'убед', 'уговор',
+    'угро', 'запуг', 'драк', 'атак', 'удар', 'бежа', 'беги', 'бег', 'прыг', 'лез', 'карабк', 'плыв', 'плыт', 'обыск', 'внимательн', 'тщательн', 'осторожн', 'быстр',
+    'краст', 'краж', 'стащ', 'ищ', 'иска', 'поиск', 'найти', 'спрят',
+    // en
+    'sneak', 'stealth', 'secret', 'steal', 'pick', 'lock', 'force', 'break', 'persuad', 'convinc', 'threat', 'intimidat', 'attack', 'hit', 'run', 'rush',
+    'jump', 'climb', 'swim', 'hide', 'bluff', 'lie', 'decei', 'seduc', 'search', 'careful', 'quiet', 'silent', 'fast', 'quick', 'hidden', 'find', 'seek'
+];
+// Words that make an action compound or goal-directed ("look FOR a hidden
+// door", "walk over AND steal the key") — whatever the leading verb, these
+// mean there is a second thing going on, so the model gets to judge it.
+// Exact-word matches only ("for" must not fire on "forest").
+const TRIVIAL_ACTION_COMPOUND_WORDS = ['for', 'and', 'then', 'until', 'while', 'и', 'потом', 'затем', 'чтобы', 'пока', 'ради'];
+function isTriviallySafeAction(actionText) {
+    if (typeof actionText !== 'string')
+        return false;
+    const words = actionText.toLowerCase().split(/[^a-zа-яё0-9]+/).filter(Boolean);
+    if (words.length === 0 || words.length > TRIVIAL_ACTION_MAX_WORDS)
+        return false;
+    if (!isTrivialActionVerb(words[0]))
+        return false;
+    if (words.some(w => TRIVIAL_ACTION_COMPOUND_WORDS.includes(w)))
+        return false;
+    return !words.some(w => TRIVIAL_ACTION_RISK_MARKERS.some(marker => w.startsWith(marker) || (marker.length >= 4 && w.includes(marker))));
+}
+// The stats an action check can test. "initiative" (reaction speed —
+// spotting an ambush a moment sooner, acting before anyone else can) used to
+// be missing here even though it is a real hero stat.
+const ACTION_CHECK_STATS = ['strength', 'agility', 'intelligence', 'initiative'];
+// Situational modifiers on top of the flat stat bonus, in d20 points (the
+// stat itself gives +1 per 4 points above 10, so these are deliberately
+// small but never negligible).
+const ACTION_CHECK_SITUATIONAL_TUNING = {
+    overweightAgility: -2, // carrying more than the hero's capacity — see computeCarryCapacity
+    heavyArmorStealth: -2, // clanking around in heavy armor while trying not to be heard
+    silentStepStealth: 3 // the Silent Step ability (ABILITY_DEFS) — only ever for a stealth attempt
+};
+// The single place that turns "what state is the hero in right now" into a
+// modifier for one action check, mirroring what computeHeroMods does for
+// combat rolls: status effects (EFFECT_DEFS[kind].checkDelta, optionally
+// limited to certain stats by .checkStats), encumbrance, heavy armor and
+// owned abilities all fold in here, so a poisoned, exhausted or overloaded
+// hero is actually worse at picking a lock, and Silent Step actually helps
+// a sneak — instead of those only being narrated. `ctx` is
+// { effects, abilities, overweight, heavyArmor, stealth }, all optional.
+function computeActionCheckModifier(stat, ctx) {
+    const c = ctx || {};
+    let total = 0;
+    for (const e of (c.effects || [])) {
+        const def = e && EFFECT_DEFS[e.kind];
+        if (!def || !def.checkDelta)
+            continue;
+        if (def.checkStats && !def.checkStats.includes(stat))
+            continue;
+        total += effectSeverityValue(def.checkDelta, e.severity);
+    }
+    if (stat === 'agility' && c.overweight)
+        total += ACTION_CHECK_SITUATIONAL_TUNING.overweightAgility;
+    if (c.stealth) {
+        if (c.heavyArmor)
+            total += ACTION_CHECK_SITUATIONAL_TUNING.heavyArmorStealth;
+        if ((c.abilities || []).includes('silentStep'))
+            total += ACTION_CHECK_SITUATIONAL_TUNING.silentStepStealth;
+    }
+    return total;
+}
 // Resolves one check. A natural 1 or a natural max roll nudges the base
 // result one band further in the obvious direction — bad or great luck
 // matters, but never enough on its own to hand a highly-skilled attempt a
 // flat failure, or a hopeless one a flat success; it can only move the
 // needle one step from wherever the hero's actual stat already put it.
-function rollActionCheck(statValue, difficultyKey) {
+function rollActionCheck(statValue, difficultyKey, situationalModifier) {
     const difficulty = ACTION_CHECK_DIFFICULTY_TIERS[difficultyKey] || ACTION_CHECK_DIFFICULTY_TIERS.moderate;
     const modifier = Math.round((statValue - ACTION_CHECK_TUNING.statBaseline) / ACTION_CHECK_TUNING.statModifierDivisor);
+    const situational = Math.round(Number(situationalModifier) || 0);
     const roll = 1 + Math.floor(Math.random() * ACTION_CHECK_TUNING.diceSides);
-    const total = roll + modifier;
+    const total = roll + modifier + situational;
     const margin = total - difficulty;
     const bands = ['failure', 'partialSuccess', 'success', 'criticalSuccess'];
     let bandIndex = margin >= ACTION_CHECK_TUNING.criticalBand ? 3 : margin >= 0 ? 2 : margin >= -ACTION_CHECK_TUNING.partialBand ? 1 : 0;
@@ -24312,7 +25000,7 @@ function rollActionCheck(statValue, difficultyKey) {
     else if (roll === ACTION_CHECK_TUNING.diceSides)
         bandIndex += 1;
     const outcome = bandIndex < 0 ? 'criticalFailure' : bandIndex > 3 ? 'criticalSuccess' : bands[bandIndex];
-    return { difficultyKey, difficulty, modifier, roll, total, outcome };
+    return { difficultyKey, difficulty, modifier, situational, roll, total, outcome };
 }
 // Narrative guidance per outcome band, folded into buildNarrativeSystemPrompt's
 // checkRule below — deliberately about WHAT HAPPENS, never about numbers,
@@ -25320,6 +26008,22 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
             React.createElement("div", { className: "sheet-stat-row" },
                 React.createElement("span", { className: "sheet-stat-label" }, t('initiativeLabel')),
                 React.createElement("span", { className: "sheet-stat-value" }, gameState.stats.initiative))),
+        gameState.abilities.length > 0 && (React.createElement("div", { className: "sheet-section" },
+            React.createElement("p", { className: "sheet-heading" }, t('abilitiesHeading')),
+            gameState.abilities.map(id => {
+                const def = ABILITY_DEFS[id];
+                if (!def)
+                    return null;
+                return (React.createElement("div", { key: id, className: "sheet-list-item sheet-ability-item" },
+                    React.createElement("span", { className: "sheet-ability-item-icon" }, def.icon),
+                    React.createElement("span", { className: "sheet-ability-item-body" },
+                        React.createElement("span", { className: "sheet-ability-item-name" },
+                            t(def.nameKey),
+                            React.createElement("span", { className: "sheet-ability-item-tag" },
+                                t(def.type === 'passive' ? 'abilityTypePassive' : 'abilityTypeActive'),
+                                def.type === 'active' ? ' · ' + abilityFrequencyLabel(def, t) : '')),
+                        React.createElement("span", { className: "sheet-ability-item-desc" }, t(def.descKey)))));
+            }))),
         isEmpty && React.createElement("p", { className: "sheet-empty" }, t('sheetEmpty')),
         gameState.effects.length > 0 && (React.createElement("div", { className: "sheet-section" },
             React.createElement("p", { className: "sheet-heading" }, t('effectsHeading')),
@@ -27509,9 +28213,30 @@ function splitForFlanking(list) {
     const half = Math.ceil(list.length / 2);
     return { left: list.slice(0, half), right: list.slice(half) };
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, introActive, onAttack, onFlee, onUseItem, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {} }) {
+// Combat-only display helper for CombatModal's ability row below: whether
+// a given active ability (see ABILITY_DEFS) is currently usable, and if
+// not, how many rounds remain (see createAbilityFightState/onUseAbility —
+// this only ever reads the state, never changes it). Passive abilities
+// never reach this.
+function getAbilityStatus(id, fightState, round) {
+    const def = ABILITY_DEFS[id];
+    if (!def || def.type !== 'active')
+        return { available: false, cooldown: null, usedUp: false };
+    const state = fightState || createAbilityFightState();
+    if (def.frequency === 'perFight') {
+        const usedField = id === 'bloodlust' ? 'bloodlustUsed' : id === 'resilience' ? 'resilienceUsed' : 'secondWindUsed';
+        return { available: !state[usedField], cooldown: null, usedUp: !!state[usedField] };
+    }
+    if (def.frequency === 'perRounds') {
+        const remaining = Math.max(0, state.intimidationReadyAtRound - round);
+        return { available: remaining <= 0, cooldown: remaining > 0 ? remaining : null, usedUp: false };
+    }
+    return { available: true, cooldown: null, usedUp: false };
+}
+function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, introActive, abilities, onAttack, onFlee, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {} }) {
     const current = combat.order[combat.turnPos];
     const isHeroTurn = !combat.result && current && current.type === 'hero';
+    const ownedActiveAbilities = (abilities || []).filter(id => ABILITY_DEFS[id] && ABILITY_DEFS[id].type === 'active');
     const resultCopy = combat.result ? RESULT_COPY[combat.result] : null;
     const showLoot = combat.result === 'victory' && combat.loot;
     const lootReadyWithItems = showLoot && combat.loot.status === 'ready' && (combat.loot.items.length > 0 || combat.loot.currency > 0);
@@ -27766,7 +28491,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
             spark = 'hit';
             basePopup = { text: t('combatFxDamageLabel') + ' ' + action.dmg, tone: 'dmg' };
         }
-        else if (action.resultKind === 'blocked') {
+        else if (action.resultKind === 'blocked' || action.resultKind === 'resilience') {
             defenderCls = 'combat-fx-block';
             spark = 'block';
             basePopup = { text: t('combatFxBlockLabel'), tone: 'block' };
@@ -27890,6 +28615,21 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
                     alliesRight.map(ally => (React.createElement(CombatPortrait, { key: ally.id, name: ally.name, parts: ally.parts, isDown: isBodyDestroyed(ally.parts), isFled: !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: !combat.result && current && current.type === 'ally' && current.id === ally.id, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: () => pickHealTarget('ally', ally.id), fx: fx['ally:' + ally.id], dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armor, protectTarget: ally.id === protectTargetId, weaponType: allyWeaponTypes[ally.name.trim().toLowerCase()], t: t }))))),
             React.createElement("div", { className: "combat-log" }, combat.log.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
             !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null ? t('combatUseItemPickTargetHint') : (isHeroTurn && !introActive ? t('combatChooseTargetHint') : t('combatWaitingHint')))),
+            !combat.result && pendingItemIndex === null && ownedActiveAbilities.length > 0 && (React.createElement("div", { className: "combat-ability-row" }, ownedActiveAbilities.map(id => {
+                const def = ABILITY_DEFS[id];
+                const status = getAbilityStatus(id, combat.abilityState, combat.round);
+                const isManual = def.trigger === 'manual';
+                const statusText = status.usedUp
+                    ? t('combatAbilityUsedHint')
+                    : status.cooldown
+                        ? t('combatAbilityCooldownHint').replace('{n}', status.cooldown)
+                        : t('combatAbilityReadyHint');
+                return (React.createElement("button", { key: id, type: "button", onClick: isManual ? () => onUseAbility(id) : undefined, className: 'combat-ability-chip' + (status.available ? ' combat-ability-chip-ready' : ' combat-ability-chip-cooldown') + (isManual ? '' : ' combat-ability-chip-auto'), disabled: !isManual || !isHeroTurn || introActive || !status.available, title: t(def.descKey) },
+                    React.createElement("span", { className: "combat-ability-chip-icon" }, def.icon),
+                    React.createElement("span", { className: "combat-ability-chip-text" },
+                        React.createElement("span", { className: "combat-ability-chip-name" }, t(def.nameKey)),
+                        React.createElement("span", { className: "combat-ability-chip-status" }, statusText))));
+            }))),
             !combat.result && pendingItemIndex === null && (React.createElement("div", { className: "combat-flee-row" },
                 React.createElement("button", { onClick: () => setItemPanelOpen(o => !o), className: "btn btn-ghost combat-item-btn", type: "button", disabled: !isHeroTurn || introActive },
                     React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-item-btn-icon" }),
@@ -27911,6 +28651,37 @@ function CombatModal({ combat, heroName, inventory, itemRarities, heroArmor, int
                 showLoot && React.createElement(CombatLootPanel, { loot: combat.loot, onToggle: onToggleLoot, t: t }),
                 React.createElement("div", { className: "modal-actions" },
                     React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button", disabled: captivityChecking }, captivityChecking ? t('deathCheckingButton') : (lootReadyWithItems ? t('lootContinueButton') : t('closeButton')))))))));
+}
+// The "small ritual" a level-up is meant to feel like (see ACTIVE
+// ABILITIES & LEVEL-UP CHOICES above) — shown whenever
+// gameState.pendingLevelUps has an entry (see App's levelUpLevel/
+// chooseLevelUpAbility), one card at a time even when several levels came
+// in from a single big XP award. `options` is this level's 3-or-fewer draw
+// (see pickLevelUpOptions), already fixed for the lifetime of this card by
+// the caller (App's levelUpOptionsRef) so it can't re-shuffle mid-render —
+// every ABILITY_DEFS id may already be owned by a high enough level, in
+// which case options is empty and there's nothing to pick, just a nod that
+// the hero leveled. Picking an option IS the confirmation — a single tap
+// both chooses and locks it in, rather than a separate select-then-confirm
+// step.
+function LevelUpModal({ level, options, t, onChoose }) {
+    return (React.createElement("div", { className: "modal-backdrop" },
+        React.createElement("div", { className: "modal-card levelup-card" },
+            React.createElement("p", { className: "levelup-eyebrow" }, t('levelUpTitle').replace('{n}', level)),
+            React.createElement("h2", { className: "modal-title" }, t('levelUpSubtitle')),
+            options.length === 0 ? (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "hint-text hint-text-block" }, t('levelUpNoOptionsText')),
+                React.createElement("div", { className: "modal-actions" },
+                    React.createElement("button", { onClick: () => onChoose(null), className: "btn btn-primary", type: "button" }, t('levelUpContinueButton'))))) : (React.createElement("div", { className: "levelup-options" }, options.map(id => {
+                const def = ABILITY_DEFS[id];
+                return (React.createElement("button", { key: id, type: "button", className: "levelup-option", onClick: () => onChoose(id) },
+                    React.createElement("span", { className: "levelup-option-icon" }, def.icon),
+                    React.createElement("span", { className: "levelup-option-name" }, t(def.nameKey)),
+                    React.createElement("span", { className: "levelup-option-type" },
+                        t(def.type === 'passive' ? 'abilityTypePassive' : 'abilityTypeActive'),
+                        def.type === 'active' ? ' · ' + abilityFrequencyLabel(def, t) : ''),
+                    React.createElement("span", { className: "levelup-option-desc" }, t(def.descKey))));
+            }))))));
 }
 // ---- Death, resurrection & captivity ----
 // The one number controlling how often a hero death even gets a chance to
@@ -29539,6 +30310,15 @@ function App() {
     // logic — checked first thing in endCombatAndClose — and reset only when
     // a fresh fight actually begins (startCombat/attemptStealthKill).
     const combatClosingRef = useRef(false);
+    // Lazily-filled per-level cache for LevelUpModal's 3-option draw (see
+    // pickLevelUpOptions) — keyed by level number so the same options stay
+    // on screen across re-renders while the card is up, computed inline
+    // during render the first time a given level is seen, same
+    // compute-on-first-render-into-a-ref pattern CombatModal's own
+    // introSparksRef already uses. Not part of gameState: if the page
+    // reloads mid-decision the options simply re-roll, which is a fine trade
+    // against persisting pure UI randomness into the save file.
+    const levelUpOptionsRef = useRef({});
     // A caster enemy's turn (see ENEMY_ROLES.caster/runAutoTurn) can decide to
     // inflict a status effect on the hero instead of a plain hit — but that
     // needs a separate setGameState call, and setCombat's own updater
@@ -30701,7 +31481,7 @@ ${JSON.stringify(state)}${partySection}` };
             gearContext += `\n\nITEM(S) THE HERO JUST EQUIPPED, RIGHT BEFORE THIS TURN: ${justEquipped.join(', ')}.`;
         }
         if (justUsed && justUsed.length > 0) {
-            gearContext += `\n\nITEM(S) THE HERO JUST USED/CONSUMED, RIGHT BEFORE THIS TURN (already removed from inventory, health already restored — just reflect the act itself narratively): ${justUsed.join(', ')}.`;
+            gearContext += `\n\nITEM(S) THE HERO JUST USED/CONSUMED, RIGHT BEFORE THIS TURN (already removed from inventory; health and psyche already restored and EVERY wound, illness, poison, curse and other affliction has already been fully cured — the hero is no longer suffering from any of them, so do not describe any as lingering (a beneficial state such as a battle-high is NOT cured by this and simply carries on); just reflect the act itself narratively): ${justUsed.join(', ')}.`;
         }
         if (state.health >= state.maxHealth && (!state.effects || state.effects.length === 0)) {
             gearContext += `\n\nHERO'S PHYSICAL CONDITION: fully healed, at full health, with no tracked injuries or afflictions right now. Do not describe the hero as wounded, in pain, bleeding, limping, exhausted, or otherwise suffering from a past injury — write them as physically sound instead, however dramatic an earlier scene made that injury feel.`;
@@ -30714,6 +31494,19 @@ ${JSON.stringify(state)}${partySection}` };
         const activeQuests = state.quests.filter(q => q.status === 'active');
         if (activeQuests.length > 0) {
             gearContext += `\n\nHERO'S ACTIVE QUESTS: ${activeQuests.map(q => q.giver ? `"${q.title}" for ${q.giver} (promised reward: ${q.reward || 'unspecified'})` : `"${q.title}" (self-started, no giver, no promised reward)`).join('; ')}.`;
+        }
+        // See ACTIVE ABILITIES & LEVEL-UP CHOICES: every mechanical bonus these
+        // grant is already handled entirely by the game's own combat math
+        // (crit chance, damage, morale, etc.) — this is purely so the model can
+        // let an owned ability color how it narrates the hero and occasionally
+        // shape a scene around it, matching each ability's own promptHint
+        // (a hero with Intimidation getting offered a scare-them-off angle
+        // against a bandit, Silent Step letting a guard plausibly miss the
+        // hero sneaking past, Blade Master's hits reading as precise rather
+        // than brutish).
+        if (state.abilities && state.abilities.length > 0) {
+            const abilityLines = state.abilities.map(id => ABILITY_DEFS[id]).filter(Boolean).map(def => `${def.promptLabel}: ${def.promptHint}`);
+            gearContext += `\n\nHERO'S LEARNED ABILITIES (color the narration and occasionally shape a scene per each hint below — do not narrate or mention any bonus number, that's already resolved by the game itself): ${abilityLines.join(' | ')}`;
         }
         // While a regenerate is in flight, read the reputation maps as they will
         // stand once the discarded turns' effects are undone (see regenViewRef)
@@ -30876,6 +31669,10 @@ ${JSON.stringify(state)}${partySection}` };
         const partyRule = partyMemberNames.length > 0
             ? `\n${partyRuleNum}. PARTY MEMBERS: everyone named above under "CURRENT PARTY" travels with the hero as an established companion. Give them real presence in the scene — their own reactions, initiative, and dialogue — rather than reducing them to silent background or forgetting they're there. If the scene puts the hero in danger, a companion can be threatened, hurt, exhausted, or otherwise affected too, exactly like the hero can; reflect that naturally in the prose rather than treating them as invulnerable set dressing.`
             : '';
+        const abilitiesRuleNum = (state.abilities && state.abilities.length > 0) ? ++ruleNum : null;
+        const abilitiesRule = (state.abilities && state.abilities.length > 0)
+            ? `\n${abilitiesRuleNum}. HERO'S ABILITIES: the hero has learned the abilities listed above under "HERO'S LEARNED ABILITIES" — treat each as a real, established trait of who this hero is, not a hidden game statistic. Let them inform how you narrate the hero (a Blade Master's strikes read as precise, a Silent Step user moves and hides unusually well) and, where a scene genuinely calls for it, let an NPC or the situation itself open a door that plays to one of them (offering an intimidation angle to a hero who has it, letting a guard plausibly miss a stealthy hero) — without ever naming the ability, stating a bonus number, or otherwise breaking the fiction to reference it as a mechanic.`
+            : '';
         // Sourced from state.pendingSecrets (see PENDING_SECRET_STATUSES/
         // reconcilePendingSecrets) — plans and intentions the hidden-information
         // fields of generateStateAndEvents (see EVENT: HIDDEN INFORMATION in
@@ -30921,7 +31718,7 @@ GAME MASTER RULES:
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
 8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands. The one exception: a merchant or vendor buying or selling their ordinary goods from/to the hero is never written as a completed exchange here at all, with or without a number — see the trade rule below.
 9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.
-10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${captivityRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${worldRule}${partyRule}${pendingSecretsRule}
+10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${captivityRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${worldRule}${partyRule}${abilitiesRule}${pendingSecretsRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own — just the scene itself.`;
     }
@@ -31034,11 +31831,10 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "dayPhase": "day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "unyielding": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "inventory": [{"name": "item name", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id"}], "currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, "npcs": [{"name": "name", "note": "brief note", "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "unyielding": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}]}], "quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, "factions": [{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "relations": [{"faction": "another known faction name", "stance": "war"}]}], "newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
-"dayPhase" is EXACTLY "day" or "night" — a coarse, mechanical reading of "time" above, not a separate judgment call. Toggle it only when the scene you just read genuinely crosses that line (dusk settling in, dawn breaking, a night passing during rest) — on every other turn, simply repeat whatever "dayPhase" the state above already carries, unchanged.
 "health" is an integer from 1 to 1000 representing the hero's CURRENT physical condition right now — how banged up, exhausted, or healed-up they are THIS turn — and must never exceed "maxHealth" (below). Calibrate against this anchor: an ordinary healthy adult sits around 50 — treat that as the normal baseline, not a low score. 1 is at death's door. Values climb above 50 only for genuinely superior physical condition (a seasoned soldier, a battle-hardened veteran, a powerful monster), reaching into the hundreds solely for truly exceptional beings, with 1000 reserved for an actual deity or equivalent cosmic-tier being. Adjust it plausibly, relative to that baseline, based on injury, healing, exhaustion, etc. — it moves scene to scene, dropping with harm and rising back up toward "maxHealth" with rest, healing, or recovery, but never past it.
 "maxHealth" is an integer from 1 to 1000 representing the hero's overall physical CAPACITY at their best — the ceiling "health" recovers toward, not their condition in this exact moment. Use the exact same 1-1000 scale and baseline-50 calibration as "health" above, but treat it like "stats" below: a lasting trait, not a momentary reading. Do NOT lower it for a temporary injury, a hard fight, or ordinary exhaustion — that's what dragging "health" below it is for. Change "maxHealth" only for a real, lasting reason: significant training or conditioning over time, a permanent crippling injury, a major magical or physical transformation, or similar genuine long-term growth or decline established by the story. On the large majority of turns, simply repeat the value already tracked in the state above unchanged.
 "psyche" is an integer from 1 to 1000 representing the hero's CURRENT mental/spiritual state right now — in settings with magic, this doubles as their currently available magical reserve (spend it on spellcasting, replenish it with rest) — and must never exceed "maxPsyche" (below). Use the same calibration as health: an ordinary person sits around 50, the hundreds are for truly exceptional willpower or magical power, and 1000 is reserved for a deity-tier being. Adjust it based on emotional strain, trauma, willpower, fear, or spellcasting — it moves scene to scene, dropping with strain or spent magic and rising back up toward "maxPsyche" with rest or recovery, but never past it.
@@ -32070,6 +32866,10 @@ ${chunkText}`;
         // just carry forward unchanged here, same as any other currentState
         // field the model doesn't have a say over).
         const { level, xp } = addXp(currentState.level, currentState.xp, questXpGained);
+        // See ACTIVE ABILITIES & LEVEL-UP CHOICES above — quest XP can cross a
+        // level threshold exactly like combat XP does in endCombatAndClose, so
+        // it queues a level-up card the same way.
+        const pendingLevelUps = [...currentState.pendingLevelUps, ...computeNewlyGainedLevels(currentState.level, level)];
         // Missing/non-array "effects" (a badly truncated response, same edge
         // case the old fallback guarded) just carries the prior list forward
         // completely untouched — no reconciliation, no aging — rather than
@@ -32111,7 +32911,11 @@ ${chunkText}`;
         const finalConfiscatedInventory = captivityJustResolved ? [] : (currentState.confiscatedInventory || []);
         const state = {
             time: parsed.time || currentState.time,
-            dayPhase: (parsed.dayPhase === 'day' || parsed.dayPhase === 'night') ? parsed.dayPhase : (currentState.dayPhase || 'day'),
+            // Read off the time text locally (see inferDayPhaseFromTime) — the model is
+            // no longer asked for it. No phase word/clock in the text -> keep the
+            // current phase (a stray legacy "dayPhase" in a reply is honored only as
+            // a last resort before that).
+            dayPhase: inferDayPhaseFromTime(parsed.time || currentState.time) || ((parsed.dayPhase === 'day' || parsed.dayPhase === 'night') ? parsed.dayPhase : (currentState.dayPhase || 'day')),
             health: Math.min(clampVital(parsed.health, currentState.health), maxHealth),
             maxHealth,
             psyche: Math.min(clampVital(parsed.psyche, currentState.psyche), maxPsyche),
@@ -32124,6 +32928,12 @@ ${chunkText}`;
             },
             level,
             xp,
+            // Never the model's to decide (same reasoning as level/xp just
+            // above) — abilities only ever change through LevelUpModal's own
+            // chooseLevelUpAbility, so this is a straight carry-forward, and
+            // pendingLevelUps is exactly what was just computed above.
+            abilities: currentState.abilities,
+            pendingLevelUps,
             effects: finalEffects,
             inventory: finalInventory,
             confiscatedInventory: finalConfiscatedInventory,
@@ -32447,6 +33257,9 @@ Rules:
     // defeated enemy (see the loot effect below) — idPrefix keeps each enemy's
     // loot ids distinct when several are merged into one loot panel.
     async function generateCombatLoot(enemy, idPrefix) {
+        // Handless creature: nothing to take, no model call needed — see enemyCarriesNoLoot.
+        if (enemyCarriesNoLoot(enemy))
+            return { items: [], currency: rollFallbackLootCurrency(enemy.tier) };
         const enemyLine = `Defeated enemy: ${enemy.enemyName}${enemy.enemyDescription ? ' — ' + enemy.enemyDescription : ''}. Fought with: ${enemy.weaponDescription}.`;
         const raw = await callGemini(buildCombatLootSystemPrompt(gameState, enemy), [{ role: 'user', content: enemyLine }]);
         const parsed = extractJsonObject(raw);
@@ -33047,7 +33860,7 @@ Rules:
             : '';
         return `You are the hidden rules referee for a text role-playing game, working alongside (but never visible to) its narrator. You are not writing prose — you make one small, purely mechanical judgment call about a single action. Nothing you write here is ever shown to a player, in ${narrativeLanguage} or otherwise.
 
-HERO'S STATS (1-100, 10 is an ordinary untrained person; see below for which stat a given action tests): strength ${state.stats.strength}, agility ${state.stats.agility}, intelligence ${state.stats.intelligence}.${sceneContext}
+HERO'S STATS (1-100, 10 is an ordinary untrained person; see below for which stat a given action tests): strength ${state.stats.strength}, agility ${state.stats.agility}, intelligence ${state.stats.intelligence}, initiative ${state.stats.initiative}.${sceneContext}
 
 THE HERO'S ACTION THIS TURN: "${actionText}"
 
@@ -33056,6 +33869,7 @@ Decide whether this specific action is the kind of thing a tabletop game master 
 If a check IS warranted, pick exactly one stat it tests:
 - strength: physical force, breaking, lifting, overpowering, enduring
 - agility: stealth, dexterity, reflexes, balance, evading, fine manual skill like lockpicking or trap disarming
+- initiative: reaction speed and alertness — noticing something a moment before anyone else, reacting first to a sudden threat, seizing an opening before it closes
 - intelligence: knowledge, reasoning, magic, perception, analysis, and — since this hero has no separate social stat — any effort that leans on wit, insight, or people-reading rather than raw force or dexterity
 
 And pick exactly one difficulty label, judging how hard THIS attempt is for someone attempting this specific action in this specific scene — not the hero's own odds of pulling it off, that part isn't your job:
@@ -33067,21 +33881,35 @@ And pick exactly one difficulty label, judging how hard THIS attempt is for some
 
 Respond with ONLY valid JSON and nothing else (no markdown, no text before or after):
 If no check is warranted: {"check": false}
-If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
+If one is: {"check": true, "stat": "agility", "difficulty": "moderate", "stealth": false}
+"stealth" is true ONLY when the action is an attempt to stay unseen or unheard (sneaking, hiding, shadowing someone, slipping past a guard) — false for everything else.`;
     }
     async function generateActionCheck(actionText, currentState, precedingNarrator) {
         if (!actionText || !actionText.trim())
+            return null;
+        // A plainly harmless action never needs the referee — see isTriviallySafeAction.
+        if (isTriviallySafeAction(actionText))
             return null;
         try {
             const raw = await withRateLimitRetry(() => callGemini(buildActionCheckSystemPrompt(currentState, actionText, precedingNarrator), [{ role: 'user', content: 'Judge this action now, following the rules exactly.' }]));
             const parsed = extractJsonObject(raw);
             if (!parsed || !parsed.check)
                 return null;
-            const stat = ['strength', 'agility', 'intelligence'].includes(parsed.stat) ? parsed.stat : null;
+            const stat = ACTION_CHECK_STATS.includes(parsed.stat) ? parsed.stat : null;
             const difficultyKey = ACTION_CHECK_DIFFICULTY_TIERS[parsed.difficulty] ? parsed.difficulty : null;
             if (!stat || !difficultyKey)
                 return null;
-            return { stat, ...rollActionCheck(currentState.stats[stat], difficultyKey) };
+            // Everything about the hero's CURRENT condition that should move the
+            // roll (see computeActionCheckModifier): status effects, being
+            // overloaded, heavy armor on a stealth attempt, an owned Silent Step.
+            const situational = computeActionCheckModifier(stat, {
+                effects: currentState.effects,
+                abilities: currentState.abilities,
+                overweight: computeTotalWeight(currentState.inventory) > computeCarryCapacity(currentState.stats.strength, equipment, itemRarities),
+                heavyArmor: isHeavyArmorEquipped(equipment, currentState.inventory),
+                stealth: parsed.stealth === true
+            });
+            return { stat, ...rollActionCheck(currentState.stats[stat], difficultyKey, situational) };
         }
         catch (e) {
             // Fails silently and simply skips the check for this turn, exactly like
@@ -33804,23 +34632,17 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const healAmount = itemActuallyHeals(item.name) ? rollHealAmount(rarity) : 0;
         const nextInventory = gameState.inventory.filter((_, i) => i !== index);
         const nextHealth = Math.min(gameState.maxHealth, gameState.health + healAmount);
-        // A consumable's healAmount only ever raises `health` — the numeric
-        // "how banged up right now" reading — but says nothing on its own
-        // about `effects` (bleed/fracture/concussion/exhaustion entries), so
-        // those otherwise sit in state untouched forever: the narrative model
-        // is told (correctly, per GAME MASTER RULE 5) not to contradict state,
-        // and keeps writing the hero as suffering a wound whose only record is
-        // this stale effects entry, even at full health. Once healing brings
-        // the hero back to their full maxHealth ceiling, by this game's own
-        // definition (see "health" in the state schema) nothing is currently
-        // afflicting their body anymore — so any lingering PHYSICAL injury
-        // entries are resolved along with it. Left alone on purpose: "poison"
-        // and "curse", which a generic healing item has no business curing —
-        // those clear only when the story itself resolves them.
-        const nextEffects = nextHealth >= gameState.maxHealth
-            ? (gameState.effects || []).filter(e => e && e.kind !== 'bleed' && e.kind !== 'fracture' && e.kind !== 'concussion' && e.kind !== 'exhaustion')
-            : gameState.effects;
-        const nextState = { ...gameState, health: nextHealth, effects: nextEffects, inventory: nextInventory };
+        // A healing consumable cures EVERYTHING (see cureAllEffects): every
+        // tracked effect is cleared regardless of the resulting health, and the
+        // same amount also restores psyche. Without this the numeric health
+        // would rise while `effects` entries sat in state untouched, and the
+        // narrator (told, correctly, not to contradict state) would keep writing
+        // the hero as suffering from a wound that was already treated. Items
+        // that don't actually heal (see itemActuallyHeals) cure nothing.
+        const heals = itemActuallyHeals(item.name);
+        const nextEffects = heals ? cureAllEffects(gameState.effects) : gameState.effects;
+        const nextPsyche = heals ? Math.min(gameState.maxPsyche, gameState.psyche + healAmount) : gameState.psyche;
+        const nextState = { ...gameState, health: nextHealth, psyche: nextPsyche, effects: nextEffects, inventory: nextInventory };
         setGameState(nextState);
         if (!pendingJustUsedRef.current.includes(item.name)) {
             pendingJustUsedRef.current = [...pendingJustUsedRef.current, item.name];
@@ -34547,7 +35369,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             pendingWaves: normalizeReinforcementWaves(encounter.reinforcements),
             triggeredWaveIds: new Set(),
             lastReinforcement: null,
-            lastReinforcementSeq: 0
+            lastReinforcementSeq: 0,
+            abilityState: createAbilityFightState()
         });
         setCombatModalOpen(true);
     }
@@ -34578,7 +35401,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const enemy = encounter.enemies[0];
         const freshParts = buildCombatantParts(enemy.totalHp, enemy.totalHp, normalizeEnemyBodyParts(enemy.bodyParts));
         const allies = buildAllyCombatants();
-        const outcome = rollStealthKillOutcome(gameState.stats.agility);
+        const outcome = rollStealthKillOutcome(gameState.stats.agility, computeHeroMods(gameState, null).stealthKillChanceBonus);
         let enemyParts = freshParts;
         let result = null;
         let log;
@@ -34591,7 +35414,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         }
         else if (outcome === 'damage') {
             const weaponInfo = getPlayerWeaponInfo(null);
-            const rolled = computeWeaponDamage(weaponInfo.damage, gameState.stats.strength, aggregateEffectModifiers(gameState.effects), gameState.stats.agility);
+            const rolled = computeWeaponDamage(weaponInfo.damage, gameState.stats.strength, computeHeroMods(gameState, null), gameState.stats.agility);
             const dmg = Math.max(1, Math.round(rolled.dmg * COMBAT_TUNING.stealthDamageFraction - (typeof enemy.armor === 'number' ? enemy.armor : 0)));
             const targetKey = pickEnemyTargetPart(freshParts);
             const targetState = freshParts[targetKey];
@@ -34629,7 +35452,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             pendingWaves: normalizeReinforcementWaves(encounter.reinforcements),
             triggeredWaveIds: new Set(),
             lastReinforcement: null,
-            lastReinforcementSeq: 0
+            lastReinforcementSeq: 0,
+            abilityState: createAbilityFightState()
         });
         setCombatModalOpen(true);
     }
@@ -35104,6 +35928,25 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         // same full/partial/fail math and riposte-on-full-parry the manual
         // version used, just auto-picked (see pickAutoDefenseKey) instead of
         // waiting on a button.
+        //
+        // The hero's "Стойкость"/Resilience ability (see ABILITY_DEFS/
+        // onUseAbility) short-circuits all of that: once activated it
+        // guarantees a full, damage-free absorb on the very next hit that
+        // actually lands, ahead of any dodge/block/parry roll — the point is a
+        // sure thing, not just better odds. guaranteedBlockConsumed tells the
+        // caller (runAutoTurn) to clear the flag afterward so it only ever
+        // eats the one hit it was meant for. Only makeHeroDefender ever sets
+        // this, so it never touches ally combat. resultKind is its own
+        // 'resilience' rather than 'blocked' on purpose: runAutoTurn's gear-
+        // wear tracking (see heroHitWear/buildHeroBlockWearOps) keys off
+        // resultKind==='blocked' to wear the weapon used to physically parry a
+        // hit, and this isn't that — nothing physical did the absorbing, so
+        // nothing should wear. CombatModal's own FX switch gives 'resilience'
+        // the same visual treatment as a block regardless.
+        if (defender.guaranteedBlock) {
+            log.push({ text: defender.name + ' — ' + t('combatLogResilienceAbsorbText'), kind: 'defended' });
+            return { parts: defender.parts, riposteDamage: 0, log, defeated: false, resultKind: 'resilience', dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null, guaranteedBlockConsumed: true };
+        }
         const availability = defender.defenseAvailability;
         const key = pickAutoDefenseKey(availability, defender.agility, defender.mods);
         let outcome = 'fail';
@@ -35170,9 +36013,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const weaponInfo = getPlayerWeaponInfo(wear);
         return { name: heroName || t('combatYouLabel'), parts: null, agility: gameState.stats.agility, power: gameState.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, mods, isEnemy: false };
     }
-    function makeHeroDefender(parts, mods, wear) {
+    function makeHeroDefender(parts, mods, wear, guaranteedBlock) {
         const availability = computeDefenseAvailability(equipment, wear ? overlayGearWear(gameState.inventory, wear, itemRarities) : gameState.inventory, itemRarities);
-        return { name: heroName || t('combatYouLabel'), parts, isEnemy: false, agility: gameState.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getPlayerDefenseForPart(k, wear), weaponDamage: getPlayerWeaponInfo(wear).damage, mods };
+        return { name: heroName || t('combatYouLabel'), parts, isEnemy: false, agility: gameState.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getPlayerDefenseForPart(k, wear), weaponDamage: getPlayerWeaponInfo(wear).damage, mods, guaranteedBlock: !!guaranteedBlock };
     }
     function makeAllyActor(ally, mods, wear) {
         const key = ally.name.trim().toLowerCase();
@@ -35218,7 +36061,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 return prev;
             let log = prev.log;
             let heroParts = prev.heroParts;
-            const mods = aggregateEffectModifiers(gameState.effects);
+            const mods = computeHeroMods(gameState, prev.abilityState, heroPartsHealthRatio(prev.heroParts));
             // Bleed/poison ticks once per round, right at the top of the hero's
             // own turn, exactly like the old single-enemy version did.
             const dotEffects = (gameState.effects || []).filter(e => EFFECT_DEFS[e.kind] && EFFECT_DEFS[e.kind].hpTickPct);
@@ -35243,6 +36086,16 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const defender = makeEnemyDefender(enemy, prev.enemies);
             const outcome = resolveOneAttack(attacker, defender, t);
             log = [...log, ...outcome.log];
+            // Bloodlust (see ABILITY_DEFS): the bonus was already baked into
+            // `mods.damageMultiplier` above (unconditionally, as long as it's
+            // unspent this fight) so the hit-line damage above already reflects
+            // it — this just tags the log and marks it spent, and only for a
+            // genuine landed hit ('miss' doesn't consume it).
+            let abilityState = prev.abilityState;
+            if (abilityState && !abilityState.bloodlustUsed && outcome.resultKind !== 'miss' && gameState.abilities.includes('bloodlust')) {
+                abilityState = { ...abilityState, bloodlustUsed: true };
+                log = [...log, { text: '🩸 ' + t('combatLogBloodlustText'), kind: 'effect' }];
+            }
             // A landed strike wears the weapon(s) in hand — more against a tough
             // enemy, less against a weak one. Misses wear nothing.
             let gearWear = prev.gearWear || {};
@@ -35267,9 +36120,9 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
             const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
             if (enemies.every(isEnemyOut)) {
-                return { ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, result: 'victory' };
+                return { ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState, result: 'victory' };
             }
-            return advanceTurn({ ...prev, heroParts, enemies, log, lastAction, stunned, gearWear });
+            return advanceTurn({ ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState });
         });
     }
     // Pure predicate — see checkReinforcementWaves, which runs this once per
@@ -35426,7 +36279,15 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const rarity = findItemRarity(item.name, itemRarities);
         const healAmount = itemActuallyHeals(item.name) ? rollHealAmount(rarity) : 0;
         const scaledHeal = healAmount * COMBAT_TUNING.hpScale;
+        const heals = itemActuallyHeals(item.name);
         let applied = false;
+        // Who actually got treated and how many ailments came off them — filled
+        // in inside the updater below (the only place that knows which ally was
+        // targeted), then applied to gameState afterwards, since a healing
+        // consumable cures EVERYTHING (see cureAllEffects) and that has to stop
+        // a bleed/poison tick mid-fight, not only after it.
+        let curedAllyKey = null;
+        let curedCount = 0;
         setCombat(prev => {
             if (!prev || prev.result)
                 return prev;
@@ -35445,20 +36306,116 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 allies = prev.allies.map(a => a.id === targetId ? { ...a, parts: result.parts } : a);
                 actualHeal = result.actualHeal;
                 healedName = ally.name;
+                if (heals) {
+                    const allyNpcKey = ally.name.trim().toLowerCase();
+                    const allyNpc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === allyNpcKey);
+                    curedCount = allyNpc ? countCurableEffects(allyNpc.effects) : 0;
+                    curedAllyKey = allyNpc ? allyNpcKey : null;
+                }
             }
             else {
                 const result = healCombatantParts(prev.heroParts, scaledHeal);
                 heroParts = result.parts;
                 actualHeal = result.actualHeal;
+                if (heals)
+                    curedCount = countCurableEffects(gameState.effects);
             }
             applied = true;
-            const log = [...prev.log, { text: healedName + ' ' + t('combatItemUsedLogVerb') + ' «' + item.name + '»: +' + actualHeal + ' HP', kind: 'heal' }];
+            const curedText = curedCount > 0 ? ' · ' + t('combatItemCuredSuffix').replace('{n}', curedCount) : '';
+            const log = [...prev.log, { text: healedName + ' ' + t('combatItemUsedLogVerb') + ' «' + item.name + '»: +' + actualHeal + ' HP' + curedText, kind: 'heal' }];
             return advanceTurn({ ...prev, heroParts, allies, log });
         });
         if (!applied)
             return;
         const nextInventory = gameState.inventory.filter((_, i) => i !== itemIndex);
-        const nextState = { ...gameState, inventory: nextInventory };
+        let nextState = { ...gameState, inventory: nextInventory };
+        if (heals) {
+            if (targetType === 'ally') {
+                if (curedAllyKey) {
+                    nextState = { ...nextState, npcs: (nextState.npcs || []).map(n => (n && typeof n.name === 'string' && n.name.trim().toLowerCase() === curedAllyKey && Array.isArray(n.effects))
+                            ? { ...n, effects: cureAllEffects(n.effects) } : n) };
+                }
+            }
+            else {
+                nextState = { ...nextState, effects: cureAllEffects(nextState.effects), psyche: Math.min(nextState.maxPsyche, nextState.psyche + healAmount) };
+            }
+        }
+        setGameState(nextState);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+    }
+    // Manually-activated active abilities (see ABILITY_DEFS' trigger:
+    // 'manual' — bloodlust is 'auto' and never reaches this function, it
+    // resolves on its own inside resolveHeroAttack instead). Always spends
+    // the hero's own turn, exactly like useConsumableInCombat above — a
+    // considered trade-off against just attacking, not a free action layered
+    // on top of one. Silently no-ops if it isn't actually the hero's turn,
+    // the ability isn't owned, or it's already spent/on cooldown, so a stray
+    // click (a double-tap racing the turn hand-off, say) can never double-
+    // apply anything. Unlike useConsumableInCombat, nothing here ever touches
+    // gameState/inventory, so there's no saveGame call — every field this
+    // touches lives on the ephemeral `combat` object, same as heroParts/log
+    // changes everywhere else mid-fight.
+    function onUseAbility(abilityId) {
+        if (combatIntroActive)
+            return;
+        if (!gameState.abilities.includes(abilityId))
+            return;
+        setCombat(prev => {
+            if (!prev || prev.result)
+                return prev;
+            const current = prev.order[prev.turnPos];
+            if (!current || current.type !== 'hero')
+                return prev;
+            const fightState = prev.abilityState || createAbilityFightState();
+            const youLabel = heroName || t('combatYouLabel');
+            if (abilityId === 'resilience') {
+                if (fightState.resilienceUsed)
+                    return prev;
+                // Doesn't absorb anything itself — just arms guaranteedBlock (see
+                // makeHeroDefender/resolveOneAttack) so the next hit that actually
+                // lands against the hero, whenever that is, gets fully absorbed.
+                const abilityState = { ...fightState, resilienceUsed: true, resilienceActive: true };
+                const log = [...prev.log, { text: youLabel + ' — ' + t('combatLogResilienceActivateText'), kind: 'defended' }];
+                return advanceTurn({ ...prev, abilityState, log });
+            }
+            if (abilityId === 'secondWind') {
+                if (fightState.secondWindUsed)
+                    return prev;
+                const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (prev.heroParts[p.key] ? prev.heroParts[p.key].maxHp : 0), 0);
+                const result = healCombatantParts(prev.heroParts, Math.round(totalMaxHp * ABILITY_DEFS.secondWind.secondWindHealFraction));
+                const abilityState = { ...fightState, secondWindUsed: true };
+                const log = [...prev.log, { text: youLabel + ' — ' + t('combatLogSecondWindText') + ': +' + result.actualHeal + ' HP', kind: 'heal' }];
+                return advanceTurn({ ...prev, heroParts: result.parts, abilityState, log });
+            }
+            if (abilityId === 'intimidation') {
+                if (prev.round < fightState.intimidationReadyAtRound)
+                    return prev;
+                // No sourceId to exclude (see applyMoraleShockToGroup) — the hero
+                // isn't one of the enemies being shocked, so every living one
+                // takes it, fearless ones aside.
+                const shock = applyMoraleShockToGroup(prev.enemies, null, ABILITY_DEFS.intimidation.intimidationMoraleShock, t);
+                const abilityState = { ...fightState, intimidationReadyAtRound: prev.round + ABILITY_DEFS.intimidation.cooldownRounds };
+                const log = [...prev.log, { text: youLabel + ' — ' + t('combatLogIntimidationText'), kind: 'defended' }, ...shock.log];
+                if (shock.enemies.every(isEnemyOut))
+                    return { ...prev, enemies: shock.enemies, abilityState, log, result: 'victory' };
+                return advanceTurn({ ...prev, enemies: shock.enemies, abilityState, log });
+            }
+            return prev;
+        });
+    }
+    // LevelUpModal's onChoose. abilityId is null when the pool was already
+    // exhausted (see LevelUpModal's empty-options branch) — nothing to pick,
+    // so this just clears the queue entry with no ability added. Otherwise
+    // adds the pick to gameState.abilities (order = pick order, shown that
+    // way on the sheet) and pops this level off pendingLevelUps; if several
+    // levels came in at once, the next-lowest one still queued reappears the
+    // moment this render commits, so the player works through them one card
+    // at a time rather than all at once.
+    function chooseLevelUpAbility(level, abilityId) {
+        delete levelUpOptionsRef.current[level];
+        const nextAbilities = (abilityId && !gameState.abilities.includes(abilityId)) ? [...gameState.abilities, abilityId] : gameState.abilities;
+        const nextPendingLevelUps = gameState.pendingLevelUps.filter(l => l !== level);
+        const nextState = { ...gameState, abilities: nextAbilities, pendingLevelUps: nextPendingLevelUps };
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
     }
@@ -35475,7 +36432,6 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const current = prev.order[prev.turnPos];
             if (!current || current.type === 'hero')
                 return prev;
-            const mods = aggregateEffectModifiers(gameState.effects);
             let log = prev.log;
             if (current.type === 'ally') {
                 const ally = prev.allies.find(a => a.id === current.id);
@@ -35544,7 +36500,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const target = pickLivingTarget(prev.enemies, isEnemyOut);
                 if (!target)
                     return { ...prev, log, result: 'victory' };
-                const attacker = makeAllyActor(ally, mods, (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+                const attacker = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
                 const outcome = resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t);
                 log = [...log, ...outcome.log];
                 // A landed strike wears the companion's weapon(s), same as the hero's.
@@ -35617,12 +36573,19 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             const roleDmgMult = (enemy.role === 'ranged' && enemy.engaged) ? ENEMY_ROLES.ranged.engagedDamageMult : 1;
             const attacker = roleDmgMult === 1 ? makeEnemyActor(enemy) : { ...makeEnemyActor(enemy), power: Math.max(1, Math.round(enemy.power * roleDmgMult)) };
             if (targetChoice.kind === 'hero') {
-                const defender = makeHeroDefender(prev.heroParts, mods, prev.gearWear);
+                const heroMods = computeHeroMods(gameState, prev.abilityState);
+                const defender = makeHeroDefender(prev.heroParts, heroMods, prev.gearWear, prev.abilityState && prev.abilityState.resilienceActive);
                 const outcome = resolveOneAttack(attacker, defender, t);
                 log = [...log, ...outcome.log];
+                // Resilience (see ABILITY_DEFS/resolveOneAttack's guaranteedBlock
+                // check): once it's actually eaten the one hit it was activated
+                // for, clear resilienceActive so the very next incoming hit goes
+                // back through the normal dodge/block/parry roll.
+                const abilityState = (outcome.guaranteedBlockConsumed && prev.abilityState) ? { ...prev.abilityState, resilienceActive: false } : prev.abilityState;
                 // Gear wear: a landed hit wears the armor over that body part plus
                 // the cloak and jewelry; a successful shield block wears the shield;
-                // a miss, dodge or parry wears nothing.
+                // a miss, dodge, parry, or Resilience's guaranteed absorb (see
+                // above) wears nothing.
                 let gearWear = prev.gearWear || {};
                 if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
                     const hitPart = prev.heroParts[outcome.partKey];
@@ -35660,13 +36623,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
                 const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 if (outcome.defeated)
-                    return { ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, gearWear, result: 'death', killedBy: enemy.enemyName };
+                    return { ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, gearWear, abilityState, result: 'death', killedBy: enemy.enemyName };
                 if (enemies.every(isEnemyOut))
-                    return { ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, gearWear, result: 'victory' };
-                return advanceTurn({ ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, gearWear });
+                    return { ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, gearWear, abilityState, result: 'victory' };
+                return advanceTurn({ ...prev, heroParts: outcome.parts, enemies, log, lastAction, stunned, gearWear, abilityState });
             }
             const ally = targetChoice.ally;
-            const defender = makeAllyDefender(ally, mods, (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+            const defender = makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name), (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
             const outcome = resolveOneAttack(attacker, defender, t);
             log = [...log, ...outcome.log];
             // Companion gear wear: a landed hit wears the armor over that part plus
@@ -35810,10 +36773,12 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
     // alternative to attacking. Success ends the fight immediately (result:
     // 'fled'); failure means one random living enemy gets an unopposed hit on
     // the hero (fleeing forfeits any chance to dodge/block/parry, though armor
-    // still helps) and the turn stays with the hero, who can attack or try to
-    // flee again. Difficulty is judged against the toughest enemy still
-    // standing, so a fight that's down to one weak straggler is easy to
-    // outrun even if the original group was fearsome.
+    // still helps) and, like any other action, spends the hero's turn — a
+    // failed attempt is a real (costly) action, not a free re-roll, so it
+    // hands off to advanceTurn same as an attack or item use would. Difficulty
+    // is judged against the toughest enemy still standing, so a fight that's
+    // down to one weak straggler is easy to outrun even if the original group
+    // was fearsome.
     function resolveFleeAttempt() {
         // Nothing should happen while the pre-battle intro is still playing.
         if (combatIntroActive)
@@ -35828,7 +36793,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             if (living.length === 0)
                 return prev;
             const toughest = living.reduce((a, b) => (a.power + a.precision >= b.power + b.precision ? a : b));
-            const chance = computeFleeChance(toughest.power, toughest.precision, toughest.totalHp, gameState.stats.agility, aggregateEffectModifiers(gameState.effects));
+            const chance = computeFleeChance(toughest.power, toughest.precision, toughest.totalHp, gameState.stats.agility, computeHeroMods(gameState, prev.abilityState));
             const succeeded = Math.random() * 100 < chance;
             let log = prev.log;
             if (succeeded) {
@@ -35866,7 +36831,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
                 log = [...log, { text: partLabel + ': ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
             if (stunApplied)
                 log = [...log, { text: t('combatLogStunAppliedText'), kind: 'effect' }];
-            return { ...prev, heroParts, log, lastAction, stunned, gearWear };
+            return advanceTurn({ ...prev, heroParts, log, lastAction, stunned, gearWear });
         });
     }
     function buildCombatSummaryTag(finalCombat, failedQuests) {
@@ -36025,7 +36990,15 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         const totalMaxHp = BODY_PARTS.reduce((sum, p) => sum + (combat.heroParts[p.key] ? combat.heroParts[p.key].maxHp : 0), 0);
         const totalHp = BODY_PARTS.reduce((sum, p) => sum + (combat.heroParts[p.key] ? combat.heroParts[p.key].hp : 0), 0);
         const ratio = totalMaxHp > 0 ? totalHp / totalMaxHp : 1;
-        const newHealth = isCaptivity ? captivityOutcome.healthAfter : (isDeath ? 0 : Math.max(1, Math.round(gameState.maxHealth * ratio)));
+        const baseHealth = isCaptivity ? captivityOutcome.healthAfter : (isDeath ? 0 : Math.max(1, Math.round(gameState.maxHealth * ratio)));
+        // Resilient Body (see ABILITY_DEFS): a small extra sliver on top of the
+        // ordinary post-fight reconciliation above, victory only — fleeing,
+        // dying, and captivity (isDeath is already true for that last one) all
+        // get none of it, same as the fight's own XP.
+        const resilientBonus = (!isDeath && combat.result === 'victory' && gameState.abilities.includes('resilientBody'))
+            ? Math.round(gameState.maxHealth * ABILITY_DEFS.resilientBody.bonusHealFraction)
+            : 0;
+        const newHealth = resilientBonus > 0 ? Math.min(gameState.maxHealth, baseHealth + resilientBonus) : baseHealth;
         // A disabled limb becomes a clientManaged "fracture" (see STATUS
         // EFFECTS above) — a real hit chance/damage penalty until the hero
         // actually gets it healed, not just flavor text — and death becomes a
@@ -36108,7 +37081,13 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         // is pocketed automatically on victory, same as any other coin pickup —
         // no per-item ✓/✗ confirmation the way individual loot items get, since
         // there's nothing to individually decline about a lump sum of coins.
-        const lootCurrency = (combat.result === 'victory' && combat.loot && combat.loot.status === 'ready') ? (combat.loot.currency || 0) : 0;
+        const rawLootCurrency = (combat.result === 'victory' && combat.loot && combat.loot.status === 'ready') ? (combat.loot.currency || 0) : 0;
+        // Scavenger's Eye (see ABILITY_DEFS): a flat percentage on top of
+        // whatever loot generation already rolled, same "victory only" scope
+        // as Resilient Body just above.
+        const lootCurrency = (rawLootCurrency > 0 && gameState.abilities.includes('scavengerEye'))
+            ? Math.round(rawLootCurrency * (1 + ABILITY_DEFS.scavengerEye.lootCurrencyBonusFraction))
+            : rawLootCurrency;
         const nextCurrency = lootCurrency > 0 ? clampCurrency(gameState.currency + lootCurrency, gameState.currency) : gameState.currency;
         let nextItemRarities = itemRarities;
         if (takenLoot.length > 0) {
@@ -36152,7 +37131,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
             nextLevel = leveled.level;
             nextXp = leveled.xp;
         }
-        const nextState = { ...gameState, health: newHealth, effects: newEffects, inventory: finalInventory, confiscatedInventory: finalConfiscatedInventory, currency: nextCurrency, quests: nextQuests, level: nextLevel, xp: nextXp, npcs: nextNpcs };
+        const nextPendingLevelUps = [...gameState.pendingLevelUps, ...computeNewlyGainedLevels(gameState.level, nextLevel)];
+        const nextState = { ...gameState, health: newHealth, effects: newEffects, inventory: finalInventory, confiscatedInventory: finalConfiscatedInventory, currency: nextCurrency, quests: nextQuests, level: nextLevel, xp: nextXp, npcs: nextNpcs, pendingLevelUps: nextPendingLevelUps };
         const summaryTag = buildCombatSummaryTag(combat, failedQuests);
         const sourceNarratorIndex = combat.sourceNarratorIndex;
         // Computed and applied BEFORE saveGame (rather than after, as this used
@@ -36551,7 +37531,7 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         saveGame(messages, gameState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, next);
     }, [gameState.npcs, narrativeItemSlots]);
     // ---- MORNING (SHOP RESTOCK CLOCK) ----
-    // A story morning = the narrator's dayPhase flipping from night to day.
+    // A story morning = dayPhase flipping from night to day (read from the narrator's time text).
     // Each one bumps shopClock.morning and records the turn it dawned on;
     // merchants compare that against the morning they were last stocked on
     // (see isRestockDue / openTrade), so every shop refreshes at dawn rather
@@ -37461,7 +38441,14 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate"}`;
         combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroArmor: computeTotalArmorDefense(equipment, gameState.inventory, itemRarities), heroWeaponType: getLoadoutWeaponType(equipment, gameState.inventory), allyWeaponTypes: Object.fromEntries((combat.allies || []).map(a => {
                 const k = a.name.trim().toLowerCase();
                 return [k, getLoadoutWeaponType(partyEquipment[k], partyInventories[k] || [])];
-            })), introActive: combatIntroActive, onAttack: resolveHeroAttack, onFlee: resolveFleeAttempt, onUseItem: useConsumableInCombat, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
+            })), introActive: combatIntroActive, abilities: gameState.abilities, onAttack: resolveHeroAttack, onFlee: resolveFleeAttempt, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
+        gameState.pendingLevelUps.length > 0 && !combatModalOpen && !deathModalOpen && (() => {
+            const currentLevelUp = Math.min(...gameState.pendingLevelUps);
+            if (!levelUpOptionsRef.current[currentLevelUp]) {
+                levelUpOptionsRef.current[currentLevelUp] = pickLevelUpOptions(gameState.abilities, 3);
+            }
+            return (React.createElement(LevelUpModal, { level: currentLevelUp, options: levelUpOptionsRef.current[currentLevelUp], onChoose: (abilityId) => chooseLevelUpAbility(currentLevelUp, abilityId), t: t }));
+        })(),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: gameState, itemRarities: itemRarities, equipment: equipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, party: party, partyInventories: partyInventories, partyEquipment: partyEquipment, repairKitName: repairKitIndex !== null && gameState.inventory[repairKitIndex] && gameState.inventory[repairKitIndex].slot === 'repairKit' ? gameState.inventory[repairKitIndex].name : null, onApplyRepairKit: applyRepairKitToIndex, onCancelRepairKit: cancelRepairKit, onClose: () => { setInventoryModalOpen(false); setRepairKitIndex(null); }, t: t })),
         (itemDetailIndex !== null || itemDetailEmptySlot !== null) && (React.createElement(ItemDetailModal, { itemIndex: itemDetailIndex, 
@@ -38408,6 +39395,17 @@ const APP_STYLES = `
   .combat-item-btn { flex: 1 1 0; max-width: 11rem; opacity: 0.85; }
   .combat-item-btn-icon { width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; image-rendering: pixelated; }
   .combat-item-cancel-btn { flex: none; opacity: 0.85; }
+  .combat-ability-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin-top: 0.6rem; }
+  .combat-ability-chip { display: flex; align-items: center; gap: 0.4rem; background: var(--stone-900); border: 1px solid var(--amber-800); border-radius: 999px; padding: 0.3rem 0.7rem 0.3rem 0.5rem; font-family: var(--font-mono); cursor: pointer; text-align: left; }
+  .combat-ability-chip:disabled { cursor: default; }
+  .combat-ability-chip-ready:not(:disabled) { border-color: var(--amber-600); }
+  .combat-ability-chip-ready:not(:disabled):hover { background: var(--stone-800); }
+  .combat-ability-chip-cooldown { opacity: 0.45; border-color: var(--stone-700); }
+  .combat-ability-chip-auto { border-style: dashed; }
+  .combat-ability-chip-icon { font-size: 1.1rem; line-height: 1; }
+  .combat-ability-chip-text { display: flex; flex-direction: column; gap: 0.05rem; }
+  .combat-ability-chip-name { font-size: 0.72rem; color: var(--amber-100); }
+  .combat-ability-chip-status { font-size: 0.6rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; }
   .combat-item-panel { margin-top: 0.6rem; background: var(--stone-900); border: 1px solid var(--amber-700); border-radius: 4px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; max-height: 9rem; overflow-y: auto; }
   .combat-item-panel-title { margin: 0 0 0.2rem; font-size: 0.7rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
   .combat-item-panel-empty { margin: 0; font-size: 0.75rem; color: var(--stone-600); text-align: center; padding: 0.3rem 0; }
@@ -38422,6 +39420,15 @@ const APP_STYLES = `
   .loot-item-damage-tag { color: var(--stone-500); font-style: italic; }
   .death-card { max-width: 26rem; }
   .death-modal-actions { flex-wrap: wrap; }
+  .levelup-card { max-width: 26rem; }
+  .levelup-eyebrow { font-family: var(--font-mono); font-size: 0.7rem; color: var(--amber-600); text-transform: uppercase; letter-spacing: 0.2em; margin: 0 0 0.3rem; }
+  .levelup-options { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem; }
+  .levelup-option { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; text-align: left; width: 100%; background: var(--stone-950); border: 1px solid var(--amber-800); border-radius: 4px; padding: 0.75rem 0.9rem; cursor: pointer; font-family: inherit; }
+  .levelup-option:hover, .levelup-option:focus-visible { border-color: var(--amber-500); background: var(--stone-900); }
+  .levelup-option-icon { font-size: 1.3rem; line-height: 1; }
+  .levelup-option-name { font-family: var(--font-display); color: var(--amber-100); font-size: 1rem; }
+  .levelup-option-type { font-family: var(--font-mono); font-size: 0.62rem; color: var(--amber-600); text-transform: uppercase; letter-spacing: 0.05em; margin-left: auto; }
+  .levelup-option-desc { flex-basis: 100%; font-family: var(--font-serif); font-size: 0.85rem; color: var(--stone-400); margin-top: 0.1rem; }
   .equip-slot-occupied-note { font-size: 0.65rem; color: var(--stone-600); margin: 0.15rem 0 0; font-style: italic; }
   .suggestions-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.85rem; }
   .suggestions-label { font-family: var(--font-mono); font-size: 0.65rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.1em; width: 100%; margin: 0 0 0.15rem; }
@@ -38507,6 +39514,12 @@ const APP_STYLES = `
   .sheet-effect-item-btn { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.1rem 0; font-family: inherit; cursor: pointer; }
   .sheet-effect-item-btn:hover, .sheet-effect-item-btn:focus-visible { color: var(--amber-300); }
   .sheet-effect-duration { color: var(--stone-500); font-size: 0.75rem; }
+  .sheet-ability-item { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .sheet-ability-item-icon { font-size: 1rem; line-height: 1.3; }
+  .sheet-ability-item-body { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+  .sheet-ability-item-name { color: #d6d3d1; }
+  .sheet-ability-item-tag { display: block; font-family: var(--font-mono); font-size: 0.62rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; }
+  .sheet-ability-item-desc { color: var(--stone-500); font-size: 0.78rem; }
   .sheet-list-item-clickable { cursor: pointer; padding: 0.1rem 0.3rem; margin: 0 0 0.25rem -0.3rem; border-radius: 3px; }
   .sheet-list-item-clickable:hover { background: var(--stone-800); }
   .sheet-item-meta { color: var(--stone-500); font-size: 0.8em; }
