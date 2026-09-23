@@ -31803,7 +31803,16 @@ function App() {
         // so a response that needs several passes to finish still comes back
         // as one complete string — raising maxOutputTokens above makes this
         // rare, but this is what keeps it correct rather than just less common.
-        if (candidate && candidate.finishReason === 'MAX_TOKENS' && retriesLeft > 0) {
+        // Previously this only retried on finishReason === 'MAX_TOKENS'. Any
+        // other non-STOP reason (SAFETY, PROHIBITED_CONTENT, RECITATION, OTHER)
+        // fell through with no retry at all — the console.warn above fired, but
+        // whatever partial text had come back was returned as-is, which is what
+        // produced scenes that just stopped mid-sentence with no recovery
+        // attempt. Retrying the same "continue where you left off" approach for
+        // these too costs nothing (still bounded by retriesLeft, still falls
+        // back to the partial text on failure) and gives every truncation cause
+        // — not just MAX_TOKENS — a chance to complete.
+        if (candidate && candidate.finishReason && candidate.finishReason !== 'STOP' && retriesLeft > 0 && text) {
             try {
                 const continuation = await callGemini(system, [...messages, { role: 'assistant', content: text }, { role: 'user', content: 'Continue exactly where you left off — do not repeat any part of what you already wrote, do not restart, no commentary. Resume mid-token if that\'s where you stopped, and output only the rest of the same response.' }], retriesLeft - 1);
                 return text + continuation;
@@ -31909,7 +31918,13 @@ function App() {
         // there. The wrapped onChunk keeps forwarding the TRUE cumulative text
         // (this call's fullText plus whatever the continuation streams in), so
         // the live-typing effect on screen carries on seamlessly.
-        if (finishReason === 'MAX_TOKENS' && retriesLeft > 0) {
+        // Previously gated to finishReason === 'MAX_TOKENS' only — any other
+        // non-STOP reason (SAFETY, PROHIBITED_CONTENT, RECITATION, OTHER) got no
+        // retry at all, just the console.warn above, so a scene truncated for
+        // any of those reasons was shown to the player exactly as cut off with
+        // no attempt to recover. Retry on any non-STOP reason that still
+        // produced partial text instead.
+        if (finishReason && finishReason !== 'STOP' && retriesLeft > 0 && fullText) {
             try {
                 const continuation = await callGeminiStreaming(system, [...messages, { role: 'assistant', content: fullText }, { role: 'user', content: 'Continue exactly where you left off — do not repeat any part of what you already wrote, do not restart, no commentary. Resume mid-sentence if that\'s where you stopped, and write only the rest of the scene.' }], chunk => onChunk(fullText + chunk), retriesLeft - 1);
                 return fullText + continuation;
