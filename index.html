@@ -20641,10 +20641,95 @@ const ENEMY_TIERS = {
     exceptional: { hp: [150, 399], power: [25, 54], precision: [25, 54], initiative: [25, 54], armor: [6, 13] },
     legendary: { hp: [400, 1000], power: [55, 100], precision: [55, 100], initiative: [55, 100], armor: [9, 20] }
 };
+// ---- ENEMY ARMOR LOADOUT — random gear count/quality, by rank -----------
+// An enemy never carries a real per-slot inventory the way the hero/allies
+// do (see ARMOR_POOL_SLOTS/partyEquipment) — but unlike the version of this
+// system that shipped earlier, gear is no longer purely cosmetic either.
+// Previously ENEMY_TIERS.armor was rolled on its own and the procedural
+// loadout below only decided how that fixed number was SPLIT between the
+// helmet and body portrait bars — two enemies at the same tier and the same
+// rolled total could show a totally different "outfit" (one ratty piece vs
+// a full set) for identical defense. Now the loadout comes first: each of
+// the 4 physical armor slots (helmet/armor/gloves/boots — see
+// ARMOR_SLOT_PROTECTION) is its own independent roll, so there's no more
+// artificial cap at 1-3 body pieces — a bare enemy and a complete four-piece
+// set are both reachable at any rank — each worn piece's quality is rolled
+// off ENEMY_ARMOR_LOADOUT_RARITIES same as before, and the pieces' REAL
+// defense values (via the exact getArmorDefenseForSlot the hero/allies' own
+// gear reads off) are summed to see how this enemy actually turned out
+// dressed. That raw sum is then rescaled to fill ENEMY_TIERS.armor's own
+// [min,max] band for this tier (see rollEnemyArmorPools) rather than used
+// directly, so the weapon-tier-vs-ENEMY_TIERS.armor win-rate simulation
+// documented above ARMOR_DEFENSE_BY_RARITY stays valid — a mythic four-piece
+// set is 260 raw, which would otherwise dwarf even legendary's old ceiling
+// of 20. The practical effect: a bare-handed enemy sits at this tier's
+// tuned armor floor, a best-in-tier full set sits at its tuned ceiling, and
+// everything in between scales smoothly with exactly what's equipped — gear
+// now genuinely determines the stat, not just how it's drawn. Whatever
+// total that lands on, the ENEMY still only ever mitigates that one number
+// per hit (see resolveOneAttack's `defender.isEnemy` branch, which reads the
+// flat `armor` field) — only the portrait bars visualize the head/body
+// split, never separate math.
+const ENEMY_ARMOR_LOADOUT_RARITIES = ['junk', 'common', 'uncommon', 'rare', 'unique', 'epic', 'mythic'];
+// Per tier: independent presence odds for each physical armor slot (the 3
+// body slots — armor/gloves/boots — share one figure; helmet gets its own,
+// traditionally a notch harder to come by) plus roughly where in
+// ENEMY_ARMOR_LOADOUT_RARITIES that gear's quality is centered. Every slot
+// is its own coin flip now rather than a weighted pick over a hard-capped
+// range, so a full four-piece set — or nothing at all — can land at any
+// rank; it's the odds that shift with rank, not the ceiling. At legendary
+// (0.90/0.85 per slot) a full set lands roughly 60% of the time and true
+// bare-handed is nearly unheard of; at weak (0.25/0.15) it's the reverse.
+const ENEMY_ARMOR_LOADOUT_BY_TIER = {
+    weak: { bodyChance: 0.25, helmetChance: 0.15, rarityCenter: 0 },
+    average: { bodyChance: 0.40, helmetChance: 0.30, rarityCenter: 1 },
+    strong: { bodyChance: 0.55, helmetChance: 0.50, rarityCenter: 2 },
+    exceptional: { bodyChance: 0.75, helmetChance: 0.70, rarityCenter: 4 },
+    legendary: { bodyChance: 0.90, helmetChance: 0.85, rarityCenter: 5 }
+};
+function rollEnemyArmorRarity(center) {
+    const idx = Math.max(0, Math.min(ENEMY_ARMOR_LOADOUT_RARITIES.length - 1, Math.round(center + (Math.random() * 3 - 1.5))));
+    return ENEMY_ARMOR_LOADOUT_RARITIES[idx];
+}
+// The raw ceiling rollEnemyArmorPools rescales against: a full four-slot
+// set at roughly the best quality this tier's rarityCenter plausibly rolls
+// (center+1, clamped — see rollEnemyArmorRarity's spread). Reads
+// ARMOR_DEFENSE_BY_RARITY directly (defined further down the file, same as
+// getArmorDefenseForSlot already does from here), so it can never drift out
+// of sync if that table's numbers ever move.
+function enemyArmorLoadoutCeiling(center) {
+    const topRarity = ENEMY_ARMOR_LOADOUT_RARITIES[Math.min(ENEMY_ARMOR_LOADOUT_RARITIES.length - 1, center + 1)];
+    return 4 * (ARMOR_DEFENSE_BY_RARITY[topRarity] || ARMOR_DEFENSE_BY_RARITY.common);
+}
+// Rolls this enemy's actual loadout, then both derives its total armor FROM
+// that loadout and splits it across the helmet/body portrait pools — see
+// the note above. Returns {head:{max,cur}, body:{max,cur}, total} in the
+// exact same head/body shape CombatPortrait/resolveOneAttack already read
+// off the hero's own armorPools, head+body always summing back to `total`.
+function rollEnemyArmorPools(tierKey) {
+    const cfg = ENEMY_ARMOR_LOADOUT_BY_TIER[tierKey] || ENEMY_ARMOR_LOADOUT_BY_TIER.average;
+    const tier = ENEMY_TIERS[tierKey] || ENEMY_TIERS.average;
+    const bodySlotKeys = ['armor', 'gloves', 'boots'];
+    let bodyWeight = 0;
+    bodySlotKeys.forEach(slot => {
+        if (Math.random() < cfg.bodyChance)
+            bodyWeight += getArmorDefenseForSlot(slot, rollEnemyArmorRarity(cfg.rarityCenter)) || 0;
+    });
+    const hasHelmet = Math.random() < cfg.helmetChance;
+    const headWeight = hasHelmet ? (getArmorDefenseForSlot('helmet', rollEnemyArmorRarity(cfg.rarityCenter)) || 0) : 0;
+    const gearRaw = headWeight + bodyWeight;
+    const ceiling = enemyArmorLoadoutCeiling(cfg.rarityCenter);
+    const fraction = ceiling > 0 ? Math.min(1, gearRaw / ceiling) : 0;
+    const total = Math.round(tier.armor[0] + fraction * (tier.armor[1] - tier.armor[0]));
+    const headMax = gearRaw > 0 ? Math.round(total * headWeight / gearRaw) : 0;
+    const bodyMax = Math.max(0, total - headMax);
+    return { head: { max: headMax, cur: headMax }, body: { max: bodyMax, cur: bodyMax }, total };
+}
 function rollEnemyStatsForTier(tierKey) {
     const tier = ENEMY_TIERS[tierKey] || ENEMY_TIERS.average;
     const rollRange = ([min, max]) => Math.round(min + Math.random() * (max - min));
-    return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armor: rollRange(tier.armor) };
+    const armorPools = rollEnemyArmorPools(tierKey);
+    return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armor: armorPools.total, armorPools };
 }
 // Every enemy the model generates (see the COMBAT event schema) is tagged
 // with a "role" alongside its "tier" — this is what actually makes that tag
@@ -24751,36 +24836,100 @@ function computeReachableCells(from, range, combat, exclude) {
     }
     return cells;
 }
-// Full greedy diagonal-first path from `from` to `to` (one step per cell,
-// same 8-directional walk chooseMoveStep uses) — its length always equals
-// chebyshevDistance(from,to), matching how range/distance are judged
-// everywhere else here. Split into `reachable` (the leading run of cells
-// that are neither cover nor occupied, up to `range` cells) and `beyond`
-// (whatever's left of the raw path past that point) — see CombatModal's
+// True pathfinding for the player's own move-planning UI (see CombatModal's
+// onCellTap/clampedPath below) — breadth-first search over footprint
+// positions (8-directional, one step per cell) that actually routes AROUND
+// cover blocks and other combatants standing in the way, instead of the old
+// straight-line walk that simply stopped dead the moment it hit one (see
+// findPathToAdjacent above, which already does this for AI-controlled
+// movement — this is the same idea, just pathing to an exact clicked cell
+// rather than to "anywhere adjacent to a target"). If `to` itself is
+// blocked (occupied, or a cover tile — you can never stand where something
+// else already is), routes instead to whichever unblocked cell the search
+// reaches that ends up closest (Chebyshev) to `to`, so clicking on or past
+// an obstacle still plans a sensible route up to its edge rather than
+// refusing to path at all. Returns an ordered list of positions from (but
+// excluding) `from`, or null if every direction is genuinely walled off
+// (boxed in on every side).
+function findFullPathToCell(from, to, combat, exclude) {
+    if (from.x === to.x && from.y === to.y)
+        return [];
+    const key = (p) => p.x + ',' + p.y;
+    const startKey = key(from);
+    const visited = new Set([startKey]);
+    const cameFrom = new Map();
+    const queue = [from];
+    let head = 0;
+    const dirs = [
+        { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
+        { x: -1, y: 0 }, { x: 1, y: 0 },
+        { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 }
+    ];
+    // Bounded exactly like findPathToAdjacent — the playable grid
+    // (GRID_RENDER_MIN/MAX_X/Y) is small enough that this is always far more
+    // headroom than any real path could ever need.
+    const maxNodes = 6000;
+    const targetBlocked = isFootprintBlocked(to, combat, exclude);
+    let goalPos = null;
+    let nearestFallback = null;
+    let nearestFallbackDist = Infinity;
+    while (head < queue.length && visited.size < maxNodes && !goalPos) {
+        const cur = queue[head++];
+        for (const d of dirs) {
+            const next = { x: cur.x + d.x, y: cur.y + d.y };
+            const k = key(next);
+            if (visited.has(k))
+                continue;
+            if (isFootprintBlocked(next, combat, exclude))
+                continue;
+            visited.add(k);
+            cameFrom.set(k, cur);
+            if (!targetBlocked && next.x === to.x && next.y === to.y) {
+                goalPos = next;
+                break;
+            }
+            // Track whichever unblocked cell visited so far sits closest to `to`,
+            // in case `to` itself turns out to be unreachable (occupied/cover) —
+            // this is what lets a click on or beyond an obstacle still plan a
+            // route right up to its edge instead of doing nothing.
+            const d2 = chebyshevDistance(next, to);
+            if (d2 < nearestFallbackDist) {
+                nearestFallbackDist = d2;
+                nearestFallback = next;
+            }
+            queue.push(next);
+        }
+    }
+    const finalGoal = goalPos || nearestFallback;
+    if (!finalGoal)
+        return null;
+    const path = [];
+    let cur = finalGoal;
+    while (key(cur) !== startKey) {
+        path.push(cur);
+        const prev = cameFrom.get(key(cur));
+        if (!prev)
+            return null;
+        cur = prev;
+    }
+    return path.reverse();
+}
+// Full path from `from` to `to`, routing around cover blocks and other
+// combatants (see findFullPathToCell just above) rather than the old
+// straight-line walk that simply stopped dead at the first obstacle in its
+// way. Split into `reachable` (the leading run of cells, up to `range`
+// cells — the path itself is already guaranteed unblocked end to end, so
+// nothing can cut it short besides running out of movement) and `beyond`
+// (whatever's left of the real path past that point) — see CombatModal's
 // path-preview rendering (yellow for reachable, dim for beyond) and
 // onMove, which is only ever given reachable's last cell: clicking a cell
 // further away than you can actually walk this turn just paths you as far
 // as you can go, it never extends past your real movement range.
 function computeClampedPath(from, to, range, combat, exclude) {
-    const full = [];
-    let cur = from;
-    let guard = 0;
-    while (!(cur.x === to.x && cur.y === to.y) && guard < 120) {
-        guard++;
-        const sx = Math.sign(to.x - cur.x);
-        const sy = Math.sign(to.y - cur.y);
-        cur = { x: cur.x + sx, y: cur.y + sy };
-        full.push(cur);
-    }
-    const reachable = [];
-    for (const c of full) {
-        if (reachable.length >= range)
-            break;
-        if (isFootprintBlocked(c, combat, exclude))
-            break;
-        reachable.push(c);
-    }
-    return { full, reachable, beyond: full.slice(reachable.length) };
+    const full = findFullPathToCell(from, to, combat, exclude) || [];
+    const reachable = full.slice(0, range);
+    const beyond = full.slice(range);
+    return { full, reachable, beyond };
 }
 // hero's row (y=0) and the enemy row (see layoutInitialPositions) —
 // generated locally at combat start, never by the narrator (see the
@@ -25117,7 +25266,7 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
         enemyDescription: typeof spec.enemyDescription === 'string' ? spec.enemyDescription.trim() : '',
         weaponDescription, tier, role, fearless,
         totalHp: rolled.totalHp, power: rolled.power, precision: rolled.precision,
-        initiative: rolled.initiative, armor: rolled.armor,
+        initiative: rolled.initiative, armor: rolled.armor, armorPools: rolled.armorPools,
         bodyParts: normalizeEnemyBodyParts(spec.bodyParts)
     };
 }
@@ -29446,6 +29595,19 @@ function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isArriving, is
     const displayMaxHp = Math.max(1, Math.round(maxHp / COMBAT_TUNING.hpScale));
     const displayHp = Math.max(0, Math.round(hp / COMBAT_TUNING.hpScale));
     const pct = maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0;
+    // The three portrait bars — helmet armor / body armor / HP — must always
+    // render in this fixed order for EVERY combatant (hero, ally, enemy),
+    // never appearing/disappearing slot to slot. The hero is the only one
+    // with real per-slot gear data (armorPools, split head/body — see
+    // ARMOR_POOL_SLOTS); allies and enemies only ever carry a single flat
+    // `armor` number with no head/body distinction, so that number becomes
+    // this portrait's body-armor value and its head-armor value is always 0
+    // (rendered inactive below) rather than omitted — nobody in this game
+    // has enemy/ally helmet data to show instead.
+    const headArmorMax = armorPools ? armorPools.head.max : 0;
+    const headArmorCur = armorPools ? Math.max(0, armorPools.head.cur) : 0;
+    const bodyArmorMax = armorPools ? armorPools.body.max : (typeof armor === 'number' ? armor : 0);
+    const bodyArmorCur = armorPools ? Math.max(0, armorPools.body.cur) : (typeof armor === 'number' ? armor : 0);
     const fxCls = fx && fx.cls ? fx.cls : '';
     // The attacker's lunge is aimed at the defender's actual on-screen
     // position — see CombatModal's fx effect — via these two CSS custom
@@ -29491,17 +29653,13 @@ function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isArriving, is
             React.createElement("div", { className: "combat-portrait-overlay" },
                 React.createElement("div", { className: "combat-portrait-note-slot" }, isDown && React.createElement("p", { className: "equip-slot-occupied-note" }, t('combatPartDisabledSuffix'))),
                 React.createElement("p", { className: "combat-portrait-name" }, name),
-                React.createElement("div", { className: "combat-portrait-bars" }, armorPools ? (React.createElement(React.Fragment, null,
-                    armorPools.head.max > 0 && (React.createElement("div", { className: "combat-armor-bar combat-armor-bar-head", "aria-label": t('combatArmorHeadLabel') + ': ' + Math.max(0, armorPools.head.cur) + '/' + armorPools.head.max },
-                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: (Math.round((Math.max(0, armorPools.head.cur) / armorPools.head.max) * 100)) + '%' } }))),
-                    armorPools.body.max > 0 && (React.createElement("div", { className: "combat-armor-bar combat-armor-bar-body", "aria-label": t('combatArmorBodyLabel') + ': ' + Math.max(0, armorPools.body.cur) + '/' + armorPools.body.max },
-                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: (Math.round((Math.max(0, armorPools.body.cur) / armorPools.body.max) * 100)) + '%' } }))),
+                React.createElement("div", { className: "combat-portrait-bars" },
+                    React.createElement("div", { className: 'combat-armor-bar combat-armor-bar-head' + (headArmorMax > 0 ? '' : ' combat-armor-bar-inactive'), "aria-label": t('combatArmorHeadLabel') + ': ' + headArmorCur + '/' + headArmorMax },
+                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: (headArmorMax > 0 ? Math.round((headArmorCur / headArmorMax) * 100) : 0) + '%' } })),
+                    React.createElement("div", { className: 'combat-armor-bar combat-armor-bar-body' + (bodyArmorMax > 0 ? '' : ' combat-armor-bar-inactive'), "aria-label": t('combatArmorBodyLabel') + ': ' + bodyArmorCur + '/' + bodyArmorMax },
+                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: (bodyArmorMax > 0 ? Math.round((bodyArmorCur / bodyArmorMax) * 100) : 0) + '%' } })),
                     React.createElement("div", { className: "combat-hp-bar", "aria-label": displayHp + '/' + displayMaxHp },
-                        React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } })))) : (React.createElement(React.Fragment, null,
-                    React.createElement("div", { className: "combat-hp-bar", "aria-label": displayHp + '/' + displayMaxHp },
-                        React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } })),
-                    typeof armor === 'number' && armor > 0 && (React.createElement("div", { className: "combat-armor-bar", "aria-label": t('itemDefenseLabel') + ': ' + armor },
-                        React.createElement("div", { className: "combat-armor-bar-fill", style: { width: '100%' } })))))))),
+                        React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } }))))),
         fx && fx.spark && (React.createElement("span", { key: 'spark-' + fx.seq, className: 'combat-spark-burst' + (fx.spark === 'block' ? ' combat-spark-burst-block' : ''), "aria-hidden": "true" },
             React.createElement("span", null),
             React.createElement("span", null),
@@ -30194,7 +30352,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             return (React.createElement("div", { key: enemy.id, className: "combat-grid-token", style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
-                                        React.createElement(CombatPortrait, { name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, targetable: isPlayerTurn && !planningMove && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
+                                        React.createElement(CombatPortrait, { name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, targetable: isPlayerTurn && !planningMove && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
                         }),
                         visibleAllies.map(ally => {
                             const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !introActive && pendingItemIndex === null;
@@ -31834,6 +31992,1259 @@ function EditConfirmModal({ withLoss, dontShowAgain, onDontShowAgainChange, onCo
                 React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
                 React.createElement("button", { onClick: onConfirm, className: "btn btn-primary", type: "button" }, t('editConfirmButton'))))));
 }
+// ============================================================================
+// DEV MODE — offline sandbox / cheat panel (one self-contained block)
+// ============================================================================
+// Turn it on by typing `/dev` into the main action input and sending it — or,
+// before a game exists, by typing `/dev` into the world / hero name / hero
+// concept field on the setup screen and pressing the start button (that
+// launches an empty offline sandbox: no API key, no model call). `/dev off`
+// switches it off again. The on/off choice is remembered in storage.
+//
+// Everything DevPanel does is a plain local state edit — it never calls the
+// model. While its "offline" switch is on, App() additionally (a) makes
+// callGemini throw, so nothing can reach the network, and (b) answers each turn
+// with a stub narrator message (see devOfflineTurn in App) instead of a model
+// call, so combat, trade, equipment, quests, offers and the map can all be
+// exercised with no AI at all. Wiring inside App() is marked "DEV MODE".
+// ============================================================================
+const DEV_MODE_KEY = 'grimoire-rpg-dev-mode';
+const DEV_RARITY_LABELS = { junk: 'Хлам', common: 'Обычный', uncommon: 'Необычный', rare: 'Редкий', unique: 'Уникальный', epic: 'Эпический', mythic: 'Мифический' };
+const DEV_RARITY_TAGS = { junk: ['хлам', 'junk'], common: ['обыч.', 'common'], uncommon: ['необыч.', 'uncommon'], rare: ['редк.', 'rare'], unique: ['уник.', 'unique'], epic: ['эпич.', 'epic'], mythic: ['миф.', 'mythic'] };
+const DEV_SLOT_LABELS = { weapon: 'Оружие', armor: 'Броня', helmet: 'Шлем', amulet: 'Амулет', gloves: 'Перчатки', boots: 'Сапоги', ring: 'Кольцо', cloak: 'Плащ', backpack: 'Рюкзак', consumable: 'Расходник', repairKit: 'Ремкомплект', none: 'Прочее' };
+const DEV_TIER_LABELS = { weak: 'слабый', average: 'средний', strong: 'сильный', exceptional: 'исключит.', legendary: 'легендарный' };
+const DEV_ROLE_LABELS = { melee: 'ближний бой', ranged: 'стрелок', caster: 'маг', tank: 'танк' };
+const DEV_SEVERITY_LABELS = { mild: 'лёгкая', moderate: 'средняя', severe: 'тяжёлая' };
+const DEV_EFFECT_LABELS = {
+    bleed: ['Кровотечение', 'Bleeding'], poison: ['Отравление', 'Poisoned'], fracture: ['Перелом', 'Fracture'],
+    concussion: ['Сотрясение', 'Concussion'], exhaustion: ['Истощение', 'Exhaustion'], curse: ['Проклятие', 'Cursed'],
+    adrenaline: ['Прилив адреналина', 'Adrenaline rush'], other: ['Особое состояние', 'Special condition']
+};
+const DEV_KIND_LABELS = { settlement: 'Поселение', wilderness: 'Глушь', dungeon: 'Подземелье', landmark: 'Место' };
+const DEV_TRIGGER_LABELS = { turn: 'раунд', enemyDeaths: 'смертей врагов', allyDeaths: 'смертей союзников', heroHpBelow: 'HP героя ниже, %' };
+const DEV_NPC_ROLE_PRESETS = ['Торговец', 'Кузнец', 'Бронник', 'Ювелир', 'Алхимик', 'Стражник', 'Бандит', 'Наёмник'];
+const DEV_TIME_PRESETS = [
+    { label: '🌅 Утро', time: 'Раннее утро', phase: 'day' },
+    { label: '☀ Полдень', time: 'Полдень', phase: 'day' },
+    { label: '🌆 Вечер', time: 'Поздний вечер', phase: 'night' },
+    { label: '🌙 Полночь', time: 'Глубокая ночь', phase: 'night' }
+];
+const DEV_GEAR_SET = [
+    { ru: 'Меч', en: 'Sword', slot: 'weapon', weightCategory: 'medium' },
+    { ru: 'Щит', en: 'Shield', slot: 'weapon', shield: true, weightCategory: 'medium' },
+    { ru: 'Лук', en: 'Bow', slot: 'weapon', twoHanded: true, weightCategory: 'light' },
+    { ru: 'Шлем', en: 'Helmet', slot: 'helmet', weightCategory: 'medium' },
+    { ru: 'Доспех', en: 'Armor', slot: 'armor', weightCategory: 'heavy' },
+    { ru: 'Перчатки', en: 'Gloves', slot: 'gloves', weightCategory: 'light' },
+    { ru: 'Сапоги', en: 'Boots', slot: 'boots', weightCategory: 'light' },
+    { ru: 'Плащ', en: 'Cloak', slot: 'cloak', weightCategory: 'light' },
+    { ru: 'Амулет', en: 'Amulet', slot: 'amulet' },
+    { ru: 'Кольцо силы', en: 'Ring of Might', slot: 'ring' },
+    { ru: 'Кольцо ловкости', en: 'Ring of Agility', slot: 'ring' },
+    { ru: 'Рюкзак', en: 'Backpack', slot: 'backpack' }
+];
+const DEV_CONSUMABLE_SET = [
+    { ru: 'Зелье лечения', en: 'Healing potion', slot: 'consumable', qty: 3 },
+    { ru: 'Ремонтный набор', en: 'Repair kit', slot: 'repairKit', qty: 1 }
+];
+function devL(lang, ru, en) { return lang === 'en' ? en : ru; }
+function devKey(name) { return typeof name === 'string' ? name.trim().toLowerCase() : ''; }
+function devUid(prefix) { return prefix + '_' + Math.random().toString(36).slice(2, 9); }
+function devClamp(value, lo, hi, fallback) {
+    const n = Number(value);
+    if (value === '' || value === null || value === undefined || !Number.isFinite(n))
+        return fallback;
+    return Math.max(lo, Math.min(hi, Math.round(n)));
+}
+// "/dev", "/dev on", "/dev off" (also "/devmode"). Returns { action } or null.
+function devParseCommand(text) {
+    if (typeof text !== 'string')
+        return null;
+    const m = text.trim().toLowerCase().match(/^\/dev(?:mode)?(?:\s+(on|off))?$/);
+    return m ? { action: m[1] === 'off' ? 'off' : 'on' } : null;
+}
+// A synthetic narrator message — same shape the game's own client-made scenes use
+// (captivity outcome, resurrection), with every optional block present but empty.
+function devMakeNarrator(text, state, lang, extra) {
+    return Object.assign({
+        role: 'narrator', text, secrets: '',
+        suggestions: FALLBACK_SUGGESTIONS[lang] || FALLBACK_SUGGESTIONS.ru,
+        itemOffers: [], questOffers: [], rewardOffers: [], travelOffer: null, combatEncounter: null,
+        stateBefore: state, tokenUsage: 0
+    }, extra || {});
+}
+// The local stand-in for generateResurrectionCheck / generateCaptivityCheck.
+function devOfflineCaptivity(lang) {
+    return {
+        narrative: devL(lang, '⛓ [DEV] Тебя оглушают и волокут в камеру. Всё снаряжение конфисковано.', '⛓ [DEV] You are knocked out and dragged to a cell. All your gear is confiscated.'),
+        healthAfter: 20,
+        dangerTurns: 5,
+        suggestions: FALLBACK_CAPTIVITY_SUGGESTIONS[lang] || FALLBACK_CAPTIVITY_SUGGESTIONS.ru
+    };
+}
+function devOfflineResurrection(lang) {
+    return {
+        resurrectionNarrative: devL(lang, '✨ [DEV] Ты судорожно втягиваешь воздух — смерть отступила.', '✨ [DEV] You gasp for air — death lets go.'),
+        healthAfter: 20
+    };
+}
+function devPool(kind, lang) {
+    const entry = TRADE_RESTOCK_ITEM_NAMES[kind];
+    if (!entry)
+        return [];
+    return entry[lang] || entry.ru || [];
+}
+// Post-fight loot without a model call (stand-in for generateCombatLoot).
+function devRollLoot(enemy, idPrefix, lang, helpers) {
+    const tier = enemy && enemy.tier;
+    const items = [];
+    if (!enemyCarriesNoLoot(enemy)) {
+        const pool = ['weapon', 'armor', 'amulet', 'consumable'].flatMap(k => devPool(k, lang));
+        const count = pool.length > 0 ? rollIntInRange(0, 2) : 0;
+        for (let i = 0; i < count; i++) {
+            const entry = pool[Math.floor(Math.random() * pool.length)];
+            const norm = normalizeInventoryItem(entry);
+            if (!norm)
+                continue;
+            const rarity = rollLootItemRarity(tier);
+            const lootItem = { id: idPrefix + '_devloot_' + i, label: norm.name, slot: norm.slot, twoHanded: norm.twoHanded, shield: norm.shield, weightCategory: norm.weightCategory, rarity };
+            const durability = helpers && helpers.rollDurability ? helpers.rollDurability({ name: norm.name, slot: norm.slot, twoHanded: norm.twoHanded, shield: norm.shield, weightCategory: norm.weightCategory }, rarity) : undefined;
+            if (durability !== undefined)
+                lootItem.durability = durability;
+            items.push(lootItem);
+        }
+    }
+    return { items, currency: helpers && helpers.rollCurrency ? helpers.rollCurrency(tier) : 0 };
+}
+// ---- items ----------------------------------------------------------------
+function devMakeItem(spec, rarity) {
+    const item = normalizeInventoryItem({
+        name: spec.name, slot: spec.slot, twoHanded: spec.twoHanded === true, shield: spec.shield === true,
+        weightCategory: spec.weightCategory, questId: spec.questId || null
+    });
+    if (!item)
+        return null;
+    const pct = spec.durabilityPct === null || spec.durabilityPct === undefined || spec.durabilityPct === '' ? NaN : Number(spec.durabilityPct);
+    if (Number.isFinite(pct) && pct >= 0 && pct < 100) {
+        const max = getItemMaxDurability(item, rarity);
+        if (Number.isFinite(max) && max > 0)
+            item.durability = Math.round(max * pct) / 100;
+    }
+    return item;
+}
+function devGearSet(rarity, lang) {
+    const tag = (DEV_RARITY_TAGS[rarity] || DEV_RARITY_TAGS.common)[lang === 'en' ? 1 : 0];
+    const items = [];
+    const rarityByName = {};
+    for (const tpl of DEV_GEAR_SET) {
+        const name = devL(lang, tpl.ru, tpl.en) + ' [' + tag + ']';
+        const item = devMakeItem({ name, slot: tpl.slot, twoHanded: tpl.twoHanded, shield: tpl.shield, weightCategory: tpl.weightCategory }, rarity);
+        if (!item)
+            continue;
+        items.push(item);
+        rarityByName[devKey(name)] = rarity;
+    }
+    return { items, rarityByName };
+}
+function devConsumableSet(lang) {
+    const items = [];
+    const rarityByName = {};
+    for (const tpl of DEV_CONSUMABLE_SET) {
+        const name = devL(lang, tpl.ru, tpl.en);
+        const item = devMakeItem({ name, slot: tpl.slot }, 'common');
+        if (!item)
+            continue;
+        for (let i = 0; i < tpl.qty; i++)
+            items.push({ ...item });
+        rarityByName[devKey(name)] = 'common';
+    }
+    return { items, rarityByName };
+}
+// Adds items to the hero's inventory and (optionally) puts them on. A two-handed
+// weapon is only auto-equipped when both hands are empty, so it can never clash
+// with what is already held.
+function devAddItemsToHero(gameState, equipment, items, autoEquip) {
+    const inventory = [...gameState.inventory, ...items];
+    let nextEquipment = equipment;
+    if (autoEquip) {
+        nextEquipment = { ...equipment };
+        for (const item of items) {
+            if (item.slot === 'weapon' && item.twoHanded && (nextEquipment.weaponRight || nextEquipment.weaponLeft))
+                continue;
+            const slotKey = pickEquipSlotForItem(item.slot, nextEquipment, inventory);
+            if (slotKey && !nextEquipment[slotKey])
+                nextEquipment[slotKey] = item.name;
+        }
+    }
+    return { gameState: { ...gameState, inventory }, equipment: nextEquipment };
+}
+// One place that knows where an item can be given: 'hero', 'party:<key>' or
+// 'stock:<npc key>' (a merchant's shelf — optionally with an asking price).
+function devGive(api, target, items, rarityByName, opts) {
+    const o = opts || {};
+    api.setItemRarities(r => ({ ...r, ...rarityByName }));
+    if (target === 'hero') {
+        const res = devAddItemsToHero(api.gameState, api.equipment, items, !!o.autoEquip);
+        api.setGameState(s => ({ ...s, inventory: [...s.inventory, ...items] }));
+        if (res.equipment !== api.equipment)
+            api.setEquipment(res.equipment);
+    }
+    else if (target.startsWith('party:')) {
+        const key = target.slice(6);
+        api.setPartyInventories(p => ({ ...p, [key]: [...(p[key] || []), ...items] }));
+    }
+    else if (target.startsWith('stock:')) {
+        const key = target.slice(6);
+        const price = devClamp(o.price, 0, 1000000, 0);
+        const shelf = price > 0 ? items.map(it => ({ ...it, askingPrice: price })) : items;
+        api.setNpcInventories(p => ({ ...p, [key]: [...(p[key] || []), ...shelf] }));
+        api.setShopClock(c => ({ ...c, stocked: { ...c.stocked, [key]: c.stocked[key] || { morning: c.morning || 0, turn: api.turnsCount } } }));
+    }
+    api.commit();
+}
+// ---- NPCs -----------------------------------------------------------------
+function devPartyFields(npc, hp, stat) {
+    const h = devClamp(hp, 1, 1000, 50);
+    const s = devClamp(stat, 1, 100, 10);
+    return {
+        health: Number.isFinite(npc.health) ? npc.health : h,
+        maxHealth: Number.isFinite(npc.maxHealth) ? npc.maxHealth : h,
+        psyche: Number.isFinite(npc.psyche) ? npc.psyche : 50,
+        maxPsyche: Number.isFinite(npc.maxPsyche) ? npc.maxPsyche : 50,
+        stats: npc.stats && typeof npc.stats === 'object' ? npc.stats : { strength: s, agility: s, intelligence: s, initiative: s },
+        effects: Array.isArray(npc.effects) ? npc.effects : []
+    };
+}
+function devBuildMerchantStock(role, lang, count) {
+    const profile = inferNpcMerchantProfile(role);
+    const spec = profile && TRADE_RESTOCK_ITEM_NAMES[profile.specialization] ? profile.specialization : null;
+    const entries = spec
+        ? [...devPool(spec, lang), ...devPool('consumable', lang)]
+        : ['weapon', 'armor', 'amulet', 'consumable'].flatMap(k => devPool(k, lang));
+    const shuffled = entries.slice().sort(() => Math.random() - 0.5);
+    const seen = new Set();
+    const items = [];
+    const rarities = {};
+    for (const entry of shuffled) {
+        if (items.length >= count)
+            break;
+        const item = normalizeInventoryItem(entry);
+        if (!item)
+            continue;
+        const key = devKey(item.name);
+        if (seen.has(key))
+            continue;
+        seen.add(key);
+        items.push(item);
+        rarities[key] = rollItemRarity();
+    }
+    return { items, rarities };
+}
+// ---- effects / quests / map ------------------------------------------------
+function devBuildEffect(form, lang) {
+    const kind = EFFECT_KINDS.includes(form.kind) ? form.kind : 'other';
+    const label = form.label.trim() || DEV_EFFECT_LABELS[kind][lang === 'en' ? 1 : 0];
+    const severity = kind === 'other' ? null : (EFFECT_SEVERITIES.includes(form.severity) ? form.severity : 'moderate');
+    let turnsLeft = null;
+    const typed = parseInt(form.turns, 10);
+    const defaults = EFFECT_DEFS[kind] && EFFECT_DEFS[kind].defaultDuration;
+    if (Number.isFinite(typed) && typed > 0)
+        turnsLeft = typed;
+    else if (severity && defaults && Number.isFinite(defaults[severity]))
+        turnsLeft = defaults[severity];
+    const effect = { id: makeEffectId(), kind, label, severity, turnsLeft, clientManaged: true };
+    if (form.partKey)
+        effect.partKey = form.partKey;
+    return effect;
+}
+function devBuildQuest(form) {
+    const stages = form.stages.split('\n').map(s => s.trim()).filter(Boolean)
+        .map((title, i) => ({ id: 's' + (i + 1), title, description: '', status: 'active', log: [] }));
+    return {
+        id: devUid('dev_quest'), title: form.title.trim(), giver: form.giver.trim() || 'Dev',
+        reward: form.reward.trim(), description: form.description.trim(), status: 'active',
+        log: [], npcs: form.npcs.split(',').map(s => s.trim()).filter(Boolean), stages
+    };
+}
+function devAddMapNode(mapState, form) {
+    const nodes = mapState.nodes.map(n => ({ ...n, connections: [...n.connections] }));
+    const current = nodes.find(n => n.id === mapState.currentId) || null;
+    const id = slugifyMapId(form.name, new Set(nodes.map(n => n.id)));
+    const layer = current ? (current.layer || 0) : 0;
+    const occupied = new Set(nodes.filter(n => (n.layer || 0) === layer).map(n => n.gx + ',' + n.gy));
+    const cell = current ? findFreeGridCell(current.gx, current.gy, form.direction, occupied) : { gx: 0, gy: 0 };
+    const link = form.connect && current;
+    const node = normalizeMapNode({
+        id, name: form.name.trim(), kind: form.kind, gx: cell.gx, gy: cell.gy, layer,
+        discovered: form.discovered, danger: form.danger, faction: form.faction || null,
+        description: form.description.trim(), connections: link ? [current.id] : []
+    });
+    if (!node)
+        return mapState;
+    if (link && !current.connections.includes(id))
+        current.connections.push(id);
+    nodes.push(node);
+    syncStackPositions(nodes);
+    return { ...mapState, nodes, currentId: mapState.currentId || id };
+}
+function devRemoveMapNode(mapState, nodeId) {
+    if (mapState.currentId === nodeId)
+        return mapState;
+    return {
+        ...mapState,
+        nodes: mapState.nodes.filter(n => n.id !== nodeId).map(n => ({ ...n, connections: n.connections.filter(c => c !== nodeId) })),
+        visitedEdges: mapState.visitedEdges.filter(e => e[0] !== nodeId && e[1] !== nodeId)
+    };
+}
+// ---- combat ----------------------------------------------------------------
+function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
+    const fallbackName = devL(lang, 'Противник', 'Enemy');
+    const enemies = [];
+    let n = 0;
+    for (const row of rows) {
+        const count = devClamp(row.count, 1, MAX_COMBAT_ENEMIES, 1);
+        for (let i = 0; i < count && enemies.length < MAX_COMBAT_ENEMIES; i++) {
+            enemies.push(rollEnemyFromSpec({
+                enemyName: row.name, enemyDescription: row.desc, weaponDescription: row.weapon,
+                tier: row.tier, role: row.role, fearless: row.fearless
+            }, 'dev_enemy_' + (n++), fallbackName, unarmedLabel));
+        }
+    }
+    const reinforcements = [];
+    if (wave && wave.on) {
+        const count = devClamp(wave.count, 1, MAX_REINFORCEMENT_WAVE_COMBATANTS, 1);
+        const combatants = Array.from({ length: count }, () => (wave.side === 'ally'
+            ? { name: wave.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: wave.weapon || '', tier: wave.tier, role: wave.role }
+            : { enemyName: wave.name || fallbackName, enemyDescription: '', weaponDescription: wave.weapon || unarmedLabel, tier: wave.tier, role: wave.role, fearless: false, bodyParts: normalizeEnemyBodyParts(undefined) }));
+        reinforcements.push({
+            id: 'dev_wave_1', label: wave.side === 'ally' ? devL(lang, 'Подмога', 'Backup') : devL(lang, 'Подкрепление', 'Reinforcements'),
+            side: wave.side === 'ally' ? 'ally' : 'enemy',
+            trigger: { type: wave.type, value: Math.max(1, Number(wave.value) || 1) }, combatants
+        });
+    }
+    return { enemies, reinforcements, ambush: !!ambush && enemies.length === 1, objective: null };
+}
+// ============================================================================
+// DevPanel UI
+// ============================================================================
+function DevRow({ children }) { return React.createElement("div", { className: "dev-row" }, children); }
+function DevSection({ title, children }) {
+    return (React.createElement("div", { className: "dev-section" },
+        title && React.createElement("div", { className: "dev-section-title" }, title),
+        children));
+}
+function DevField({ label, grow, children }) {
+    return (React.createElement("label", { className: 'dev-field' + (grow ? ' dev-field-grow' : '') },
+        React.createElement("span", { className: "dev-label" }, label),
+        children));
+}
+function DevText({ value, onChange, placeholder }) {
+    return React.createElement("input", { type: "text", className: "dev-in", value: value, placeholder: placeholder || '', onChange: e => onChange(e.target.value) });
+}
+function DevNum({ value, onChange, min, max }) {
+    return React.createElement("input", { type: "number", inputMode: "numeric", className: "dev-in", value: value, min: min, max: max, onChange: e => onChange(e.target.value) });
+}
+function DevSelect({ value, onChange, options }) {
+    return (React.createElement("select", { className: "dev-in", value: value, onChange: e => onChange(e.target.value) }, options.map(o => React.createElement("option", { key: o[0], value: o[0] }, o[1]))));
+}
+function DevCheck({ checked, onChange, children }) {
+    return (React.createElement("label", { className: "dev-check" },
+        React.createElement("input", { type: "checkbox", checked: !!checked, onChange: e => onChange(e.target.checked) }),
+        " ",
+        children));
+}
+function DevBtn({ onClick, kind, small, disabled, title, children }) {
+    return (React.createElement("button", { type: "button", className: 'dev-btn' + (kind ? ' dev-btn-' + kind : '') + (small ? ' dev-btn-small' : ''), onClick: onClick, disabled: disabled, title: title }, children));
+}
+// -- Hero --------------------------------------------------------------------
+function DevHeroTab({ api }) {
+    const gs = api.gameState;
+    const lang = api.uiLang;
+    const [v, setV] = useState({
+        health: String(gs.health), maxHealth: String(gs.maxHealth), psyche: String(gs.psyche), maxPsyche: String(gs.maxPsyche),
+        strength: String(gs.stats.strength), agility: String(gs.stats.agility), intelligence: String(gs.stats.intelligence), initiative: String(gs.stats.initiative),
+        level: String(gs.level)
+    });
+    const [xp, setXp] = useState('200');
+    const [gold, setGold] = useState('100');
+    const [points, setPoints] = useState('3');
+    const [fx, setFx] = useState({ kind: 'bleed', severity: 'moderate', label: '', turns: '', partKey: '' });
+    const set = (k, val) => setV(p => ({ ...p, [k]: val }));
+    const setF = (k, val) => setFx(p => ({ ...p, [k]: val }));
+    const patch = fn => { api.setGameState(s => fn(s)); api.commit(); };
+    function applyVitals() {
+        patch(s => {
+            const maxHealth = devClamp(v.maxHealth, 1, 1000, s.maxHealth);
+            const maxPsyche = devClamp(v.maxPsyche, 1, 1000, s.maxPsyche);
+            const level = devClamp(v.level, 1, LEVEL_CAP, s.level);
+            const gained = level > s.level ? computeNewlyGainedLevels(s.level, level).length * TALENT_POINTS_PER_LEVEL : 0;
+            return {
+                ...s, maxHealth, maxPsyche,
+                health: Math.min(maxHealth, devClamp(v.health, 1, 1000, s.health)),
+                psyche: Math.min(maxPsyche, devClamp(v.psyche, 1, 1000, s.psyche)),
+                stats: {
+                    ...s.stats,
+                    strength: clampStat(v.strength, s.stats.strength), agility: clampStat(v.agility, s.stats.agility),
+                    intelligence: clampStat(v.intelligence, s.stats.intelligence), initiative: clampStat(v.initiative, s.stats.initiative)
+                },
+                level, xp: level === s.level ? s.xp : 0, talentPoints: (s.talentPoints || 0) + gained
+            };
+        });
+        api.flash('Параметры героя применены');
+    }
+    function fullHeal() { patch(s => ({ ...s, health: s.maxHealth, psyche: s.maxPsyche })); api.flash('Здоровье и психика восстановлены'); }
+    function giveXp(amount) {
+        patch(s => {
+            const res = addXp(s.level, s.xp, amount);
+            const gained = computeNewlyGainedLevels(s.level, res.level).length * TALENT_POINTS_PER_LEVEL;
+            return { ...s, level: res.level, xp: res.xp, talentPoints: (s.talentPoints || 0) + gained };
+        });
+    }
+    function giveGold(sign) {
+        const amount = devClamp(gold, 0, 100000000, 0);
+        patch(s => ({ ...s, currency: clampCurrency(s.currency + sign * amount, s.currency) }));
+    }
+    function setGoldExact() { patch(s => ({ ...s, currency: devClamp(gold, 0, 1000000000, s.currency) })); }
+    function learnAll() {
+        patch(s => {
+            const talents = Object.fromEntries(Object.keys(TALENT_DEFS).map(id => [id, 1]));
+            return { ...s, talents, abilities: deriveAbilitiesFromTalents(talents) };
+        });
+        api.flash('Все таланты изучены');
+    }
+    function resetTalents() { patch(s => ({ ...s, talents: {}, abilities: [] })); api.flash('Таланты сброшены'); }
+    function addEffect() {
+        const effect = devBuildEffect(fx, lang);
+        patch(s => ({ ...s, effects: dedupePartClientEffects([...s.effects, effect]) }));
+    }
+    function removeEffect(id) { patch(s => ({ ...s, effects: s.effects.filter(e => e.id !== id) })); }
+    function clearEffects() { patch(s => ({ ...s, effects: s.effects.filter(e => e.kind === 'captivity' || e.kind === 'death') })); }
+    const captive = gs.effects.some(e => e.kind === 'captivity');
+    const dead = gs.effects.some(e => e.kind === 'death') || gs.health <= 0;
+    const xpInfo = computeXpBarInfo(gs.level, gs.xp);
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: 'Параметры (ур. ' + gs.level + (xpInfo.maxed ? ', макс.' : ', опыт ' + xpInfo.current + '/' + xpInfo.needed) + ')' },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "HP" },
+                    React.createElement(DevNum, { value: v.health, onChange: x => set('health', x) })),
+                React.createElement(DevField, { label: "\u041C\u0430\u043A\u0441. HP" },
+                    React.createElement(DevNum, { value: v.maxHealth, onChange: x => set('maxHealth', x) })),
+                React.createElement(DevField, { label: "\u041F\u0441\u0438\u0445\u0438\u043A\u0430" },
+                    React.createElement(DevNum, { value: v.psyche, onChange: x => set('psyche', x) })),
+                React.createElement(DevField, { label: "\u041C\u0430\u043A\u0441. \u043F\u0441\u0438\u0445\u0438\u043A\u0430" },
+                    React.createElement(DevNum, { value: v.maxPsyche, onChange: x => set('maxPsyche', x) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0421\u0438\u043B\u0430" },
+                    React.createElement(DevNum, { value: v.strength, onChange: x => set('strength', x) })),
+                React.createElement(DevField, { label: "\u041B\u043E\u0432\u043A\u043E\u0441\u0442\u044C" },
+                    React.createElement(DevNum, { value: v.agility, onChange: x => set('agility', x) })),
+                React.createElement(DevField, { label: "\u0418\u043D\u0442\u0435\u043B\u043B\u0435\u043A\u0442" },
+                    React.createElement(DevNum, { value: v.intelligence, onChange: x => set('intelligence', x) })),
+                React.createElement(DevField, { label: "\u0418\u043D\u0438\u0446\u0438\u0430\u0442\u0438\u0432\u0430" },
+                    React.createElement(DevNum, { value: v.initiative, onChange: x => set('initiative', x) })),
+                React.createElement(DevField, { label: "\u0423\u0440\u043E\u0432\u0435\u043D\u044C" },
+                    React.createElement(DevNum, { value: v.level, onChange: x => set('level', x) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { kind: "primary", onClick: applyVitals }, "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C"),
+                React.createElement(DevBtn, { onClick: fullHeal }, "\u2764 \u041F\u043E\u043B\u043D\u043E\u0435 \u043B\u0435\u0447\u0435\u043D\u0438\u0435"))),
+        React.createElement(DevSection, { title: "\u041E\u043F\u044B\u0442, \u0442\u0430\u043B\u0430\u043D\u0442\u044B, \u0434\u0435\u043D\u044C\u0433\u0438" },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041E\u043F\u044B\u0442" },
+                    React.createElement(DevNum, { value: xp, onChange: setXp })),
+                React.createElement(DevBtn, { onClick: () => giveXp(devClamp(xp, 0, 1000000, 0)) }, "\uFF0B \u041E\u043F\u044B\u0442"),
+                React.createElement(DevField, { label: "\u041E\u0447\u043A\u0438 \u0442\u0430\u043B\u0430\u043D\u0442\u043E\u0432" },
+                    React.createElement(DevNum, { value: points, onChange: setPoints })),
+                React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, talentPoints: Math.max(0, (s.talentPoints || 0) + devClamp(points, -1000, 1000, 0)) })) }, "\uFF0B \u041E\u0447\u043A\u0438")),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { onClick: learnAll }, "\uD83D\uDCD6 \u0418\u0437\u0443\u0447\u0438\u0442\u044C \u0432\u0441\u0435 \u0442\u0430\u043B\u0430\u043D\u0442\u044B"),
+                React.createElement(DevBtn, { onClick: resetTalents }, "\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u0442\u0430\u043B\u0430\u043D\u0442\u044B"),
+                React.createElement("span", { className: "dev-hint" },
+                    "\u041E\u0447\u043A\u0438: ",
+                    gs.talentPoints || 0)),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: 'Деньги (сейчас ' + gs.currency + ')' },
+                    React.createElement(DevNum, { value: gold, onChange: setGold })),
+                React.createElement(DevBtn, { onClick: () => giveGold(1) }, "\uFF0B"),
+                React.createElement(DevBtn, { onClick: () => giveGold(-1) }, "\uFF0D"),
+                React.createElement(DevBtn, { onClick: setGoldExact }, "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C"))),
+        React.createElement(DevSection, { title: 'Эффекты (' + gs.effects.length + ')' },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                    React.createElement(DevSelect, { value: fx.kind, onChange: x => setF('kind', x), options: EFFECT_KINDS.map(k => [k, DEV_EFFECT_LABELS[k][0]]) })),
+                React.createElement(DevField, { label: "\u0422\u044F\u0436\u0435\u0441\u0442\u044C" },
+                    React.createElement(DevSelect, { value: fx.severity, onChange: x => setF('severity', x), options: EFFECT_SEVERITIES.map(s => [s, DEV_SEVERITY_LABELS[s]]) })),
+                React.createElement(DevField, { label: "\u0427\u0430\u0441\u0442\u044C \u0442\u0435\u043B\u0430" },
+                    React.createElement(DevSelect, { value: fx.partKey, onChange: x => setF('partKey', x), options: [['', '—']].concat(BODY_PARTS.map(p => [p.key, api.t(p.labelKey)])) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 (\u043F\u0443\u0441\u0442\u043E = \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E)", grow: true },
+                    React.createElement(DevText, { value: fx.label, onChange: x => setF('label', x) })),
+                React.createElement(DevField, { label: "\u0425\u043E\u0434\u043E\u0432 (\u043F\u0443\u0441\u0442\u043E = \u0441\u0442\u0430\u043D\u0434.)" },
+                    React.createElement(DevNum, { value: fx.turns, onChange: x => setF('turns', x) })),
+                React.createElement(DevBtn, { kind: "primary", onClick: addEffect }, "\uFF0B \u042D\u0444\u0444\u0435\u043A\u0442")),
+            gs.effects.map(e => (React.createElement("div", { className: "dev-item", key: e.id },
+                React.createElement("div", { className: "dev-item-main" },
+                    React.createElement("div", { className: "dev-item-name" }, e.label),
+                    React.createElement("div", { className: "dev-item-sub" },
+                        e.kind,
+                        e.severity ? ' · ' + e.severity : '',
+                        e.partKey ? ' · ' + e.partKey : '',
+                        e.turnsLeft ? ' · ходов: ' + e.turnsLeft : '',
+                        e.clientManaged ? ' · client' : '')),
+                React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => removeEffect(e.id) }, "\u2715")))),
+            gs.effects.length > 0 && React.createElement(DevRow, null,
+                React.createElement(DevBtn, { small: true, onClick: clearEffects }, "\u0421\u043D\u044F\u0442\u044C \u0432\u0441\u0435 (\u043A\u0440\u043E\u043C\u0435 \u0441\u043C\u0435\u0440\u0442\u0438/\u043F\u043B\u0435\u043D\u0430)"))),
+        React.createElement(DevSection, { title: "\u0421\u043C\u0435\u0440\u0442\u044C \u0438 \u043F\u043B\u0435\u043D" },
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { kind: "danger", onClick: api.killHero }, "\u2620 \u0423\u0431\u0438\u0442\u044C \u0433\u0435\u0440\u043E\u044F"),
+                React.createElement(DevBtn, { onClick: api.reviveHero, disabled: !dead }, "\u2728 \u0412\u043E\u0441\u043A\u0440\u0435\u0441\u0438\u0442\u044C"),
+                React.createElement(DevBtn, { kind: "danger", onClick: api.captureHero, disabled: captive }, "\u26D3 \u0412 \u043F\u043B\u0435\u043D"),
+                React.createElement(DevBtn, { onClick: api.releaseHero, disabled: !captive }, "\uD83D\uDD13 \u041E\u0441\u0432\u043E\u0431\u043E\u0434\u0438\u0442\u044C")),
+            React.createElement("p", { className: "dev-hint" }, "\u041F\u043B\u0435\u043D \u043F\u0435\u0440\u0435\u043D\u043E\u0441\u0438\u0442 \u0438\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C \u0432 \u00AB\u043A\u043E\u043D\u0444\u0438\u0441\u043A\u043E\u0432\u0430\u043D\u043D\u043E\u0435\u00BB \u2014 \u043A\u0430\u043A \u043F\u043E\u0441\u043B\u0435 \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u0433\u043E \u043F\u043E\u0440\u0430\u0436\u0435\u043D\u0438\u044F. \u041E\u0441\u0432\u043E\u0431\u043E\u0436\u0434\u0435\u043D\u0438\u0435 \u0432\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u0442 \u0435\u0433\u043E \u043E\u0431\u0440\u0430\u0442\u043D\u043E."))));
+}
+// -- Items -------------------------------------------------------------------
+function DevItemsTab({ api }) {
+    const gs = api.gameState;
+    const lang = api.uiLang;
+    const [f, setFState] = useState({ name: '', slot: 'weapon', rarity: 'rare', qty: '1', weight: '', twoHanded: false, shield: false, dur: '', questId: '', target: 'hero', equip: false, price: '' });
+    const [setRarity, setSetRarity] = useState('epic');
+    const set = (k, val) => setFState(p => ({ ...p, [k]: val }));
+    const npcs = (gs.npcs || []).filter(n => n && typeof n.name === 'string');
+    const nameByKey = {};
+    for (const n of npcs)
+        nameByKey[devKey(n.name)] = n.name;
+    const targets = [['hero', 'Герой (инвентарь)']]
+        .concat(api.party.map(k => ['party:' + k, 'Группа: ' + (nameByKey[k] || k)]))
+        .concat(npcs.map(n => ['stock:' + devKey(n.name), 'Товар у: ' + n.name]));
+    const activeQuests = gs.quests.filter(q => q.status === 'active');
+    function addItems() {
+        const name = f.name.trim();
+        if (!name) {
+            api.flash('Укажи название предмета');
+            return;
+        }
+        const proto = devMakeItem({ name, slot: f.slot, twoHanded: f.twoHanded, shield: f.shield, weightCategory: f.weight || undefined, questId: f.questId || null, durabilityPct: f.dur }, f.rarity);
+        if (!proto) {
+            api.flash('Не удалось создать предмет');
+            return;
+        }
+        const items = Array.from({ length: devClamp(f.qty, 1, 20, 1) }, () => ({ ...proto }));
+        devGive(api, f.target, items, { [devKey(name)]: f.rarity }, { autoEquip: f.equip, price: f.price });
+        api.flash('Добавлено: ' + name + (items.length > 1 ? ' ×' + items.length : ''));
+    }
+    function addGearSet() {
+        const set_ = devGearSet(setRarity, lang);
+        devGive(api, f.target, set_.items, set_.rarityByName, { autoEquip: f.equip, price: f.price });
+        api.flash('Набор снаряжения добавлен');
+    }
+    function addConsumables() {
+        const set_ = devConsumableSet(lang);
+        devGive(api, f.target, set_.items, set_.rarityByName, { price: f.price });
+        api.flash('Расходники добавлены');
+    }
+    function removeItem(index) {
+        const item = gs.inventory[index];
+        if (!item)
+            return;
+        const remaining = gs.inventory.filter((_, j) => j !== index);
+        api.setGameState(s => ({ ...s, inventory: s.inventory.filter((_, j) => j !== index) }));
+        if (!remaining.some(it => it.name === item.name)) {
+            api.setEquipment(eq => Object.fromEntries(Object.entries(eq).map(([k, val]) => [k, val === item.name ? null : val])));
+        }
+        api.commit();
+    }
+    function equipItem(index) {
+        const item = gs.inventory[index];
+        if (!item)
+            return;
+        const key = pickEquipSlotForItem(item.slot, api.equipment, gs.inventory);
+        if (!key) {
+            api.flash('Этот предмет нельзя надеть');
+            return;
+        }
+        if (item.slot === 'weapon' && item.twoHanded && (api.equipment.weaponRight || api.equipment.weaponLeft)) {
+            api.flash('Сначала освободи обе руки');
+            return;
+        }
+        if (item.slot === 'weapon' && api.equipment[key]) {
+            api.flash('Слот занят');
+            return;
+        }
+        api.setEquipment(eq => ({ ...eq, [key]: item.name }));
+        api.commit();
+    }
+    function unequipItem(name) {
+        api.setEquipment(eq => Object.fromEntries(Object.entries(eq).map(([k, val]) => [k, val === name ? null : val])));
+        api.commit();
+    }
+    const equippedNames = new Set(Object.values(api.equipment || {}).filter(Boolean));
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043C\u0435\u0442" },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: f.name, onChange: x => set('name', x), placeholder: "\u041D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: \u041A\u043B\u0438\u043D\u043E\u043A \u0420\u0430\u0441\u0441\u0432\u0435\u0442\u0430" })),
+                React.createElement(DevField, { label: "\u041A\u043E\u043B-\u0432\u043E" },
+                    React.createElement(DevNum, { value: f.qty, onChange: x => set('qty', x), min: 1, max: 20 }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                    React.createElement(DevSelect, { value: f.slot, onChange: x => set('slot', x), options: EQUIPMENT_SLOT_TYPES.map(s => [s, DEV_SLOT_LABELS[s] || s]) })),
+                React.createElement(DevField, { label: "\u0420\u0435\u0434\u043A\u043E\u0441\u0442\u044C" },
+                    React.createElement(DevSelect, { value: f.rarity, onChange: x => set('rarity', x), options: RARITY_TIERS.map(r => [r.key, DEV_RARITY_LABELS[r.key] || r.key]) })),
+                React.createElement(DevField, { label: "\u0412\u0435\u0441" },
+                    React.createElement(DevSelect, { value: f.weight, onChange: x => set('weight', x), options: [['', 'авто']].concat(WEIGHT_CATEGORIES.map(w => [w, w])) })),
+                React.createElement(DevField, { label: "\u041F\u0440\u043E\u0447\u043D\u043E\u0441\u0442\u044C, %" },
+                    React.createElement(DevNum, { value: f.dur, onChange: x => set('dur', x), min: 0, max: 100 }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevCheck, { checked: f.twoHanded, onChange: x => set('twoHanded', x) }, "\u0434\u0432\u0443\u0440\u0443\u0447\u043D\u043E\u0435"),
+                React.createElement(DevCheck, { checked: f.shield, onChange: x => set('shield', x) }, "\u0449\u0438\u0442"),
+                React.createElement(DevField, { label: "\u041A\u0432\u0435\u0441\u0442\u043E\u0432\u044B\u0439 \u043F\u0440\u0435\u0434\u043C\u0435\u0442 \u0434\u043B\u044F" },
+                    React.createElement(DevSelect, { value: f.questId, onChange: x => set('questId', x), options: [['', '— нет —']].concat(activeQuests.map(q => [q.id, q.title])) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041A\u043E\u043C\u0443", grow: true },
+                    React.createElement(DevSelect, { value: f.target, onChange: x => set('target', x), options: targets })),
+                f.target.startsWith('stock:') && React.createElement(DevField, { label: "\u0426\u0435\u043D\u0430 (0 = \u0430\u0432\u0442\u043E)" },
+                    React.createElement(DevNum, { value: f.price, onChange: x => set('price', x), min: 0 })),
+                f.target === 'hero' && React.createElement(DevCheck, { checked: f.equip, onChange: x => set('equip', x) }, "\u0441\u0440\u0430\u0437\u0443 \u043D\u0430\u0434\u0435\u0442\u044C")),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { kind: "primary", onClick: addItems }, "\uFF0B \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C"))),
+        React.createElement(DevSection, { title: "\u0411\u044B\u0441\u0442\u0440\u044B\u0435 \u043D\u0430\u0431\u043E\u0440\u044B (\u043F\u043E\u043B\u0443\u0447\u0430\u0442\u0435\u043B\u044C \u2014 \u0438\u0437 \u043F\u043E\u043B\u044F \u00AB\u041A\u043E\u043C\u0443\u00BB)" },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0420\u0435\u0434\u043A\u043E\u0441\u0442\u044C \u043D\u0430\u0431\u043E\u0440\u0430" },
+                    React.createElement(DevSelect, { value: setRarity, onChange: setSetRarity, options: RARITY_TIERS.map(r => [r.key, DEV_RARITY_LABELS[r.key] || r.key]) })),
+                React.createElement(DevBtn, { onClick: addGearSet }, "\uD83D\uDEE1 \u041D\u0430\u0431\u043E\u0440 \u0441\u043D\u0430\u0440\u044F\u0436\u0435\u043D\u0438\u044F"),
+                React.createElement(DevBtn, { onClick: addConsumables }, "\uD83E\uDDEA \u0417\u0435\u043B\u044C\u044F \u0438 \u0440\u0435\u043C\u043A\u043E\u043C\u043F\u043B\u0435\u043A\u0442")),
+            React.createElement("p", { className: "dev-hint" }, "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u0432 \u043D\u0430\u0431\u043E\u0440\u0435 \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u0442 \u043C\u0435\u0442\u043A\u0443 \u0440\u0435\u0434\u043A\u043E\u0441\u0442\u0438 \u0432 \u0441\u043A\u043E\u0431\u043A\u0430\u0445 \u2014 \u0440\u0435\u0434\u043A\u043E\u0441\u0442\u044C \u0432 \u0438\u0433\u0440\u0435 \u043F\u0440\u0438\u0432\u044F\u0437\u0430\u043D\u0430 \u043A \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u0430.")),
+        React.createElement(DevSection, { title: 'Инвентарь героя (' + gs.inventory.length + ')' },
+            gs.inventory.length === 0 && React.createElement("p", { className: "dev-hint" }, "\u041F\u0443\u0441\u0442\u043E."),
+            gs.inventory.map((it, i) => (React.createElement("div", { className: "dev-item", key: i + '_' + it.name },
+                React.createElement("div", { className: "dev-item-main" },
+                    React.createElement("div", { className: "dev-item-name" },
+                        it.name,
+                        equippedNames.has(it.name) ? ' 🎽' : ''),
+                    React.createElement("div", { className: "dev-item-sub" },
+                        DEV_SLOT_LABELS[it.slot] || it.slot,
+                        " \u00B7 ",
+                        DEV_RARITY_LABELS[findItemRarity(it.name, api.itemRarities)] || '—',
+                        it.twoHanded ? ' · двуручное' : '',
+                        it.shield ? ' · щит' : '',
+                        Number.isFinite(it.durability) ? ' · прочн. ' + it.durability : '',
+                        it.questId ? ' · квест' : '')),
+                React.createElement("div", { className: "dev-actions" },
+                    equippedNames.has(it.name)
+                        ? React.createElement(DevBtn, { small: true, onClick: () => unequipItem(it.name) }, "\u0441\u043D\u044F\u0442\u044C")
+                        : React.createElement(DevBtn, { small: true, onClick: () => equipItem(i) }, "\u043D\u0430\u0434\u0435\u0442\u044C"),
+                    React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => removeItem(i) }, "\u2715"))))),
+            gs.confiscatedInventory.length > 0 && React.createElement("p", { className: "dev-hint" },
+                "\u041A\u043E\u043D\u0444\u0438\u0441\u043A\u043E\u0432\u0430\u043D\u043E (\u043F\u043B\u0435\u043D): ",
+                gs.confiscatedInventory.length,
+                " \u0448\u0442."))));
+}
+// -- NPCs --------------------------------------------------------------------
+function DevNpcTab({ api }) {
+    const gs = api.gameState;
+    const lang = api.uiLang;
+    const currentNode = (gs.map.nodes || []).find(n => n.id === gs.map.currentId) || null;
+    const [f, setFState] = useState({ name: '', role: '', faction: '', note: '', rep: '10', present: true, party: false, merchant: false, purse: '300', stock: '6', hp: '50', stat: '10' });
+    const set = (k, val) => setFState(p => ({ ...p, [k]: val }));
+    const profile = f.role.trim() ? inferNpcMerchantProfile(f.role) : null;
+    const npcs = (gs.npcs || []).filter(n => n && typeof n.name === 'string');
+    function spawn() {
+        const name = f.name.trim();
+        if (!name) {
+            api.flash('Укажи имя NPC');
+            return;
+        }
+        const key = devKey(name);
+        if (f.party && !api.party.includes(key) && api.party.length >= MAX_PARTY_SIZE) {
+            api.flash('Группа полна (' + MAX_PARTY_SIZE + ')');
+            return;
+        }
+        const base = {
+            name, role: f.role.trim(), faction: f.faction.trim(), note: f.note.trim(),
+            location: currentNode ? currentNode.name : '', presentNow: f.present, dead: false
+        };
+        api.setGameState(s => {
+            const existing = s.npcs.find(n => n && devKey(n.name) === key);
+            const merged = { ...(existing || {}), ...base };
+            const npc = f.party ? { ...merged, ...devPartyFields(merged, f.hp, f.stat) } : merged;
+            return { ...s, npcs: existing ? s.npcs.map(n => (n === existing ? npc : n)) : [...s.npcs, npc] };
+        });
+        const rep = devClamp(f.rep, -100, 100, DEFAULT_REPUTATION);
+        api.setNpcReputations(r => ({ ...r, [key]: f.party ? Math.max(rep, PARTY_REPUTATION_THRESHOLD) : rep }));
+        if (f.party)
+            api.setParty(p => (p.includes(key) ? p : [...p, key]));
+        if (f.merchant) {
+            const stock = devBuildMerchantStock(f.role, lang, devClamp(f.stock, 0, 30, 6));
+            api.setNpcInventories(inv => ({ ...inv, [key]: stock.items }));
+            api.setItemRarities(r => ({ ...stock.rarities, ...r }));
+            api.setNpcCurrencies(c => ({ ...c, [key]: devClamp(f.purse, 0, 1000000000, 300) }));
+            api.setShopClock(c => ({ ...c, stocked: { ...c.stocked, [key]: { morning: c.morning || 0, turn: api.turnsCount } } }));
+        }
+        api.commit();
+        api.flash('NPC создан: ' + name);
+    }
+    function patchNpc(name, fn) {
+        const key = devKey(name);
+        api.setGameState(s => ({ ...s, npcs: s.npcs.map(n => (n && devKey(n.name) === key ? fn(n) : n)) }));
+        api.commit();
+    }
+    function bumpRep(name, delta) {
+        const key = devKey(name);
+        api.setNpcReputations(r => ({ ...r, [key]: clampReputationValue((Number.isFinite(r[key]) ? r[key] : DEFAULT_REPUTATION) + delta, DEFAULT_REPUTATION) }));
+        api.commit();
+    }
+    function toggleParty(npc) {
+        const key = devKey(npc.name);
+        if (api.party.includes(key)) {
+            api.setParty(p => p.filter(k => k !== key));
+        }
+        else {
+            if (api.party.length >= MAX_PARTY_SIZE) {
+                api.flash('Группа полна (' + MAX_PARTY_SIZE + ')');
+                return;
+            }
+            patchNpc(npc.name, n => ({ ...n, ...devPartyFields(n, '50', '10'), dead: false, presentNow: true, location: currentNode ? currentNode.name : n.location }));
+            api.setNpcReputations(r => ({ ...r, [key]: Math.max(Number.isFinite(r[key]) ? r[key] : DEFAULT_REPUTATION, PARTY_REPUTATION_THRESHOLD) }));
+            api.setParty(p => [...p, key]);
+        }
+        api.commit();
+    }
+    function removeNpc(npc) {
+        const key = devKey(npc.name);
+        api.setGameState(s => ({ ...s, npcs: s.npcs.filter(n => !(n && devKey(n.name) === key)) }));
+        api.setParty(p => p.filter(k => k !== key));
+        api.setNpcReputations(r => { const c = { ...r }; delete c[key]; return c; });
+        api.setNpcInventories(r => { const c = { ...r }; delete c[key]; return c; });
+        api.setNpcCurrencies(r => { const c = { ...r }; delete c[key]; return c; });
+        api.commit();
+    }
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C / \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C NPC" },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0418\u043C\u044F", grow: true },
+                    React.createElement(DevText, { value: f.name, onChange: x => set('name', x), placeholder: "\u041D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: \u041C\u0430\u0440\u0442\u0430" })),
+                React.createElement(DevField, { label: "\u0420\u043E\u043B\u044C", grow: true },
+                    React.createElement(DevText, { value: f.role, onChange: x => set('role', x), placeholder: "\u041A\u0443\u0437\u043D\u0435\u0446, \u0421\u0442\u0440\u0430\u0436\u043D\u0438\u043A\u2026" }))),
+            React.createElement(DevRow, null, DEV_NPC_ROLE_PRESETS.map(r => React.createElement("button", { key: r, type: "button", className: "dev-chip", onClick: () => set('role', r) }, r))),
+            React.createElement("p", { className: "dev-hint" }, f.role.trim() ? (profile ? 'Роль распознана как торговая: ' + profile.specialization : 'Роль не торговая — без автоматической специализации товаров') : 'Роль определяет специализацию торговца'),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0424\u0440\u0430\u043A\u0446\u0438\u044F" },
+                    React.createElement(DevSelect, { value: f.faction, onChange: x => set('faction', x), options: [['', '— нет —']].concat((gs.factions || []).map(fc => [fc.name, fc.name])) })),
+                React.createElement(DevField, { label: "\u0420\u0435\u043F\u0443\u0442\u0430\u0446\u0438\u044F (\u2212100\u2026100)" },
+                    React.createElement(DevNum, { value: f.rep, onChange: x => set('rep', x), min: -100, max: 100 }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0417\u0430\u043C\u0435\u0442\u043A\u0430", grow: true },
+                    React.createElement(DevText, { value: f.note, onChange: x => set('note', x) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevCheck, { checked: f.present, onChange: x => set('present', x) }, "\u0440\u044F\u0434\u043E\u043C \u0441 \u0433\u0435\u0440\u043E\u0435\u043C"),
+                React.createElement(DevCheck, { checked: f.party, onChange: x => set('party', x) }, "\u0432 \u0433\u0440\u0443\u043F\u043F\u0443"),
+                React.createElement(DevCheck, { checked: f.merchant, onChange: x => set('merchant', x) }, "\u0441 \u0442\u043E\u0432\u0430\u0440\u0430\u043C\u0438")),
+            f.party && (React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "HP \u0441\u043F\u0443\u0442\u043D\u0438\u043A\u0430" },
+                    React.createElement(DevNum, { value: f.hp, onChange: x => set('hp', x) })),
+                React.createElement(DevField, { label: "\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u044B" },
+                    React.createElement(DevNum, { value: f.stat, onChange: x => set('stat', x) })))),
+            f.merchant && (React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041A\u043E\u0448\u0435\u043B\u0451\u043A" },
+                    React.createElement(DevNum, { value: f.purse, onChange: x => set('purse', x) })),
+                React.createElement(DevField, { label: "\u0422\u043E\u0432\u0430\u0440\u043E\u0432 (\u0434\u043E \u0440\u0430\u0437\u043C\u0435\u0440\u0430 \u043F\u0443\u043B\u0430)" },
+                    React.createElement(DevNum, { value: f.stock, onChange: x => set('stock', x) })))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { kind: "primary", onClick: spawn }, "\uFF0B \u0421\u043E\u0437\u0434\u0430\u0442\u044C"))),
+        React.createElement(DevSection, { title: 'Персонажи (' + npcs.length + ')' },
+            npcs.length === 0 && React.createElement("p", { className: "dev-hint" }, "\u041F\u043E\u043A\u0430 \u043D\u0438\u043A\u043E\u0433\u043E."),
+            npcs.map(npc => {
+                const key = devKey(npc.name);
+                const inParty = api.party.includes(key);
+                const rep = Number.isFinite(api.npcReputations[key]) ? api.npcReputations[key] : DEFAULT_REPUTATION;
+                const stockCount = (api.npcInventories[key] || []).length;
+                return (React.createElement("div", { className: "dev-item dev-item-wrap", key: key },
+                    React.createElement("div", { className: "dev-item-main" },
+                        React.createElement("div", { className: "dev-item-name" },
+                            npc.name,
+                            inParty ? ' 👥' : '',
+                            npc.dead ? ' 💀' : '',
+                            npc.presentNow === false ? ' (не здесь)' : ''),
+                        React.createElement("div", { className: "dev-item-sub" },
+                            npc.role || 'без роли',
+                            npc.faction ? ' · ' + npc.faction : '',
+                            " \u00B7 \u0440\u0435\u043F. ",
+                            rep,
+                            stockCount ? ' · товаров: ' + stockCount : '',
+                            Number.isFinite(npc.health) ? ' · HP ' + npc.health + '/' + npc.maxHealth : '')),
+                    React.createElement("div", { className: "dev-actions" },
+                        React.createElement(DevBtn, { small: true, onClick: () => api.openTrade(npc.name), title: "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0442\u043E\u0440\u0433\u043E\u0432\u043B\u044E" }, "\uD83D\uDED2"),
+                        React.createElement(DevBtn, { small: true, onClick: () => toggleParty(npc) }, inParty ? '➖ группа' : '➕ группа'),
+                        React.createElement(DevBtn, { small: true, onClick: () => bumpRep(npc.name, -20) }, "\u0440\u0435\u043F \u221220"),
+                        React.createElement(DevBtn, { small: true, onClick: () => bumpRep(npc.name, 20) }, "\u0440\u0435\u043F +20"),
+                        React.createElement(DevBtn, { small: true, onClick: () => patchNpc(npc.name, n => ({ ...n, dead: !n.dead })) }, npc.dead ? 'оживить' : '💀'),
+                        React.createElement(DevBtn, { small: true, onClick: () => patchNpc(npc.name, n => ({ ...n, presentNow: true, location: currentNode ? currentNode.name : n.location })) }, "\uD83D\uDCCD \u043A\u043E \u043C\u043D\u0435"),
+                        Number.isFinite(npc.maxHealth) && React.createElement(DevBtn, { small: true, onClick: () => patchNpc(npc.name, n => ({ ...n, health: n.maxHealth, psyche: n.maxPsyche })) }, "\u2764"),
+                        React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => removeNpc(npc) }, "\u2715"))));
+            }))));
+}
+// -- Quests ------------------------------------------------------------------
+function DevQuestsTab({ api }) {
+    const gs = api.gameState;
+    const [f, setFState] = useState({ title: '', giver: '', reward: '', description: '', stages: '', npcs: '' });
+    const [newStage, setNewStage] = useState({});
+    const set = (k, val) => setFState(p => ({ ...p, [k]: val }));
+    const patchQuests = fn => { api.setGameState(s => ({ ...s, quests: fn(s.quests) })); api.commit(); };
+    function create() {
+        if (!f.title.trim()) {
+            api.flash('Укажи название квеста');
+            return;
+        }
+        const quest = devBuildQuest(f);
+        patchQuests(qs => [...qs, quest]);
+        api.flash('Квест создан: ' + quest.title);
+    }
+    const setStatus = (id, status) => patchQuests(qs => qs.map(q => (q.id === id ? { ...q, status } : q)));
+    const removeQuest = id => patchQuests(qs => qs.filter(q => q.id !== id));
+    const cycleStage = (qid, sid) => patchQuests(qs => qs.map(q => (q.id !== qid ? q : {
+        ...q, stages: q.stages.map(st => (st.id !== sid ? st : { ...st, status: QUEST_STAGE_STATUSES[(QUEST_STAGE_STATUSES.indexOf(st.status) + 1) % QUEST_STAGE_STATUSES.length] }))
+    })));
+    function addStage(qid) {
+        const title = (newStage[qid] || '').trim();
+        if (!title)
+            return;
+        patchQuests(qs => qs.map(q => (q.id !== qid ? q : { ...q, stages: [...q.stages, { id: devUid('s'), title, description: '', status: 'active', log: [] }] })));
+        setNewStage(p => ({ ...p, [qid]: '' }));
+    }
+    const STATUS_ICON = { active: '▶', completed: '✔', failed: '✖', moot: '∅' };
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u0432\u0435\u0441\u0442" },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: f.title, onChange: x => set('title', x) })),
+                React.createElement(DevField, { label: "\u0417\u0430\u043A\u0430\u0437\u0447\u0438\u043A", grow: true },
+                    React.createElement(DevSelect, { value: f.giver, onChange: x => set('giver', x), options: [['', '— Dev —']].concat((gs.npcs || []).filter(n => n && n.name).map(n => [n.name, n.name])) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0433\u0440\u0430\u0434\u0430 (\u0442\u0435\u043A\u0441\u0442)", grow: true },
+                    React.createElement(DevText, { value: f.reward, onChange: x => set('reward', x) })),
+                React.createElement(DevField, { label: "\u0421\u0432\u044F\u0437\u0430\u043D\u043D\u044B\u0435 NPC (\u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E)", grow: true },
+                    React.createElement(DevText, { value: f.npcs, onChange: x => set('npcs', x) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: f.description, onChange: x => set('description', x) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0421\u0442\u0430\u0434\u0438\u0438 (\u043F\u043E \u043E\u0434\u043D\u043E\u0439 \u043D\u0430 \u0441\u0442\u0440\u043E\u043A\u0443)", grow: true },
+                    React.createElement("textarea", { className: "dev-in", rows: 3, value: f.stages, onChange: e => set('stages', e.target.value) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { kind: "primary", onClick: create }, "\uFF0B \u0421\u043E\u0437\u0434\u0430\u0442\u044C"))),
+        React.createElement(DevSection, { title: 'Квесты (' + gs.quests.length + ')' },
+            gs.quests.length === 0 && React.createElement("p", { className: "dev-hint" }, "\u041F\u043E\u043A\u0430 \u043D\u0435\u0442."),
+            gs.quests.map(q => (React.createElement("div", { className: "dev-quest", key: q.id },
+                React.createElement("div", { className: "dev-item" },
+                    React.createElement("div", { className: "dev-item-main" },
+                        React.createElement("div", { className: "dev-item-name" },
+                            STATUS_ICON[q.status] || '',
+                            " ",
+                            q.title),
+                        React.createElement("div", { className: "dev-item-sub" },
+                            q.giver,
+                            " \u00B7 ",
+                            q.status,
+                            q.reward ? ' · ' + q.reward : '')),
+                    React.createElement("div", { className: "dev-actions" },
+                        React.createElement(DevBtn, { small: true, onClick: () => setStatus(q.id, 'completed'), disabled: q.status === 'completed' }, "\u2714"),
+                        React.createElement(DevBtn, { small: true, onClick: () => setStatus(q.id, 'failed'), disabled: q.status === 'failed' }, "\u2716"),
+                        React.createElement(DevBtn, { small: true, onClick: () => setStatus(q.id, 'active'), disabled: q.status === 'active' }, "\u21BA"),
+                        React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => removeQuest(q.id) }, "\uD83D\uDDD1"))),
+                q.stages.map(st => (React.createElement("div", { className: "dev-stage", key: st.id },
+                    React.createElement("button", { type: "button", className: "dev-chip", onClick: () => cycleStage(q.id, st.id), title: "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0441\u0442\u0430\u0442\u0443\u0441 \u0441\u0442\u0430\u0434\u0438\u0438" }, STATUS_ICON[st.status] || st.status),
+                    React.createElement("span", null, st.title)))),
+                React.createElement("div", { className: "dev-row" },
+                    React.createElement(DevField, { label: "\u041D\u043E\u0432\u0430\u044F \u0441\u0442\u0430\u0434\u0438\u044F", grow: true },
+                        React.createElement(DevText, { value: newStage[q.id] || '', onChange: x => setNewStage(p => ({ ...p, [q.id]: x })) })),
+                    React.createElement(DevBtn, { small: true, onClick: () => addStage(q.id) }, "\uFF0B"))))))));
+}
+// -- World (time, map, factions) ---------------------------------------------
+function DevWorldTab({ api }) {
+    const gs = api.gameState;
+    const map = gs.map;
+    const [time, setTime] = useState(gs.time || '');
+    const [node, setNode] = useState({ name: '', kind: 'settlement', direction: 'E', connect: true, discovered: true, danger: false, faction: '', description: '' });
+    const [faction, setFaction] = useState({ name: '', note: '' });
+    const setN = (k, val) => setNode(p => ({ ...p, [k]: val }));
+    const patchState = fn => { api.setGameState(s => fn(s)); api.commit(); };
+    function applyTime(text, phase) {
+        patchState(s => ({ ...s, time: text, dayPhase: phase || inferDayPhaseFromTime(text) || s.dayPhase }));
+        setTime(text);
+    }
+    function newMorning() {
+        api.setShopClock(c => ({ ...c, morning: (c.morning || 0) + 1, dawnTurn: api.turnsCount }));
+        api.commit();
+        api.flash('Наступило новое утро — торговцы обновят товары');
+    }
+    function addNode() {
+        if (!node.name.trim()) {
+            api.flash('Укажи название локации');
+            return;
+        }
+        patchState(s => ({ ...s, map: devAddMapNode(s.map, node) }));
+        setNode(p => ({ ...p, name: '', description: '' }));
+        api.flash('Локация добавлена');
+    }
+    const patchNode = (id, fn) => patchState(s => ({ ...s, map: { ...s.map, nodes: s.map.nodes.map(n => (n.id === id ? fn(n) : n)) } }));
+    const teleport = id => patchState(s => ({ ...s, map: { ...s.map, nodes: s.map.nodes.map(n => (n.id === id ? { ...n, discovered: true } : n)), currentId: id } }));
+    function addFaction() {
+        const name = faction.name.trim();
+        if (!name) {
+            api.flash('Укажи название фракции');
+            return;
+        }
+        patchState(s => (s.factions.some(fc => devKey(fc.name) === devKey(name)) ? s : { ...s, factions: [...s.factions, { name, note: faction.note.trim(), relations: [] }] }));
+        setFaction({ name: '', note: '' });
+    }
+    function bumpFaction(name, delta) {
+        const key = devKey(name);
+        api.setFactionReputations(r => ({ ...r, [key]: clampFactionReputation((Number.isFinite(r[key]) ? r[key] : FACTION_DEFAULT_REPUTATION) + delta) }));
+        api.commit();
+    }
+    const current = map.nodes.find(n => n.id === map.currentId) || null;
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: 'Время: ' + (gs.time || '—') + ' · ' + (gs.dayPhase === 'night' ? 'ночь' : 'день') },
+            React.createElement(DevRow, null, DEV_TIME_PRESETS.map(p => React.createElement("button", { key: p.label, type: "button", className: "dev-chip", onClick: () => applyTime(p.time, p.phase) }, p.label))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0422\u0435\u043A\u0441\u0442 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 (\u0444\u0430\u0437\u0430 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u044F\u0435\u0442\u0441\u044F \u043F\u043E \u043D\u0435\u043C\u0443)", grow: true },
+                    React.createElement(DevText, { value: time, onChange: setTime })),
+                React.createElement(DevBtn, { onClick: () => applyTime(time) }, "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C")),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { onClick: newMorning }, "\uD83C\uDF05 \u041D\u043E\u0432\u043E\u0435 \u0443\u0442\u0440\u043E (\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0442\u043E\u0432\u0430\u0440\u044B)"))),
+        React.createElement(DevSection, { title: 'Карта (' + map.nodes.length + ') · сейчас: ' + (current ? current.name : '—') },
+            map.nodes.map(n => (React.createElement("div", { className: "dev-item", key: n.id },
+                React.createElement("div", { className: "dev-item-main" },
+                    React.createElement("div", { className: "dev-item-name" },
+                        n.id === map.currentId ? '📍 ' : '',
+                        n.name,
+                        n.danger ? ' ⚠' : ''),
+                    React.createElement("div", { className: "dev-item-sub" },
+                        DEV_KIND_LABELS[n.kind] || n.kind,
+                        n.discovered ? '' : ' · скрыта',
+                        n.faction ? ' · ' + n.faction : '')),
+                React.createElement("div", { className: "dev-actions" },
+                    React.createElement(DevBtn, { small: true, onClick: () => teleport(n.id), disabled: n.id === map.currentId }, "\u27A1"),
+                    React.createElement(DevBtn, { small: true, onClick: () => patchNode(n.id, x => ({ ...x, discovered: !x.discovered })) }, n.discovered ? '🙈' : '👁'),
+                    React.createElement(DevBtn, { small: true, onClick: () => patchNode(n.id, x => ({ ...x, danger: !x.danger })) }, "\u26A0"),
+                    React.createElement(DevBtn, { small: true, kind: "danger", disabled: n.id === map.currentId, onClick: () => patchState(s => ({ ...s, map: devRemoveMapNode(s.map, n.id) })) }, "\u2715"))))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { small: true, onClick: () => patchState(s => ({ ...s, map: { ...s.map, nodes: s.map.nodes.map(n => ({ ...n, discovered: true })) } })) }, "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0432\u0441\u0435 \u043B\u043E\u043A\u0430\u0446\u0438\u0438")),
+            React.createElement("div", { className: "dev-section-title dev-subtitle" }, "\u041D\u043E\u0432\u0430\u044F \u043B\u043E\u043A\u0430\u0446\u0438\u044F"),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: node.name, onChange: x => setN('name', x) })),
+                React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                    React.createElement(DevSelect, { value: node.kind, onChange: x => setN('kind', x), options: MAP_NODE_KINDS.map(k => [k, DEV_KIND_LABELS[k] || k]) })),
+                React.createElement(DevField, { label: "\u041D\u0430\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435" },
+                    React.createElement(DevSelect, { value: node.direction, onChange: x => setN('direction', x), options: MAP_DIRECTIONS.map(d => [d, d]) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0424\u0440\u0430\u043A\u0446\u0438\u044F" },
+                    React.createElement(DevSelect, { value: node.faction, onChange: x => setN('faction', x), options: [['', '— нет —']].concat(gs.factions.map(fc => [fc.name, fc.name])) })),
+                React.createElement(DevField, { label: "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: node.description, onChange: x => setN('description', x) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevCheck, { checked: node.connect, onChange: x => setN('connect', x) }, "\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u044C \u0441 \u0442\u0435\u043A\u0443\u0449\u0435\u0439"),
+                React.createElement(DevCheck, { checked: node.discovered, onChange: x => setN('discovered', x) }, "\u043E\u0442\u043A\u0440\u044B\u0442\u0430"),
+                React.createElement(DevCheck, { checked: node.danger, onChange: x => setN('danger', x) }, "\u043E\u043F\u0430\u0441\u043D\u0430"),
+                React.createElement(DevBtn, { kind: "primary", onClick: addNode }, "\uFF0B \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C"))),
+        React.createElement(DevSection, { title: 'Фракции (' + gs.factions.length + ')' },
+            gs.factions.map(fc => {
+                const key = devKey(fc.name);
+                const rep = Number.isFinite(api.factionReputations[key]) ? api.factionReputations[key] : FACTION_DEFAULT_REPUTATION;
+                return (React.createElement("div", { className: "dev-item", key: key },
+                    React.createElement("div", { className: "dev-item-main" },
+                        React.createElement("div", { className: "dev-item-name" }, fc.name),
+                        React.createElement("div", { className: "dev-item-sub" },
+                            "\u0440\u0435\u043F\u0443\u0442\u0430\u0446\u0438\u044F ",
+                            rep,
+                            isFactionHostile(rep) ? ' · враждебна' : '')),
+                    React.createElement("div", { className: "dev-actions" },
+                        React.createElement(DevBtn, { small: true, onClick: () => bumpFaction(fc.name, -20) }, "\u221220"),
+                        React.createElement(DevBtn, { small: true, onClick: () => bumpFaction(fc.name, 20) }, "+20"))));
+            }),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u043E\u0432\u0430\u044F \u0444\u0440\u0430\u043A\u0446\u0438\u044F", grow: true },
+                    React.createElement(DevText, { value: faction.name, onChange: x => setFaction(p => ({ ...p, name: x })) })),
+                React.createElement(DevField, { label: "\u0417\u0430\u043C\u0435\u0442\u043A\u0430", grow: true },
+                    React.createElement(DevText, { value: faction.note, onChange: x => setFaction(p => ({ ...p, note: x })) })),
+                React.createElement(DevBtn, { onClick: addFaction }, "\uFF0B")))));
+}
+// -- Combat & scenes ---------------------------------------------------------
+function DevCombatTab({ api }) {
+    const gs = api.gameState;
+    const lang = api.uiLang;
+    const newRow = () => ({ name: devL(lang, 'Бандит', 'Bandit'), tier: 'average', role: 'melee', weapon: devL(lang, 'Ржавый меч', 'Rusty sword'), desc: '', count: '1', fearless: false });
+    const [rows, setRows] = useState([newRow()]);
+    const [ambush, setAmbush] = useState(false);
+    const [wave, setWave] = useState({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', weapon: '', count: '2' });
+    const [sceneText, setSceneText] = useState('');
+    const [io, setIo] = useState({ name: '', slot: 'weapon', rarity: 'rare', cost: '', twoHanded: false, shield: false, mode: 'multi' });
+    const [qo, setQo] = useState({ title: '', giver: '', reward: '', description: '', negotiable: true });
+    const [to, setTo] = useState({ label: '', kind: 'landmark' });
+    const [ro, setRo] = useState({ questId: '', reward: '' });
+    const setRow = (i, k, val) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+    const setW = (k, val) => setWave(p => ({ ...p, [k]: val }));
+    const totalEnemies = rows.reduce((sum, r) => sum + devClamp(r.count, 1, MAX_COMBAT_ENEMIES, 1), 0);
+    const activeQuests = gs.quests.filter(q => q.status === 'active');
+    const PRESETS = [
+        { label: '3 слабых бандита', rows: [{ name: 'Бандит', tier: 'weak', role: 'melee', weapon: 'Дубина', count: '3' }] },
+        { label: 'Отряд: воин + лучник + маг', rows: [{ name: 'Наёмник', tier: 'average', role: 'melee', weapon: 'Меч', count: '1' }, { name: 'Стрелок', tier: 'average', role: 'ranged', weapon: 'Лук', count: '1' }, { name: 'Чародей', tier: 'average', role: 'caster', weapon: 'Посох', count: '1' }] },
+        { label: 'Босс (исключит. танк)', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
+        { label: 'Легенда', rows: [{ name: 'Древний дракон', tier: 'legendary', role: 'melee', weapon: 'Когти и пламя', count: '1' }] }
+    ];
+    function loadPreset(p) {
+        setRows(p.rows.map(r => ({ desc: '', fearless: false, ...r })));
+        setAmbush(false);
+    }
+    function encounter() {
+        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'));
+    }
+    function post(fightNow) {
+        const enc = encounter();
+        if (enc.enemies.length === 0) {
+            api.flash('Добавь хотя бы одного врага');
+            return;
+        }
+        const names = enc.enemies.map(e => e.enemyName).join(', ');
+        const index = api.postScene(devL(lang, '⚔ [DEV] Появляются противники: ' + names + '.', '⚔ [DEV] Enemies appear: ' + names + '.'), { combatEncounter: enc });
+        if (fightNow)
+            api.startFight(index);
+        else
+            api.flash('Сцена боя создана — жми «В бой»');
+    }
+    function postScene() {
+        if (!sceneText.trim()) {
+            api.flash('Впиши текст сцены');
+            return;
+        }
+        api.postScene(sceneText.trim(), {});
+        setSceneText('');
+        api.flash('Сцена добавлена');
+    }
+    function postItemOffer() {
+        const name = io.name.trim();
+        if (!name) {
+            api.flash('Укажи название предмета');
+            return;
+        }
+        const cost = devClamp(io.cost, 0, 100000000, 0);
+        const item = { id: devUid('offer'), label: name, slot: io.slot, twoHanded: io.slot === 'weapon' && io.twoHanded, shield: io.slot === 'weapon' && io.shield, weightCategory: undefined, rarity: io.rarity };
+        if (cost > 0)
+            item.cost = cost;
+        api.postScene(devL(lang, '🎁 [DEV] Предложение предмета: «' + name + '».', '🎁 [DEV] Item offer: "' + name + '".'), { itemOffers: [{ groupId: devUid('dev-group'), selectionMode: io.mode, items: [item] }] });
+    }
+    function postQuestOffer() {
+        if (!qo.title.trim()) {
+            api.flash('Укажи название квеста');
+            return;
+        }
+        const giver = qo.giver.trim() || 'Dev';
+        api.postScene(devL(lang, '📜 [DEV] Предложение квеста: «' + qo.title.trim() + '».', '📜 [DEV] Quest offer: "' + qo.title.trim() + '".'), {
+            questOffers: [{ id: devUid('quest'), title: qo.title.trim(), giver, reward: qo.reward.trim(), advance: null, description: qo.description.trim(), rewardNegotiable: qo.negotiable }]
+        });
+    }
+    function postTravelOffer() {
+        if (!to.label.trim()) {
+            api.flash('Укажи название места');
+            return;
+        }
+        api.postScene(devL(lang, '🧭 [DEV] Предложение пути: «' + to.label.trim() + '».', '🧭 [DEV] Travel offer: "' + to.label.trim() + '".'), { travelOffer: { id: devUid('travel'), label: to.label.trim(), kind: to.kind } });
+    }
+    function postRewardOffer() {
+        const quest = activeQuests.find(q => q.id === ro.questId);
+        if (!quest) {
+            api.flash('Выбери активный квест');
+            return;
+        }
+        api.postScene(devL(lang, '🏆 [DEV] Награда за квест «' + quest.title + '».', '🏆 [DEV] Reward for quest "' + quest.title + '".'), {
+            rewardOffers: [{ id: devUid('reward'), questId: quest.id, giver: quest.giver, reward: ro.reward.trim() || quest.reward }]
+        });
+    }
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: 'Бой (врагов: ' + totalEnemies + ' из ' + MAX_COMBAT_ENEMIES + ')' },
+            React.createElement(DevRow, null, PRESETS.map(p => React.createElement("button", { key: p.label, type: "button", className: "dev-chip", onClick: () => loadPreset(p) }, p.label))),
+            rows.map((r, i) => (React.createElement("div", { className: "dev-enemy", key: i },
+                React.createElement(DevRow, null,
+                    React.createElement(DevField, { label: "\u0418\u043C\u044F", grow: true },
+                        React.createElement(DevText, { value: r.name, onChange: x => setRow(i, 'name', x) })),
+                    React.createElement(DevField, { label: "\u041A\u043E\u043B-\u0432\u043E" },
+                        React.createElement(DevNum, { value: r.count, onChange: x => setRow(i, 'count', x), min: 1, max: MAX_COMBAT_ENEMIES }))),
+                React.createElement(DevRow, null,
+                    React.createElement(DevField, { label: "\u0423\u0440\u043E\u0432\u0435\u043D\u044C" },
+                        React.createElement(DevSelect, { value: r.tier, onChange: x => setRow(i, 'tier', x), options: Object.keys(ENEMY_TIERS).map(k => [k, DEV_TIER_LABELS[k] || k]) })),
+                    React.createElement(DevField, { label: "\u0420\u043E\u043B\u044C" },
+                        React.createElement(DevSelect, { value: r.role, onChange: x => setRow(i, 'role', x), options: Object.keys(ENEMY_ROLES).map(k => [k, DEV_ROLE_LABELS[k] || k]) })),
+                    React.createElement(DevField, { label: "\u041E\u0440\u0443\u0436\u0438\u0435", grow: true },
+                        React.createElement(DevText, { value: r.weapon, onChange: x => setRow(i, 'weapon', x) }))),
+                React.createElement(DevRow, null,
+                    React.createElement(DevCheck, { checked: r.fearless, onChange: x => setRow(i, 'fearless', x) }, "\u0431\u0435\u0441\u0441\u0442\u0440\u0430\u0448\u043D\u044B\u0439 (\u0431\u0435\u0437 \u043C\u043E\u0440\u0430\u043B\u0438)"),
+                    rows.length > 1 && React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => setRows(rs => rs.filter((_, j) => j !== i)) }, "\u0443\u0431\u0440\u0430\u0442\u044C"))))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { small: true, onClick: () => setRows(rs => [...rs, newRow()]), disabled: rows.length >= MAX_COMBAT_ENEMIES }, "\uFF0B \u0415\u0449\u0451 \u0442\u0438\u043F \u0432\u0440\u0430\u0433\u0430"),
+                React.createElement(DevCheck, { checked: ambush, onChange: setAmbush }, "\u0437\u0430\u0441\u0430\u0434\u0430 (\u0442\u0438\u0445\u0430\u044F \u0430\u0442\u0430\u043A\u0430; \u0442\u043E\u043B\u044C\u043A\u043E 1 \u0432\u0440\u0430\u0433)")),
+            React.createElement(DevCheck, { checked: wave.on, onChange: x => setW('on', x) }, "\u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432\u043E\u043B\u043D\u0443 \u043F\u043E\u0434\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u044F"),
+            wave.on && (React.createElement("div", { className: "dev-enemy" },
+                React.createElement(DevRow, null,
+                    React.createElement(DevField, { label: "\u041A\u0442\u043E \u043F\u0440\u0438\u0445\u043E\u0434\u0438\u0442" },
+                        React.createElement(DevSelect, { value: wave.side, onChange: x => setW('side', x), options: [['enemy', 'Враги'], ['ally', 'Союзники']] })),
+                    React.createElement(DevField, { label: "\u0423\u0441\u043B\u043E\u0432\u0438\u0435" },
+                        React.createElement(DevSelect, { value: wave.type, onChange: x => setW('type', x), options: REINFORCEMENT_TRIGGER_TYPES.map(k => [k, DEV_TRIGGER_LABELS[k] || k]) })),
+                    React.createElement(DevField, { label: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435" },
+                        React.createElement(DevNum, { value: wave.value, onChange: x => setW('value', x), min: 1 }))),
+                React.createElement(DevRow, null,
+                    React.createElement(DevField, { label: "\u0418\u043C\u044F", grow: true },
+                        React.createElement(DevText, { value: wave.name, onChange: x => setW('name', x) })),
+                    React.createElement(DevField, { label: "\u0423\u0440\u043E\u0432\u0435\u043D\u044C" },
+                        React.createElement(DevSelect, { value: wave.tier, onChange: x => setW('tier', x), options: Object.keys(ENEMY_TIERS).map(k => [k, DEV_TIER_LABELS[k] || k]) })),
+                    React.createElement(DevField, { label: "\u0420\u043E\u043B\u044C" },
+                        React.createElement(DevSelect, { value: wave.role, onChange: x => setW('role', x), options: Object.keys(ENEMY_ROLES).map(k => [k, DEV_ROLE_LABELS[k] || k]) })),
+                    React.createElement(DevField, { label: "\u041A\u043E\u043B-\u0432\u043E" },
+                        React.createElement(DevNum, { value: wave.count, onChange: x => setW('count', x), min: 1 }))))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { kind: "primary", onClick: () => post(true) }, "\u2694 \u0421\u0440\u0430\u0437\u0443 \u0432 \u0431\u043E\u0439"),
+                React.createElement(DevBtn, { onClick: () => post(false) }, "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u0446\u0435\u043D\u0443 \u0441 \u043A\u043D\u043E\u043F\u043A\u043E\u0439 \u00AB\u0412 \u0431\u043E\u0439\u00BB")),
+            React.createElement("p", { className: "dev-hint" }, "\u0426\u0435\u043B\u0438 \u0431\u043E\u044F (\u043E\u0431\u044A\u0435\u043A\u0442\u0438\u0432\u044B) \u043F\u0430\u043D\u0435\u043B\u044C \u043D\u0435 \u0437\u0430\u0434\u0430\u0451\u0442 \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u00AB\u043F\u043E\u0431\u0435\u0434\u0438\u0442\u044C \u0432\u0441\u0435\u0445\u00BB. \u0418\u0441\u0445\u043E\u0434 \u043F\u043E\u0440\u0430\u0436\u0435\u043D\u0438\u044F (\u043F\u043B\u0435\u043D/\u0441\u043C\u0435\u0440\u0442\u044C) \u0438 \u0432\u043E\u0441\u043A\u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u043D\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u0432\u043E \u0432\u043A\u043B\u0430\u0434\u043A\u0435 \u00AB\u0421\u0438\u0441\u0442\u0435\u043C\u0430\u00BB.")),
+        React.createElement(DevSection, { title: "\u0421\u0446\u0435\u043D\u0430 \u0440\u0430\u0441\u0441\u043A\u0430\u0437\u0447\u0438\u043A\u0430" },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0422\u0435\u043A\u0441\u0442", grow: true },
+                    React.createElement("textarea", { className: "dev-in", rows: 3, value: sceneText, onChange: e => setSceneText(e.target.value) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { onClick: postScene }, "\u041E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u0441\u0446\u0435\u043D\u0443"))),
+        React.createElement(DevSection, { title: "\u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u044F (\u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432 \u043D\u043E\u0432\u043E\u0439 \u0441\u0446\u0435\u043D\u0435)" },
+            React.createElement("div", { className: "dev-section-title dev-subtitle" }, "\u041F\u0440\u0435\u0434\u043C\u0435\u0442"),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: io.name, onChange: x => setIo(p => ({ ...p, name: x })) })),
+                React.createElement(DevField, { label: "\u0426\u0435\u043D\u0430 (0 = \u0434\u0430\u0440\u043E\u043C)" },
+                    React.createElement(DevNum, { value: io.cost, onChange: x => setIo(p => ({ ...p, cost: x })), min: 0 }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                    React.createElement(DevSelect, { value: io.slot, onChange: x => setIo(p => ({ ...p, slot: x })), options: EQUIPMENT_SLOT_TYPES.map(s => [s, DEV_SLOT_LABELS[s] || s]) })),
+                React.createElement(DevField, { label: "\u0420\u0435\u0434\u043A\u043E\u0441\u0442\u044C" },
+                    React.createElement(DevSelect, { value: io.rarity, onChange: x => setIo(p => ({ ...p, rarity: x })), options: RARITY_TIERS.map(r => [r.key, DEV_RARITY_LABELS[r.key] || r.key]) })),
+                React.createElement(DevField, { label: "\u0412\u044B\u0431\u043E\u0440" },
+                    React.createElement(DevSelect, { value: io.mode, onChange: x => setIo(p => ({ ...p, mode: x })), options: [['multi', 'любые'], ['single', 'один из']] }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevCheck, { checked: io.twoHanded, onChange: x => setIo(p => ({ ...p, twoHanded: x })) }, "\u0434\u0432\u0443\u0440\u0443\u0447\u043D\u043E\u0435"),
+                React.createElement(DevCheck, { checked: io.shield, onChange: x => setIo(p => ({ ...p, shield: x })) }, "\u0449\u0438\u0442"),
+                React.createElement(DevBtn, { onClick: postItemOffer }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435")),
+            React.createElement("div", { className: "dev-section-title dev-subtitle" }, "\u041A\u0432\u0435\u0441\u0442"),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: qo.title, onChange: x => setQo(p => ({ ...p, title: x })) })),
+                React.createElement(DevField, { label: "\u0417\u0430\u043A\u0430\u0437\u0447\u0438\u043A", grow: true },
+                    React.createElement(DevText, { value: qo.giver, onChange: x => setQo(p => ({ ...p, giver: x })) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041D\u0430\u0433\u0440\u0430\u0434\u0430", grow: true },
+                    React.createElement(DevText, { value: qo.reward, onChange: x => setQo(p => ({ ...p, reward: x })) })),
+                React.createElement(DevField, { label: "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435", grow: true },
+                    React.createElement(DevText, { value: qo.description, onChange: x => setQo(p => ({ ...p, description: x })) }))),
+            React.createElement(DevRow, null,
+                React.createElement(DevCheck, { checked: qo.negotiable, onChange: x => setQo(p => ({ ...p, negotiable: x })) }, "\u043D\u0430\u0433\u0440\u0430\u0434\u0443 \u043C\u043E\u0436\u043D\u043E \u0442\u043E\u0440\u0433\u043E\u0432\u0430\u0442\u044C"),
+                React.createElement(DevBtn, { onClick: postQuestOffer }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435")),
+            React.createElement("div", { className: "dev-section-title dev-subtitle" }, "\u041F\u0443\u0442\u0435\u0448\u0435\u0441\u0442\u0432\u0438\u0435"),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041A\u0443\u0434\u0430", grow: true },
+                    React.createElement(DevText, { value: to.label, onChange: x => setTo(p => ({ ...p, label: x })) })),
+                React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                    React.createElement(DevSelect, { value: to.kind, onChange: x => setTo(p => ({ ...p, kind: x })), options: MAP_NODE_KINDS.map(k => [k, DEV_KIND_LABELS[k] || k]) })),
+                React.createElement(DevBtn, { onClick: postTravelOffer }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C")),
+            React.createElement("div", { className: "dev-section-title dev-subtitle" }, "\u041D\u0430\u0433\u0440\u0430\u0434\u0430 \u0437\u0430 \u043A\u0432\u0435\u0441\u0442"),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041A\u0432\u0435\u0441\u0442", grow: true },
+                    React.createElement(DevSelect, { value: ro.questId, onChange: x => setRo(p => ({ ...p, questId: x })), options: [['', '— выбери —']].concat(activeQuests.map(q => [q.id, q.title])) })),
+                React.createElement(DevField, { label: "\u041D\u0430\u0433\u0440\u0430\u0434\u0430 (\u043F\u0443\u0441\u0442\u043E = \u0438\u0437 \u043A\u0432\u0435\u0441\u0442\u0430)", grow: true },
+                    React.createElement(DevText, { value: ro.reward, onChange: x => setRo(p => ({ ...p, reward: x })) })),
+                React.createElement(DevBtn, { onClick: postRewardOffer }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C")))));
+}
+// -- System ------------------------------------------------------------------
+function DevSystemTab({ api }) {
+    return (React.createElement("div", null,
+        React.createElement(DevSection, { title: "\u0420\u0430\u0431\u043E\u0442\u0430 \u0431\u0435\u0437 \u0418\u0418" },
+            React.createElement(DevCheck, { checked: api.offline, onChange: api.setOffline }, "\u043E\u0444\u043B\u0430\u0439\u043D: \u043B\u044E\u0431\u044B\u0435 \u0432\u044B\u0437\u043E\u0432\u044B \u0418\u0418 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u044B"),
+            React.createElement("p", { className: "dev-hint" }, "\u0412\u043A\u043B\u044E\u0447\u0435\u043D\u043E: \u043A\u0430\u0436\u0434\u043E\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u0438\u0433\u0440\u043E\u043A\u0430 \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u0442 \u0437\u0430\u0433\u043B\u0443\u0448\u043A\u0443 \u0432\u043C\u0435\u0441\u0442\u043E \u043E\u0442\u0432\u0435\u0442\u0430 \u0440\u0430\u0441\u0441\u043A\u0430\u0437\u0447\u0438\u043A\u0430, \u043B\u0443\u0442 \u043F\u043E\u0441\u043B\u0435 \u0431\u043E\u044F \u0432\u044B\u043F\u0430\u0434\u0430\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E, \u0430 \u0441\u0435\u0442\u0435\u0432\u044B\u0435 \u0432\u044B\u0437\u043E\u0432\u044B \u043C\u043E\u0434\u0435\u043B\u0438 \u0431\u043B\u043E\u043A\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u0446\u0435\u043B\u0438\u043A\u043E\u043C. \u041F\u0435\u0440\u0435\u0433\u0435\u043D\u0435\u0440\u0430\u0446\u0438\u044F \u0438 \u043F\u0440\u0430\u0432\u043A\u0430 \u0445\u043E\u0434\u0430 \u043F\u0440\u0438 \u044D\u0442\u043E\u043C \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B. \u0412\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u043E: \u0438\u0433\u0440\u0430 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043A\u0430\u043A \u043E\u0431\u044B\u0447\u043D\u043E, \u0430 \u0441\u043E\u0437\u0434\u0430\u043D\u043D\u044B\u0435 \u0442\u0443\u0442 \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0438 \u043F\u043E\u043F\u0430\u0434\u0430\u044E\u0442 \u0432 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442 \u0418\u0418.")),
+        React.createElement(DevSection, { title: "\u0418\u0441\u0445\u043E\u0434 \u043F\u043E\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u0432 \u0431\u043E\u044E" },
+            React.createElement(DevSelect, { value: api.defeatMode, onChange: api.setDefeatMode, options: [['default', 'Как в игре (небольшой шанс плена)'], ['captivity', 'Всегда плен'], ['death', 'Всегда смерть']] }),
+            React.createElement("p", { className: "dev-hint" }, "\u041F\u043B\u0435\u043D \u0432 \u043E\u0444\u043B\u0430\u0439\u043D\u0435 \u0440\u0430\u0437\u044B\u0433\u0440\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E: \u0438\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C \u0443\u0445\u043E\u0434\u0438\u0442 \u0432 \u00AB\u043A\u043E\u043D\u0444\u0438\u0441\u043A\u043E\u0432\u0430\u043D\u043D\u043E\u0435\u00BB, \u043D\u0430 \u0433\u0435\u0440\u043E\u0435 \u043F\u043E\u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u044D\u0444\u0444\u0435\u043A\u0442 \u043F\u043B\u0435\u043D\u0430.")),
+        React.createElement(DevSection, { title: "\u0412\u043E\u0441\u043A\u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u0441\u043C\u0435\u0440\u0442\u0438 (\u043E\u0444\u043B\u0430\u0439\u043D)" },
+            React.createElement(DevSelect, { value: api.resurrection, onChange: api.setResurrection, options: [['allow', 'Разрешено — кнопка воскрешения срабатывает'], ['deny', 'Отказано — воскрешение не удаётся']] })),
+        React.createElement(DevSection, { title: "\u041F\u0440\u043E\u0447\u0435\u0435" },
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { onClick: () => { api.commit(); api.flash('Игра сохранена'); } }, "\uD83D\uDCBE \u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u0435\u0439\u0447\u0430\u0441"),
+                React.createElement(DevBtn, { kind: "danger", onClick: api.disable }, "\u0412\u044B\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C \u0440\u0430\u0437\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A\u0430")),
+            React.createElement("p", { className: "dev-hint" }, "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0441\u043D\u043E\u0432\u0430: \u0432\u0432\u0435\u0441\u0442\u0438 /dev \u0432 \u043F\u043E\u043B\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F. \u041A\u043E\u043C\u0430\u043D\u0434\u0430 /dev off \u0442\u043E\u0436\u0435 \u0432\u044B\u043A\u043B\u044E\u0447\u0430\u0435\u0442 \u0440\u0435\u0436\u0438\u043C."))));
+}
+const DEV_TABS = [
+    ['hero', '🧙 Герой'], ['items', '🎒 Предметы'], ['npc', '👥 NPC'], ['quests', '📜 Квесты'],
+    ['world', '🗺 Мир'], ['combat', '⚔ Бой и сцены'], ['system', '⚙ Система']
+];
+function DevPanel({ api }) {
+    const [tab, setTab] = useState(api.initialTab || 'hero');
+    if (!api.open) {
+        return (React.createElement(React.Fragment, null,
+            React.createElement("style", null, DEV_PANEL_STYLES),
+            React.createElement("button", { type: "button", className: "dev-fab", onClick: api.onOpen, "aria-label": "Dev panel", title: "\u041F\u0430\u043D\u0435\u043B\u044C \u0440\u0430\u0437\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A\u0430" }, "\uD83D\uDEE0")));
+    }
+    return (React.createElement("div", { className: "dev-backdrop", role: "dialog", "aria-label": "Dev panel" },
+        React.createElement("style", null, DEV_PANEL_STYLES),
+        React.createElement("div", { className: "dev-panel" },
+            React.createElement("div", { className: "dev-head" },
+                React.createElement("h3", { className: "dev-title" },
+                    "\uD83D\uDEE0 \u0420\u0435\u0436\u0438\u043C \u0440\u0430\u0437\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A\u0430",
+                    api.offline ? ' · офлайн' : ' · онлайн'),
+                React.createElement(DevBtn, { small: true, onClick: api.onClose }, "\u2715 \u0417\u0430\u043A\u0440\u044B\u0442\u044C")),
+            React.createElement("div", { className: "dev-tabs" }, DEV_TABS.map(entry => (React.createElement("button", { key: entry[0], type: "button", className: 'dev-tab' + (tab === entry[0] ? ' dev-tab-active' : ''), onClick: () => setTab(entry[0]) }, entry[1])))),
+            React.createElement("div", { className: "dev-body" },
+                tab === 'hero' && React.createElement(DevHeroTab, { api: api }),
+                tab === 'items' && React.createElement(DevItemsTab, { api: api }),
+                tab === 'npc' && React.createElement(DevNpcTab, { api: api }),
+                tab === 'quests' && React.createElement(DevQuestsTab, { api: api }),
+                tab === 'world' && React.createElement(DevWorldTab, { api: api }),
+                tab === 'combat' && React.createElement(DevCombatTab, { api: api }),
+                tab === 'system' && React.createElement(DevSystemTab, { api: api })))));
+}
+const DEV_PANEL_STYLES = `
+  .dev-fab { position: fixed; left: 0.75rem; bottom: 0.75rem; z-index: 45; width: 2.6rem; height: 2.6rem; border-radius: 50%; border: 1px solid var(--amber-700); background: var(--stone-900); color: var(--amber-400); font-size: 1.15rem; cursor: pointer; opacity: 0.85; }
+  .dev-fab:hover { opacity: 1; border-color: var(--amber-500); }
+  .dev-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.62); display: flex; align-items: flex-end; justify-content: center; }
+  .dev-panel { background: var(--stone-900); border: 1px solid var(--amber-900); width: 100%; max-width: 46rem; height: 90vh; max-height: 100%; display: flex; flex-direction: column; border-radius: 8px 8px 0 0; }
+  @media (min-width: 720px) { .dev-backdrop { align-items: center; padding: 1rem; } .dev-panel { border-radius: 4px; height: 84vh; } }
+  .dev-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--stone-800); }
+  .dev-title { font-family: var(--font-display); color: var(--amber-100); font-size: 0.95rem; margin: 0; }
+  .dev-tabs { display: flex; gap: 0.3rem; overflow-x: auto; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--stone-800); }
+  .dev-tab { flex: 0 0 auto; font-family: var(--font-mono); font-size: 0.72rem; color: var(--stone-400); background: transparent; border: 1px solid var(--stone-700); border-radius: 999px; padding: 0.3rem 0.7rem; cursor: pointer; white-space: nowrap; }
+  .dev-tab-active { color: var(--stone-950); background: var(--amber-600); border-color: var(--amber-600); }
+  .dev-body { flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem 2rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--stone-300); }
+  .dev-section { border: 1px solid var(--stone-800); border-radius: 4px; padding: 0.6rem 0.7rem; margin-bottom: 0.75rem; background: var(--stone-950); }
+  .dev-section-title { font-family: var(--font-display); color: var(--amber-300); font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .dev-subtitle { margin-top: 0.6rem; font-size: 0.78rem; color: var(--amber-500); }
+  .dev-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; margin-bottom: 0.5rem; }
+  .dev-field { display: flex; flex-direction: column; gap: 0.2rem; min-width: 5.5rem; flex: 1 1 5.5rem; }
+  .dev-field-grow { flex: 3 1 11rem; }
+  .dev-label { font-size: 0.62rem; color: var(--amber-600); text-transform: uppercase; letter-spacing: 0.08em; }
+  .dev-in { width: 100%; background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.4rem 0.45rem; color: var(--amber-50); font-family: var(--font-mono); font-size: 0.8rem; }
+  .dev-in:focus { outline: 1px solid var(--amber-600); }
+  textarea.dev-in { resize: vertical; }
+  .dev-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--stone-300); cursor: pointer; margin: 0.15rem 0.5rem 0.15rem 0; }
+  .dev-btn { font-family: var(--font-mono); font-size: 0.74rem; color: var(--amber-100); background: var(--stone-800); border: 1px solid var(--stone-600); border-radius: 3px; padding: 0.42rem 0.7rem; cursor: pointer; }
+  .dev-btn:hover:not(:disabled) { border-color: var(--amber-600); }
+  .dev-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .dev-btn-primary { background: var(--amber-600); color: var(--stone-950); border-color: var(--amber-600); }
+  .dev-btn-danger { background: transparent; color: var(--red-400); border-color: var(--red-700); }
+  .dev-btn-small { padding: 0.22rem 0.5rem; font-size: 0.68rem; }
+  .dev-chip { font-family: var(--font-mono); font-size: 0.68rem; color: var(--stone-300); background: transparent; border: 1px solid var(--stone-700); border-radius: 999px; padding: 0.2rem 0.6rem; cursor: pointer; }
+  .dev-chip:hover { border-color: var(--amber-600); color: var(--amber-100); }
+  .dev-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px dashed var(--stone-800); }
+  .dev-item-wrap { flex-wrap: wrap; }
+  .dev-item-main { flex: 1 1 10rem; min-width: 0; }
+  .dev-item-name { color: var(--amber-100); overflow-wrap: anywhere; }
+  .dev-item-sub { color: var(--stone-500); font-size: 0.68rem; overflow-wrap: anywhere; }
+  .dev-actions { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+  .dev-hint { color: var(--stone-500); font-size: 0.68rem; margin: 0.3rem 0 0; line-height: 1.4; }
+  .dev-quest { border-bottom: 1px dashed var(--stone-800); padding-bottom: 0.4rem; margin-bottom: 0.4rem; }
+  .dev-stage { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0 0.15rem 0.8rem; color: var(--stone-300); }
+  .dev-enemy { border: 1px solid var(--stone-800); border-radius: 4px; padding: 0.5rem; margin: 0.4rem 0; }
+`;
 function App() {
     // -- Language & session settings --
     const [uiLang, setUiLang] = useState('ru');
@@ -33073,6 +34484,8 @@ function App() {
     ];
     const GEMINI_GENERATION_CONFIG = { maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 1024 } };
     async function callGemini(system, messages, retriesLeft) {
+        if (devOfflineActive())
+            throw new Error('DEV: offline mode — model calls are disabled');
         if (retriesLeft === undefined)
             retriesLeft = 2;
         const response = await fetch(geminiEndpoint(geminiModel, 'generateContent'), {
@@ -35121,7 +36534,16 @@ ${chunkText}`;
         const prior = priorRaw.map(it => {
             const key = it.name.trim().toLowerCase();
             const u = updatesByKey.get(key);
-            if (!u)
+            // An update op names an item by name only, but two copies of the same
+            // name can legitimately carry different mutable state — most
+            // importantly questId (one of two identical "sealed letter" copies
+            // can be THE quest item while the other is just a decoy). Applying
+            // the op via .map() over every same-named entry would silently
+            // retag/reslot copies the update was never about, so — mirroring the
+            // one-index-at-a-time consumption the inventoryRemove loop below
+            // already uses — only the first not-yet-claimed copy of that name is
+            // patched; any further same-named copies pass through untouched.
+            if (!u || matchedUpdateKeys.has(key))
                 return it;
             matchedUpdateKeys.add(key);
             const patched = { ...it };
@@ -35822,6 +37244,8 @@ ${chunkText}`;
     // silently). Otherwise returns the narrative passage and post-revival
     // health for tryResurrection to apply.
     async function generateResurrectionCheck(currentState) {
+        if (devOfflineActive())
+            return devRef.current.resurrection === 'allow' ? devOfflineResurrection(uiLang) : null;
         const storyText = messages.filter(m => m.role === 'narrator').map(m => m.text).join('\n\n');
         const raw = await callGemini(buildResurrectionCheckSystemPrompt(currentState), [{ role: 'user', content: 'Full story so far, ending with the hero\'s death:\n\n' + storyText }]);
         const parsed = extractJsonObject(raw);
@@ -35843,6 +37267,8 @@ ${chunkText}`;
     // how that paces later turns), and suggestions fitting someone bound and
     // unarmed rather than the ordinary combat-adjacent fallback.
     async function generateCaptivityCheck(currentState, combatState) {
+        if (devOfflineActive())
+            return devOfflineCaptivity(uiLang);
         const storyText = messages.filter(m => m.role === 'narrator').map(m => m.text).join('\n\n');
         const raw = await callGemini(buildCaptivityCheckSystemPrompt(currentState, combatState), [{ role: 'user', content: 'Full story so far, ending with the hero\'s defeat:\n\n' + storyText }]);
         const parsed = extractJsonObject(raw);
@@ -35940,6 +37366,8 @@ Rules:
     // defeated enemy (see the loot effect below) — idPrefix keeps each enemy's
     // loot ids distinct when several are merged into one loot panel.
     async function generateCombatLoot(enemy, idPrefix) {
+        if (devOfflineActive())
+            return devRollLoot(enemy, idPrefix, uiLang, { rollCurrency: rollFallbackLootCurrency, rollDurability: rollLootDurability });
         // Handless creature: nothing to take, no model call needed — see enemyCarriesNoLoot.
         if (enemyCarriesNoLoot(enemy))
             return { items: [], currency: rollFallbackLootCurrency(enemy.tier) };
@@ -40304,7 +41732,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // judged implausible to survive — all three collapse into the exact
         // same "isDeath, not isCaptivity" path this function already had.
         let captivityOutcome = null;
-        if (isDeath && Math.random() < CAPTIVITY_CHANCE) {
+        if (isDeath && devCaptivityRoll()) {
             setCaptivityChecking(true);
             try {
                 captivityOutcome = await generateCaptivityCheck(gameState, combat);
@@ -41020,6 +42448,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         return backup;
     }
     async function handleStart() {
+        if ([worldSetting, heroName, heroConcept].some(v => devParseCommand(v))) {
+            devStartSandbox();
+            return;
+        }
         if (!worldSetting.trim() || !heroName.trim()) {
             setError(t('missingFieldsError'));
             return;
@@ -41062,6 +42494,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         }
         if (loading || newActionMessages.length === 0)
             return;
+        if (devOfflineActive()) {
+            devOfflineTurn(newActionMessages, base, baseState);
+            return;
+        }
         // Hard stop: a fight that is waiting to be fought can only be resolved by
         // the combat engine — never by sending another action (which the narrator
         // could then "resolve" in prose). The engine's own auto-continue after a
@@ -41147,7 +42583,237 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             releaseWakeLock();
         }
     }
+    // ==========================================================================
+    // DEV MODE — wiring for the DevPanel block defined above App() (read the
+    // header comment there first). Nothing in here runs unless devMode is on,
+    // apart from the two command checks in handleSend / handleStart.
+    // ==========================================================================
+    const [devMode, setDevMode] = useState(false);
+    const [devPanelOpen, setDevPanelOpen] = useState(false);
+    const [devOffline, setDevOffline] = useState(true);
+    const [devDefeatMode, setDevDefeatMode] = useState('default'); // 'default' | 'captivity' | 'death'
+    const [devResurrection, setDevResurrection] = useState('allow'); // 'allow' | 'deny'
+    const [devSaveTick, setDevSaveTick] = useState(0);
+    const [devAutoFight, setDevAutoFight] = useState(null);
+    // Read from callbacks that may outlive the render that created them (callGemini
+    // is reached from async continuations), so the flags live in a ref as well.
+    const devRef = useRef({ mode: false, offline: true, defeat: 'default', resurrection: 'allow' });
+    devRef.current = { mode: devMode, offline: devOffline, defeat: devDefeatMode, resurrection: devResurrection };
+    // Restores the remembered on/off choice.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await window.storage.get(DEV_MODE_KEY, false);
+                if (!cancelled && result && result.value === 'on')
+                    setDevMode(true);
+            }
+            catch (e) {
+                // no remembered choice — dev mode simply starts off
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+    // Panel edits change several state slices at once and call commit() to save;
+    // running the save from an effect means it sees the values of the render that
+    // applied them, not the stale ones of the click that asked for it.
+    useEffect(() => {
+        if (devSaveTick === 0)
+            return;
+        saveGame(messages, gameState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, npcInventories, npcCurrencies, partyCurrency, undefined, shopClock);
+    }, [devSaveTick]);
+    // "Straight into the fight": startCombat reads the encounter off messages[index],
+    // so it has to wait until the scene that carries it is actually in state.
+    useEffect(() => {
+        if (devAutoFight === null)
+            return;
+        const msg = messages[devAutoFight];
+        if (!msg || !msg.combatEncounter)
+            return;
+        setDevAutoFight(null);
+        startCombat(devAutoFight);
+    }, [devAutoFight, messages]);
+    function devOfflineActive() {
+        return devRef.current.mode && devRef.current.offline;
+    }
+    async function devPersist(on) {
+        try {
+            await window.storage.set(DEV_MODE_KEY, on ? 'on' : 'off', false);
+        }
+        catch (e) {
+            // storage unavailable — the choice just won't be remembered
+        }
+    }
+    // "/dev" (or "/dev on") opens the panel, "/dev off" switches the mode off.
+    // Returns true when the text was a dev command (and so must not go any further).
+    function devHandleCommand(text) {
+        const cmd = devParseCommand(text);
+        if (!cmd)
+            return false;
+        if (cmd.action === 'off') {
+            setDevMode(false);
+            setDevPanelOpen(false);
+            devPersist(false);
+            flashNotice('🛠 Режим разработчика выключен', 2400);
+        }
+        else {
+            setDevMode(true);
+            setDevPanelOpen(true);
+            devPersist(true);
+            flashNotice('🛠 Режим разработчика включён', 2400);
+        }
+        return true;
+    }
+    // Lets endCombatAndClose honour the panel's "defeat outcome" setting.
+    function devCaptivityRoll() {
+        const d = devRef.current;
+        if (d.mode && d.defeat === 'captivity')
+            return true;
+        if (d.mode && d.defeat === 'death')
+            return false;
+        return Math.random() < CAPTIVITY_CHANCE;
+    }
+    // Appends a client-made narrator scene (optionally carrying a combat encounter,
+    // offers, ...) and returns its index in messages.
+    function devPostScene(text, extra) {
+        const index = messages.length;
+        const scene = devMakeNarrator(text, gameState, uiLang, extra);
+        setMessages(prev => [...prev, scene]);
+        setDevSaveTick(n => n + 1);
+        return index;
+    }
+    // Stand-in for a whole model turn while offline: keeps the player's actions,
+    // replays the map moves the model call would have applied (an accepted travel
+    // offer, a destination picked on the map), and answers with a stub scene.
+    function devOfflineTurn(newActionMessages, base, baseState) {
+        const state = baseState || gameState;
+        const preceding = base.length > 0 && base[base.length - 1].role === 'narrator' ? base[base.length - 1] : null;
+        let map = state.map;
+        if (preceding)
+            map = applyConfirmedTravel(map, preceding, false);
+        const destination = pendingMapDestinationRef.current;
+        if (destination) {
+            map = applyPlayerChosenDestination(map, destination, state.map.currentId);
+            pendingMapDestinationRef.current = null;
+            setPendingMapTravel(null);
+        }
+        const actionText = newActionMessages.filter(m => m.role === 'player' && m.text && m.text.trim()).map(m => m.text.trim()).join(' / ');
+        const stub = devMakeNarrator(devL(uiLang, '⚙ Офлайн-режим: ответ ИИ не запрашивался.', '⚙ Offline mode: no AI response was requested.') + (actionText ? '\n\n«' + actionText + '»' : ''), state, uiLang);
+        setMessages([...base, ...newActionMessages, stub]);
+        if (map !== state.map)
+            setGameState({ ...state, map });
+        setDevSaveTick(n => n + 1);
+    }
+    // Setup screen: "/dev" typed into the world / hero name / hero concept field
+    // and "start" pressed launches an empty offline sandbox — no API key, no model.
+    function devStartSandbox() {
+        const clean = v => (devParseCommand(v) ? '' : String(v || '').trim());
+        const identity = {
+            worldSetting: clean(worldSetting) || devL(uiLang, 'Песочница разработчика: офлайн-мир для тестов.', 'Developer sandbox: an offline world for testing.'),
+            heroName: clean(heroName) || devL(uiLang, 'Разработчик', 'Developer'),
+            heroConcept: clean(heroConcept) || devL(uiLang, 'Тестовый герой', 'Test hero'),
+            startingPartySize: 0
+        };
+        resetCampaignData();
+        const node = normalizeMapNode({
+            id: 'dev-sandbox', name: devL(uiLang, 'Песочница', 'Sandbox'), kind: 'landmark', gx: 0, gy: 0, discovered: true,
+            description: devL(uiLang, 'Тестовая локация режима разработчика.', 'Developer-mode test location.'), connections: [], itemCapacity: 0
+        });
+        const state = { ...EMPTY_STATE, time: devL(uiLang, 'Утро', 'Morning'), dayPhase: 'day', map: { nodes: [node], currentId: node.id, visitedEdges: [] } };
+        const opening = devMakeNarrator(devL(uiLang, '🛠 Режим разработчика. Это офлайн-песочница: ИИ не вызывается. Открой панель 🛠 (слева внизу), чтобы создавать NPC, предметы, квесты и бои.', '🛠 Developer mode. This is an offline sandbox: no AI is called. Open the 🛠 panel (bottom left) to spawn NPCs, items, quests and fights.'), state, uiLang);
+        setWorldSetting(identity.worldSetting);
+        setHeroName(identity.heroName);
+        setHeroConcept(identity.heroConcept);
+        setStartingPartySize(0);
+        setGameState(state);
+        setMessages([opening]);
+        setLastTokenUsage(null);
+        setCurrentTurnIndex(1);
+        setError(null);
+        setInput('');
+        setPendingNote('');
+        setDevMode(true);
+        setDevOffline(true);
+        setDevPanelOpen(true);
+        devPersist(true);
+        setStage('playing');
+        saveGame([opening], state, {}, EMPTY_EQUIPMENT, {}, [], {}, {}, {}, {}, {}, {}, {}, identity, { morning: 0, dawnTurn: 0, stocked: {} });
+    }
+    // ---- hero death / captivity, mirroring what endCombatAndClose does ----
+    function devKillHero() {
+        let source = null;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'narrator') {
+                source = i;
+                break;
+            }
+        }
+        setGameState(s => ({
+            ...s, health: 0,
+            effects: s.effects.some(e => e.kind === 'death') ? s.effects : [...s.effects, { id: makeEffectId(), kind: 'death', label: t('combatDeathEffectLabel'), severity: null, turnsLeft: null, clientManaged: true }]
+        }));
+        setDeathSourceNarratorIndex(source);
+        setResurrectionDenied(false);
+        setDeathModalOpen(true);
+        setDevPanelOpen(false);
+        setDevSaveTick(n => n + 1);
+    }
+    function devReviveHero() {
+        setGameState(s => ({ ...s, health: Math.max(1, s.maxHealth), effects: s.effects.filter(e => e.kind !== 'death') }));
+        setDeathModalOpen(false);
+        setDevSaveTick(n => n + 1);
+    }
+    function devCaptureHero() {
+        setGameState(s => {
+            if (s.effects.some(e => e.kind === 'captivity'))
+                return s;
+            return {
+                ...s,
+                health: s.health > 0 ? s.health : Math.min(20, s.maxHealth),
+                effects: [...s.effects.filter(e => e.kind !== 'death'), { id: makeEffectId(), kind: 'captivity', label: t('combatCaptivityEffectLabel'), severity: null, turnsLeft: null, clientManaged: true, dangerTurns: 5 }],
+                confiscatedInventory: [...s.confiscatedInventory, ...s.inventory],
+                inventory: []
+            };
+        });
+        setDeathModalOpen(false);
+        setDevSaveTick(n => n + 1);
+    }
+    function devReleaseHero() {
+        setGameState(s => ({
+            ...s,
+            effects: s.effects.filter(e => e.kind !== 'captivity'),
+            inventory: [...s.inventory, ...s.confiscatedInventory],
+            confiscatedInventory: []
+        }));
+        setDevSaveTick(n => n + 1);
+    }
+    function buildDevApi() {
+        return {
+            open: devPanelOpen, onOpen: () => setDevPanelOpen(true), onClose: () => setDevPanelOpen(false),
+            uiLang, t,
+            gameState, setGameState, equipment, setEquipment, itemRarities, setItemRarities,
+            npcReputations, setNpcReputations, factionReputations, setFactionReputations,
+            party, setParty, partyInventories, setPartyInventories,
+            npcInventories, setNpcInventories, npcCurrencies, setNpcCurrencies, shopClock, setShopClock,
+            turnsCount: totalTurns,
+            commit: () => setDevSaveTick(n => n + 1),
+            flash: text => flashNotice(text, 2400),
+            postScene: devPostScene,
+            startFight: index => { setDevPanelOpen(false); setDevAutoFight(index); },
+            openTrade: name => { setDevPanelOpen(false); openTrade(name); },
+            killHero: devKillHero, reviveHero: devReviveHero, captureHero: devCaptureHero, releaseHero: devReleaseHero,
+            offline: devOffline, setOffline: setDevOffline,
+            defeatMode: devDefeatMode, setDefeatMode: setDevDefeatMode,
+            resurrection: devResurrection, setResurrection: setDevResurrection,
+            disable: () => devHandleCommand('/dev off')
+        };
+    }
     async function handleSend() {
+        if (devParseCommand(input)) {
+            setInput('');
+            devHandleCommand(input);
+            return;
+        }
         if (!input.trim() || loading || gameState.health <= 0)
             return;
         const text = input.trim();
@@ -41929,7 +43595,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         partyGiveModalOpen && partyGearTarget && (React.createElement(GivePartyItemModal, { npcName: partyGearTarget, gameState: gameState, itemRarities: itemRarities, equipment: equipment, memberEquipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, inventory: partyInventories[partyGearKey] || [], onConfirm: indexes => giveItemsToPartyMember(partyGearTarget, indexes), onTakeBack: indexes => takeItemsFromPartyMember(partyGearTarget, indexes), onCancel: () => setPartyGiveModalOpen(false), t: t })),
         restartConfirmOpen && React.createElement(RestartConfirmModal, { onConfirm: confirmRestart, onCancel: () => setRestartConfirmOpen(false), t: t }),
         regenerateTarget !== null && (React.createElement(RegenerateConfirmModal, { withLoss: regenerateTarget !== totalTurns, onConfirm: () => regenerateTurn(regenerateTarget), onCancel: () => setRegenerateTarget(null), t: t })),
-        editWarningTarget !== null && (React.createElement(EditConfirmModal, { withLoss: editWarningTarget !== totalTurns, dontShowAgain: editWarningDontShowAgain, onDontShowAgainChange: setEditWarningDontShowAgain, onConfirm: confirmEditWarning, onCancel: cancelEditWarning, t: t }))));
+        editWarningTarget !== null && (React.createElement(EditConfirmModal, { withLoss: editWarningTarget !== totalTurns, dontShowAgain: editWarningDontShowAgain, onDontShowAgainChange: setEditWarningDontShowAgain, onConfirm: confirmEditWarning, onCancel: cancelEditWarning, t: t })),
+        devMode && React.createElement(DevPanel, { api: buildDevApi() })));
 }
 const APP_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -42524,8 +44191,10 @@ const APP_STYLES = `
      edge-to-edge (see COMBAT_CARD_NATURAL_W/H and COMBAT_CARD_GRID_SCALE in
      CombatModal) rather than sitting scaled down, with margin all around,
      inside a much bigger cell the way the old tall-rectangle card did.
-     object-fit: cover on combat-portrait-frame-img below means the source
-     portrait re-crops to this shape automatically, with no distortion. */
+     object-fit: contain on combat-portrait-frame-img below means the whole
+     source portrait is kept — it's scaled to fill the box's full height,
+     with no vertical crop, and letterboxed left/right if needed instead of
+     cropping. */
   .combat-portrait {
     position: relative; display: block; overflow: hidden;
     width: 6.25rem; height: 6.25rem; padding: 0; box-sizing: border-box;
@@ -42540,11 +44209,11 @@ const APP_STYLES = `
   /* Image fills the button's full content box edge-to-edge (no inset, no
      padding) and is clipped to the button's own border-radius via the
      button's overflow:hidden above — same pattern as .equip-slot-icon-wrap
-     elsewhere. object-fit:cover scales uniformly on both axes and crops
-     whatever overhangs, rather than stretching non-uniformly or leaving
-     letterbox gaps. */
+     elsewhere. object-fit:contain scales uniformly on both axes so the
+     full portrait (head to feet) always fits without vertical cropping or
+     top/bottom gaps; any leftover space lands on the sides instead. */
   .combat-portrait-frame { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; }
-  .combat-portrait-frame-img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; display: block; }
+  .combat-portrait-frame-img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
   .combat-portrait-frame-skull { font-size: 1.8rem; line-height: 1; }
   /* Enemy role badge (see ENEMY_ROLES/ENEMY_ROLE_ICONS) and the ally-side
      "protect" objective badge (see combat.objective) — both a small corner
@@ -42908,18 +44577,26 @@ const APP_STYLES = `
      (equip-slot-defense-badge, the sheet's defense stat). */
   .combat-armor-bar { width: 100%; height: 3px; background: var(--stone-800); border-radius: 2px; overflow: hidden; }
   .combat-armor-bar-fill { height: 100%; background: var(--sky-400); transition: width 0.3s ease; }
+  /* Zero-capacity armor slot (no helmet worn, an ally/enemy with no
+     head-armor data at all, or gear broken down to 0) — same dimmed
+     treatment as .combat-part-disabled elsewhere in combat, so "nothing
+     here" reads as an inactive bar rather than the bar vanishing and
+     reshuffling the stack below it. */
+  .combat-armor-bar-inactive { opacity: 0.4; }
   .combat-hp-value { font-size: 0.62rem; color: var(--stone-500); margin: 0.15rem 0 0; font-family: var(--font-mono); }
   /* Portrait-only: the HP+armor bars, no number/shield-icon labels (see
      the aria-labels in CombatPortrait's JSX instead). margin-top:0 on the
      nested .combat-hp-bar hands its usual top spacing over to this flex
      gap instead, so every gap in the stack — name→top bar, bar→bar, and
      bottom bar→the overlay's own 0.3rem bottom padding — ends up the same
-     0.3rem. For an ally/enemy that stack is just HP then the one flat
-     armor bar (top to bottom); for the hero (see armorPools) it's head
-     armor, then body armor, then HP, top to bottom — so HP always reads as
-     the bottommost bar regardless of which portrait it is. The body-part
-     grid's own .combat-hp-bar (outside this wrapper) keeps its original
-     margin-top untouched. */
+     0.3rem. Every combatant (hero, ally, enemy) always renders the same
+     three bars in the same fixed order, top to bottom: helmet armor, body
+     armor, HP — so HP always reads as the bottommost bar and the stack
+     never changes height or order from portrait to portrait (see
+     CombatPortrait's headArmorMax/bodyArmorMax and
+     .combat-armor-bar-inactive above for the "no armor here" case). The
+     body-part grid's own .combat-hp-bar (outside this wrapper) keeps its
+     original margin-top untouched. */
   .combat-portrait-bars { width: 100%; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
   .combat-portrait-bars .combat-hp-bar { margin-top: 0; }
   .combat-log { margin-top: 0.85rem; padding: 0.6rem 0.75rem; background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px; max-height: 8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem; }
