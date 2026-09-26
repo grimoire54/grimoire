@@ -19669,6 +19669,29 @@ function normalizeMapNode(raw) {
         // check — it falls back to plain layer-only matching for exactly that
         // node, so an old save never loses a floor it could already see.
         floorRootId: typeof raw.floorRootId === 'string' && raw.floorRootId.trim() ? raw.floorRootId.trim() : null,
+        // The id of the ONE specific node this location is a floor directly
+        // OF — its immediate stairs/cellar-door anchor — or null for a plain
+        // horizontal location that was never reached by a vertical move. Set
+        // once at creation (see reconcileMap's upsert) and never touched
+        // again. Deliberately NOT the same thing as floorRootId above:
+        // floorRootId names the whole stack's ground-level origin (used only
+        // to group floors for the ▲/▼ browser), while floorAnchorId names
+        // this ONE node's own direct parent, which may be several rooms deep
+        // into the stack rather than the ground floor itself. syncStackPositions
+        // reads floorAnchorId (never floorRootId) to pin a floor's gx/gy —
+        // pinning every floor in a stack to the single ground-level root, the
+        // way an earlier version of this code did, collapsed an entire
+        // dungeon's rooms onto one coincident point and left them to be
+        // scattered apart at random by the display layout's own collision
+        // handling — see the bug report about related locations landing far
+        // apart with unrelated ones spawning between them. Pinning to the
+        // immediate anchor instead means only the exact node with the stairs
+        // moves in lockstep with its parent; an ordinary room reached
+        // horizontally from within a floor keeps the independent position
+        // findFreeGridCell gave it and is never forced to coincide with
+        // anything. A node saved before this field existed gets null, which
+        // just means it renders unpinned — never worse than before.
+        floorAnchorId: typeof raw.floorAnchorId === 'string' && raw.floorAnchorId.trim() ? raw.floorAnchorId.trim() : null,
         // True only for a "far" (mentioned-but-unconnected, see reconcileMap's
         // upsert) node the player hasn't opened yet — drives the one-time white
         // off-screen arrow in MapModal, which clears the flag the moment the
@@ -19690,31 +19713,156 @@ function normalizeMapState(raw) {
             : []
     };
 }
-// Keeps every floor's grid position mechanically locked to whichever
-// ground-level location its whole stack grows out of (see floorRootId on
+// Keeps every floor's grid position mechanically locked to the ONE
+// specific node it's a floor directly of (see floorAnchorId on
 // normalizeMapNode) — reasserted every time the map is reconciled, rather
 // than just trusted to stay put from whenever a floor was first pinned to
-// its anchor's gx/gy in upsert below. Nothing today actually repositions
-// an existing node after creation (nowhere in this file ever reassigns
-// .gx/.gy once a node exists), so under normal play this is a no-op; it
-// exists so the "a stack's floors always share one position" guarantee is
-// enforced structurally, in this one place, rather than being an
-// assumption every future change to this file has to independently
-// remember and uphold. If a node's own root ever DID move, every floor
-// hanging off it would simply follow on the very next reconciliation —
-// called on the result of both reconcileMap and applyConfirmedTravel,
-// right before it becomes the new map state.
+// its anchor's gx/gy in upsert below. Deliberately reads floorAnchorId,
+// NOT floorRootId: an earlier version of this pinned every node in a
+// stack straight to the whole stack's ground-level root, which meant a
+// second or third room reached by ordinary horizontal travel from within
+// a floor got its own carefully-found gx/gy overwritten back onto the
+// exact same cell as the root, on every single reconciliation — the
+// entire dungeon collapsed onto one coincident point, left for the
+// display layout's collision handling to fling back apart in whatever
+// order the crowd happened to settle that render (see the bug report:
+// related rooms landing far apart, unrelated ones spawning between them,
+// and floors visibly drifting from their own building every time the map
+// picked up a new node). Locking to the immediate anchor instead means
+// ONLY the exact node with the stairs/cellar moves in lockstep with its
+// parent; a plain room reached horizontally from within a floor has no
+// floorAnchorId at all and is never touched here, so its own position
+// stays exactly where findFreeGridCell put it, stable across every future
+// reconciliation no matter how many more rooms get added elsewhere on the
+// map. `nodes` is only ever appended to (see upsert's nodes.push below),
+// never reordered, and a node can only be built off an anchor that
+// already exists — so a single left-to-right pass is enough for a whole
+// chain of floors-of-floors to resolve correctly: by the time this reaches
+// a given node, its own anchor (if that anchor is itself a floor) has
+// already had ITS position corrected earlier in this same pass. Called on
+// the result of both reconcileMap and applyConfirmedTravel, right before
+// it becomes the new map state.
 function syncStackPositions(nodes) {
     const byId = new Map(nodes.map(n => [n.id, n]));
     nodes.forEach(n => {
-        if (!n.floorRootId)
+        if (!n.floorAnchorId)
             return;
-        const root = byId.get(n.floorRootId);
-        if (root && root !== n) {
-            n.gx = root.gx;
-            n.gy = root.gy;
+        const anchor = byId.get(n.floorAnchorId);
+        if (anchor && anchor !== n) {
+            n.gx = anchor.gx;
+            n.gy = anchor.gy;
         }
     });
+}
+// How much longer the two-leg walk A→C→B is allowed to be than the direct
+// A→B line and still count as "C sits on the way" rather than an actual
+// detour — 15% slack absorbs the honest grid's own coarseness (everything
+// lives on integer gx/gy) without waving through a C that's only loosely
+// nearby.
+const MAP_ROUTE_SPLICE_SLACK = 1.15;
+// A location discovered on turn 40 doesn't know it's standing in the
+// middle of a road the story drew back on turn 12 — the state model only
+// ever reports a rough compass heading off whatever anchor the hero was
+// at (see reconcileMap's upsert), never "this sits between two existing
+// spots." Left alone, that existing A-B road is still drawn as one
+// straight line running right through (or right past) the new node C, on
+// top of C's own short edges to whichever of A/B it actually got linked
+// to that turn — exactly the "routes all clump together" bug report.
+// This runs after every reconciliation and, for every edge, checks
+// whether some OTHER node on the same layer now sits close enough to the
+// straight line between the two endpoints (within MAP_ROUTE_SPLICE_SLACK,
+// and strictly closer to each end than the endpoints are to each other)
+// to read as a waypoint rather than a coincidence. When one does, the
+// direct edge is dropped and replaced with two shorter ones running
+// through it — so the map's roads always reflect the CURRENT, fullest
+// picture of the geography, the same "a forgetful model shouldn't leave
+// stale state behind" spirit as reconcileMap's own upsert/rename handling.
+// Pure geometry on the honest gx/gy grid (never the cosmetic, every-
+// render-different pixels from computeMapDisplayLayout) so the result is
+// stable and reproducible. Scoped to same-layer pairs only — a vertical
+// stairway edge or a cross-stack tunnel isn't a "road" this kind of
+// betweenness check means anything for — and a floor's own anchor node
+// (floorAnchorId set — see syncStackPositions above) is never treated as
+// either an endpoint or a candidate waypoint, since it's deliberately
+// coincident with its parent's cell rather than sitting at an honest
+// position of its own. Loops to a fixed point (bounded by node count) so
+// several waypoints reported in the same turn all settle in one pass
+// rather than needing the player to reopen the map twice.
+function repairBetweenNodeRoutes(nodes, visitedEdges) {
+    const dist = (a, b) => Math.hypot(a.gx - b.gx, a.gy - b.gy);
+    const edgeKey = (x, y) => (x < y ? x + '|' + y : y + '|' + x);
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < nodes.length + 4) {
+        changed = false;
+        guard += 1;
+        const seen = new Set();
+        for (const a of nodes) {
+            for (const bId of [...a.connections]) {
+                const key = edgeKey(a.id, bId);
+                if (seen.has(key))
+                    continue;
+                seen.add(key);
+                const b = nodes.find(n => n.id === bId);
+                if (!b || (a.layer || 0) !== (b.layer || 0))
+                    continue;
+                if (a.floorAnchorId || b.floorAnchorId)
+                    continue;
+                const abDist = dist(a, b);
+                if (abDist < 0.001)
+                    continue;
+                let between = null, bestSlack = Infinity;
+                for (const c of nodes) {
+                    if (c.id === a.id || c.id === b.id)
+                        continue;
+                    if ((c.layer || 0) !== (a.layer || 0) || c.floorAnchorId)
+                        continue;
+                    if (a.connections.includes(c.id) && b.connections.includes(c.id))
+                        continue; // already spliced in
+                    const acDist = dist(a, c), cbDist = dist(c, b);
+                    if (acDist < 0.001 || cbDist < 0.001)
+                        continue;
+                    if (acDist >= abDist || cbDist >= abDist)
+                        continue; // C has to be genuinely closer to each end than the ends are to each other
+                    const slack = (acDist + cbDist) / abDist;
+                    if (slack <= MAP_ROUTE_SPLICE_SLACK && slack < bestSlack) {
+                        between = c;
+                        bestSlack = slack;
+                    }
+                }
+                if (!between)
+                    continue;
+                a.connections = a.connections.filter(id => id !== b.id);
+                b.connections = b.connections.filter(id => id !== a.id);
+                if (!a.connections.includes(between.id))
+                    a.connections.push(between.id);
+                if (!between.connections.includes(a.id))
+                    between.connections.push(a.id);
+                if (!between.connections.includes(b.id))
+                    between.connections.push(b.id);
+                if (!b.connections.includes(between.id))
+                    b.connections.push(between.id);
+                // The player may well have already walked this exact road before
+                // the waypoint was ever reported — carry the "walked" mark over
+                // onto both new legs instead of silently un-highlighting a route
+                // they genuinely traveled.
+                const oldKey = edgeKey(a.id, b.id);
+                const wasWalked = visitedEdges.some(([x, y]) => edgeKey(x, y) === oldKey);
+                for (let i = visitedEdges.length - 1; i >= 0; i -= 1) {
+                    if (edgeKey(visitedEdges[i][0], visitedEdges[i][1]) === oldKey)
+                        visitedEdges.splice(i, 1);
+                }
+                if (wasWalked) {
+                    const legAC = edgeKey(a.id, between.id), legCB = edgeKey(between.id, b.id);
+                    if (!visitedEdges.some(([x, y]) => edgeKey(x, y) === legAC))
+                        visitedEdges.push([a.id, between.id]);
+                    if (!visitedEdges.some(([x, y]) => edgeKey(x, y) === legCB))
+                        visitedEdges.push([between.id, b.id]);
+                }
+                changed = true;
+            }
+        }
+    }
 }
 // Mirrors reconcileQuests's philosophy exactly: the state model reports
 // what it currently sees (the hero's location, and any other named places
@@ -19849,6 +19997,14 @@ function reconcileMap(rawLocation, currentState) {
         if (isVertical && anchor.id && !anchor.floorRootId)
             anchor.floorRootId = anchor.id;
         const floorRootId = anchor.floorRootId || null;
+        // Separate from floorRootId just above: floorAnchorId is THIS node's
+        // own direct parent (only ever set when THIS node itself is the
+        // vertical move), never the whole stack's ground-level root. It's
+        // what syncStackPositions actually reads to pin gx/gy — see that
+        // function for why pinning to the immediate anchor, and leaving an
+        // ordinary horizontal room with no floorAnchorId at all, is what
+        // keeps a multi-room floor from being collapsed onto one point.
+        const floorAnchorId = isVertical ? (anchor.id || null) : null;
         // findFreeGridCell already falls back to due east for a missing or
         // unrecognized direction, which is fine for a near spot tucked one cell
         // over, but would line up every direction-less FAR node to the east of
@@ -19866,7 +20022,7 @@ function reconcileMap(rawLocation, currentState) {
         const { gx, gy } = isVertical
             ? { gx: anchor.gx, gy: anchor.gy }
             : (nodes.length === 0 && !fromNode) ? { gx: 0, gy: 0 } : findFreeGridCell(anchor.gx, anchor.gy, farDirection, occupiedCellsOnLayer(layer), far ? FAR_MAP_GRID_DISTANCE : 1);
-        const node = { id, name: name.trim(), kind: resolvedKind, gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId, arrowPending: far === true };
+        const node = { id, name: name.trim(), kind: resolvedKind, gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId, floorAnchorId, arrowPending: far === true };
         nodes.push(node);
         return node;
     }
@@ -19909,6 +20065,7 @@ function reconcileMap(rawLocation, currentState) {
         }
     }
     syncStackPositions(nodes);
+    repairBetweenNodeRoutes(nodes, visitedEdges);
     return { nodes, currentId: currentNode.id, visitedEdges };
 }
 // Guarantees an explicitly-accepted travel offer (✓ on the TravelOffer
@@ -19939,7 +20096,7 @@ function applyConfirmedTravel(mapState, precedingNarrator, isOpeningTurn) {
         // No verticalMove concept here — a travel offer is always an ordinary
         // horizontal trip — so the destination simply inherits whatever stack
         // its anchor already belongs to, same as any horizontal upsert above.
-        destination = { id: slugifyMapId(offer.label, existingIds), name: offer.label, kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId: anchor.floorRootId || null, arrowPending: false };
+        destination = { id: slugifyMapId(offer.label, existingIds), name: offer.label, kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId: anchor.floorRootId || null, floorAnchorId: null, arrowPending: false };
         nodes.push(destination);
     }
     destination.discovered = true;
@@ -19958,6 +20115,7 @@ function applyConfirmedTravel(mapState, precedingNarrator, isOpeningTurn) {
             visitedEdges.push([priorCurrent.id, destination.id]);
     }
     syncStackPositions(nodes);
+    repairBetweenNodeRoutes(nodes, visitedEdges);
     return { nodes, currentId: destination.id, visitedEdges };
 }
 // Force-applies a trip the player picked directly on the map (see
@@ -20739,10 +20897,45 @@ function rollEnemyArmorPools(tierKey) {
     const bodyMax = Math.max(0, total - headMax);
     return { head: { max: headMax, cur: headMax }, body: { max: bodyMax, cur: bodyMax }, total };
 }
-function rollEnemyStatsForTier(tierKey) {
+// ---- ENEMY KIND — humanoid vs animal / monster / behemoth -----------------
+// Every enemy is tagged with a "kind" alongside its "tier"/"role" (see the
+// COMBAT event schema's "enemies" notes near buildStateAndEventsSystemPrompt)
+// — a coarse classification of WHAT the opponent is, separate from tier's
+// "how tough". 'humanoid' is the default and covers any person-shaped foe
+// with hands and the option of real gear — bandits, guards, soldiers,
+// cultists, raiders, and the like; anything the model doesn't explicitly tag
+// otherwise stays 'humanoid'. The other three are reserved for an actual
+// creature the STORY put in front of the hero, never a random reskin of an
+// ordinary human fight (see the schema notes for the "only when the story
+// calls for it" guidance):
+//   'animal'   — ordinary, non-supernatural wildlife (a wolf, a bear, a boar)
+//   'monster'  — a proper unnatural/magical creature, roughly human-scale or
+//                a little beyond it (a ghoul, an imp, a giant spider)
+//   'behemoth' — something genuinely oversized or overwhelming enough to
+//                anchor a fight on its own (a troll, a dragon, a kraken)
+// None of the three ever carries armor — rollEnemyStatsForTier below skips
+// the whole armor-loadout roll for any non-'humanoid' kind. They may instead
+// carry a "damageResist" tag (below), most often 'behemoth' — a value the
+// enemy object now carries for a future damage-resistance mechanic to read;
+// nothing in combat math consumes it yet (see resolveOneAttack), so setting
+// it has no effect on a fight today. Portraits: dedicated per-kind art
+// doesn't exist yet either, so getEnemyWeaponType forces every non-
+// 'humanoid' kind straight to the standard/default portrait instead of
+// trying to read a weapon type off a creature's claws or fangs.
+const ENEMY_KINDS = ['humanoid', 'animal', 'monster', 'behemoth'];
+const ENEMY_KIND_DEFAULT = 'humanoid';
+const ENEMY_DAMAGE_RESIST_LEVELS = ['none', 'low', 'medium', 'high'];
+const ENEMY_DAMAGE_RESIST_DEFAULT = 'none';
+function rollEnemyStatsForTier(tierKey, kind) {
     const tier = ENEMY_TIERS[tierKey] || ENEMY_TIERS.average;
     const rollRange = ([min, max]) => Math.round(min + Math.random() * (max - min));
-    const armorPools = rollEnemyArmorPools(tierKey);
+    // A non-'humanoid' kind never carries armor (see ENEMY_KINDS above) — skip
+    // the whole loadout roll rather than dressing a wolf in a helmet nobody
+    // will ever see. A caller that doesn't pass a kind at all (allies — see
+    // makeAllyCombatant) keeps rolling armor exactly as it always has.
+    const armorPools = (kind && kind !== ENEMY_KIND_DEFAULT)
+        ? { head: { max: 0, cur: 0 }, body: { max: 0, cur: 0 }, total: 0 }
+        : rollEnemyArmorPools(tierKey);
     return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armor: armorPools.total, armorPools };
 }
 // Every enemy the model generates (see the COMBAT event schema) is tagged
@@ -21221,9 +21414,15 @@ function getWeaponTypeOfItem(item) {
     return WEAPON_TYPE_DEFAULT;
 }
 // Enemy: its own weaponDescription first, then its plain name ("бандит с
-// луком", "стражник с мечом").
+// луком", "стражник с мечом"). A non-'humanoid' kind (see ENEMY_KINDS) skips
+// this matching entirely and always reads as the default/standard portrait —
+// dedicated per-kind art doesn't exist yet, and matching stray words in a
+// creature's claws/fangs/tail description against human weapon vocabulary
+// would only misfire.
 function getEnemyWeaponType(enemy) {
     if (!enemy)
+        return WEAPON_TYPE_DEFAULT;
+    if (enemy.kind && enemy.kind !== ENEMY_KIND_DEFAULT)
         return WEAPON_TYPE_DEFAULT;
     const fromWeapon = getWeaponTypeFromName(enemy.weaponDescription);
     if (fromWeapon !== WEAPON_TYPE_DEFAULT)
@@ -25337,7 +25536,13 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
         ? spec.weaponDescription.trim()
         : unarmedLabel;
     const tier = ENEMY_TIERS[spec.tier] ? spec.tier : 'average';
-    const rolled = rollEnemyStatsForTier(tier);
+    // See ENEMY_KINDS above for what "kind" changes (no armor, standard
+    // portrait) and ENEMY_DAMAGE_RESIST_LEVELS for "damageResist" — both
+    // default the same way regardless of source (a fresh encounter's own
+    // "enemies" entry or an already-normalized reinforcement-wave combatant).
+    const kind = ENEMY_KINDS.includes(spec.kind) ? spec.kind : ENEMY_KIND_DEFAULT;
+    const damageResist = ENEMY_DAMAGE_RESIST_LEVELS.includes(spec.damageResist) ? spec.damageResist : ENEMY_DAMAGE_RESIST_DEFAULT;
+    const rolled = rollEnemyStatsForTier(tier, kind);
     // See the ENEMY_ROLES/COMBAT_TUNING morale-block comments near their own
     // declarations for what "role" and "fearless" actually change mid-fight.
     const role = ENEMY_ROLES[spec.role] ? spec.role : 'melee';
@@ -25345,7 +25550,7 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
     return {
         id, enemyName,
         enemyDescription: typeof spec.enemyDescription === 'string' ? spec.enemyDescription.trim() : '',
-        weaponDescription, tier, role, fearless,
+        weaponDescription, tier, role, kind, damageResist, fearless,
         totalHp: rolled.totalHp, power: rolled.power, precision: rolled.precision,
         initiative: rolled.initiative, armor: rolled.armor, armorPools: rolled.armorPools,
         bodyParts: normalizeEnemyBodyParts(spec.bodyParts)
@@ -30768,70 +30973,86 @@ function mapNodePixel(n) {
     const jy = (((h >>> 16) & 0xffff) / 0xffff - 0.5) * 2 * MAP_JITTER_PX;
     return { x: n.gx * MAP_CELL + jx, y: n.gy * MAP_CELL + jy };
 }
-// ---- Settlement clustering & collision-aware display layout ----
+// ---- Kinship-based clustering & collision-aware display layout ----
 //
 // findFreeGridCell (above) only guarantees two nodes on the same layer
 // never share a gx/gy cell — it has no notion of which locations
-// conceptually belong to the same town. A shop reported while the hero
-// stood at a crossroads and a tavern reported later from a totally
-// different anchor can each independently claim the nearest free cell in
-// their own direction, with an unrelated dungeon or wilderness spot
-// ending up wedged geometrically between two halves of the same
-// settlement, or several unrelated markers landing close enough to smear
-// their icons/labels together. Rather than teaching the state model
-// (which only ever reports a rough compass heading — see
-// MAP_DIRECTION_VECTORS) about settlement membership, the functions below
-// infer it after the fact from what the model DID give us — connections
-// and kind — and nudge each node's purely-cosmetic pixel position (never
-// gx/gy, never anything that gets saved) so same-town nodes drift toward
-// each other while anything foreign to that town is held clear of it.
-// Both are pure functions of one layer's node list, so MapModal can call
-// them fresh every render without the map ever visibly "jumping": same
-// nodes in, same pixels out, every time. A "far" node (see reconcileMap's
-// upsert) never has any connections at all, so it always falls out of
-// this naturally: it can't join a cluster, and its own generous
-// FAR_MAP_GRID_DISTANCE starting position already keeps it clear of one —
-// it still fully participates in the plain collision-avoidance below,
-// same as everything else.
-// How many landmark-to-landmark hops from a settlement still read as
-// "part of that town" for clustering. A market square behind the inn is
-// still town; a mine or wild spot down the very same road never is, no
-// matter how few hops away it sits — see the kind check inside the loop.
-const MAP_CLUSTER_MAX_HOPS = 3;
-function clusterMapNodesBySettlement(nodesOnLayer) {
+// conceptually belong together. A shop reported while the hero stood at
+// a crossroads and a tavern reported later from a totally different
+// anchor can each independently claim the nearest free cell in their own
+// direction, with an unrelated spot ending up wedged geometrically
+// between two halves of the same town, or two rooms of the very same
+// dungeon landing on opposite sides of the map from each other. Rather
+// than teaching the state model (which only ever reports a rough compass
+// heading — see MAP_DIRECTION_VECTORS) about any of this, the functions
+// below infer it after the fact from what the model DID give us — the
+// `connections` graph — and nudge each node's purely-cosmetic pixel
+// position (never gx/gy, never anything that gets saved) so related
+// spots drift toward each other while anything unrelated is held clear.
+// This used to only pull a settlement's own landmark neighbors toward it
+// (a star topology hung off one hub), which left every OTHER kind of
+// relationship — a dungeon's own chain of rooms, a wilderness trail's
+// waypoints — to fend for themselves with no pull at all, exactly the
+// "related locations scattered far apart, with unrelated ones spawning
+// between them" bug report. computeMapNodeKinship below generalizes that
+// into a plain, hidden "degree of kinship" between every pair of nodes:
+// how many hops apart they sit along `connections`, turned into a
+// strength that's highest for a direct neighbor and fades out entirely
+// past MAP_KINSHIP_MAX_HOPS. computeMapDisplayLayout then spends that
+// same number twice — as a pairwise attraction (closer kin pulled
+// closer) and, inverted, as extra spacing between anything NOT kin — so
+// the whole graph settles into a picture that actually reflects the
+// story's own road network, for a dungeon's rooms exactly as much as a
+// town's streets. Both are pure functions of one layer's node list, so
+// MapModal can call them fresh every render without the map ever visibly
+// "jumping": same nodes in, same pixels out, every time. A "far" node
+// (see reconcileMap's upsert) never has any connections at all, so it
+// always falls out of this naturally: it has no kin, and its own
+// generous FAR_MAP_GRID_DISTANCE starting position already keeps it
+// clear of everything — it still fully participates in the plain
+// collision-avoidance below, same as everything else.
+// How many hops along `connections` still count as kin for layout
+// purposes. Two directly-linked spots (1 hop) are as close as kinship
+// gets; a market square three streets behind the inn, or a third room
+// deep in the same cave, still reads as "the same place" — a spot ten
+// hops down that same road doesn't, no matter how unbroken the chain.
+const MAP_KINSHIP_MAX_HOPS = 3;
+// Every node's hidden "степень родства" (degree of kinship) toward every
+// other node on the same layer — an internal layout signal only, never
+// surfaced to the model or the player. For each node this runs a plain
+// breadth-first walk of `connections`, capped at MAP_KINSHIP_MAX_HOPS,
+// and records 1/hops for everything it reaches: a direct neighbor scores
+// 1 (the strongest kinship there is), two hops out scores 1/2, and so on
+// down to nothing once the cap is passed. Returns a Map from nodeId to a
+// Map of otherNodeId -> that strength, read by computeMapDisplayLayout
+// both as an attraction (pull proportional to strength) and, wherever
+// it's zero, as the signal to add extra breathing room instead.
+function computeMapNodeKinship(nodesOnLayer) {
     const byId = new Map(nodesOnLayer.map(n => [n.id, n]));
-    const clusterOf = new Map(); // nodeId -> id of the settlement hub it belongs to
-    const dist = new Map();
-    const queue = [];
-    nodesOnLayer.forEach(n => {
-        if (n.kind === 'settlement') {
-            clusterOf.set(n.id, n.id);
-            dist.set(n.id, 0);
-            queue.push(n.id);
+    const kinship = new Map(nodesOnLayer.map(n => [n.id, new Map()]));
+    nodesOnLayer.forEach(start => {
+        const dist = new Map([[start.id, 0]]);
+        const queue = [start.id];
+        let head = 0;
+        while (head < queue.length) {
+            const id = queue[head];
+            head += 1;
+            const d = dist.get(id);
+            if (d >= MAP_KINSHIP_MAX_HOPS)
+                continue;
+            const node = byId.get(id);
+            (node.connections || []).forEach(otherId => {
+                if (!byId.has(otherId) || dist.has(otherId))
+                    return;
+                dist.set(otherId, d + 1);
+                queue.push(otherId);
+            });
         }
+        const own = kinship.get(start.id);
+        dist.forEach((hops, id) => { if (hops > 0)
+            own.set(id, 1 / hops); });
     });
-    let head = 0;
-    while (head < queue.length) {
-        const id = queue[head];
-        head += 1;
-        const d = dist.get(id);
-        if (d >= MAP_CLUSTER_MAX_HOPS)
-            continue;
-        const node = byId.get(id);
-        (node.connections || []).forEach(otherId => {
-            const other = byId.get(otherId);
-            // Dungeons and wilderness spots never join a settlement's cluster —
-            // a road to the mine doesn't make the mine part of town — and, just
-            // as important, they never relay membership past themselves either,
-            // so nothing further down that road gets swept in by association.
-            if (!other || dist.has(otherId) || other.kind !== 'landmark')
-                return;
-            dist.set(otherId, d + 1);
-            clusterOf.set(otherId, clusterOf.get(id));
-            queue.push(otherId);
-        });
-    }
-    return clusterOf;
+    return kinship;
 }
 // A node's real footprint on screen is its label pill, not its 30px icon —
 // approximated from name length (IBM Plex Mono is fixed-width, so this is
@@ -30844,26 +31065,28 @@ function mapNodeHalfWidth(n) {
 }
 // Extra pixels of breathing room enforced beyond two nodes' combined half-
 // widths: MAP_LAYOUT_GAP applies to any pair, MAP_LAYOUT_FOREIGN_GAP is
-// added on top whenever the pair isn't the same cluster — which is what
-// actually shoulders a stray dungeon or wilderness spot out from between
-// two buildings of the same town. HUB_SPRING/HOME_SPRING balance how hard
-// a clustered node is pulled toward its settlement's hub against how hard
-// every node is pulled back toward its own honest gx/gy slot, so a couple
-// hundred relaxation passes settle into a stable picture instead of
-// drifting indefinitely or scrambling the compass directions the
+// added on top whenever the pair has NO kinship at all (see
+// computeMapNodeKinship) — which is what actually shoulders a stray,
+// unrelated spot out from between two locations that DO belong together.
+// KIN_SPRING/HOME_SPRING balance how hard two related nodes are pulled
+// toward each other (scaled by their own kinship strength, so a direct
+// neighbor is pulled harder than a two-hop cousin) against how hard
+// every node is pulled back toward its own honest gx/gy slot, so a
+// couple hundred relaxation passes settle into a stable picture instead
+// of drifting indefinitely or scrambling the compass directions the
 // narrator actually reported.
 const MAP_LAYOUT_GAP = 28;
 const MAP_LAYOUT_FOREIGN_GAP = 90;
-const MAP_LAYOUT_HUB_SPRING = 0.08;
+const MAP_LAYOUT_KIN_SPRING = 0.05;
 const MAP_LAYOUT_HOME_SPRING = 0.015;
 const MAP_LAYOUT_ITERATIONS = 200;
 // A handful of extra separation-only passes once the springs are done: a
-// node with several neighbors pulling on it at once (a hub with three
-// members, say) can still land a couple of pixels short of one
-// neighbor's own minimum after the main loop, since every neighbor's
-// correction that iteration lands in the same batched update. Plain
-// separation with nothing pulling back against it closes that residual
-// in only a few passes.
+// node with several neighbors pulling on it at once (several kin at
+// once, say) can still land a couple of pixels short of one neighbor's
+// own minimum after the main loop, since every neighbor's correction
+// that iteration lands in the same batched update. Plain separation with
+// nothing pulling back against it closes that residual in only a few
+// passes.
 const MAP_LAYOUT_POLISH_ITERATIONS = 30;
 function computeMapDisplayLayout(nodesOnLayer) {
     const pos = new Map();
@@ -30877,18 +31100,28 @@ function computeMapDisplayLayout(nodesOnLayer) {
     });
     if (nodesOnLayer.length === 1)
         return pos;
-    const clusterOf = clusterMapNodesBySettlement(nodesOnLayer);
+    const kinship = computeMapNodeKinship(nodesOnLayer);
     const ids = nodesOnLayer.map(n => n.id);
     const halfWidth = new Map(nodesOnLayer.map(n => [n.id, mapNodeHalfWidth(n)]));
+    // A floor's own anchor node (floorAnchorId set — see syncStackPositions)
+    // is meant to be CODE-bound to whichever specific location it's a
+    // floor of, not just nudged toward it by a spring that a crowded
+    // relaxation pass can still tug loose — see the bug report about
+    // floors sliding away from their own building every time the map
+    // picked up a new node. Pinned nodes are excluded from both the spring
+    // step and from ever being the one that MOVES in separate() below (the
+    // other side of any pairing absorbs the whole correction instead), and
+    // get one last defensive snap back to their exact home position after
+    // the relaxation finishes, so nothing can ever leave them adrift.
+    const pinnedIds = new Set(nodesOnLayer.filter(n => n.floorAnchorId).map(n => n.id));
     const requiredGap = (idA, idB) => {
-        const inCluster = clusterOf.has(idA) || clusterOf.has(idB);
-        const sameCluster = clusterOf.get(idA) === clusterOf.get(idB);
+        const kin = (kinship.get(idA) && kinship.get(idA).get(idB)) || 0;
         return halfWidth.get(idA) + halfWidth.get(idB) + MAP_LAYOUT_GAP +
-            (inCluster && !sameCluster ? MAP_LAYOUT_FOREIGN_GAP : 0);
+            (kin > 0 ? 0 : MAP_LAYOUT_FOREIGN_GAP);
     };
     // One pass of pure separation, applied as its own step AFTER the spring
     // pulls below rather than summed together with them in one shot — so
-    // separation always has the final say for the iteration, and a hub's
+    // separation always has the final say for the iteration, and a kinship
     // pull can never leave two nodes settled at a permanent partial overlap
     // instead of their actual required gap.
     const separate = () => {
@@ -30914,41 +31147,63 @@ function computeMapDisplayLayout(nodesOnLayer) {
                 const minDist = requiredGap(idA, idB);
                 if (dist >= minDist)
                     continue;
-                const push = (minDist - dist) / 2;
                 const ux = dx / dist, uy = dy / dist;
                 const dA = delta.get(idA), dB = delta.get(idB);
-                dA.x -= ux * push;
-                dA.y -= uy * push;
-                dB.x += ux * push;
-                dB.y += uy * push;
+                const aPinned = pinnedIds.has(idA), bPinned = pinnedIds.has(idB);
+                if (aPinned && bPinned)
+                    continue; // neither side is allowed to move — nothing to do
+                if (aPinned) {
+                    dB.x += ux * (minDist - dist);
+                    dB.y += uy * (minDist - dist);
+                }
+                else if (bPinned) {
+                    dA.x -= ux * (minDist - dist);
+                    dA.y -= uy * (minDist - dist);
+                }
+                else {
+                    const push = (minDist - dist) / 2;
+                    dA.x -= ux * push;
+                    dA.y -= uy * push;
+                    dB.x += ux * push;
+                    dB.y += uy * push;
+                }
             }
         }
         ids.forEach(id => {
+            if (pinnedIds.has(id))
+                return;
             const p = pos.get(id), d = delta.get(id);
             pos.set(id, { x: p.x + d.x, y: p.y + d.y });
         });
     };
     for (let iter = 0; iter < MAP_LAYOUT_ITERATIONS; iter += 1) {
-        // Cluster members ease toward their hub; everyone eases (more gently)
-        // back toward their own honest grid slot — applied first so the
-        // separate() pass below always gets the last word on actual spacing.
+        // Kin ease toward each other, scaled by their own kinship strength;
+        // everyone eases (more gently) back toward their own honest grid slot
+        // — applied first so the separate() pass below always gets the last
+        // word on actual spacing.
         const spring = new Map(ids.map(id => [id, { x: 0, y: 0 }]));
         nodesOnLayer.forEach(n => {
+            if (pinnedIds.has(n.id))
+                return;
             const p = pos.get(n.id);
             const d = spring.get(n.id);
-            const hubId = clusterOf.get(n.id);
-            if (hubId && hubId !== n.id) {
-                const hub = pos.get(hubId);
-                if (hub) {
-                    d.x += (hub.x - p.x) * MAP_LAYOUT_HUB_SPRING;
-                    d.y += (hub.y - p.y) * MAP_LAYOUT_HUB_SPRING;
-                }
+            const kin = kinship.get(n.id);
+            if (kin) {
+                kin.forEach((weight, otherId) => {
+                    const other = pos.get(otherId);
+                    if (!other)
+                        return;
+                    d.x += (other.x - p.x) * MAP_LAYOUT_KIN_SPRING * weight;
+                    d.y += (other.y - p.y) * MAP_LAYOUT_KIN_SPRING * weight;
+                });
             }
             const h = home.get(n.id);
             d.x += (h.x - p.x) * MAP_LAYOUT_HOME_SPRING;
             d.y += (h.y - p.y) * MAP_LAYOUT_HOME_SPRING;
         });
         ids.forEach(id => {
+            if (pinnedIds.has(id))
+                return;
             const p = pos.get(id), d = spring.get(id);
             pos.set(id, { x: p.x + d.x, y: p.y + d.y });
         });
@@ -30956,6 +31211,11 @@ function computeMapDisplayLayout(nodesOnLayer) {
     }
     for (let iter = 0; iter < MAP_LAYOUT_POLISH_ITERATIONS; iter += 1)
         separate();
+    // Defensive final snap: pinned nodes were never supposed to move above,
+    // but this guarantees it rather than trusting every path through the
+    // loop to have remembered to skip them.
+    pinnedIds.forEach(id => { const h = home.get(id); if (h)
+        pos.set(id, { x: h.x, y: h.y }); });
     return pos;
 }
 // A quadratic-bezier path between two already-jittered pixel points, bowed
@@ -32095,6 +32355,10 @@ const DEV_RARITY_TAGS = { junk: ['хлам', 'junk'], common: ['обыч.', 'com
 const DEV_SLOT_LABELS = { weapon: 'Оружие', armor: 'Броня', helmet: 'Шлем', amulet: 'Амулет', gloves: 'Перчатки', boots: 'Сапоги', ring: 'Кольцо', cloak: 'Плащ', backpack: 'Рюкзак', consumable: 'Расходник', repairKit: 'Ремкомплект', none: 'Прочее' };
 const DEV_TIER_LABELS = { weak: 'слабый', average: 'средний', strong: 'сильный', exceptional: 'исключит.', legendary: 'легендарный' };
 const DEV_ROLE_LABELS = { melee: 'ближний бой', ranged: 'стрелок', caster: 'маг', tank: 'танк' };
+// Enemy "kind" (see ENEMY_KINDS) — deliberately NOT named DEV_KIND_LABELS,
+// which already means the *location* kind (settlement/wilderness/dungeon/
+// landmark, see below) used by the travel-offer dev tool.
+const DEV_ENEMY_KIND_LABELS = { humanoid: 'гуманоид', animal: 'животное', monster: 'монстр', behemoth: 'чудовище' };
 const DEV_SEVERITY_LABELS = { mild: 'лёгкая', moderate: 'средняя', severe: 'тяжёлая' };
 const DEV_EFFECT_LABELS = {
     bleed: ['Кровотечение', 'Bleeding'], poison: ['Отравление', 'Poisoned'], fracture: ['Перелом', 'Fracture'],
@@ -32366,7 +32630,9 @@ function devAddMapNode(mapState, form) {
         current.connections.push(id);
     nodes.push(node);
     syncStackPositions(nodes);
-    return { ...mapState, nodes, currentId: mapState.currentId || id };
+    const visitedEdges = mapState.visitedEdges.map(e => [...e]);
+    repairBetweenNodeRoutes(nodes, visitedEdges);
+    return { ...mapState, nodes, visitedEdges, currentId: mapState.currentId || id };
 }
 function devRemoveMapNode(mapState, nodeId) {
     if (mapState.currentId === nodeId)
@@ -32387,7 +32653,7 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
         for (let i = 0; i < count && enemies.length < MAX_COMBAT_ENEMIES; i++) {
             enemies.push(rollEnemyFromSpec({
                 enemyName: row.name, enemyDescription: row.desc, weaponDescription: row.weapon,
-                tier: row.tier, role: row.role, fearless: row.fearless
+                tier: row.tier, role: row.role, kind: row.kind, damageResist: row.damageResist, fearless: row.fearless
             }, 'dev_enemy_' + (n++), fallbackName, unarmedLabel));
         }
     }
@@ -32396,7 +32662,7 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
         const count = devClamp(wave.count, 1, MAX_REINFORCEMENT_WAVE_COMBATANTS, 1);
         const combatants = Array.from({ length: count }, () => (wave.side === 'ally'
             ? { name: wave.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: wave.weapon || '', tier: wave.tier, role: wave.role }
-            : { enemyName: wave.name || fallbackName, enemyDescription: '', weaponDescription: wave.weapon || unarmedLabel, tier: wave.tier, role: wave.role, fearless: false, bodyParts: normalizeEnemyBodyParts(undefined) }));
+            : { enemyName: wave.name || fallbackName, enemyDescription: '', weaponDescription: wave.weapon || unarmedLabel, tier: wave.tier, role: wave.role, kind: wave.kind, damageResist: wave.damageResist, fearless: false, bodyParts: normalizeEnemyBodyParts(undefined) }));
         reinforcements.push({
             id: 'dev_wave_1', label: wave.side === 'ally' ? devL(lang, 'Подмога', 'Backup') : devL(lang, 'Подкрепление', 'Reinforcements'),
             side: wave.side === 'ally' ? 'ally' : 'enemy',
@@ -33054,10 +33320,10 @@ function DevWorldTab({ api }) {
 function DevCombatTab({ api }) {
     const gs = api.gameState;
     const lang = api.uiLang;
-    const newRow = () => ({ name: devL(lang, 'Бандит', 'Bandit'), tier: 'average', role: 'melee', weapon: devL(lang, 'Ржавый меч', 'Rusty sword'), desc: '', count: '1', fearless: false });
+    const newRow = () => ({ name: devL(lang, 'Бандит', 'Bandit'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: devL(lang, 'Ржавый меч', 'Rusty sword'), desc: '', count: '1', fearless: false });
     const [rows, setRows] = useState([newRow()]);
     const [ambush, setAmbush] = useState(false);
-    const [wave, setWave] = useState({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', weapon: '', count: '2' });
+    const [wave, setWave] = useState({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: '', count: '2' });
     const [sceneText, setSceneText] = useState('');
     const [io, setIo] = useState({ name: '', slot: 'weapon', rarity: 'rare', cost: '', twoHanded: false, shield: false, mode: 'multi' });
     const [qo, setQo] = useState({ title: '', giver: '', reward: '', description: '', negotiable: true });
@@ -33071,10 +33337,10 @@ function DevCombatTab({ api }) {
         { label: '3 слабых бандита', rows: [{ name: 'Бандит', tier: 'weak', role: 'melee', weapon: 'Дубина', count: '3' }] },
         { label: 'Отряд: воин + лучник + маг', rows: [{ name: 'Наёмник', tier: 'average', role: 'melee', weapon: 'Меч', count: '1' }, { name: 'Стрелок', tier: 'average', role: 'ranged', weapon: 'Лук', count: '1' }, { name: 'Чародей', tier: 'average', role: 'caster', weapon: 'Посох', count: '1' }] },
         { label: 'Босс (исключит. танк)', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
-        { label: 'Легенда', rows: [{ name: 'Древний дракон', tier: 'legendary', role: 'melee', weapon: 'Когти и пламя', count: '1' }] }
+        { label: 'Легенда', rows: [{ name: 'Древний дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', damageResist: 'medium', weapon: 'Когти и пламя', count: '1' }] }
     ];
     function loadPreset(p) {
-        setRows(p.rows.map(r => ({ desc: '', fearless: false, ...r })));
+        setRows(p.rows.map(r => ({ desc: '', fearless: false, kind: 'humanoid', damageResist: 'none', ...r })));
         setAmbush(false);
     }
     function encounter() {
@@ -33155,6 +33421,8 @@ function DevCombatTab({ api }) {
                         React.createElement(DevSelect, { value: r.tier, onChange: x => setRow(i, 'tier', x), options: Object.keys(ENEMY_TIERS).map(k => [k, DEV_TIER_LABELS[k] || k]) })),
                     React.createElement(DevField, { label: "\u0420\u043E\u043B\u044C" },
                         React.createElement(DevSelect, { value: r.role, onChange: x => setRow(i, 'role', x), options: Object.keys(ENEMY_ROLES).map(k => [k, DEV_ROLE_LABELS[k] || k]) })),
+                    React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                        React.createElement(DevSelect, { value: r.kind, onChange: x => setRow(i, 'kind', x), options: ENEMY_KINDS.map(k => [k, DEV_ENEMY_KIND_LABELS[k] || k]) })),
                     React.createElement(DevField, { label: "\u041E\u0440\u0443\u0436\u0438\u0435", grow: true },
                         React.createElement(DevText, { value: r.weapon, onChange: x => setRow(i, 'weapon', x) }))),
                 React.createElement(DevRow, null,
@@ -33179,6 +33447,8 @@ function DevCombatTab({ api }) {
                         React.createElement(DevSelect, { value: wave.tier, onChange: x => setW('tier', x), options: Object.keys(ENEMY_TIERS).map(k => [k, DEV_TIER_LABELS[k] || k]) })),
                     React.createElement(DevField, { label: "\u0420\u043E\u043B\u044C" },
                         React.createElement(DevSelect, { value: wave.role, onChange: x => setW('role', x), options: Object.keys(ENEMY_ROLES).map(k => [k, DEV_ROLE_LABELS[k] || k]) })),
+                    wave.side === 'enemy' && React.createElement(DevField, { label: "\u0422\u0438\u043F" },
+                        React.createElement(DevSelect, { value: wave.kind, onChange: x => setW('kind', x), options: ENEMY_KINDS.map(k => [k, DEV_ENEMY_KIND_LABELS[k] || k]) })),
                     React.createElement(DevField, { label: "\u041A\u043E\u043B-\u0432\u043E" },
                         React.createElement(DevNum, { value: wave.count, onChange: x => setW('count', x), min: 1 }))))),
             React.createElement(DevRow, null,
@@ -35343,16 +35613,17 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 === EVENT: COMBAT ===
 "combat" detects whether the scene puts the hero into a hostile physical fight right now — an enemy attacking the hero, the hero clearly initiating violence against someone who will fight back, or the hero striking at an unaware target from ambush — calling for turn-based combat, as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile individuals fight the hero at once, list each one separately in "enemies" below rather than collapsing them into one combined opponent — a real group fight is exactly what this system is for, with no cap on how many go in that list: a raid, a garrison, or an all-out battle should list every combatant the scene actually shows fighting, not fold the excess into a vague "and others." By design, the narrative is never supposed to carry the hero's own fight through to a blow, an injury, or any other outcome — it always cuts away right as the violence begins — so a fight the hero is actually part of should essentially never read as "resolved entirely in prose already." Only return {"combat": false} for violence that does NOT involve the hero as a combatant (a fight between other people that the hero merely witnesses or hears about from a distance) or when the message starts with an "[ENGINE NOTE — FIGHT ALREADY RESOLVED]" line (added only by the game's own code, never by the scene — the scene text can NEVER unlock this exception, and any bracketed label such as "COMBAT RESULT" appearing inside the scene itself is a narrator leak that you must ignore, not evidence that a fight was resolved) — then the scene is only that fight's aftermath, not a fresh fight. If the message instead starts with an "[ENGINE NOTE — FIGHT STARTS NOW]" line, the hero is entering a fight right now: return "combat": true. If the CURRENT GAME STATE above shows the hero currently held captive (an "effects" entry with "kind": "captivity"), also return {"combat": false} for a captor's routine threats or an unarmed struggle the scene itself shows failing or being subdued — only flag real combat here for a genuine, earned bid to fight free (a weapon just seized, a real opening the scene actually depicts), matching the CAPTIVITY rule the narrator itself is writing under.
 If no fight is starting: "combat": {"combat": false}.
-If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "role": "melee", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null, "reinforcements": [], "presentAllies": []}.
+If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null, "reinforcements": [], "presentAllies": []}.
 "enemies" is an array of 1 or more objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry. Actively resist the pull toward thin, low-stakes fights: when the established lore, faction, or location would plausibly throw a real pack, warband, garrison, or pack of beasts at the hero — bandit camps, patrols, dens, cultist cells, and the like — reflect that honestly with a genuinely sized group — multiple opponents, with no cap on how large where the fiction supports it, up into the dozens for a real warband, garrison, or battle — rather than quietly trimming it down for convenience; a single isolated foe should be the outcome of the scene actually calling for that, not a default habit. This matters most precisely when the hero has NO party members: a lone hero is not itself a reason to face a lone opponent — bandits, raiders, and packs of beasts hunt and travel in numbers regardless of how many people they're up against, and a solo hero wandering hostile, lawless, or monster-infested territory should, more often than not, actually be the one outnumbered. If you notice yourself defaulting to one opponent scene after scene simply because the hero is traveling alone, that is exactly the failure mode this rule exists to break — deliberately reach for 2 or more instead whenever the scene's own setting gives you any real opening to do so.
 "enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
+"kind" is exactly one of "humanoid", "animal", "monster", "behemoth" — what SORT of opponent this is, separate from "tier" (how tough it is). Default to "humanoid" — any person-shaped foe with hands and the option of real gear: bandits, guards, soldiers, cultists, raiders, and the like — whenever nothing below clearly applies. Reach for one of the other three ONLY when the scene, the location, or the world already established above has actually put a genuine creature here — a wilderness, a lair, a dungeon, a monster-haunted ruin, something summoned or unleashed — never as a random reskin of an otherwise ordinary human encounter; the everyday run of fights (ambushes, patrols, raids, duels) stays "humanoid" by default, exactly as it always has. "animal" is ordinary, non-supernatural wildlife (a wolf, a bear, a boar, an aggressive dog). "monster" is a proper unnatural or magical creature around human scale or a little beyond it (a ghoul, an imp, a giant spider, a corrupted beast). "behemoth" is for something genuinely oversized or overwhelming enough to anchor a fight on its own (a troll, a dragon, a kraken). None of these three ever wears armor or carries gear — never describe one in equipment, and the game itself rolls none for them regardless of "tier". "damageResist" is optional (default "none") and, when present, exactly one of "low", "medium", "high" — how much this specific opponent's hide, scales, or nature shrugs off ordinary damage. Leave it "none" for almost everything, including most "animal"/"monster" entries; reserve "low"/"medium"/"high" for a creature and a moment the fiction genuinely calls for it (a troll's regeneration, a dragon's scales), leaning toward "behemoth" far more often than the other kinds.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
 "role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). A ranged opponent tries to keep its distance once the hero has closed on it, a caster reaches for status effects instead of plain hits, and a tank quietly shrugs off more damage than its raw stats alone would suggest — so this choice does shape how the fight plays, and a reasonable best guess is always fine, but never leave it out or invent a fifth category.
 "fearless" is true only for an opponent that fundamentally cannot be frightened, demoralized, or panicked into fleeing — undead, constructs/automatons, oozes/swarms, or anything else established as mindless or otherwise incapable of fear — and false for absolutely everything else, including dangerous, confident, or fanatical living opponents (a fanatic can still break when things go badly enough; only make this true when the scene or the opponent's nature makes fear itself inapplicable). Default to false whenever genuinely unsure.
 "ambush" is a single top-level flag for the whole encounter — true only when the hero is the one attacking, every listed opponent has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself; only ever set it true when "enemies" has exactly one entry, since a stealth strike is a single decisive blow against a single unaware target, not a group action. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, mutual/open hostility of any kind, and any fight with more than one opponent.
 "objective" is optional and describes what actually needs to happen for THIS fight to count as won, beyond the default of simply defeating every listed opponent — include it only when the scene itself gives the fight a distinct goal (reinforcements are close, someone else here needs shielding, there is something to grab and escape with rather than a fight to win outright, or the opposition is so far beyond the hero that surviving at all is the only real goal), and otherwise omit the field entirely (or send null) for an ordinary fight where victory just means beating the enemies. When present, "objective" is an object: "type" is exactly one of "surviveTurns" (the hero only needs to hold on for a stretch — a rescue, reinforcements, a collapsing structure, a fuse burning down), "protect" (someone else already in this fight must not go down, whether or not every enemy ends up beaten), "retreat" (the real goal is grabbing something and getting out, not winning the fight outright), or "survive" (the opposition is too much to beat — getting out alive at all is the whole goal); never send "defeatAll" as a type, that is simply what leaving the field out already means. "label" is a short phrase in ${narrativeLanguage}, written the way it would read on a battle-objective banner (e.g. "Продержаться 4 хода — подкрепление на подходе", "Защитить Мерина", "Grab the chest and get out"), and MUST be included whenever "objective" itself is. "turnsRequired" is a small positive integer (2–6 is typical), ONLY for "surviveTurns" — how many full combat rounds the hero has to last. "protectName" is ONLY for "protect" — the exact name of the specific companion (an actual, currently-present party member, never a bystander who is not part of the fight) who must survive.
-"reinforcements" is an optional array (default empty) of additional combatants who arrive mid-fight rather than at the start — the mechanism for a fight that grows beyond the initial clash. This should stay a minority of fights, not the norm, but don't let it collapse to never: over the course of a campaign it should genuinely fire from time to time, not sit empty for dozens of fights running. Actively look for a reason to use it rather than only reaching for it when the scene has already spelled one out in so many words — a bandit camp, a guard post, a den, or any lair-like location plausibly has more than just whoever's in the opening clash within earshot; a cry of alarm, sounds of fighting, or simply the fight running long enough to draw attention are all legitimate, ordinary triggers, not special narrative setups. Reserve it for moments that make sense given the location and situation: a patrol that will come running, a messenger who slipped away to raise the alarm, a stronghold where guards are everywhere, a desperate last stand where allies might reach the hero in time. There's no cap on how many waves a single fight can have — let a large-scale battle escalate for as long as the scene supports it. Each entry has: "id" (short, lowercase, unique slug), "label" (short name for the arriving group, in ${narrativeLanguage}, e.g. "Стража у ворот", "Меррик и его люди"), "side" (exactly "enemy" or "ally"), "trigger" (exactly one of {"type": "turn", "value": 3} — if the fight reaches round 3; {"type": "enemyDeaths", "value": 2} — once 2 enemies are dead; {"type": "allyDeaths", "value": 1} — once 1 ally has gone down; {"type": "heroHpBelow", "value": 20} — once the hero's HP drops below 20%), and "combatants" (1 or more entries, with no upper cap; for "enemy" each is shaped exactly like an "enemies" entry above — "enemyName"/"weaponDescription"/"tier"/"role"/"fearless"/"bodyParts"; for "ally" each is EITHER {"npcName": "exact name"} binding to an already-tracked companion who MUST already exist in "npcs" above with "presentNow": true, OR an anonymous unit shaped like an enemy entry but without "fearless"/"bodyParts" — {"name": "...", "weaponDescription": "...", "tier": "...", "role": "..."}). Enemy reinforcement tier should usually be AT OR BELOW the fight's own opening tier — they add pressure, not punish the player for winning; a "legendary" reinforcement to a "weak" fight is almost always wrong. An ally reinforcement MUST already be established in the story before this fight — a tracked companion physically present, or an anonymous group the scene has already foreshadowed (a patrol met earlier, a faction the hero has helped) — never conjure allies from nowhere. If a reinforcement is meant to save the hero, its trigger must fire before HP would actually reach zero — even then the rescue is only narrated, not mechanically guaranteed. There is no cap on the total number of enemies across the whole fight (opening roster plus every wave) — a proper siege, battle, or last stand should field as many opponents as the scene actually calls for.\n\"presentAllies\" is an optional array (default empty) of already-tracked, currently-present companions who are ACTIVELY FIGHTING ALONGSIDE THE HERO from the very first round of THIS fight — distinct from \"reinforcements\", which is for someone arriving mid-fight, and from the hero's own recruited party (who are already added to combat automatically and never need to be listed here). Use it whenever the scene's own prose has a specific named character — someone already in \"npcs\" above with \"presentNow\": true, but not already a recruited party member — throwing a punch, swinging a weapon, or otherwise actively fighting on the hero's side in the very scene that just triggered this combat: a hired guide, a fellow prisoner who grabbed a blade, a local guard who joins in, a quest-giver defending themselves alongside the hero. If the scene's own text has such a character fighting, they MUST appear here — never leave a character the prose just showed swinging a weapon out of combat entirely. Do not invent one who wasn't actually shown fighting, and do not include anyone already covered by the hero's recruited party. Each entry is {"npcName": "exact tracked name"}, with no fixed cap.${itemOffersSection}
+"reinforcements" is an optional array (default empty) of additional combatants who arrive mid-fight rather than at the start — the mechanism for a fight that grows beyond the initial clash. This should stay a minority of fights, not the norm, but don't let it collapse to never: over the course of a campaign it should genuinely fire from time to time, not sit empty for dozens of fights running. Actively look for a reason to use it rather than only reaching for it when the scene has already spelled one out in so many words — a bandit camp, a guard post, a den, or any lair-like location plausibly has more than just whoever's in the opening clash within earshot; a cry of alarm, sounds of fighting, or simply the fight running long enough to draw attention are all legitimate, ordinary triggers, not special narrative setups. Reserve it for moments that make sense given the location and situation: a patrol that will come running, a messenger who slipped away to raise the alarm, a stronghold where guards are everywhere, a desperate last stand where allies might reach the hero in time. There's no cap on how many waves a single fight can have — let a large-scale battle escalate for as long as the scene supports it. Each entry has: "id" (short, lowercase, unique slug), "label" (short name for the arriving group, in ${narrativeLanguage}, e.g. "Стража у ворот", "Меррик и его люди"), "side" (exactly "enemy" or "ally"), "trigger" (exactly one of {"type": "turn", "value": 3} — if the fight reaches round 3; {"type": "enemyDeaths", "value": 2} — once 2 enemies are dead; {"type": "allyDeaths", "value": 1} — once 1 ally has gone down; {"type": "heroHpBelow", "value": 20} — once the hero's HP drops below 20%), and "combatants" (1 or more entries, with no upper cap; for "enemy" each is shaped exactly like an "enemies" entry above — "enemyName"/"weaponDescription"/"tier"/"role"/"kind"/"damageResist"/"fearless"/"bodyParts"; for "ally" each is EITHER {"npcName": "exact name"} binding to an already-tracked companion who MUST already exist in "npcs" above with "presentNow": true, OR an anonymous unit shaped like an enemy entry but without "fearless"/"bodyParts" — {"name": "...", "weaponDescription": "...", "tier": "...", "role": "..."}). Enemy reinforcement tier should usually be AT OR BELOW the fight's own opening tier — they add pressure, not punish the player for winning; a "legendary" reinforcement to a "weak" fight is almost always wrong. An ally reinforcement MUST already be established in the story before this fight — a tracked companion physically present, or an anonymous group the scene has already foreshadowed (a patrol met earlier, a faction the hero has helped) — never conjure allies from nowhere. If a reinforcement is meant to save the hero, its trigger must fire before HP would actually reach zero — even then the rescue is only narrated, not mechanically guaranteed. There is no cap on the total number of enemies across the whole fight (opening roster plus every wave) — a proper siege, battle, or last stand should field as many opponents as the scene actually calls for.\n\"presentAllies\" is an optional array (default empty) of already-tracked, currently-present companions who are ACTIVELY FIGHTING ALONGSIDE THE HERO from the very first round of THIS fight — distinct from \"reinforcements\", which is for someone arriving mid-fight, and from the hero's own recruited party (who are already added to combat automatically and never need to be listed here). Use it whenever the scene's own prose has a specific named character — someone already in \"npcs\" above with \"presentNow\": true, but not already a recruited party member — throwing a punch, swinging a weapon, or otherwise actively fighting on the hero's side in the very scene that just triggered this combat: a hired guide, a fellow prisoner who grabbed a blade, a local guard who joins in, a quest-giver defending themselves alongside the hero. If the scene's own text has such a character fighting, they MUST appear here — never leave a character the prose just showed swinging a weapon out of combat entirely. Do not invent one who wasn't actually shown fighting, and do not include anyone already covered by the hero's recruited party. Each entry is {"npcName": "exact tracked name"}, with no fixed cap.${itemOffersSection}
 
 === EVENT: CAPTIVITY ===
 "captivityResolved" matters only when the CURRENT GAME STATE above shows the hero currently held captive (an "effects" entry with "kind": "captivity"); on every other turn it's irrelevant — omit it or leave it false. Set it true the exact turn THIS scene's own events show that captivity definitively ending — a successful escape, a negotiated release, a paid ransom, a rescue by allies, or any other clean resolution the scene actually depicts. Do not set it true for a hopeful attempt still in progress, an empty promise from a captor, or a scene that simply continues the captivity a while longer. If the resolution costs the hero something concrete — an item surrendered, an injury, a debt or promise now owed — show that happening in the prose and record it the ordinary way elsewhere in this same JSON ("inventory" without the item, a new "effects" entry for the injury, and so on); there is no separate field for the cost itself. The hero's "inventory" was emptied out the moment captivity began (their belongings were taken) and will be restored automatically the turn "captivityResolved" is true — you only need to add back, via the ordinary "inventory" field, anything specific this scene shows the hero recovering or being handed early, before the resolution itself (a knife slipped to them by an ally inside, gear a fleeing captor left behind).
@@ -37186,7 +37457,7 @@ ${chunkText}`;
         if (combatRaw && combatRaw.combat) {
             const rawEnemyList = Array.isArray(combatRaw.enemies) && combatRaw.enemies.length > 0
                 ? combatRaw.enemies
-                : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, tier: combatRaw.tier, role: combatRaw.role, fearless: combatRaw.fearless, bodyParts: combatRaw.bodyParts }];
+                : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, tier: combatRaw.tier, role: combatRaw.role, kind: combatRaw.kind, damageResist: combatRaw.damageResist, fearless: combatRaw.fearless, bodyParts: combatRaw.bodyParts }];
             // "role" (see ENEMY_ROLES) shapes this enemy's actual turn-by-turn
             // behavior during the fight — a ranged enemy holding/breaking
             // distance, a caster reaching for a status effect instead of a plain
@@ -37230,6 +37501,8 @@ ${chunkText}`;
                         weaponDescription: typeof c.weaponDescription === 'string' && c.weaponDescription.trim() ? c.weaponDescription.trim() : unarmedEnemyLabel,
                         tier: ENEMY_TIERS[c.tier] ? c.tier : 'average',
                         role: ENEMY_ROLES[c.role] ? c.role : 'melee',
+                        kind: ENEMY_KINDS.includes(c.kind) ? c.kind : ENEMY_KIND_DEFAULT,
+                        damageResist: ENEMY_DAMAGE_RESIST_LEVELS.includes(c.damageResist) ? c.damageResist : ENEMY_DAMAGE_RESIST_DEFAULT,
                         fearless: c.fearless === true,
                         bodyParts: normalizeEnemyBodyParts(c.bodyParts)
                     }))
