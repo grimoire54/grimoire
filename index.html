@@ -17779,6 +17779,7 @@ const TRANSLATIONS = {
         combatArmorHeadLabel: 'Защита головы',
         combatArmorBodyLabel: 'Защита тела',
         combatLogArmorAbsorbSuffix: 'броня полностью поглощает удар',
+        combatLogArmorReducedSuffix: ' (броня −{n})',
         combatHeadArmorBrokenLog: '🛡️ Защита головы разбита!',
         combatBodyArmorBrokenLog: '🛡️ Защита тела разбита!',
         combatLogDodgeSuccessText: 'Уклонение удаётся — урона нет',
@@ -18521,6 +18522,7 @@ const TRANSLATIONS = {
         combatArmorHeadLabel: 'Head armor',
         combatArmorBodyLabel: 'Body armor',
         combatLogArmorAbsorbSuffix: 'armor fully absorbs the blow',
+        combatLogArmorReducedSuffix: ' (armor −{n})',
         combatHeadArmorBrokenLog: '🛡️ Head armor shattered!',
         combatBodyArmorBrokenLog: '🛡️ Body armor shattered!',
         combatLogDodgeSuccessText: 'Dodge succeeds — no damage',
@@ -40305,7 +40307,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const justDisabled = newHp === 0 && !targetState.disabled;
             const parts = { ...defender.parts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
             const hitTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogHitTag');
-            log.push({ text: attacker.name + ' — ' + hitTag + ' (' + attacker.weaponLabel + '): ' + defender.name + ' ' + partLabel + ' −' + dmg + ' HP', kind: rolled.isCrit ? 'crit' : 'hit' });
+            const armorNote = armor > 0 ? t('combatLogArmorReducedSuffix').replace('{n}', armor) : '';
+            log.push({ text: attacker.name + ' — ' + hitTag + ' (' + attacker.weaponLabel + '): ' + defender.name + ' ' + partLabel + ' −' + dmg + ' HP' + armorNote, kind: rolled.isCrit ? 'crit' : 'hit' });
             const defeated = justDisabled && isBodyDestroyed(parts);
             // A solid hit to the head — even one that doesn't end the fight —
             // has a chance to stun (see COMBAT_TUNING.headStunChance), and one
@@ -40390,7 +40393,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // draws from; the pool absorbs it in full up to whatever it still has,
         // and HP only takes the overflow. An ally/enemy defender never carries
         // armorPools, so it keeps the old flat-reduction math below unchanged.
-        let dmg, armorPoolKey = null, armorPoolNext = null, armorJustBroke = false;
+        let dmg, armorPoolKey = null, armorPoolNext = null, armorJustBroke = false, flatArmorNote = '';
         if (defender.armorPools) {
             const poolKey = armorPoolKeyForPart(partKey);
             const curPool = Math.max(0, (defender.armorPools.cur && defender.armorPools.cur[poolKey]) || 0);
@@ -40405,6 +40408,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         else {
             const defense = defender.getDefenseForPart(partKey);
             dmg = Math.max(1, Math.round(softenedDmg - defense));
+            // getDefenseForPart wasn't previously surfaced anywhere in the log —
+            // an ally's worn armor was silently doing its job, so a hit that
+            // landed for less than the raw roll looked indistinguishable from
+            // armor being ignored entirely. Show the actual reduction.
+            if (defense > 0)
+                flatArmorNote = t('combatLogArmorReducedSuffix').replace('{n}', Math.round(defense));
         }
         const newHp = Math.max(0, targetState.hp - dmg);
         const justDisabled = newHp === 0 && !targetState.disabled;
@@ -40414,7 +40423,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 : (key === 'none' ? t('combatLogNoDefenseTag') : t('combatLogDefenseFailTag')));
         // A hit the armor pool swallowed entirely reads as the armor taking it,
         // not a "−0 HP" line.
-        const dmgSuffix = (armorPoolKey && dmg === 0) ? ' — ' + t('combatLogArmorAbsorbSuffix') : ' −' + dmg + ' HP';
+        const dmgSuffix = (armorPoolKey && dmg === 0) ? ' — ' + t('combatLogArmorAbsorbSuffix') : ' −' + dmg + ' HP' + flatArmorNote;
         log.push({ text: defender.name + ' — ' + tag + ' (' + attacker.weaponLabel + '): ' + partLabel + dmgSuffix, kind: rolled.isCrit ? 'crit' : 'hit' });
         if (armorJustBroke) {
             log.push({ text: defender.name + ': ' + t(armorPoolKey === 'head' ? 'combatHeadArmorBrokenLog' : 'combatBodyArmorBrokenLog'), kind: 'disabled' });
