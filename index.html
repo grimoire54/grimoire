@@ -17354,9 +17354,8 @@ const TRANSLATIONS = {
         modelLabel: 'Модель',
         modelHint: 'Например: gemini-3.8-flash, gemini-3.6-flash, gemini-3-pro — полный список смотри в Google AI Studio. Google часто снимает старые модели с поддержки быстрее заявленных сроков — если появится ошибка «is no longer available», впиши сюда модель из текста ошибки.',
         languageLabel: 'Язык',
-        itemInteractionLabel: 'Взаимодействие с предметами',
-        itemInteractionOn: 'Включено',
-        itemInteractionOff: 'Выключено',
+        toggleOn: 'Включено',
+        toggleOff: 'Выключено',
         stateDeltaLabel: 'Дельта-режим состояния',
         stateDeltaHint: 'Модель сообщает только изменения инвентаря, NPC и фракций за ход вместо полного списка заново — короче и быстрее ответ модели, с защитой на случай её ошибок.',
         importLink: 'Импорт',
@@ -17493,7 +17492,6 @@ const TRANSLATIONS = {
         mapLegendQuest: 'Задание',
         mapLegendRoute: 'Маршрут',
         mapLegendToggle: 'Обозначения',
-        mapHint: 'Тяни карту, своди/разводи пальцы или крути колёсико. Нажми на значок — покажется описание.',
         mapEmptyText: 'Карта заполнится, как только история начнёт называть места.',
         mapFogLabel: 'Неисследовано',
         mapKindSettlement: 'Поселение',
@@ -17507,10 +17505,6 @@ const TRANSLATIONS = {
         mapRouteDistanceDays: 'пара дней пути',
         mapRouteDistanceWeek: 'почти неделя пути',
         mapRouteDistanceLong: 'долгий путь, неделя и больше',
-        mapTravelModeRealtime: 'В реальном времени',
-        mapTravelModeTimeskip: 'Перемотка',
-        mapTravelModeRealtimeAria: 'Показать путь по ходу дела, шаг за шагом',
-        mapTravelModeTimeskipAria: 'Свернуть путь в один отрывок — «спустя несколько дней»',
         pendingMapTravelPrefix: '🧭 Герой отправится к «',
         pendingMapTravelSuffix: '» в следующем ходу',
         removeMapTravelAria: 'Отменить перемещение',
@@ -17583,9 +17577,8 @@ const TRANSLATIONS = {
         abilityDesc_secondWind: 'Раз в бой можно немедленно восстановить часть здоровья прямо в разгар боя.',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Таланты',
-        talentsTitle: 'Древо талантов',
+        talentsTitle: 'Таланты',
         talentPointsLabel: 'Очки талантов',
-        talentsPanHint: 'Потяни пальцем по дереву, чтобы прокрутить его. Своди/разводи пальцы или крути колёсико, чтобы приблизить.',
         talentRankWord: 'ранг',
         talentStatDescTemplate: 'Увеличивает параметр «{stat}» на {amount}.',
         talentStatusLabel: 'Статус',
@@ -18048,6 +18041,7 @@ const TRANSLATIONS = {
         mapLegendHostileTerritory: 'Территория враждебной фракции',
         mapLegendFriendlyTerritory: 'Территория дружественной фракции',
         mapLegendAlliedTerritory: 'Территория союзной фракции',
+        mapLegendNeutralTerritory: 'Территория нейтральной фракции',
         mapLegendDanger: 'Возможна опасность',
         mapDangerLabel: 'Возможна опасность',
         // -- World reactivity: day/night, faction territory drift, tavern rumors --
@@ -18123,9 +18117,8 @@ const TRANSLATIONS = {
         modelLabel: 'Model',
         modelHint: 'e.g. gemini-3.8-flash, gemini-3.6-flash, gemini-3-pro — see the full list in Google AI Studio. Google often retires old models earlier than announced — if you see an "is no longer available" error, paste the model name it suggests here.',
         languageLabel: 'Language',
-        itemInteractionLabel: 'Item interaction',
-        itemInteractionOn: 'On',
-        itemInteractionOff: 'Off',
+        toggleOn: 'On',
+        toggleOff: 'Off',
         stateDeltaLabel: 'State delta mode',
         stateDeltaHint: 'The model reports only what changed in inventory, NPCs, and factions each turn instead of the full list — shorter and faster, with safeguards if it gets something wrong.',
         importLink: 'Import',
@@ -18262,7 +18255,6 @@ const TRANSLATIONS = {
         mapLegendQuest: 'Quest',
         mapLegendRoute: 'Route',
         mapLegendToggle: 'Legend',
-        mapHint: 'Drag to pan, pinch or scroll to zoom. Tap a marker for its description.',
         mapEmptyText: 'The map fills in as the story starts naming places.',
         mapFogLabel: 'Unexplored',
         mapKindSettlement: 'Settlement',
@@ -18276,10 +18268,6 @@ const TRANSLATIONS = {
         mapRouteDistanceDays: 'a couple of days\' travel',
         mapRouteDistanceWeek: 'nearly a week\'s travel',
         mapRouteDistanceLong: 'a long trek, a week or more',
-        mapTravelModeRealtime: 'Real time',
-        mapTravelModeTimeskip: 'Time-skip',
-        mapTravelModeRealtimeAria: 'Play the journey out step by step',
-        mapTravelModeTimeskipAria: 'Compress the journey into one passage of time',
         pendingMapTravelPrefix: '🧭 Heading to "',
         pendingMapTravelSuffix: '" next turn',
         removeMapTravelAria: 'Cancel the trip',
@@ -18352,9 +18340,8 @@ const TRANSLATIONS = {
         abilityDesc_secondWind: 'Once per fight, instantly recover part of your health mid-battle.',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Talents',
-        talentsTitle: 'Talent tree',
+        talentsTitle: 'Talents',
         talentPointsLabel: 'Talent points',
-        talentsPanHint: 'Drag anywhere on the tree to pan it. Pinch or scroll to zoom.',
         talentRankWord: 'rank',
         talentStatDescTemplate: 'Increases "{stat}" by {amount}.',
         talentStatusLabel: 'Status',
@@ -18808,6 +18795,7 @@ const TRANSLATIONS = {
         mapLegendHostileTerritory: 'Territory of a hostile faction',
         mapLegendFriendlyTerritory: 'Territory of a friendly faction',
         mapLegendAlliedTerritory: 'Territory of an allied faction',
+        mapLegendNeutralTerritory: 'Territory of a neutral faction',
         mapLegendDanger: 'Possible danger',
         mapDangerLabel: 'Possible danger',
         // -- World reactivity: day/night, faction territory drift, tavern rumors --
@@ -19540,11 +19528,11 @@ function normalizePendingSecrets(raw) {
     return raw.map(normalizePendingSecret).filter(Boolean);
 }
 const MAP_NODE_KINDS = ['settlement', 'wilderness', 'dungeon', 'landmark'];
-// Constant on-screen SPEED (not total duration) for the travel-route dot
-// in MapModal — seconds of animation per grid-unit of a route's real
-// distance (see mapNodeDistance), so a long multi-hop trip takes
-// proportionally longer to visibly cross rather than being squeezed into
-// the same couple of seconds as a short hop.
+// Old per-grid-unit pacing — no longer what actually drives the travel
+// dot's speed (see MAP_ROUTE_DOT_PIXELS_PER_SECOND, defined further down
+// next to MAP_CELL once that constant exists), kept only as the one-frame
+// fallback in MapModal's routeDurationSeconds, before its DOM measurement
+// of the route path has run for the first time.
 const MAP_ROUTE_DOT_SECONDS_PER_UNIT = 0.55;
 const MAP_DIRECTION_VECTORS = {
     N: [0, -1], NE: [1, -1], E: [1, 0], SE: [1, 1],
@@ -19638,6 +19626,17 @@ function normalizeMapNodeName(name) {
         .replace(/\s+/g, ' ')
         .replace(/^["'«»„“”\s]+|["'«»„“”.,;:!?\s]+$/g, '');
 }
+// Capitalizes just the first letter of a location's display name, leaving
+// the rest of it (and any inner capitalization the model already got right,
+// like a proper noun mid-name) untouched. Applied wherever a node's display
+// `name` is actually set — both on first creation and on rename (see
+// reconcileMap's upsert) — so every label on the map, in search, in the
+// current-location header, etc. reads consistently rather than only fixing
+// the spots that happen to render it.
+function capitalizeMapNodeName(name) {
+    const trimmed = name.trim();
+    return trimmed.length ? trimmed[0].toUpperCase() + trimmed.slice(1) : trimmed;
+}
 function findFreeGridCell(fromGx, fromGy, direction, occupied, startStep = 1) {
     const vec = MAP_DIRECTION_VECTORS[direction] || MAP_DIRECTION_VECTORS.E;
     const lastStep = startStep + 11;
@@ -19656,7 +19655,7 @@ function normalizeMapNode(raw) {
         return null;
     return {
         id: raw.id.trim(),
-        name: raw.name.trim(),
+        name: capitalizeMapNodeName(raw.name),
         kind: MAP_NODE_KINDS.includes(raw.kind) ? raw.kind : 'landmark',
         gx: Number.isFinite(raw.gx) ? raw.gx : 0,
         gy: Number.isFinite(raw.gy) ? raw.gy : 0,
@@ -19977,7 +19976,7 @@ function reconcileMap(rawLocation, currentState) {
         if (!existing && typeof previousName === 'string' && previousName.trim()) {
             existing = byName(previousName);
             if (existing)
-                existing.name = name.trim();
+                existing.name = capitalizeMapNodeName(name);
         }
         if (existing) {
             if (!existing.description && description)
@@ -20061,7 +20060,7 @@ function reconcileMap(rawLocation, currentState) {
         const { gx, gy } = isVertical
             ? { gx: anchor.gx, gy: anchor.gy }
             : (nodes.length === 0 && !fromNode) ? { gx: 0, gy: 0 } : findFreeGridCell(anchor.gx, anchor.gy, farDirection, occupiedCellsOnLayer(layer), far ? FAR_MAP_GRID_DISTANCE : 1);
-        const node = { id, name: name.trim(), kind: resolvedKind, gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId, floorAnchorId, arrowPending: far === true };
+        const node = { id, name: capitalizeMapNodeName(name), kind: resolvedKind, gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId, floorAnchorId, arrowPending: far === true };
         nodes.push(node);
         return node;
     }
@@ -20135,7 +20134,7 @@ function applyConfirmedTravel(mapState, precedingNarrator, isOpeningTurn) {
         // No verticalMove concept here — a travel offer is always an ordinary
         // horizontal trip — so the destination simply inherits whatever stack
         // its anchor already belongs to, same as any horizontal upsert above.
-        destination = { id: slugifyMapId(offer.label, existingIds), name: offer.label, kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId: anchor.floorRootId || null, floorAnchorId: null, arrowPending: false };
+        destination = { id: slugifyMapId(offer.label, existingIds), name: capitalizeMapNodeName(offer.label), kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId: anchor.floorRootId || null, floorAnchorId: null, arrowPending: false };
         nodes.push(destination);
     }
     destination.discovered = true;
@@ -20882,7 +20881,6 @@ function generateRumors(state, t) {
 // STORAGE KEYS & SESSION CONSTANTS
 // ==============================================================================
 const LANG_KEY = 'grimoire-rpg-ui-lang';
-const ITEM_TOGGLE_KEY = 'grimoire-rpg-item-interaction';
 const STATE_DELTA_TOGGLE_KEY = 'grimoire-rpg-state-delta';
 const EDIT_WARNING_SKIP_KEY = 'grimoire-rpg-skip-edit-warning';
 // "Don't show this again" for the gift confirm screen — see
@@ -20923,6 +20921,17 @@ const RECENT_TURN_WINDOW = 40;
 // narrator temporarily runs a little past RECENT_TURN_WINDOW while a batch
 // is pending, shrinking back down right after each summary update lands.
 const SUMMARY_BATCH_SIZE = 10;
+// How many of the hero's most recent explicitly-declined quest/advance/
+// reward offers are kept as a standing, verbatim fact list fed to the
+// narrator AND the summarizer every single turn — see declinedOffersRef
+// and recordDeclinedOffer. Deliberately independent of RECENT_TURN_WINDOW
+// and narrativeSummary: a decline is a hard, discrete fact ("the hero does
+// NOT have this"), not prose to compress, so it must never depend on a
+// summarizing model correctly noticing and preserving it turn after turn.
+// Declines are rare relative to ordinary turns, so this cap is only a
+// safety bound against pathological growth over a very long campaign, not
+// a limit expected to bite in normal play.
+const MAX_DECLINED_OFFERS_TRACKED = 50;
 const PRIVACY_URL = 'https://grimoire54.github.io/grimoire/privacy.html';
 const SAVE_PREFIX = 'GRIMOIRE-RPG-SAVE-v1:';
 const SAVE_PREFIX_V2 = 'GRIMOIRE-RPG-SAVE-v2:';
@@ -30449,8 +30458,8 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // actually zooming on stays under your fingers/cursor instead of the
     // whole field sliding toward the top-left corner every time zoom changes
     // — and the camera auto-following whoever's turn it currently is (see the
-    // effect below). Replaces the old "Move" button: now you click your own
-    // card to start planning a route (planningMove) and click a cell to
+    // effect below). Move-planning (planningMove) is on by default for
+    // whoever's turn it is — no click needed to enable it — click a cell to
     // preview, then confirm, a path to it (pathTarget/computeClampedPath).
     // moved (in panStateRef) distinguishes an actual drag from a plain tap so
     // dragging the field never also fires whatever cell/token sits under the
@@ -30462,9 +30471,13 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     const pinchRef = useRef(null);
     const viewportRef = useRef(null);
     const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
-    const [planningMove, setPlanningMove] = useState(false);
+    // On by default from the moment it's your turn — clicking your own card
+    // is no longer what turns this on (attacking already doesn't need it
+    // either, see enemy targetable above), it's just still available if you
+    // ever want to toggle the path-preview overlay off.
+    const [planningMove, setPlanningMove] = useState(true);
     const [pathTarget, setPathTarget] = useState(null);
-    useEffect(() => { setPlanningMove(false); setPathTarget(null); }, [combat.turnPos, combat.round]);
+    useEffect(() => { setPlanningMove(true); setPathTarget(null); }, [combat.turnPos, combat.round]);
     const activeMoverPos = isHeroTurn ? combat.heroPos : (isAllyPlayerTurn ? currentAlly.pos : null);
     // Which combatant computeClampedPath should leave out of its own
     // collision check while planning a route — see findOccupantAt's
@@ -30789,10 +30802,14 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // the hero sits between them) isn't known until it's actually rendered.
     const portraitRefs = useRef({});
     const setPortraitRef = (key) => (el) => { portraitRefs.current[key] = el; };
-    // DOM node for the placeholder arrow (see fireArrow below) — moved with
-    // direct style writes rather than React state so its mid-flight position
-    // never has to round-trip through a render.
-    const arrowRef = useRef(null);
+    // In-flight placeholder arrows, one entry per shot rather than a single
+    // shared DOM node — see fireArrow below for why: sharing one node meant a
+    // second ranged attack landing before the first one's flight finished
+    // would yank that node to a new start position mid-flight (looked like
+    // the arrow teleporting/flying erratically). Each entry here gets its
+    // own <svg> with its own key, so overlapping shots animate independently.
+    const [arrows, setArrows] = useState([]);
+    const arrowSeqRef = useRef(0);
     // True when the given combatant's currently-equipped weapon is ranged
     // (bow/crossbow/sling — see isRangedWeaponName), which is what decides
     // whether an attack plays the archer draw/release/arrow sequence below
@@ -30810,34 +30827,58 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         }
         return false;
     }
-    // Flies the placeholder arrow from attackerEl to defenderEl (or, on a
-    // miss, to a random point just outside defenderEl's own footprint) and
-    // calls onArrive once it lands. Returns the timer id so callers can
-    // clear it on cleanup.
-    function fireArrow(attackerEl, defenderEl, isMiss, onArrive) {
-        const el = arrowRef.current;
-        if (!el || !attackerEl || !defenderEl) {
-            onArrive();
-            return null;
+    // Grid (world-space) position of a combatant — used so the ranged
+    // attack's placeholder arrow can be flown in the exact same coordinate
+    // space as the grid tokens themselves (see fireArrow below), instead of
+    // reading screen pixels off getBoundingClientRect.
+    function combatantGridPos(type, id) {
+        if (type === 'hero')
+            return combat.heroPos;
+        if (type === 'ally') {
+            const ally = (combat.allies || []).find(a => a.id === id);
+            return ally ? ally.pos : null;
         }
-        const a = attackerEl.getBoundingClientRect();
-        const d = defenderEl.getBoundingClientRect();
-        const start = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
-        let end = { x: d.left + d.width / 2, y: d.top + d.height / 2 };
+        if (type === 'enemy') {
+            const enemy = (combat.enemies || []).find(e => e.id === id);
+            return enemy ? enemy.pos : null;
+        }
+        return null;
+    }
+    // Flies a placeholder arrow from the attacker's grid cell to the
+    // defender's (or, on a miss, to a random point just outside the
+    // defender's own footprint), calling onArrive 260ms later when it lands.
+    // Positions are computed in the same world-space pixels as every grid
+    // token (see unitCenterPx), and each arrow is its own <svg> keyed by id
+    // (rendered below, inside .combat-grid-world so it pans/zooms with the
+    // camera) — that's what lets several shots be mid-flight at once without
+    // one clobbering another's position. Pushes its timers onto the caller's
+    // timers array instead of returning one, since this now schedules two
+    // separate things (the arrival callback, and the arrow's own cleanup).
+    function fireArrow(attackerPos, defenderPos, isMiss, onArrive, timers) {
+        if (!attackerPos || !defenderPos) {
+            onArrive();
+            return;
+        }
+        const start = { x: unitCenterPx(attackerPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(attackerPos.y, GRID_RENDER_MIN_Y) };
+        let end = { x: unitCenterPx(defenderPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(defenderPos.y, GRID_RENDER_MIN_Y) };
         if (isMiss) {
-            const cardHalf = Math.max(d.width, d.height) / 2;
+            const cardHalf = (UNIT_SPAN * GRID_CELL_PX) / 2;
             const missRadius = cardHalf + 14 + Math.random() * 34;
             const missAngle = Math.random() * Math.PI * 2;
             end = { x: end.x + Math.cos(missAngle) * missRadius, y: end.y + Math.sin(missAngle) * missRadius };
         }
         const angleDeg = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
-        el.style.transition = 'none';
-        el.style.opacity = '1';
-        el.style.transform = 'translate(' + (start.x - 10) + 'px,' + (start.y - 10) + 'px) rotate(' + angleDeg + 'deg)';
-        void el.offsetWidth;
-        el.style.transition = 'transform 0.26s linear, opacity 0.1s linear 0.16s';
-        el.style.transform = 'translate(' + (end.x - 10) + 'px,' + (end.y - 10) + 'px) rotate(' + angleDeg + 'deg)';
-        return setTimeout(() => { el.style.opacity = '0'; onArrive(); }, 260);
+        const id = ++arrowSeqRef.current;
+        setArrows(prev => [...prev, {
+                id,
+                x1: (start.x - 16) + 'px', y1: (start.y - 5) + 'px',
+                x2: (end.x - 16) + 'px', y2: (end.y - 5) + 'px',
+                angle: angleDeg + 'deg'
+            }]);
+        timers.push(setTimeout(onArrive, 260));
+        // Matches the arrow-flight keyframe's own duration (see the CSS) —
+        // the element only gets removed once it's already faded out.
+        timers.push(setTimeout(() => setArrows(prev => prev.filter(a => a.id !== id)), 480));
     }
     // ---- Pre-battle sword-clash intro ----
     // introActive itself now lives in App() (combatIntroActive) — shared with
@@ -30983,18 +31024,20 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             // flight and the defender's own reaction are chained off its end so
             // a hit (or a miss landing wide) plays exactly when the arrow
             // arrives, instead of firing immediately the way a melee lunge does.
+            const attackerPos = combatantGridPos(action.attackerType, action.attackerId);
+            const defenderPos = combatantGridPos(action.defenderType, action.defenderId);
             setFx(prev => ({ ...prev, [attackerKey]: { cls: 'combat-fx-archer-draw', seq, spark: null, vec: archerVec } }));
             timers.push(setTimeout(() => {
                 setFx(prev => (prev[attackerKey] && prev[attackerKey].seq === seq)
                     ? { ...prev, [attackerKey]: { cls: 'combat-fx-archer-release', seq, spark: null, vec: archerVec } }
                     : prev);
-                timers.push(fireArrow(attackerEl, defenderEl, isMiss, () => {
+                fireArrow(attackerPos, defenderPos, isMiss, () => {
                     if (defenderCls)
                         setFx(prev => ({ ...prev, [defenderKey]: { cls: defenderCls, seq, spark, vec: null } }));
                     if (popupItems.length > 0)
                         setPopups(prev => ({ ...prev, [defenderKey]: { seq, items: popupItems } }));
                     timers.push(setTimeout(clearFxAndPopups, 900));
-                }));
+                }, timers);
             }, 420));
         }
         else {
@@ -31012,7 +31055,6 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget && combat.result)
             onClose(); } },
         React.createElement("div", { className: "modal-card combat-card combat-card-group" },
-            React.createElement("span", { ref: arrowRef, className: "combat-arrow-projectile", "aria-hidden": "true" }, "\u27B3"),
             React.createElement("h2", { className: "modal-title" },
                 t('combatModalTitle'),
                 ": ",
@@ -31050,6 +31092,9 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')',
                             transformOrigin: '0 0'
                         } },
+                        arrows.map(a => (React.createElement("svg", { key: a.id, className: "combat-arrow-projectile", "aria-hidden": "true", viewBox: "0 0 32 10", style: { '--arrow-x1': a.x1, '--arrow-y1': a.y1, '--arrow-x2': a.x2, '--arrow-y2': a.y2, '--arrow-angle': a.angle } },
+                            React.createElement("line", { x1: "0", y1: "5", x2: "21", y2: "5", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round" }),
+                            React.createElement("path", { d: "M17 0 L32 5 L17 10 Z", fill: "currentColor" })))),
                         combat.coverCells.map((c, i) => (React.createElement("div", { key: 'cover' + i, className: 'combat-grid-cover combat-grid-cover-' + c.tier, style: { left: cellOriginPx(c.x, GRID_RENDER_MIN_X), top: cellOriginPx(c.y, GRID_RENDER_MIN_Y), width: GRID_CELL_PX * UNIT_SPAN, height: GRID_CELL_PX * UNIT_SPAN }, title: c.tier === 'full' ? t('combatCoverFullLabel') : t('combatCoverPartialLabel') }, "\uD83D\uDEE1"))),
                         planningMove && activeMoverPos && Array.from({ length: (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) }, (_, idx) => {
                             const gx = GRID_RENDER_MIN_X + (idx % (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1));
@@ -31081,7 +31126,14 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             return (React.createElement("div", { key: enemy.id, className: "combat-grid-token", style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
-                                        React.createElement(CombatPortrait, { name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, targetable: isPlayerTurn && !planningMove && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
+                                        React.createElement(CombatPortrait, { name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, 
+                                            // Attacking and planning a move are two different
+                                            // things you can reach for on your turn, not an
+                                            // exclusive toggle — enemies stay targetable even
+                                            // while planningMove (below) is active, so tapping
+                                            // your own card to preview a route never locks out
+                                            // tapping an enemy to attack instead.
+                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled, onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
                         }),
                         visibleAllies.map(ally => {
                             const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !introActive && pendingItemIndex === null;
@@ -31329,15 +31381,15 @@ function TalentTreeScreen({ gameState, onLearn, onClose, t }) {
                 React.createElement("p", { className: "talent-tree-title" }, t('talentsTitle')),
                 React.createElement("span", { className: "talent-tree-points", title: t('talentPointsLabel') },
                     "\uD83D\uDCD6 ",
-                    points),
-                React.createElement("button", { onClick: onClose, className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
+                    points)),
             React.createElement("div", { className: "talent-tree-viewport", ref: viewportRef, onPointerDown: onPointerDown, onPointerMove: onPointerMove, onPointerUp: onPointerUp, onPointerCancel: onPointerUp, onWheel: onWheel },
                 React.createElement("div", { className: "talent-tree-canvas", style: { width: TALENT_CANVAS_WIDTH, height: TALENT_CANVAS_HEIGHT, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' } },
                     React.createElement(TalentConnectors, null),
                     TALENT_BRANCHES.map((b, i) => (React.createElement("div", { key: b.key, className: "talent-branch-label", style: { left: i * (TALENT_COLS_PER_BRANCH * TALENT_CELL + TALENT_BRANCH_GAP), width: TALENT_COLS_PER_BRANCH * TALENT_CELL } }, t(b.nameKey)))),
                     Object.values(TALENT_DEFS).map(def => (React.createElement(TalentNodeButton, { key: def.id, def: def, learned: (talents[def.id] || 0) >= def.maxRank, learnable: canLearnTalent(talents, points, def.id), selected: def.id === selectedId, onSelect: id => { if (!dragRef.current.moved)
                             setSelectedId(id); } }))))),
-            React.createElement("p", { className: "talent-tree-hint" }, t('talentsPanHint'))),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton')))),
         selectedDef && (React.createElement("div", { className: "talent-detail-backdrop", onClick: () => setSelectedId(null) },
             React.createElement("div", { className: "talent-detail-panel", onClick: e => e.stopPropagation() },
                 React.createElement("div", { className: "talent-detail-head" },
@@ -31387,6 +31439,16 @@ function DeathModal({ resurrectionChecking, resurrectionDenied, onClose, onGoBac
 // stray tap can never lose an item without a second, explicit confirmation.
 // ---- Map ----
 const MAP_CELL = 130;
+// Constant on-screen SPEED for the travel-route dot in MapModal, in real
+// rendered pixels per second — the actual dial that keeps a 1-hop and a
+// 10-hop trip crossing the screen at the same visible pace (see
+// routeDurationSeconds in MapModal, which divides the DOM-measured route
+// path length by this). Derived from MAP_CELL / MAP_ROUTE_DOT_SECONDS_PER_UNIT
+// so it feels the same as the old per-grid-unit pacing did for a plain,
+// unbowed, un-jittered hop — but this one, unlike that old number, stays
+// honest on a real multi-hop/bowed/jittered route because it's driven off
+// the path's own measured length rather than an estimate.
+const MAP_ROUTE_DOT_PIXELS_PER_SECOND = MAP_CELL / MAP_ROUTE_DOT_SECONDS_PER_UNIT;
 // How far a node is allowed to wobble off its exact grid intersection, in
 // pixels — and how strongly a road between two nodes is allowed to bow into
 // a curve, as a fraction of that road's own length. Both are derived from a
@@ -31531,18 +31593,29 @@ const MAP_LAYOUT_ITERATIONS = 200;
 // nothing pulling back against it closes that residual in only a few
 // passes.
 const MAP_LAYOUT_POLISH_ITERATIONS = 30;
-function computeMapDisplayLayout(nodesOnLayer) {
+function computeMapDisplayLayout(nodesOnLayer, previousPositions) {
     const pos = new Map();
     if (nodesOnLayer.length === 0)
         return pos;
     const home = new Map();
     nodesOnLayer.forEach(n => {
         const base = mapNodePixel(n);
-        pos.set(n.id, { x: base.x, y: base.y });
+        // Seed the relaxation's STARTING point from wherever this node last
+        // settled, if we have that on record — the spring target (`home`,
+        // just below) still always stays the node's own raw grid slot,
+        // unchanged. A node that was already at equilibrium last time starts
+        // this run already at equilibrium too and barely moves; only a
+        // genuinely new node (nothing in previousPositions yet) starts fresh
+        // at its raw home and has to find its own spot, same as before.
+        const prev = previousPositions && previousPositions.get(n.id);
+        pos.set(n.id, prev ? { x: prev.x, y: prev.y } : { x: base.x, y: base.y });
         home.set(n.id, base);
     });
-    if (nodesOnLayer.length === 1)
+    if (nodesOnLayer.length === 1) {
+        if (previousPositions)
+            nodesOnLayer.forEach(n => previousPositions.set(n.id, pos.get(n.id)));
         return pos;
+    }
     const kinship = computeMapNodeKinship(nodesOnLayer);
     const ids = nodesOnLayer.map(n => n.id);
     const halfWidth = new Map(nodesOnLayer.map(n => [n.id, mapNodeHalfWidth(n)]));
@@ -31659,6 +31732,12 @@ function computeMapDisplayLayout(nodesOnLayer) {
     // loop to have remembered to skip them.
     pinnedIds.forEach(id => { const h = home.get(id); if (h)
         pos.set(id, { x: h.x, y: h.y }); });
+    // Record where everything actually landed this time, so the NEXT call
+    // (this floor gaining/losing a node, a different floor being viewed and
+    // coming back, or the whole map being reopened later) starts from here
+    // instead of from scratch — see previousPositions' own seeding above.
+    if (previousPositions)
+        ids.forEach(id => previousPositions.set(id, pos.get(id)));
     return pos;
 }
 // A quadratic-bezier path between two already-jittered pixel points, bowed
@@ -31677,160 +31756,261 @@ function curvedEdgePath(x1, y1, x2, y2, key) {
 }
 // ---- Faction territory borders ----
 // The legend promises a shared border around a faction's own nearby
-// holdings, not a ring around each dot — this builds one smoothed blob
-// per (faction, nearby cluster) pair instead of coloring individual node
-// icons. See computeTerritoryShapes below for the entry point, and its
-// call site inside MapModal for how each cluster picks its color.
-// How far apart (in already-laid-out screen pixels) two same-faction
-// nodes on the same floor can sit and still share one border rather than
-// each getting its own — reads as "nearby, by geography" rather than
-// "connected by a road", since two holdings a faction treats as one
-// territory don't need a drawn road between them to read as contiguous.
-const MAP_TERRITORY_CLUSTER_DISTANCE = 300;
-// How far the border sits outside each node's own center point —
-// deliberately separate from mapNodeHalfWidth (that one sizes label-
-// collision clearance during layout, a different concern from how puffy
-// a territory border looks).
-const MAP_TERRITORY_NODE_RADIUS = 60;
-// Points sampled around each node's own radius before the convex hull
-// below — enough that the hull already reads as rounded before the
-// Catmull-Rom smoothing pass rounds it further.
-const MAP_TERRITORY_CIRCLE_SAMPLES = 16;
-// Standard monotone-chain convex hull (Andrew's algorithm), returned
-// counter-clockwise with no repeated closing point. Nothing about this
-// is map-specific — only its call site below is.
-function convexHull(points) {
-    const pts = points.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
-    if (pts.length < 3)
-        return pts;
-    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-    const lower = [];
-    for (const p of pts) {
-        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
-            lower.pop();
-        lower.push(p);
-    }
-    const upper = [];
-    for (let i = pts.length - 1; i >= 0; i -= 1) {
-        const p = pts[i];
-        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
-            upper.pop();
-        upper.push(p);
-    }
-    lower.pop();
-    upper.pop();
-    return lower.concat(upper);
-}
-// Threads a smooth closed loop through every hull point (uniform
-// Catmull-Rom, converted to cubic-bezier segments) so a territory border
-// reads as one organic blob rather than the bare straight-edged polygon
-// the sampled circle points would otherwise trace — the same spirit as
-// curvedEdgePath bowing a road, just closed into a loop through many
-// points instead of one bend between two.
-function smoothClosedHullPath(points) {
+// holdings, with rival factions meeting at a real edge rather than
+// overlapping — the same visual model Stellaris uses for empire borders.
+// This builds exactly that: a coarse grid over the visible map, each
+// grid point assigned to whichever faction-owning node is nearest
+// (within MAP_TERRITORY_REACH — beyond that, a point stays unclaimed by
+// anyone), then a marching-squares pass per faction turns its own
+// claimed region into one or more closed outlines, smoothed into organic
+// blobs. See computeTerritoryShapes below for the entry point, and its
+// call site inside MapModal for how each faction's outline picks its
+// color.
+// How far a single location's own claim reaches before a grid point is
+// left unclaimed — the only knob controlling both a lone location's
+// blob radius and how close two same-faction locations need to sit to
+// visibly merge (their claims overlap, and so merge into one shape,
+// whenever the two are within 2x this distance of each other).
+const MAP_TERRITORY_REACH = 130;
+// Grid resolution for the nearest-owner sampling below — fine enough
+// that the marching-squares outline already reads as rounded before the
+// Catmull-Rom smoothing pass (see smoothClosedLoopPath) rounds it
+// further; coarse enough to keep sampling the whole floor cheap.
+const MAP_TERRITORY_GRID_STEP = 14;
+// Threads a smooth closed loop through every point of a stitched
+// marching-squares outline (centripetal Catmull-Rom, converted to
+// cubic-bezier segments) so a territory border reads as one organic
+// shape rather than the bare staircase of tiny straight segments
+// marching squares actually traces — the same spirit as curvedEdgePath
+// bowing a road, just closed into a loop through many points instead of
+// one bend between two.
+//
+// Centripetal (alpha=0.5), not uniform: consecutive points along a
+// marching-squares outline aren't perfectly evenly spaced either — a
+// straight-through square contributes a segment exactly
+// MAP_TERRITORY_GRID_STEP long, while a diagonal corner-cut contributes
+// one about 30% shorter, and a real outline mixes both constantly.
+// Uniform Catmull-Rom assumes even spacing and overshoots wherever a
+// short segment sits beside a long one; centripetal weights each
+// segment's own tangent by its actual length, so it stays smooth across
+// that mix instead of flinging control points out past the loop. Costs
+// nothing worth caring about and never does worse than uniform, so it's
+// the safe default here too, even though this outline's spacing is far
+// milder than the wildly uneven convex-hull sampling an earlier version
+// of this function smoothed.
+function smoothClosedLoopPath(points) {
     const n = points.length;
     if (n < 3)
         return '';
+    const alpha = 0.5;
+    const segLen = (a, b) => Math.max(Math.pow(Math.hypot(b.x - a.x, b.y - a.y), alpha), 1e-6);
     let d = `M${points[0].x},${points[0].y} `;
     for (let i = 0; i < n; i += 1) {
         const p0 = points[(i - 1 + n) % n];
         const p1 = points[i];
         const p2 = points[(i + 1) % n];
         const p3 = points[(i + 2) % n];
-        const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
-        const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+        const t0 = 0;
+        const t1 = t0 + segLen(p0, p1);
+        const t2 = t1 + segLen(p1, p2);
+        const t3 = t2 + segLen(p2, p3);
+        const m1x = (t2 - t1) * ((p1.x - p0.x) / (t1 - t0) - (p2.x - p0.x) / (t2 - t0) + (p2.x - p1.x) / (t2 - t1));
+        const m1y = (t2 - t1) * ((p1.y - p0.y) / (t1 - t0) - (p2.y - p0.y) / (t2 - t0) + (p2.y - p1.y) / (t2 - t1));
+        const m2x = (t2 - t1) * ((p2.x - p1.x) / (t2 - t1) - (p3.x - p1.x) / (t3 - t1) + (p3.x - p2.x) / (t3 - t2));
+        const m2y = (t2 - t1) * ((p2.y - p1.y) / (t2 - t1) - (p3.y - p1.y) / (t3 - t1) + (p3.y - p2.y) / (t3 - t2));
+        const c1x = p1.x + m1x / 3, c1y = p1.y + m1y / 3;
+        const c2x = p2.x - m2x / 3, c2y = p2.y - m2y / 3;
         d += `C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y} `;
     }
     return d + 'Z';
 }
-// Connected components over a "within MAP_TERRITORY_CLUSTER_DISTANCE"
-// graph — plain BFS, not union-find, since a floor never has enough
-// faction-owned nodes for that to matter. Three spots strung out in a
-// line all merge into one cluster; a fourth spot on the far side of the
-// map gets its own.
-function clusterNodesByProximity(nodes, maxDist) {
-    const clusters = [];
-    const visited = new Set();
-    nodes.forEach(start => {
-        if (visited.has(start.id))
+// A single grid square's marching-squares contribution: 0, 1, or 2
+// straight segments (as pairs of {x,y} edge-midpoints) tracing the
+// boundary between "belongs to this owner" and "doesn't", given the four
+// corners' owner-match booleans and the square's four edge-midpoints.
+// Ownership is strictly boolean here (not a continuous field), so every
+// crossing sits exactly at its edge's midpoint — no interpolation
+// needed. Walking a-b-c-d-a is a cycle, so the number of edges that
+// cross is always even: 0 (uniform square), 2 (exactly one segment,
+// whether the two crossing edges are adjacent or directly opposite —
+// pairing whichever two edges crossed is always correct either way), or
+// 4 (the checkerboard "saddle", resolved by pairing each crossing edge
+// with its neighbor around whichever single corner it isolates).
+function marchingSquareSegments(a, b, c, d, top, right, bottom, left) {
+    const crossing = [a !== b && top, b !== c && right, c !== d && bottom, d !== a && left].filter(Boolean);
+    if (crossing.length === 2)
+        return [[crossing[0], crossing[1]]];
+    if (crossing.length === 4)
+        return a ? [[left, top], [right, bottom]] : [[top, right], [bottom, left]];
+    return [];
+}
+// Rounds a point to a stable string key (well under a pixel of
+// precision) so two squares that independently compute the same shared
+// edge-midpoint always stitch together as the same graph node below.
+function territoryPointKey(p) {
+    return Math.round(p.x * 20) + ',' + Math.round(p.y * 20);
+}
+// Walks the graph of marching-squares segments into one or more closed
+// loops of ordered points. Every crossing edge-midpoint is shared by
+// exactly two squares (see computeTerritoryShapes' padding, which
+// guarantees the sampled grid's own outer edge never crosses for any
+// faction), so this graph is degree-2 everywhere and decomposes cleanly
+// into simple cycles — several loops just means several disjoint blobs
+// for the same faction, exactly like a fragmented empire's holdings.
+function stitchSegmentsIntoLoops(segments) {
+    const byKey = new Map();
+    segments.forEach(seg => {
+        seg.forEach(p => {
+            const k = territoryPointKey(p);
+            if (!byKey.has(k))
+                byKey.set(k, []);
+            byKey.get(k).push(seg);
+        });
+    });
+    const usedSegments = new Set();
+    const loops = [];
+    segments.forEach(seg => {
+        if (usedSegments.has(seg))
             return;
-        const cluster = [start];
-        visited.add(start.id);
-        const queue = [start];
-        let head = 0;
-        while (head < queue.length) {
-            const cur = queue[head];
-            head += 1;
-            nodes.forEach(other => {
-                if (visited.has(other.id))
-                    return;
-                if (Math.hypot(other.x - cur.x, other.y - cur.y) <= maxDist) {
-                    visited.add(other.id);
-                    cluster.push(other);
-                    queue.push(other);
+        // Every point is tracked by its string key below, never by object
+        // identity — two adjacent squares each build their own fresh {x,y}
+        // literal for the edge-midpoint they share, so those are two
+        // distinct objects even when numerically identical, and comparing
+        // them with === would silently fail to recognize the same point.
+        const startKey = territoryPointKey(seg[0]);
+        const loop = [seg[0]];
+        let prevKey = startKey, currentSeg = seg;
+        usedSegments.add(currentSeg);
+        let guard = segments.length + 5; // topology guarantees closure; this just guards against a bug freezing the tab
+        while (guard > 0) {
+            guard -= 1;
+            const nextPoint = territoryPointKey(currentSeg[0]) === prevKey ? currentSeg[1] : currentSeg[0];
+            loop.push(nextPoint);
+            const nextKey = territoryPointKey(nextPoint);
+            if (nextKey === startKey)
+                break;
+            const nextSeg = (byKey.get(nextKey) || []).find(s => !usedSegments.has(s));
+            if (!nextSeg)
+                break;
+            usedSegments.add(nextSeg);
+            prevKey = nextKey;
+            currentSeg = nextSeg;
+        }
+        if (loop.length >= 3)
+            loops.push(loop);
+    });
+    return loops;
+}
+// Builds every territory border shape for the floor currently on
+// screen. Seeds = every DISCOVERED node on this floor with a non-empty
+// .faction, each tagged with its own faction key (plain trimmed/
+// lowercased equality, matching how the rest of the file already
+// compares node.faction to a faction name). A fine grid is laid over
+// the bounding box of every discovered node (so unclaimed pockets read
+// correctly relative to what the player can actually see), padded by
+// MAP_TERRITORY_REACH plus one grid step — enough that the grid's own
+// outer edge is always further than any seed's reach, so it never
+// crosses for any faction and every contour stitches into a properly
+// closed loop (see stitchSegmentsIntoLoops). Every grid point is
+// assigned to whichever seed is nearest, or left unclaimed once the
+// nearest seed is further than MAP_TERRITORY_REACH away. Marching
+// squares then traces each faction's own claimed region into one or more
+// closed outlines, each smoothed into an organic blob. Every faction
+// with any discovered holdings gets its own outline — hostile/
+// resentful/allied/friendly cover the scored standing bands, and
+// anything left over (the "acquaintance" gap, and true neutral) still
+// gets one, just in the neutral tint, so a faction's geographic
+// footprint reads on the map even before the hero has any real opinion
+// of them. Only ever fed discovered nodes on this floor — same principle
+// as every other piece of map rendering that reveals structure (see
+// hasVerticalLink further down): an undiscovered node's faction or
+// position must never leak through a border bulging toward it before
+// the hero has actually found the place.
+function computeTerritoryShapes(nodesOnLayer, posOf, factionReputations) {
+    const discovered = nodesOnLayer.filter(n => n.discovered);
+    if (discovered.length === 0)
+        return [];
+    const seeds = [];
+    discovered.forEach(n => {
+        if (typeof n.faction !== 'string' || !n.faction.trim())
+            return;
+        const p = posOf(n);
+        seeds.push({ x: p.x, y: p.y, faction: n.faction.trim() });
+    });
+    if (seeds.length === 0)
+        return [];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    discovered.forEach(n => {
+        const p = posOf(n);
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+    });
+    const pad = MAP_TERRITORY_REACH + MAP_TERRITORY_GRID_STEP;
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+    const cols = Math.max(1, Math.ceil((maxX - minX) / MAP_TERRITORY_GRID_STEP));
+    const rows = Math.max(1, Math.ceil((maxY - minY) / MAP_TERRITORY_GRID_STEP));
+    const pointAt = (row, col) => ({ x: minX + col * MAP_TERRITORY_GRID_STEP, y: minY + row * MAP_TERRITORY_GRID_STEP });
+    // owners[row][col] = lowercased faction key nearest that grid point
+    // within reach, or null.
+    const owners = [];
+    for (let row = 0; row <= rows; row += 1) {
+        const rowOwners = [];
+        for (let col = 0; col <= cols; col += 1) {
+            const p = pointAt(row, col);
+            let bestDist = Infinity, bestFaction = null;
+            seeds.forEach(s => {
+                const dist = Math.hypot(s.x - p.x, s.y - p.y);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestFaction = s.faction;
                 }
             });
+            rowOwners.push(bestDist <= MAP_TERRITORY_REACH ? bestFaction.toLowerCase() : null);
         }
-        clusters.push(cluster);
-    });
-    return clusters;
-}
-// One cluster of nearby same-faction nodes -> a single smoothed blob path
-// enclosing all of them: sample a ring of points around each node at
-// MAP_TERRITORY_NODE_RADIUS, take the convex hull of every sampled point
-// across the whole cluster (already inflated by that radius, so a lone
-// node's "hull" is just its own circle), then smooth that hull into an
-// organic outline. Works unchanged from a single node up through a large
-// cluster — no special-casing by cluster size, and two nodes right at
-// the cluster-distance limit still come out as one connected shape
-// (a convex hull of two separate point-rings is never two disjoint
-// pieces), matching a shared border between nearby holdings.
-function territoryClusterPath(cluster) {
-    const samples = [];
-    cluster.forEach(n => {
-        for (let i = 0; i < MAP_TERRITORY_CIRCLE_SAMPLES; i += 1) {
-            const angle = (i / MAP_TERRITORY_CIRCLE_SAMPLES) * Math.PI * 2;
-            samples.push({ x: n.x + Math.cos(angle) * MAP_TERRITORY_NODE_RADIUS, y: n.y + Math.sin(angle) * MAP_TERRITORY_NODE_RADIUS });
-        }
-    });
-    return smoothClosedHullPath(convexHull(samples));
-}
-// Builds every territory border shape for the floor currently on screen:
-// groups DISCOVERED nodes by their own .faction field (plain trimmed/
-// lowercased equality, matching how the rest of the file already
-// compares node.faction to a faction name), works out each faction's
-// color exactly the way the old per-node ring used to — same four
-// predicates, same precedence, a merely neutral/acquaintance standing
-// gets no border at all — then clusters that faction's nodes by
-// proximity and turns each cluster into one <path>. Only ever fed
-// discovered nodes on this floor — same principle as every other piece
-// of map rendering that reveals structure (see hasVerticalLink further
-// down): an undiscovered node's faction or position must never leak
-// through a border bulging toward it before the hero has actually found
-// the place.
-function computeTerritoryShapes(nodesOnLayer, posOf, factionReputations) {
-    const byFaction = new Map();
-    nodesOnLayer.forEach(n => {
-        if (!n.discovered || typeof n.faction !== 'string' || !n.faction.trim())
+        owners.push(rowOwners);
+    }
+    // Every faction with any discovered holdings gets its own outline —
+    // hostile/resentful/allied/friendly cover the scored standing bands,
+    // and anything left over (the "acquaintance" gap, and true neutral)
+    // still gets one, just in the neutral tint, rather than being skipped.
+    const factionClasses = new Map();
+    seeds.forEach(s => {
+        const key = s.faction.toLowerCase();
+        if (factionClasses.has(key))
             return;
-        const key = n.faction.trim().toLowerCase();
-        if (!byFaction.has(key))
-            byFaction.set(key, { name: n.faction.trim(), nodes: [] });
-        const p = posOf(n);
-        byFaction.get(key).nodes.push({ id: n.id, x: p.x, y: p.y });
-    });
-    const shapes = [];
-    byFaction.forEach(({ name, nodes }, key) => {
-        const rep = findFactionReputation(name, factionReputations || {});
+        const rep = findFactionReputation(s.faction, factionReputations || {});
         const hostile = isFactionHostile(rep);
         const resentful = !hostile && isFactionResentful(rep);
         const allied = !hostile && !resentful && isFactionAllied(rep);
         const friendly = !hostile && !resentful && !allied && isFactionFriendly(rep);
-        if (!hostile && !resentful && !allied && !friendly)
-            return;
-        const cls = hostile ? 'map-territory-hostile' : resentful ? 'map-territory-resentful' : allied ? 'map-territory-allied' : 'map-territory-friendly';
-        clusterNodesByProximity(nodes, MAP_TERRITORY_CLUSTER_DISTANCE).forEach((cluster, i) => {
-            const d = territoryClusterPath(cluster);
+        factionClasses.set(key, hostile ? 'map-territory-hostile' : resentful ? 'map-territory-resentful' : allied ? 'map-territory-allied' : friendly ? 'map-territory-friendly' : 'map-territory-neutral');
+    });
+    const shapes = [];
+    factionClasses.forEach((cls, key) => {
+        const segments = [];
+        for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < cols; col += 1) {
+                const a = owners[row][col] === key;
+                const b = owners[row][col + 1] === key;
+                const c = owners[row + 1][col + 1] === key;
+                const d = owners[row + 1][col] === key;
+                if (a === b && b === c && c === d)
+                    continue; // uniform square: no boundary passes through here
+                const p00 = pointAt(row, col), p01 = pointAt(row, col + 1), p10 = pointAt(row + 1, col), p11 = pointAt(row + 1, col + 1);
+                const top = { x: (p00.x + p01.x) / 2, y: p00.y };
+                const bottom = { x: (p10.x + p11.x) / 2, y: p10.y };
+                const left = { x: p00.x, y: (p00.y + p10.y) / 2 };
+                const right = { x: p01.x, y: (p01.y + p11.y) / 2 };
+                marchingSquareSegments(a, b, c, d, top, right, bottom, left).forEach(seg => segments.push(seg));
+            }
+        }
+        stitchSegmentsIntoLoops(segments).forEach((loop, i) => {
+            const d = smoothClosedLoopPath(loop);
             if (d)
                 shapes.push(React.createElement("path", { key: key + '-' + i, d: d, className: 'map-territory ' + cls }));
         });
@@ -31850,7 +32030,7 @@ const MAP_KIND_LABEL_KEYS = { settlement: 'mapKindSettlement', wilderness: 'mapK
 // pixel of drag. Node layout itself (gx/gy) is plain data and rendered
 // normally through React; only the transform that pans/zooms the world is
 // pushed straight to the DOM.
-function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onClose, onRequestTravel, onCancelTravel, onDismissArrow, pendingMapTravel, mapTravelMode, onSetMapTravelMode, t }) {
+function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onClose, onRequestTravel, onCancelTravel, onDismissArrow, pendingMapTravel, previousLayoutPositions, t }) {
     // Which nodes get the battle badge below — see WORLD_EVENT_RECENT_COUNT
     // above EMPTY_STATE for why this is "recent among logged events" rather
     // than a turn-count window. A node can appear here whether or not it's
@@ -31882,6 +32062,11 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
     const newArrowRefs = useRef(new Map());
     const [openNodeId, setOpenNodeId] = useState(null);
     const [legendOpen, setLegendOpen] = useState(false);
+    // Measured on-screen length (px) of the current route-highlight path —
+    // see the routeHighlightLine block below for why the travel dot's speed
+    // is driven off this instead of activeRoute.distance.
+    const routeHighlightPathRef = useRef(null);
+    const [routePathPixelLength, setRoutePathPixelLength] = useState(0);
     // Freeform text typed into the location search box below — deliberately
     // NOT persisted anywhere, cleared whenever the modal closes/reopens (see
     // its own useState reset behavior, same as openNodeId/legendOpen above).
@@ -31955,7 +32140,7 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
     // pointing at a node's old, un-nudged position while everything else
     // has moved.
     const nodesOnLayer = useMemo(() => map.nodes.filter(onViewLayer), [map.nodes, viewLayer, viewStackRootId, currentNode]);
-    const layoutPositions = useMemo(() => computeMapDisplayLayout(nodesOnLayer), [nodesOnLayer]);
+    const layoutPositions = useMemo(() => computeMapDisplayLayout(nodesOnLayer, previousLayoutPositions), [nodesOnLayer, previousLayoutPositions]);
     const posOf = n => layoutPositions.get(n.id) || mapNodePixel(n);
     // Kept in sync on every render (not just whenever the pan/zoom effect
     // below happens to re-run) so centerOnHeroRef — callable any time later
@@ -32188,11 +32373,16 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
         }
         return parts.join(' ');
     };
-    // See computeTerritoryShapes above — recomputed plainly every render
-    // rather than behind its own useMemo, same as `lines` just below: both
-    // only ever walk this floor's own already-memoized nodesOnLayer/
-    // layoutPositions, cheap enough not to need a second memo layer.
-    const territoryShapes = computeTerritoryShapes(nodesOnLayer, posOf, factionReputations);
+    // See computeTerritoryShapes above. Unlike `lines` just below (cheap
+    // enough to recompute every render), this now samples a whole grid
+    // over the floor, so it's kept behind its own memo — only recomputed
+    // when this floor's nodes, their laid-out positions, or faction
+    // standings actually change, not on every render this modal happens
+    // to get (typing in the search box, opening a node's popup, and so
+    // on). posOf itself isn't a dependency — it's a thin read of
+    // layoutPositions recreated fresh every render, so depending on the
+    // data it reads from is what actually matters here.
+    const territoryShapes = useMemo(() => computeTerritoryShapes(nodesOnLayer, posOf, factionReputations), [nodesOnLayer, layoutPositions, factionReputations]);
     const walkedKeys = new Set(map.visitedEdges.map(([a, b]) => edgeKey(a, b)));
     const drawnEdges = new Set();
     const lines = [];
@@ -32299,7 +32489,7 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
         if (viewport) {
             const positions = sameSheet
                 ? layoutPositions
-                : computeMapDisplayLayout(map.nodes.filter(n => nodeVisibleOn(n, matchLayer, matchStackRootId)));
+                : computeMapDisplayLayout(map.nodes.filter(n => nodeVisibleOn(n, matchLayer, matchStackRootId)), previousLayoutPositions);
             const p = positions.get(match.id) || mapNodePixel(match);
             const w = viewport.clientWidth, h = viewport.clientHeight;
             const scale = Math.max(0.9, viewStateRef.current.scale || 0.95);
@@ -32427,26 +32617,52 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
     // instead of bowing to the opposite side on any leg where the hero
     // happens to be the second node of that particular pair.
     const routePathD = routeFullyVisible ? multiHopPathD(routeNodesForLine) : '';
+    // Re-measure the route path's actual on-screen length any time its `d`
+    // changes (new route picked, floor switched, or the spring layout below
+    // shuffled node positions). This has to be a real DOM measurement rather
+    // than trusting activeRoute.distance (raw Euclidean distance between
+    // nodes' own gx/gy grid cells): the line actually drawn on screen isn't
+    // that distance scaled by a constant — posOf() shifts nodes off their
+    // raw grid cell to dodge collisions/cluster together (see
+    // computeMapDisplayLayout), and each leg on top of that bows outward
+    // into a quadratic curve (curvedEdgePath) rather than running straight.
+    // Both effects accumulate per hop, so a longer, multi-hop route's real
+    // pixel length increasingly overshoots what raw grid-distance predicts —
+    // exactly why the travel dot used to visibly speed up the farther/more
+    // roundabout the trip, even though the intent (see below) was always a
+    // constant crossing speed. Measuring the rendered path directly sidesteps
+    // needing an exact closed-form length for the layout+bow math.
+    useLayoutEffect(() => {
+        setRoutePathPixelLength(routeHighlightPathRef.current ? routeHighlightPathRef.current.getTotalLength() : 0);
+    }, [routePathD]);
     // A soft radial-gradient blob glides along the route from the hero to
     // the queued (or previewed) destination, fading in near the start and
     // out near the end — the same gentle glow-and-fade language as the
     // hero's radar pulse above, just unrolled onto a line instead of
     // pulsing in place. Speed (not total duration) stays constant regardless
-    // of route length — MAP_ROUTE_DOT_SECONDS_PER_UNIT seconds per grid-unit
-    // of real distance (see mapNodeDistance) — so a long multi-hop trip
-    // takes proportionally longer to cross rather than being squeezed into
-    // the same few seconds as a short hop; only floored so a near-zero
-    // distance (adjacent nodes right next to each other) doesn't flash by
-    // instantly.
+    // of route length — MAP_ROUTE_DOT_PIXELS_PER_SECOND px/s of actual
+    // on-screen travel (measured above, not the raw grid distance) — so a
+    // long multi-hop trip takes proportionally longer to cross rather than
+    // being squeezed into the same few seconds as a short hop, and a
+    // roundabout multi-hop path doesn't cross the screen any faster than a
+    // straight one of the same rendered length. Falls back to the old
+    // grid-distance estimate for the one frame before the measurement
+    // effect above has run (routePathPixelLength still 0), so the very
+    // first paint isn't stuck at the 0.9s floor; only floored after that so
+    // a near-zero distance (adjacent nodes right next to each other)
+    // doesn't flash by instantly.
+    const routeDurationSeconds = routePathPixelLength > 0
+        ? routePathPixelLength / MAP_ROUTE_DOT_PIXELS_PER_SECOND
+        : (activeRoute ? (activeRoute.distance || 0) * MAP_ROUTE_DOT_SECONDS_PER_UNIT : 0);
     const routeHighlightLine = routeFullyVisible ? (React.createElement(React.Fragment, null,
         React.createElement("defs", null,
             React.createElement("radialGradient", { id: "mapRouteWaveGradient", cx: "50%", cy: "50%", r: "50%" },
                 React.createElement("stop", { offset: "0%", stopColor: "#7dd3fc", stopOpacity: "0.95" }),
                 React.createElement("stop", { offset: "55%", stopColor: "var(--sky-400)", stopOpacity: "0.5" }),
                 React.createElement("stop", { offset: "100%", stopColor: "var(--sky-400)", stopOpacity: "0" }))),
-        React.createElement("path", { d: routePathD, fill: "none", className: "map-route-highlight-base" }),
+        React.createElement("path", { ref: routeHighlightPathRef, d: routePathD, fill: "none", className: "map-route-highlight-base" }),
         React.createElement("circle", { r: "9", className: "map-route-wave-dot" },
-            React.createElement("animateMotion", { dur: `${Math.max(0.9, (activeRoute.distance || 0) * MAP_ROUTE_DOT_SECONDS_PER_UNIT).toFixed(2)}s`, repeatCount: "indefinite", calcMode: "linear", path: routePathD })))) : null;
+            React.createElement("animateMotion", { dur: `${Math.max(0.9, routeDurationSeconds).toFixed(2)}s`, repeatCount: "indefinite", calcMode: "linear", path: routePathD })))) : null;
     // Distance readout for the row itself always tracks whichever node's
     // popup is open right now — separate from activeRoute above (which
     // instead prioritizes an already-queued destination for the on-map
@@ -32488,6 +32704,9 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
                             React.createElement("span", { className: "map-legend-ring map-legend-ring-allied" }),
                             t('mapLegendAlliedTerritory')),
                         React.createElement("span", { className: "map-legend-item" },
+                            React.createElement("span", { className: "map-legend-ring map-legend-ring-neutral" }),
+                            t('mapLegendNeutralTerritory')),
+                        React.createElement("span", { className: "map-legend-item" },
                             React.createElement("span", { className: "map-node-danger-badge map-legend-danger-badge", "aria-hidden": "true" }, "!"),
                             t('mapLegendDanger')),
                         React.createElement("span", { className: "map-legend-item" },
@@ -32509,6 +32728,14 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
                     map.nodes.filter(n => n.discovered && onViewLayer(n)).map(n => {
                         const isCurrent = n.id === map.currentId;
                         const quest = n.questId ? quests.find(q => q.id === n.questId && q.status === 'active') : null;
+                        // The specific stage this node was tied to (see reconcileMap's
+                        // upsert — a location offered mid-quest carries the stageId
+                        // that prompted it). Falls back to whichever stage is
+                        // currently active on the quest if that exact stage is gone
+                        // (completed/removed) or was never set, so tapping a quest
+                        // node always surfaces SOME actionable "what do I do here"
+                        // rather than just the quest's name.
+                        const questStage = quest ? (quest.stages.find(s => s.id === n.stageId) || quest.stages.find(s => s.status === 'active') || null) : null;
                         const open = openNodeId === n.id;
                         const p = posOf(n);
                         const progressPct = mapNodeProgressPercent(n);
@@ -32546,12 +32773,17 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
                                 hasVerticalLink && React.createElement("span", { className: "map-node-stairs-badge", title: t('mapVerticalLinkAria'), "aria-hidden": "true" }, "\u21C5"),
                                 recentBattleNodeIds.has(n.id) && React.createElement("span", { className: "map-node-battle-badge", title: t('mapLegendRecentBattle'), "aria-hidden": "true" }, "\u2694")),
                             React.createElement("span", { className: 'map-node-label' + (isCurrent ? ' map-node-label-hero' : '') }, n.name),
-                            open && (n.description || n.danger || isMapNodeCleared(n) || progressPct !== null) && (React.createElement("div", { className: "map-node-desc", onClick: e => e.stopPropagation() },
+                            open && (n.description || n.danger || isMapNodeCleared(n) || progressPct !== null || quest) && (React.createElement("div", { className: "map-node-desc", onClick: e => e.stopPropagation() },
                                 progressPct !== null && React.createElement("p", { className: "map-node-progress-tag" }, `[${n.name} — ${progressPct}%]`),
                                 n.danger && React.createElement("p", { className: "map-node-danger-text" },
                                     "\u26A0 ",
                                     t('mapDangerLabel')),
                                 n.description && React.createElement("p", null, n.description),
+                                quest && (React.createElement("div", { className: "map-node-quest-info" },
+                                    React.createElement("p", { className: "map-node-quest-title" },
+                                        "\uD83D\uDCD6 ",
+                                        quest.title),
+                                    questStage && (questStage.description || questStage.title) && (React.createElement("p", { className: "map-node-quest-stage-desc" }, questStage.description || questStage.title)))),
                                 isMapNodeCleared(n) && React.createElement("p", { className: "map-node-cleared-tag" }, t('mapNodeClearedLabel'))))));
                     }),
                     map.nodes.filter(n => !n.discovered && onViewLayer(n)).map(n => {
@@ -32598,13 +32830,9 @@ function MapModal({ map, quests, factionReputations, worldEvents, dayPhase, onCl
                         React.createElement("div", { className: "item-offer-choice" },
                             React.createElement("button", { onClick: () => { if (!travelRowVisible)
                                     return; isQueuedOpenNode ? onCancelTravel() : onRequestTravel(openNode); }, className: 'item-choice-btn map-travel-toggle-btn' + (isQueuedOpenNode ? ' item-choice-active-take' : ''), "aria-pressed": isQueuedOpenNode, "aria-label": t(isQueuedOpenNode ? 'removeMapTravelAria' : 'mapTravelConfirmAria'), type: "button" }, "\u279C"))),
-                    React.createElement("div", { className: "map-travel-mode-toggle", role: "group", style: { visibility: travelRowVisible ? 'visible' : 'hidden' } },
-                        React.createElement("button", { type: "button", onClick: () => onSetMapTravelMode('realtime'), className: 'map-travel-mode-btn' + (mapTravelMode === 'realtime' ? ' map-travel-mode-btn-active' : ''), "aria-pressed": mapTravelMode === 'realtime', "aria-label": t('mapTravelModeRealtimeAria') }, t('mapTravelModeRealtime')),
-                        React.createElement("button", { type: "button", onClick: () => onSetMapTravelMode('timeskip'), className: 'map-travel-mode-btn' + (mapTravelMode === 'timeskip' ? ' map-travel-mode-btn-active' : ''), "aria-pressed": mapTravelMode === 'timeskip', "aria-label": t('mapTravelModeTimeskipAria') }, t('mapTravelModeTimeskip'))),
                     React.createElement("p", { className: "map-travel-queued-note", style: { visibility: travelRowVisible ? 'visible' : 'hidden' } },
                         isQueuedOpenNode ? `${t('mapTravelQueuedBadge')} · ` : '',
                         openNodeRoute ? describeRouteDistanceLabel(openNodeRoute.distance, t) : '\u00A0'))),
-            React.createElement("p", { className: "map-hint" }, t('mapHint')),
             map.nodes.length === 0 && React.createElement("p", { className: "map-empty" }, t('mapEmptyText')),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
@@ -32797,7 +33025,7 @@ function ApiKeyGuideModal({ apiKey, onSetApiKey, onClose, t }) {
                 !isLast ? (React.createElement("button", { onClick: () => setStep(s => s + 1), className: "btn btn-primary", type: "button" }, t('apiKeyGuideNextButton'))) : (React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('apiKeyGuideDoneButton')))))));
 }
 // ---- Simple content modals ----
-function SettingsModal({ uiLang, onSetLanguage, itemInteractionEnabled, onSetItemInteraction, stateDeltaMode, onSetStateDeltaMode, apiKey, onSetApiKey, model, onSetModel, onRestartClick, onClose, t }) {
+function SettingsModal({ uiLang, onSetLanguage, stateDeltaMode, onSetStateDeltaMode, apiKey, onSetApiKey, model, onSetModel, onRestartClick, onClose, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card" },
@@ -32812,14 +33040,10 @@ function SettingsModal({ uiLang, onSetLanguage, itemInteractionEnabled, onSetIte
             React.createElement("div", { className: "provider-row" },
                 React.createElement("button", { onClick: () => onSetLanguage('ru'), className: 'provider-btn' + (uiLang === 'ru' ? ' provider-btn-active' : ''), type: "button" }, "\u0420\u0443\u0441\u0441\u043A\u0438\u0439"),
                 React.createElement("button", { onClick: () => onSetLanguage('en'), className: 'provider-btn' + (uiLang === 'en' ? ' provider-btn-active' : ''), type: "button" }, "English")),
-            React.createElement("label", { className: "field-label" }, t('itemInteractionLabel')),
-            React.createElement("div", { className: "provider-row" },
-                React.createElement("button", { onClick: () => onSetItemInteraction(true), className: 'provider-btn' + (itemInteractionEnabled ? ' provider-btn-active' : ''), type: "button" }, t('itemInteractionOn')),
-                React.createElement("button", { onClick: () => onSetItemInteraction(false), className: 'provider-btn' + (!itemInteractionEnabled ? ' provider-btn-active' : ''), type: "button" }, t('itemInteractionOff'))),
             React.createElement("label", { className: "field-label" }, t('stateDeltaLabel')),
             React.createElement("div", { className: "provider-row" },
-                React.createElement("button", { onClick: () => onSetStateDeltaMode(true), className: 'provider-btn' + (stateDeltaMode ? ' provider-btn-active' : ''), type: "button" }, t('itemInteractionOn')),
-                React.createElement("button", { onClick: () => onSetStateDeltaMode(false), className: 'provider-btn' + (!stateDeltaMode ? ' provider-btn-active' : ''), type: "button" }, t('itemInteractionOff'))),
+                React.createElement("button", { onClick: () => onSetStateDeltaMode(true), className: 'provider-btn' + (stateDeltaMode ? ' provider-btn-active' : ''), type: "button" }, t('toggleOn')),
+                React.createElement("button", { onClick: () => onSetStateDeltaMode(false), className: 'provider-btn' + (!stateDeltaMode ? ' provider-btn-active' : ''), type: "button" }, t('toggleOff'))),
             React.createElement("p", { className: "hint-text hint-text-block" }, t('stateDeltaHint')),
             onRestartClick && (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "settings-danger-zone-divider" }),
@@ -34266,7 +34490,6 @@ function App() {
     // -- Language & session settings --
     const [uiLang, setUiLang] = useState('ru');
     const t = (key) => (TRANSLATIONS[uiLang] && TRANSLATIONS[uiLang][key]) || key;
-    const [itemInteractionEnabled, setItemInteractionEnabled] = useState(true);
     const [stateDeltaMode, setStateDeltaModeState] = useState(true);
     const [geminiApiKey, setGeminiApiKey] = useState('');
     const [geminiModel, setGeminiModel] = useState(DEFAULT_GEMINI_MODEL);
@@ -34515,16 +34738,23 @@ function App() {
     // bypasses generateNarrative entirely and has no route/risk model of
     // its own — see its own comment.
     const pendingMapRouteRef = useRef(null);
-    // 'realtime' narrates the trip leg by leg with some real texture per
-    // stop; 'timeskip' compresses the same route into a single passage of
-    // time (see describeRouteDistance) with the legs barely dwelt on. Purely
-    // a narration-style instruction for the model — see the TRAVEL DECISION
-    // block in buildNarrativeSystemPrompt — it changes nothing about
-    // findMapRoute/resolveRouteInterruption themselves. Read fresh at queue
-    // time (see requestMapTravel) so switching it mid-browse before
-    // confirming a destination always queues with whichever mode is
-    // currently selected.
-    const [mapTravelMode, setMapTravelMode] = useState('realtime');
+    // Node id -> last laid-out {x, y} from computeMapDisplayLayout, kept for
+    // the lifetime of the whole session (not just while MapModal happens to
+    // be mounted — the modal itself unmounts on close, see mapModalOpen
+    // below, which would otherwise wipe any layout memory the moment the
+    // player closed the map). Passed into MapModal as previousLayoutPositions
+    // and read back there to seed each node's STARTING point for the spring
+    // relaxation. Without this, computeMapDisplayLayout always started every
+    // node fresh from its raw grid slot on every recompute (any time
+    // map.nodes changed reference at all — e.g. one new location appearing),
+    // so even nodes with no real reason to move could settle into a visibly
+    // different spot purely because the whole system re-solved from scratch
+    // together with the new node. Seeding from last time instead means an
+    // already-settled node that isn't actually perturbed by the new arrival
+    // just re-confirms roughly the same position (its spring forces haven't
+    // changed), while only the new node and whichever neighbors it actually
+    // crowds or kin-pulls on need to visibly shift.
+    const mapLayoutPositionsRef = useRef(new Map());
     // Accumulates "{npcKey}::{itemNameLower}" -> price whenever a narrative
     // npcs[].inventory entry arrives as {name, cost} instead of a plain
     // string (a merchant naming an exact price for something new — see the
@@ -34692,6 +34922,13 @@ function App() {
     // lets updateNarrativeSummary fold in only the handful that newly aged out
     // instead of re-summarizing the whole campaign every turn.
     const summarizedUpToRef = useRef(0);
+    // Verbatim ledger of quest/advance/reward offers the hero has explicitly
+    // declined — a hard fact, NOT prose the model has to remember or a
+    // summarizer has to preserve. See recordDeclinedOffer,
+    // MAX_DECLINED_OFFERS_TRACKED, and its use in buildNarrativeSystemPrompt/
+    // updateNarrativeSummary. A ref for the same reason as narrativeSummaryRef
+    // above — nothing in the UI re-renders off it.
+    const declinedOffersRef = useRef([]);
     const wakeLockRef = useRef(null);
     // -- Derived values --
     const turns = buildTurns(messages);
@@ -34744,14 +34981,6 @@ function App() {
                     await setLanguage(detectSystemLanguage());
             }
             try {
-                const itemResult = await window.storage.get(ITEM_TOGGLE_KEY, false);
-                if (!cancelled && itemResult && itemResult.value === 'off')
-                    setItemInteractionEnabled(false);
-            }
-            catch (e) {
-                // default (on) stands
-            }
-            try {
                 // Default flipped to ON (see the useState above) after the
                 // full-relist data-loss postmortem: delta mode is the actual
                 // "only send/receive what changed" behavior asked for — npcAdd/
@@ -34759,9 +34988,8 @@ function App() {
                 // applyNpcsDelta/applyFactionsDelta) never touch, and therefore
                 // never lose, anything the model didn't explicitly mention that
                 // turn, unlike the old full-restate path this whole file used to
-                // rely on by default. Mirrors the itemResult load just above:
-                // an explicit 'off' is what disables it now, not the absence of
-                // an 'on'.
+                // rely on by default. An explicit 'off' is what disables it now,
+                // not the absence of an 'on'.
                 const stateDeltaResult = await window.storage.get(STATE_DELTA_TOGGLE_KEY, false);
                 if (!cancelled && stateDeltaResult && stateDeltaResult.value === 'off')
                     setStateDeltaModeState(false);
@@ -34905,15 +35133,6 @@ function App() {
             // storage unavailable — language choice just won't persist
         }
     }
-    async function setItemInteraction(enabled) {
-        setItemInteractionEnabled(enabled);
-        try {
-            await window.storage.set(ITEM_TOGGLE_KEY, enabled ? 'on' : 'off', false);
-        }
-        catch (e) {
-            // storage unavailable — preference just won't persist
-        }
-    }
     async function setStateDeltaMode(enabled) {
         setStateDeltaModeState(enabled);
         try {
@@ -34967,7 +35186,8 @@ function App() {
                 partyCurrency: nextPartyCurrency !== undefined ? nextPartyCurrency : partyCurrency,
                 startingPartySize: identity.startingPartySize !== undefined ? identity.startingPartySize : startingPartySize,
                 narrativeSummary: narrativeSummaryRef.current,
-                summarizedUpTo: summarizedUpToRef.current
+                summarizedUpTo: summarizedUpToRef.current,
+                declinedOffers: declinedOffersRef.current
             });
         }
         catch (e) {
@@ -35056,7 +35276,6 @@ function App() {
         pendingMapDestinationRef.current = null;
         pendingMapRouteRef.current = null;
         setPendingMapTravel(null);
-        setMapTravelMode('realtime');
         narrativeAskingPricesRef.current = {};
         heroEquippedSnapshotRef.current = null;
         partyItemSnapshotRef.current = null;
@@ -35093,6 +35312,7 @@ function App() {
         setShopClock({ morning: 0, dawnTurn: 0, stocked: {} });
         narrativeSummaryRef.current = '';
         summarizedUpToRef.current = 0;
+        declinedOffersRef.current = [];
         // Pending next-turn notes, queued map trip, the diff baselines — see
         // resetPerGameTracking.
         resetPerGameTracking();
@@ -35138,6 +35358,7 @@ function App() {
         setStartingPartySize(normalizedStartingPartySize);
         narrativeSummaryRef.current = saved.narrativeSummary || '';
         summarizedUpToRef.current = saved.summarizedUpTo || 0;
+        declinedOffersRef.current = Array.isArray(saved.declinedOffers) ? saved.declinedOffers : [];
         saveGame(saved.messages || [], normalizedState, saved.itemRarities || {}, normalizedEquipment, saved.npcReputations || {}, normalizedParty, normalizedPartyInventories, normalizedPartyEquipment, saved.factionReputations || {}, saved.npcKindnessCooldowns || {}, normalizedNpcInventories, normalizedNpcCurrencies, normalizedPartyCurrency, { worldSetting: saved.worldSetting || '', heroName: saved.heroName || '', heroConcept: saved.heroConcept || '', startingPartySize: normalizedStartingPartySize }, normalizedShopClock);
         if (saved.messages && saved.messages.length > 0)
             setStage('playing');
@@ -35270,7 +35491,8 @@ function App() {
                 party, partyInventories, partyEquipment, partyCurrency, npcInventories, npcCurrencies, shopClock,
                 startingPartySize,
                 narrativeSummary: narrativeSummaryRef.current,
-                summarizedUpTo: summarizedUpToRef.current
+                summarizedUpTo: summarizedUpToRef.current,
+                declinedOffers: declinedOffersRef.current
             };
             const { error } = await window.supabaseClient
                 .from('grimoire_rpg_saves')
@@ -35801,14 +36023,10 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         const { narrativeLanguage, context, partyMemberNames } = sharedContext(state);
         const isOpeningTurn = state === EMPTY_STATE;
         let ruleNum = 10;
-        const itemRuleNum = itemInteractionEnabled ? ++ruleNum : null;
-        const itemRule = itemInteractionEnabled
-            ? `\n${itemRuleNum}. If the scene naturally offers the hero one or more takeable items (an object found, something a character offers, a choice between alternatives like weapons or garments), introduce it and then STOP there — end the scene at the offer (e.g. a character gesturing at it, asking if the hero wants it). Do not resolve whether the hero takes it, and do not mention that item again for the rest of this response. The outcome will be handled next turn based on the player's choice. If a character is charging the hero for a SERVICE they personally provide — a rate for a room, a fare, a toll, a bribe demanded — have them state the exact number out loud as part of the offer (e.g. "ten gold a night"), then stop at that same offer exactly as above; do not narrate the hero paying or the money changing hands yet, that's resolved the same way as taking the item itself. This never applies to a merchant or vendor's ordinary goods for sale — see the trade rule below.`
-            : '';
-        const riskyLootRuleNum = itemInteractionEnabled ? ++ruleNum : null;
-        const riskyLootRule = itemInteractionEnabled
-            ? `\n${riskyLootRuleNum}. DISTURBING THE DEAD OR THE WARDED IS NEVER FREE: searching, looting, or opening anything bound up with death or deliberate protection — a sarcophagus, coffin, burial urn, grave, crypt niche, embalmed remains, a shrine or altar's offerings, a reliquary, a sealed vault, a warded chest or door marked with inscriptions or wards, and the like — is a genuine gamble whenever the setting gives it real reason to be one: the current location is flagged as dangerous, is itself a dungeon, tomb, crypt, ruin, battlefield, or similarly ominous place, or the scene has already planted signs that something here is watched over or wrong (carved warnings, unnatural cold or stillness, a foul unnatural smell, restless dust, a local's warning, an inscription cursing intruders). Weigh this honestly and let it escalate rather than resetting every time: a first, cautious search of one such object in an otherwise ordinary or already-cleared spot can plausibly turn up nothing but loot, but the second and third container the hero cracks open in the same tomb, the deeper the hero pushes in, or the more explicit the warning signs already on the page, the more that luck should run out — something built to guard this place, or the dead themselves, stirs, wakes, or answers back. What exactly answers fits the world established above: restless dead suit most settings, but a construct, a ward-triggered trap turned defender, a guardian beast, or an automated defense system are equally valid depending on the setting — pick whichever this specific world and place would actually produce, never default to a generic skeleton out of habit. When you decide something DOES react, don't hedge it into a false scare that fizzles with no consequence — make it a genuine hostile threat and hand it to the COMBAT AND AMBUSH HANDOFF rule below exactly like any other fight, stopping the prose the instant violence begins. A startling noise or a shudder that turns out to be nothing is a cheap trick and should stay rare, saved for when the fiction has given no real reason yet to expect danger here at all. When you decide nothing reacts, the discovery still runs through the item-offer rule above like any other find — introduce what's inside and stop there, without also inventing a threat that isn't warranted. Fairness matters as much as danger: seed the actual warning signs into the prose at or before the moment of disturbance whenever they exist, so an awakening reads as the earned result of what the hero already saw and chose to risk, never a random ambush with nothing beforehand to justify it. This applies to any such object regardless of what the hero calls it or how they phrase the attempt — judge by what the object actually is and where it sits, never by keyword-matching the hero's own wording.`
-            : '';
+        const itemRuleNum = ++ruleNum;
+        const itemRule = `\n${itemRuleNum}. If the scene naturally offers the hero one or more takeable items (an object found, something a character offers, a choice between alternatives like weapons or garments), introduce it and then STOP there — end the scene at the offer (e.g. a character gesturing at it, asking if the hero wants it). Do not resolve whether the hero takes it, and do not mention that item again for the rest of this response. The outcome will be handled next turn based on the player's choice. If a character is charging the hero for a SERVICE they personally provide — a rate for a room, a fare, a toll, a bribe demanded — have them state the exact number out loud as part of the offer (e.g. "ten gold a night"), then stop at that same offer exactly as above; do not narrate the hero paying or the money changing hands yet, that's resolved the same way as taking the item itself. This never applies to a merchant or vendor's ordinary goods for sale — see the trade rule below.`;
+        const riskyLootRuleNum = ++ruleNum;
+        const riskyLootRule = `\n${riskyLootRuleNum}. DISTURBING THE DEAD OR THE WARDED IS NEVER FREE: searching, looting, or opening anything bound up with death or deliberate protection — a sarcophagus, coffin, burial urn, grave, crypt niche, embalmed remains, a shrine or altar's offerings, a reliquary, a sealed vault, a warded chest or door marked with inscriptions or wards, and the like — is a genuine gamble whenever the setting gives it real reason to be one: the current location is flagged as dangerous, is itself a dungeon, tomb, crypt, ruin, battlefield, or similarly ominous place, or the scene has already planted signs that something here is watched over or wrong (carved warnings, unnatural cold or stillness, a foul unnatural smell, restless dust, a local's warning, an inscription cursing intruders). Weigh this honestly and let it escalate rather than resetting every time: a first, cautious search of one such object in an otherwise ordinary or already-cleared spot can plausibly turn up nothing but loot, but the second and third container the hero cracks open in the same tomb, the deeper the hero pushes in, or the more explicit the warning signs already on the page, the more that luck should run out — something built to guard this place, or the dead themselves, stirs, wakes, or answers back. What exactly answers fits the world established above: restless dead suit most settings, but a construct, a ward-triggered trap turned defender, a guardian beast, or an automated defense system are equally valid depending on the setting — pick whichever this specific world and place would actually produce, never default to a generic skeleton out of habit. When you decide something DOES react, don't hedge it into a false scare that fizzles with no consequence — make it a genuine hostile threat and hand it to the COMBAT AND AMBUSH HANDOFF rule below exactly like any other fight, stopping the prose the instant violence begins. A startling noise or a shudder that turns out to be nothing is a cheap trick and should stay rare, saved for when the fiction has given no real reason yet to expect danger here at all. When you decide nothing reacts, the discovery still runs through the item-offer rule above like any other find — introduce what's inside and stop there, without also inventing a threat that isn't warranted. Fairness matters as much as danger: seed the actual warning signs into the prose at or before the moment of disturbance whenever they exist, so an awakening reads as the earned result of what the hero already saw and chose to risk, never a random ambush with nothing beforehand to justify it. This applies to any such object regardless of what the hero calls it or how they phrase the attempt — judge by what the object actually is and where it sits, never by keyword-matching the hero's own wording.`;
         const tradeRuleNum = ++ruleNum;
         const tradeRule = `\n${tradeRuleNum}. A merchant or vendor's ordinary goods — their general stock of wares, or anything of the hero's such a character would buy (loot, trophies, unwanted gear) — are never bought or sold within the narrative itself; that always happens through a separate trade-window interface the player opens directly with that character, entirely outside this scene. The scene can still have such a character show interest, gesture at their wares, haggle, or invite the hero to look at what they have — write that exactly like any other dialogue — but never narrate the actual exchange happening: no goods changing hands for a settled sum, no coins handed over, nothing leaving or entering the hero's possession as a result. If such a character names a specific price for something THEY are selling, treat that number as final and deliberate rather than a rough or rounded guess — it becomes exactly what the trade window charges for it afterward, so give it the same care as any other concrete figure in the scene. A price they name for something of the HERO's they'd merely like to buy carries no such weight and is never binding either way. Do not stop the scene mid-offer waiting on an accept/decline for any of this either, the way a found item or a service does — there is no such mechanism for it here, so simply let the scene continue and close normally. This is entirely separate from a character charging the hero for a service they personally provide (a room, a meal, a fare, a toll, a bribe), which is still handled the ordinary way described just above.`;
         const questRuleNum = ++ruleNum;
@@ -35850,6 +36068,16 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         }).filter(Boolean);
         let gearContext = '';
         gearContext += `\n\nHERO'S CURRENT CURRENCY: ${state.currency}.`;
+        if (declinedOffersRef.current.length > 0) {
+            // Deliberately NOT gated on justQuestEvents/RECENT_TURN_WINDOW — this
+            // is a standing fact block resent every single turn for as long as
+            // MAX_DECLINED_OFFERS_TRACKED keeps it, precisely so a decline can
+            // never quietly age out of context the way the justQuestEvents note
+            // (below, further down this function) does after its one turn, or a
+            // narrativeSummary paragraph can across repeated compressions. See
+            // recordDeclinedOffer.
+            gearContext += `\n\nOFFERS THE HERO HAS EXPLICITLY DECLINED, AT ANY POINT SO FAR (standing fact, does not expire): ${declinedOffersRef.current.join('; ')}. Treat every one of these as hard, settled fact regardless of how long ago it happened or what the summary/transcript below seems to imply: the hero does not have that money or item and was never given it. The only way any of it changes hands is if the SAME giver makes a genuinely NEW, freshly-offered reward/quest/advance in THIS scene and the hero now accepts it — simply continuing, referencing, or wrapping up the old scene is never that.`;
+        }
         gearContext += `\n\nECONOMY SCALE: whenever you invent a specific sum of money in this scene — a quest reward, a price a character names for a service, a wage, coin found, a wager, a theft — keep it consistent with what things actually cost in this game: a junk-quality weapon or garment is worth about 2 coins, common about 6, uncommon about 16, rare about 40, unique about 90, epic about 180, a mythic-grade item about 350. A routine errand or small favor should land in the single digits to a couple dozen coins; only a genuinely dangerous, rare, or high-stakes job should approach or exceed the value of a rare-or-better item. Don't invent a windfall or a reward wildly out of step with this scale just because it sounds dramatic.`;
         if (equippedWithRarity.length > 0) {
             gearContext += `\n\nHERO'S CURRENTLY EQUIPPED GEAR WITH KNOWN RARITY TIER: ${equippedWithRarity.join(', ')}.`;
@@ -36141,7 +36369,7 @@ Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings
     // rather than raw stat numbers now too (see ENEMY_TIERS/rollEnemyStatsForTier)
     // — the model only ever has to make the same kind of qualitative judgment
     // call rollItemRarity's callers already leave to a fixed local table.
-    function buildStateAndEventsSystemPrompt(state, itemInteractionEnabled, stateDeltaMode) {
+    function buildStateAndEventsSystemPrompt(state, stateDeltaMode) {
         const { context } = sharedContext(state);
         const narrativeLanguage = uiLang === 'en' ? 'English' : 'Russian';
         // Same reference check buildNarrativeSystemPrompt uses — `state` here is
@@ -36187,15 +36415,13 @@ Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings
         // that's the one spot the model is actively narrating right now, while
         // every other node's budget just sits dormant until the hero actually
         // goes back there.
-        const currentMapNode = itemInteractionEnabled && state.map ? mapNodes.find(n => n.id === state.map.currentId) : null;
+        const currentMapNode = state.map ? mapNodes.find(n => n.id === state.map.currentId) : null;
         const itemBudgetContext = (currentMapNode && currentMapNode.itemCapacity > 0)
             ? (isMapNodeCleared(currentMapNode)
                 ? `\n\nTHIS LOCATION HAS ALREADY BEEN PICKED CLEAN: "${currentMapNode.name}" has nothing left lying around to find. Do not put any further "itemOffers" into this scene from searching, containers, hidden caches, or the environment here — UNLESS the item is a specific active quest's actual objective (its own "questId" set), which is scripted and can still turn up here regardless. This does not restrict ordinary commerce or generosity either: a character freely handing over something of their own (a gift, a wage, a quest reward) can still happen normally and may still use "itemOffers". A merchant's own trade goods were never drawn from this budget to begin with — buying or selling those always happens through a separate trade-window interface, never "itemOffers".`
                 : `\n\nTHIS LOCATION'S REMAINING FINDABLE ITEMS: "${currentMapNode.name}" has ${currentMapNode.itemCapacity - currentMapNode.itemsFound} more item${currentMapNode.itemCapacity - currentMapNode.itemsFound === 1 ? '' : 's'} left to turn up here before it's picked clean (${currentMapNode.itemsFound}/${currentMapNode.itemCapacity} already found). Don't have the scene surface more than that many further "itemOffers" from searching, containers, hidden caches, or the environment at this spot — pace discoveries so the location doesn't run dry too fast. This budget only covers ordinary finds: it doesn't limit ordinary commerce, a character freely giving something of their own, or an item that's a specific active quest's actual objective (its own "questId" set), which is scripted and never draws from this count.`)
             : '';
-        const itemOffersSchemaField = itemInteractionEnabled
-            ? `, "itemOffers": [{"groupId": "short_id", "selectionMode": "single", "items": [{"id": "short_id", "label": "item name as it appears in the scene, in the scene's own language", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id", "cost": 10, "amount": 0}]}]`
-            : '';
+        const itemOffersSchemaField = `, "itemOffers": [{"groupId": "short_id", "selectionMode": "single", "items": [{"id": "short_id", "label": "item name as it appears in the scene, in the scene's own language", "slot": "weapon", "twoHanded": false, "shield": false, "weightCategory": "medium", "questId": "quest_id", "cost": 10, "amount": 0}]}]`;
         // Companion count requested on the setup screen (see startingPartySize /
         // the OPENING SCENE STARTING COMPANIONS rule in
         // buildNarrativeSystemPrompt, which is what actually makes the model
@@ -36210,12 +36436,10 @@ Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings
         const openingPartyInstruction = (isOpeningTurn && startingPartySize > 0)
             ? `\n\nOPENING PARTY: this story was set up to begin with the hero already traveling alongside ${startingPartySize} established companion${startingPartySize > 1 ? 's' : ''}. Introduce exactly that many named companions in "npcs" below, each with "presentNow": true, and — exactly like the party-member fields described just above — also give each of them "health", "maxHealth", "psyche", "maxPsyche", "stats", and "effects", judged fresh from how you've just portrayed them in this opening scene. List their names, spelled exactly as in "npcs", in a new field: "startingPartyMembers", an array of exactly those ${startingPartySize} name${startingPartySize > 1 ? 's' : ''}.`
             : '';
-        const itemOffersSection = itemInteractionEnabled
-            ? `
+        const itemOffersSection = `
 
 === EVENT: ITEM OFFERS ===
-"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "currency", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. A stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — presented as something the hero can still accept or decline right now (a reward being handed over, a bribe, a prize, a wager's payout) is "slot": "currency" instead of a physical slot, no matter how the scene wraps it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to give it a physical slot. A "currency" entry takes "amount" — a SEPARATE, positive integer, the exact stated sum — in place of the physical fields below (twoHanded/shield/weightCategory/questId/cost never apply to it); "label" on it is optional, a short flavor phrase for the offer row (e.g. "a heavy jingling purse of septims"), not a container name to itemize. A container with no stated sum inside it, handed over as a keepable object in its own right (an empty purse, an ordinary belt pouch offered as gear), is a normal item instead, tagged "backpack" like any other worn container, not "currency". Money that changes hands with no choice left to make at all — already paid, already found and pocketed — is never an itemOffers entry, "currency"-slotted or otherwise: that belongs in "currencyChange" below instead, exactly as before. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "label" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; a plain ring is "light" for a ring even though that's still just a few grams — judge each item relative to typical examples of its own slot, not against other slots). "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for a SERVICE they personally provide, right now, as an open choice the hero still has to accept or decline (an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a toll, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Never set "cost" for a merchant or vendor's ordinary goods for sale — their general stock/wares — even if an exact price was stated in dialogue; buying that kind of goods happens only through a separate trade-window interface the player controls directly, so an item like that belongs in neither "itemOffers" nor "inventory" here, no matter how the scene described it. Omit "cost" entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`
-            : '';
+"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "currency", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. A stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — presented as something the hero can still accept or decline right now (a reward being handed over, a bribe, a prize, a wager's payout) is "slot": "currency" instead of a physical slot, no matter how the scene wraps it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to give it a physical slot. A "currency" entry takes "amount" — a SEPARATE, positive integer, the exact stated sum — in place of the physical fields below (twoHanded/shield/weightCategory/questId/cost never apply to it); "label" on it is optional, a short flavor phrase for the offer row (e.g. "a heavy jingling purse of septims"), not a container name to itemize. A container with no stated sum inside it, handed over as a keepable object in its own right (an empty purse, an ordinary belt pouch offered as gear), is a normal item instead, tagged "backpack" like any other worn container, not "currency". Money that changes hands with no choice left to make at all — already paid, already found and pocketed — is never an itemOffers entry, "currency"-slotted or otherwise: that belongs in "currencyChange" below instead, exactly as before. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "label" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; a plain ring is "light" for a ring even though that's still just a few grams — judge each item relative to typical examples of its own slot, not against other slots). "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for a SERVICE they personally provide, right now, as an open choice the hero still has to accept or decline (an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a toll, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Never set "cost" for a merchant or vendor's ordinary goods for sale — their general stock/wares — even if an exact price was stated in dialogue; buying that kind of goods happens only through a separate trade-window interface the player controls directly, so an item like that belongs in neither "itemOffers" nor "inventory" here, no matter how the scene described it. Omit "cost" entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`;
         // STATE DELTA MODE — an alternative to restating "inventory"/"npcs"/
         // "factions" in full every turn (see mergeNpcEntry and the block above
         // it, much further below, for the apply/reconciliation side of this).
@@ -36495,9 +36719,7 @@ Rules:
             const recentBattleNodeIds = new Set((currentState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId));
             const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds);
             const routeSoFar = waypointNames.length > 0 ? ` (by way of ${waypointNames.join(', ')})` : '';
-            const modeNote = queuedRoute.mode === 'timeskip'
-                ? ` Compress this into a single passage of time — ${describeRouteDistance(queuedRoute.distance)} — rather than dwelling on each leg; a line or two noting the days/hours passing is enough.`
-                : ' Play the journey out with some real texture (a line or two per notable stretch) rather than skipping straight to arrival.';
+            const modeNote = ` Compress this into a single passage of time — ${describeRouteDistance(queuedRoute.distance)} — rather than dwelling on each leg; a line or two noting the days/hours passing is enough.`;
             if (!interruption) {
                 pendingMapDestinationRef.current = queuedRoute.path[queuedRoute.path.length - 1];
                 routeNotes.push(`set out for "${targetName}"${routeSoFar} and completed the whole journey without incident, arriving safely.${modeNote}`);
@@ -36638,6 +36860,22 @@ Rules:
         const currentInventoryLine = currentInventoryNames.length > 0
             ? `\n\nHERO'S ACTUAL CURRENT INVENTORY RIGHT NOW: ${currentInventoryNames.join(', ')}.`
             : `\n\nHERO'S ACTUAL CURRENT INVENTORY RIGHT NOW: (nothing).`;
+        // Same rationale as currentInventoryLine just above, for the same class
+        // of bug, just with money instead of items: without an authoritative
+        // number to check against, a summary drifting through repeated
+        // compressions can end up saying "the hero has the reward" simply
+        // because the sum was the most vivid, memorable detail in the excerpt —
+        // even when the scene actually had the hero turn it down. This is the
+        // exact failure this whole change is fixing (see recordDeclinedOffer).
+        const currentCurrencyLine = `\n\nHERO'S ACTUAL CURRENT CURRENCY RIGHT NOW: ${currentState.currency}.`;
+        // declinedOffersRef is authoritative, code-tracked fact, not something
+        // this summarizer has to notice and preserve on its own — but it still
+        // needs to be told, or a fresh summary rewrite could describe an old
+        // decline in softer, more ambiguous language than the original excerpt
+        // did, which is its own version of the same bug.
+        const declinedOffersLine = declinedOffersRef.current.length > 0
+            ? `\n\nOFFERS THE HERO HAS EXPLICITLY DECLINED, AT ANY POINT SO FAR (authoritative, does not expire): ${declinedOffersRef.current.join('; ')}.`
+            : '';
         const system = `You maintain a running prose summary of an ongoing text RPG campaign, for a game master model that will only see this summary plus the most recent portion of the transcript.
 
 Update the summary below to fold in the new excerpt.
@@ -36645,8 +36883,10 @@ Update the summary below to fold in the new excerpt.
 - Preserve concrete facts a game master must not contradict later: names, relationships, promises made, unresolved threads, locations, established world/plot facts.
 - Drop atmospheric prose, exact dialogue wording, and minor color that won't matter to future scenes.
 - INVENTORY HONESTY: the excerpt may describe the hero carrying, wearing, or burdened by items that have since been sold, dropped, given away, or used up — the authoritative current inventory is given below this instruction. Never write or preserve a line implying the hero still possesses, carries, or is weighed down by an item that isn't in that list, even if earlier prose said so. If the existing summary already contains such a stale possession detail, drop it or reword it as past/resolved (sold, given away, used, lost) rather than carrying it forward as an ongoing fact.
+- CURRENCY HONESTY: the same rule, for money. The authoritative current total is given below. Never write or preserve a line implying the hero received, kept, or is carrying more (or less) money than that — including a reward, gift, wage, or payment the excerpt shows being OFFERED or discussed — unless the excerpt also shows it concretely, already being accepted and kept. An offer alone, or an offer whose outcome the excerpt doesn't settle, is never "the hero has it."
+- DECLINED-OFFER HONESTY: the list below this instruction, if present, names every reward/quest/advance the hero has explicitly turned down so far, however long ago. Always carry each one forward as a firm, standing fact — the hero does NOT have it and was never given it — no matter how many summarization passes it survives or how minor it now seems next to newer events. Never let a decline soften into vague or ambiguous language, quietly drop out of the summary, or flip into sounding like it was accepted.
 - Plain prose, no headings or lists.
-- Output ONLY the updated summary text, nothing else.${currentInventoryLine}`;
+- Output ONLY the updated summary text, nothing else.${currentInventoryLine}${currentCurrencyLine}${declinedOffersLine}`;
         const userMsg = `EXISTING SUMMARY:
 ${narrativeSummaryRef.current || '(none yet)'}
 
@@ -36711,11 +36951,9 @@ ${chunkText}`;
     // still surfaces, just as something to confirm/discard rather than an
     // unannounced inventory change. Only skipped for the opening turn, where
     // there is no prior inventory or offer to confirm against — starting kit
-    // is established directly, as it always has been — and when the player
-    // has turned item-interaction off entirely, in which case they've opted
-    // out of confirmation and the model's inventory is trusted as before.
+    // is established directly, as it always has been.
     function reconcileInventory(rawInventory, currentState, precedingNarrator, isOpeningTurn) {
-        if (!itemInteractionEnabled || isOpeningTurn) {
+        if (isOpeningTurn) {
             return { inventory: rawInventory, surpriseItems: [], justTakenCount: 0 };
         }
         const priorNames = new Set(currentState.inventory.map(it => it.name.trim().toLowerCase()));
@@ -37608,7 +37846,7 @@ ${chunkText}`;
     // happens: an item's slot getting corrected a turn or two after it's
     // first established, and a quest item's "questId" being cleared once
     // that quest resolves.
-    function applyInventoryDelta(rawAdd, rawUpdate, rawRemove, currentInventory, precedingNarrator, itemInteractionOn) {
+    function applyInventoryDelta(rawAdd, rawUpdate, rawRemove, currentInventory, precedingNarrator) {
         const priorRaw = Array.isArray(currentInventory) ? currentInventory : [];
         const rejected = [];
         const updateOps = Array.isArray(rawUpdate) ? rawUpdate : [];
@@ -37652,34 +37890,6 @@ ${chunkText}`;
         for (const key of updatesByKey.keys()) {
             if (!matchedUpdateKeys.has(key))
                 rejected.push({ op: 'inventoryUpdate', name: key, reason: 'no existing item with this name' });
-        }
-        if (!itemInteractionOn) {
-            // Mirrors reconcileInventory's own bypass above: with the
-            // confirmation system off, adds land directly with no offer/
-            // surprise step, and removals apply with no per-turn cap — the
-            // whole point of the cap is guarding the surprise-confirmation flow
-            // this mode has already opted out of.
-            let result = [...prior, ...(Array.isArray(rawAdd) ? rawAdd : [])];
-            const removeOps = Array.isArray(rawRemove) ? rawRemove : [];
-            for (const r of removeOps) {
-                if (!r || typeof r.name !== 'string' || !r.name.trim()) {
-                    rejected.push({ op: 'inventoryRemove', raw: r, reason: 'missing name' });
-                    continue;
-                }
-                const key = r.name.trim().toLowerCase();
-                const count = Number.isInteger(r.count) && r.count > 0 ? r.count : 1;
-                let left = count;
-                result = result.filter(it => {
-                    if (left > 0 && it.name.trim().toLowerCase() === key) {
-                        left--;
-                        return false;
-                    }
-                    return true;
-                });
-                if (left > 0)
-                    rejected.push({ op: 'inventoryRemove', name: r.name, reason: `only removed ${count - left} of ${count} requested (not enough in inventory)` });
-            }
-            return { inventory: result, surpriseItems: [], justTakenCount: 0, rejected };
         }
         const priorNames = new Set(prior.map(it => it.name.trim().toLowerCase()));
         const justTaken = collectJustConfirmedItems(precedingNarrator);
@@ -37806,7 +38016,7 @@ ${chunkText}`;
         const useDelta = stateDeltaMode && !isOpeningTurn;
         const hasNewShape = Array.isArray(parsed.inventoryAdd) || Array.isArray(parsed.inventoryUpdate) || Array.isArray(parsed.inventoryRemove);
         if (useDelta && hasNewShape) {
-            const result = applyInventoryDelta(parsed.inventoryAdd, parsed.inventoryUpdate, parsed.inventoryRemove, currentState.inventory, precedingNarrator, itemInteractionEnabled);
+            const result = applyInventoryDelta(parsed.inventoryAdd, parsed.inventoryUpdate, parsed.inventoryRemove, currentState.inventory, precedingNarrator);
             if (result.rejected.length > 0)
                 console.warn('[Grimoire RPG] state delta: inventory ops rejected', result.rejected);
             return result;
@@ -37873,7 +38083,7 @@ ${chunkText}`;
         if (retryNote) {
             engineNotes.push('[ENGINE NOTE — RETRY]: ' + retryNote);
         }
-        const raw = await callGemini(buildStateAndEventsSystemPrompt(currentState, itemInteractionEnabled, stateDeltaMode), [{ role: 'user', content: (engineNotes.length > 0 ? engineNotes.join('\n\n') + '\n\n' : '') + 'Scene:\n\n' + narrativeText }]);
+        const raw = await callGemini(buildStateAndEventsSystemPrompt(currentState, stateDeltaMode), [{ role: 'user', content: (engineNotes.length > 0 ? engineNotes.join('\n\n') + '\n\n' : '') + 'Scene:\n\n' + narrativeText }]);
         const parsed = extractJsonObject(raw);
         if (!parsed) {
             console.error('[Grimoire RPG] state/events response was not parsable JSON. Raw response was:', raw);
@@ -38303,7 +38513,7 @@ ${chunkText}`;
             };
         }
         // --- item offers (was generateItemOffers) ---
-        const itemOffersRaw = itemInteractionEnabled && Array.isArray(parsed.itemOffers) ? parsed.itemOffers : [];
+        const itemOffersRaw = Array.isArray(parsed.itemOffers) ? parsed.itemOffers : [];
         const itemOffers = itemOffersRaw.map(group => ({
             ...group,
             items: group.items.map(item => ({
@@ -39474,8 +39684,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         return lines.length ? '[ITEM DECISIONS FROM PREVIOUS TURN]: ' + lines.join('; ') : '';
     }
     function getUnresolvedItemOffers(msgs) {
-        if (!itemInteractionEnabled)
-            return [];
         const list = msgs || messages;
         const last = list[list.length - 1];
         if (!last || last.role !== 'narrator' || !last.itemOffers || last.itemOffers.length === 0)
@@ -39546,11 +39754,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             saveGame(nextMessages, nextState, nextItemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
         }
     }
-    // Mirrors getUnresolvedItemOffers, but NOT gated by itemInteractionEnabled
-    // — a quest is enough of a commitment that confirming it shouldn't depend
-    // on the item-pickup convenience toggle. An advance only counts as
-    // unresolved once its quest was actually accepted; declining the quest
-    // makes the advance moot rather than something that blocks sending.
+    // Mirrors getUnresolvedItemOffers. An advance only counts as unresolved
+    // once its quest was actually accepted; declining the quest makes the
+    // advance moot rather than something that blocks sending.
     function getUnresolvedQuestOffers(msgs) {
         const list = msgs || messages;
         const last = list[list.length - 1];
@@ -39660,8 +39866,18 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // narrative note is only ever built once, at send time, straight from
         // pendingMapRouteRef — see generateNarrative).
         pendingMapDestinationRef.current = node.id;
-        pendingMapRouteRef.current = { path: route.path, distance: route.distance, mode: mapTravelMode };
-        setPendingMapTravel({ id: node.id, name: node.name });
+        pendingMapRouteRef.current = { path: route.path, distance: route.distance };
+        // MapModal's activeRoute (see its own comment just above where it's
+        // defined) reads path/distance straight off this same pendingMapTravel
+        // object — not off pendingMapRouteRef, which is a separate ref only
+        // generateNarrative ever reads, at send time. Leaving those two fields
+        // out here used to crash the whole app the instant a trip was queued:
+        // activeRoute.path.map(...) on an {id, name}-only object throws
+        // (Cannot read properties of undefined), and with no error boundary
+        // that took the entire React tree down to a blank screen. Keep this
+        // object and pendingMapRouteRef in sync — same path/distance, just one
+        // of them also carries id/name for the UI bits that only need those.
+        setPendingMapTravel({ id: node.id, name: node.name, path: route.path, distance: route.distance });
     }
     // Cancels a still-unsent queued map trip. Only meaningful before the next
     // action goes out — once sendBatch/handleSend fires, the route has
@@ -39689,6 +39905,23 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
     }
+    // Appends a verbatim, client-computed fact to declinedOffersRef — the one
+    // thing about this decline the app knows for certain, independent of
+    // whatever the model narrates before or after it. Fed to the narrator
+    // EVERY turn and to updateNarrativeSummary (see both), so a decline can
+    // never quietly fall out of context the way a one-turn
+    // pendingQuestEventsRef note or a compressed summary paragraph can — see
+    // MAX_DECLINED_OFFERS_TRACKED for why this is still bounded rather than
+    // truly unbounded. Only ever called with accept === false; there's
+    // nothing to guard against re-granting on the accept path, since taking
+    // something is the ordinary, low-risk narrative direction models already
+    // default toward.
+    function recordDeclinedOffer(note) {
+        const next = [...declinedOffersRef.current, note];
+        declinedOffersRef.current = next.length > MAX_DECLINED_OFFERS_TRACKED
+            ? next.slice(next.length - MAX_DECLINED_OFFERS_TRACKED)
+            : next;
+    }
     // Accept/decline a new quest offer. Accepting adds the quest to the log
     // right away, client-side — same instant, no-round-trip mutation
     // toggleItemSelection now does for a confirmed item — since the offer
@@ -39712,6 +39945,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const note = (accept ? 'accepted the quest "' : 'declined the quest "') + offer.title + '" from ' + offer.giver;
             if (!pendingQuestEventsRef.current.includes(note))
                 pendingQuestEventsRef.current = [...pendingQuestEventsRef.current, note];
+            if (accept === false)
+                recordDeclinedOffer(`the hero explicitly DECLINED the quest "${offer.title}" offered by ${offer.giver} — it was never taken on; never narrate or treat it as active or accepted`);
         }
         if (accept === true && offer && !gameState.quests.some(q => q.id === offerId)) {
             const nextState = {
@@ -39740,6 +39975,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const note = (accept ? 'accepted the advance for "' : 'declined the advance for "') + offer.title + '"';
             if (!pendingQuestEventsRef.current.includes(note))
                 pendingQuestEventsRef.current = [...pendingQuestEventsRef.current, note];
+            if (accept === false)
+                recordDeclinedOffer(`the hero explicitly DECLINED the advance offered alongside the quest "${offer.title}" — the hero does NOT have it`);
         }
     }
     // Accept/decline the material reward for an already-completed quest.
@@ -39763,6 +40000,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (!pendingQuestEventsRef.current.includes(note))
                 pendingQuestEventsRef.current = [...pendingQuestEventsRef.current, note];
             if (accept === false) {
+                // The exact bug this guards against: the hero declines here, the
+                // click is unambiguous, but this specific turn/exchange later ages
+                // out of RECENT_TURN_WINDOW and gets folded into narrativeSummary —
+                // and nothing forced that fold-in to keep "declined" rather than
+                // let it soften or drop. recordDeclinedOffer sidesteps that
+                // entirely: it's client state, re-sent verbatim every turn, not
+                // something any model has to keep noticing and re-preserving.
+                recordDeclinedOffer(`the hero explicitly DECLINED the reward ("${offer.reward}") offered by ${offer.giver} for a completed quest — the hero does NOT possess this money or item; never narrate or report it as already received, taken, carried, or spent, and never grant it again unless ${offer.giver} makes a genuinely NEW offer in the current scene that the hero then freshly accepts`);
                 applyReputationDeltas({ [offer.giver.trim().toLowerCase()]: QUEST_REWARD_DECLINE_BONUS });
                 const giverFaction = findNpcFaction(offer.giver, gameState.npcs);
                 if (giverFaction) {
@@ -40974,16 +41219,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // stashes it on combat.loot so CombatModal can render it instead of
     // jumping straight to the close button. Guarded by `!prev.loot` so it
     // never re-fires while the request is in flight or after it lands.
-    // Skipped entirely (loot: { status: 'none', ... }) when the player has
-    // turned off item interaction altogether — same convenience toggle that
-    // gates ordinary scene item offers.
     useEffect(() => {
         if (!combat || combat.result !== 'victory' || combat.loot)
             return;
-        if (!itemInteractionEnabled) {
-            setCombat(prev => (prev && prev.result === 'victory' && !prev.loot ? { ...prev, loot: { status: 'none', items: [], currency: 0, resolutions: {} } } : prev));
-            return;
-        }
         const finalCombat = combat;
         setCombat(prev => (prev && prev.result === 'victory' && !prev.loot ? { ...prev, loot: { status: 'loading', items: [], currency: 0, resolutions: {} } } : prev));
         (async () => {
@@ -41011,7 +41249,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             setCombat(prev => (prev && prev.result === 'victory' ? { ...prev, loot: { status: 'ready', items, currency, resolutions: {} } } : prev));
         })();
-    }, [combat, itemInteractionEnabled]);
+    }, [combat]);
     // Toggles whether a single looted item is taken (true) or left behind
     // (false) — same ✓/✗ shape as toggleItemSelection, but simpler: loot
     // items are independent, never grouped as mutually-exclusive alternatives.
@@ -44076,9 +44314,21 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     function invalidateSummaryPastSurviving(survivingCount) {
         if (summarizedUpToRef.current <= survivingCount)
             return null;
-        const backup = { text: narrativeSummaryRef.current, upTo: summarizedUpToRef.current };
+        // declinedOffersRef rides along with the same invalidation: a note
+        // recorded by clicking decline on a turn that's about to be discarded
+        // describes a choice the surviving, edited-forward timeline may never
+        // repeat (the offer might not recur, or might now be accepted) — so it
+        // gets wiped here rather than risk a stale "declined" fact outliving
+        // the turn it came from. Simply clearing it (rather than trying to
+        // trim just the discarded entries) is deliberate: the list has no
+        // per-entry turn index to trim by, and an empty list is always SAFE —
+        // worst case a still-valid older decline is briefly missing from the
+        // standing fact list until the summary/window covers it again — never
+        // stale or wrong the way carrying it forward unchecked could be.
+        const backup = { text: narrativeSummaryRef.current, upTo: summarizedUpToRef.current, declinedOffers: declinedOffersRef.current };
         narrativeSummaryRef.current = '';
         summarizedUpToRef.current = 0;
+        declinedOffersRef.current = [];
         summaryEpochRef.current += 1;
         return backup;
     }
@@ -44656,6 +44906,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (summaryBackup) {
                 narrativeSummaryRef.current = summaryBackup.text;
                 summarizedUpToRef.current = summaryBackup.upTo;
+                declinedOffersRef.current = summaryBackup.declinedOffers || [];
             }
             setError(describeError(e, 'sendFailedPrefix'));
         }
@@ -44743,6 +44994,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (summaryBackup) {
                 narrativeSummaryRef.current = summaryBackup.text;
                 summarizedUpToRef.current = summaryBackup.upTo;
+                declinedOffersRef.current = summaryBackup.declinedOffers || [];
             }
             setError(describeError(e, 'sendFailedPrefix'));
         }
@@ -44773,7 +45025,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             shopClock,
             startingPartySize,
             narrativeSummary: narrativeSummaryRef.current,
-            summarizedUpTo: summarizedUpToRef.current
+            summarizedUpTo: summarizedUpToRef.current,
+            declinedOffers: declinedOffersRef.current
         };
         const json = JSON.stringify(payload);
         if (typeof CompressionStream !== 'undefined') {
@@ -45010,7 +45263,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 React.createElement("p", { className: "privacy-footer" },
                     React.createElement("a", { href: PRIVACY_URL, target: "_blank", rel: "noopener noreferrer" }, t('privacyLink')))),
             importModalOpen && (React.createElement(ImportModal, { value: importText, onChange: setImportText, error: importError, replacesCurrentGame: messages.length > 0, onLoad: handleImportSave, onCancel: () => { setImportModalOpen(false); setImportText(''); setImportError(null); }, t: t })),
-            settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
+            settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onClose: () => setSettingsOpen(false), t: t })),
             apiKeyGuideOpen && (React.createElement(ApiKeyGuideModal, { apiKey: geminiApiKey, onSetApiKey: setApiKey, onClose: () => setApiKeyGuideOpen(false), t: t })),
             cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t }))));
     }
@@ -45124,7 +45377,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                                 React.createElement("div", { className: "narrator-text-row" },
                                     React.createElement(NarrativeText, { text: currentTurn.narrator.text, entityIndex: narrativeEntityIndex, onOpenEntity: openNarrativeEntity }),
                                     !anyEditActive && (React.createElement("button", { onClick: () => startEditingNarrator(currentTurn.narratorIndex, currentTurn.narrator.text), className: "edit-btn narrator-edit-btn", "aria-label": t('editAria'), type: "button" }, "\u270E"))))),
-                            itemInteractionEnabled && (React.createElement(ItemOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, currency: viewedState.currency, onToggle: (groupId, itemId, mode, val) => toggleItemSelection(currentTurn.narratorIndex, groupId, itemId, mode, val), t: t })),
+                            React.createElement(ItemOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, currency: viewedState.currency, onToggle: (groupId, itemId, mode, val) => toggleItemSelection(currentTurn.narratorIndex, groupId, itemId, mode, val), t: t }),
                             React.createElement(QuestOffers, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggleQuest: (offerId, val) => toggleQuestOffer(currentTurn.narratorIndex, offerId, val), onToggleAdvance: (offerId, val) => toggleAdvanceOffer(currentTurn.narratorIndex, offerId, val), onToggleReward: (offerId, val) => toggleRewardOffer(currentTurn.narratorIndex, offerId, val), onHaggle: (offerId) => haggleQuestOffer(currentTurn.narratorIndex, offerId), t: t }),
                             React.createElement(TravelOffer, { narratorMessage: currentTurn.narrator, interactive: isLatestTurn, onToggle: val => toggleTravelOffer(currentTurn.narratorIndex, val), t: t }),
                             isLatestTurn && !anyEditActive && combatPending && !combatModalOpen && (currentTurn.narrator.combatEncounter.ambush ? (React.createElement(StealthKillOffer, { enemyName: currentTurn.narrator.combatEncounter.enemies[0].enemyName, interactive: isLatestTurn, onAttempt: () => attemptStealthKill(currentTurn.narratorIndex), onDecline: () => startCombat(currentTurn.narratorIndex), t: t })) : (React.createElement("div", { className: "suggestions-row" },
@@ -45218,9 +45471,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         effectDetail && (React.createElement(EffectDetailModal, { effect: effectDetail, onClose: () => setEffectDetail(null), t: t })),
         dropConfirmIndex !== null && (React.createElement(DropConfirmModal, { itemName: (viewedState.inventory[dropConfirmIndex] || {}).name || '', onConfirm: () => dropItem(dropConfirmIndex), onCancel: () => setDropConfirmIndex(null), t: t })),
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
-        settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, itemInteractionEnabled: itemInteractionEnabled, onSetItemInteraction: setItemInteraction, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
+        settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
         cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
-        mapModalOpen && (React.createElement(MapModal, { map: viewedState.map, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, mapTravelMode: mapTravelMode, onSetMapTravelMode: setMapTravelMode, t: t })),
+        mapModalOpen && (React.createElement(MapModal, { map: viewedState.map, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: viewedState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
@@ -46049,16 +46302,34 @@ const APP_STYLES = `
   @media (prefers-reduced-motion: reduce) {
     .combat-fx-archer-draw, .combat-fx-archer-release { animation: none !important; }
   }
-  /* Placeholder arrow flying between the two on-screen cards — swap the
-     ➳ glyph in CombatModal's JSX for an <img> once real arrow art exists.
-     Positioned fixed and moved imperatively via inline transform (see
-     fireArrow in CombatModal) since its start/end points are read straight
-     off getBoundingClientRect, same as the lunge vector above; a CSS
-     keyframe couldn't know those coordinates in advance. */
+  /* Placeholder arrow flying between the two grid tokens — swap the inline
+     SVG shape in CombatModal's JSX for real arrow art once it exists.
+     Lives inside .combat-grid-world (not fixed to the viewport), so each
+     one automatically pans/zooms together with the camera. Every shot
+     renders its own svg keyed by id (see the 'arrows' state in
+     CombatModal / fireArrow) rather than sharing one node moved
+     imperatively — with a shared node, a second shot landing before the
+     first one's flight finished would yank it to a new position
+     mid-flight. --arrow-x1/y1/x2/y2/angle are set per-shot from each
+     combatant's actual grid coordinates (fireArrow), same as the lunge/
+     archer-draw vectors above use getBoundingClientRect — a CSS keyframe
+     alone couldn't know those in advance. Constant speed for the ~220ms
+     flight itself (0%–45%, linear throughout), then it sits at the target
+     and dissolves over the remaining time instead of just vanishing. */
+  @keyframes arrow-flight {
+    0%   { transform: translate(var(--arrow-x1, 0px), var(--arrow-y1, 0px)) rotate(var(--arrow-angle, 0deg)); opacity: 1; }
+    45%  { transform: translate(var(--arrow-x2, 0px), var(--arrow-y2, 0px)) rotate(var(--arrow-angle, 0deg)); opacity: 1; }
+    100% { transform: translate(var(--arrow-x2, 0px), var(--arrow-y2, 0px)) rotate(var(--arrow-angle, 0deg)); opacity: 0; }
+  }
   .combat-arrow-projectile {
-    position: fixed; top: 0; left: 0; z-index: 60; font-size: 1.3rem;
-    line-height: 1; pointer-events: none; opacity: 0; will-change: transform;
+    position: absolute; top: 0; left: 0; z-index: 60; width: 2rem; height: 0.625rem;
+    pointer-events: none; will-change: transform, opacity;
+    color: var(--amber-400);
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+    animation: arrow-flight 0.48s linear forwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .combat-arrow-projectile { animation: none !important; opacity: 0 !important; }
   }
   @media (prefers-reduced-motion: reduce) {
     .combat-portrait-active, .combat-fx-lunge, .combat-fx-hit, .combat-fx-hit-vital, .combat-fx-block, .combat-fx-dodge, .combat-fx-stunned { animation: none !important; }
@@ -46341,7 +46612,6 @@ const APP_STYLES = `
   .talent-node-locked { opacity: 0.45; }
   .talent-node-selected { box-shadow: 0 0 0 2px var(--amber-400); }
   .talent-node-check { position: absolute; bottom: -4px; right: -4px; font-size: 0.6rem; color: #4ade80; background: var(--stone-950); border-radius: 50%; line-height: 1; padding: 1px; pointer-events: none; }
-  .talent-tree-hint { flex: none; text-align: center; font-family: var(--font-mono); font-size: 0.65rem; color: var(--stone-600); margin: 0.5rem 0 0; }
   .talent-detail-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.55); padding: 1rem; }
   .talent-detail-panel { background: var(--stone-900); border: 1px solid var(--amber-900); border-radius: 6px; padding: 1.1rem; width: 100%; max-width: 26rem; }
   .talent-detail-head { display: flex; align-items: center; gap: 0.6rem; }
@@ -46631,6 +46901,7 @@ const APP_STYLES = `
   .map-legend-ring-hostile { border-color: var(--red-400); background: var(--red-400); opacity: 0.6; }
   .map-legend-ring-friendly { border-color: var(--emerald-400); background: var(--emerald-400); opacity: 0.55; }
   .map-legend-ring-allied { border-color: var(--sky-400); background: var(--sky-400); opacity: 0.55; }
+  .map-legend-ring-neutral { border-color: var(--stone-400); background: var(--stone-400); opacity: 0.5; }
   /* Territory borders — one smoothed blob per nearby faction cluster,
      drawn into .map-svg beneath the roads/nodes (see
      computeTerritoryShapes). fill/stroke reuse the exact legend-swatch
@@ -46640,6 +46911,7 @@ const APP_STYLES = `
   .map-territory-hostile { fill: var(--red-400); fill-opacity: 0.14; stroke: var(--red-400); stroke-opacity: 0.7; stroke-width: 1.5; }
   .map-territory-friendly { fill: var(--emerald-400); fill-opacity: 0.12; stroke: var(--emerald-400); stroke-opacity: 0.65; stroke-width: 1.5; }
   .map-territory-allied { fill: var(--sky-400); fill-opacity: 0.12; stroke: var(--sky-400); stroke-opacity: 0.65; stroke-width: 1.5; }
+  .map-territory-neutral { fill: var(--stone-400); fill-opacity: 0.08; stroke: var(--stone-400); stroke-opacity: 0.5; stroke-width: 1.5; }
   .map-viewport { position: relative; height: 280px; background: var(--stone-950); border: 1px solid var(--stone-700); border-radius: 3px; overflow: hidden; touch-action: none; cursor: grab; }
   .map-recenter-btn { position: absolute; right: 0.6rem; bottom: 0.6rem; width: 2.1rem; height: 2.1rem; border-radius: 50%; background: var(--stone-900); border: 1px solid var(--stone-700); color: var(--amber-500); font-size: 1rem; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; padding: 0; }
   .map-recenter-btn:hover { border-color: var(--amber-700); background: var(--stone-800); }
@@ -46681,7 +46953,7 @@ const APP_STYLES = `
   .map-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
   .map-node-open { z-index: 6; }
   .map-node-icon-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-  .map-node-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--stone-800); border: 1px solid var(--stone-600); font-size: 15px; }
+  .map-node-icon { position: relative; z-index: 2; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--stone-800); border: 1px solid var(--stone-600); font-size: 15px; }
   .map-node-icon-hero { width: 10px; height: 10px; background: var(--emerald-600); border: none; }
   .map-node-icon-quest { border-color: var(--amber-700); color: var(--amber-400); }
   .map-node-icon-fog { background: var(--stone-900); border: 1px dashed var(--stone-600); color: var(--stone-500); font-family: var(--font-mono); }
@@ -46698,6 +46970,10 @@ const APP_STYLES = `
   .map-node-danger-text { color: var(--red-400); font-style: normal; }
   .map-node-cleared-tag { font-family: var(--font-mono); font-style: normal; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--stone-500); }
   .map-node-progress-tag { font-family: var(--font-mono); font-style: normal; font-size: 0.68rem; letter-spacing: 0.02em; color: var(--amber-400); }
+  .map-node-quest-info { border-top: 1px dashed var(--stone-700); padding-top: 0.35rem; margin-top: 0.35rem; }
+  .map-node-quest-info:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .map-node-quest-title { font-style: normal; font-weight: 600; color: var(--amber-300); }
+  .map-node-quest-stage-desc { color: var(--stone-300); }
   .map-node-danger-badge { position: absolute; top: -4px; right: -4px; width: 13px; height: 13px; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); background: var(--red-600); color: var(--amber-50); font-family: var(--font-mono); font-size: 9px; font-weight: 700; line-height: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 1px; box-shadow: 0 0 3px rgba(0,0,0,0.7); z-index: 3; }
   /* Opposite corner from the danger badge above (top-LEFT) so a node that's
      both dangerous AND has a floor connection can show both at once without
@@ -46717,9 +46993,6 @@ const APP_STYLES = `
   .rumor-line { font-style: italic; }
   .map-travel-offer { margin: 0.6rem 0 0; }
   .map-travel-toggle-btn { font-size: 1.1rem; }
-  .map-travel-mode-toggle { display: flex; gap: 0.4rem; margin: 0.35rem 0 0; }
-  .map-travel-mode-btn { flex: 1; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--stone-700); background: var(--stone-950); color: var(--stone-500); font-family: var(--font-mono); font-size: 0.7rem; cursor: pointer; }
-  .map-travel-mode-btn-active { border-color: var(--sky-400); color: var(--sky-300); background: var(--stone-900); }
   .map-travel-queued-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--amber-400); margin: 0.3rem 0 0; }
   .map-node-radar { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
   .map-node-radar span { position: absolute; left: 0; top: 0; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--emerald-600); animation: map-radar-hero 2.4s ease-out infinite; }
@@ -46728,7 +47001,6 @@ const APP_STYLES = `
   @keyframes map-radar-hero { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(3.4); opacity: 0; } }
   @keyframes map-radar-quest { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.45); opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .map-node-radar span { animation: none !important; opacity: 0; } }
-  .map-hint { font-family: var(--font-mono); font-size: 0.65rem; color: var(--stone-500); margin: 0.6rem 0 0; text-align: center; }
   .map-empty { font-family: var(--font-serif); font-style: italic; font-size: 0.85rem; color: var(--stone-500); text-align: center; margin: 0.6rem 0 0; }
   .equipment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem 0.6rem; }
   .equip-slot-wrap { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
