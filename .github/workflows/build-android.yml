@@ -35,8 +35,8 @@ jobs:
       - name: Set version code
         working-directory: android
         run: |
-          sed -i "s/versionCode [0-9]*/versionCode 2/" app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "1.0.2"/' app/build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode 4/" app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "1.0.4"/' app/build.gradle
           grep -E "versionCode|versionName" app/build.gradle
 
       - name: Register the AdMob App ID
