@@ -17565,7 +17565,7 @@ const TRANSLATIONS = {
         abilityName_resilientBody: 'Живучесть',
         abilityDesc_resilientBody: 'После победы в бою восстанавливает чуть больше здоровья, чем обычно.',
         abilityName_coldBlood: 'Хладнокровие',
-        abilityDesc_coldBlood: 'Постоянный бонус к шансу вырваться из проигрышного боя.',
+        abilityDesc_coldBlood: 'Постоянный бонус к шансу ускользнуть от удара, отступая из ближнего боя.',
         abilityName_scavengerEye: 'Чутьё добычи',
         abilityDesc_scavengerEye: 'Из побеждённых противников достаётся больше монет.',
         abilityName_bloodlust: 'Жажда крови',
@@ -17599,7 +17599,7 @@ const TRANSLATIONS = {
         talentTrack_healBonus: 'Восполнение здоровья',
         talentTrack_stealthKill: 'Скрытное убийство',
         talentTrack_hitChance: 'Меткость',
-        talentTrack_fleeChance: 'Побег из боя',
+        talentTrack_fleeChance: 'Отход с боем',
         talentTrack_lootBonus: 'Добыча',
         // -- Effect detail popup (tap an effect on the sheet) --
         effectKindLabel_bleed: 'Кровотечение',
@@ -17617,7 +17617,7 @@ const TRANSLATIONS = {
         effectSeverityLabel_severe: 'тяжёлая степень',
         effectMechanicHitChance: 'Шанс попадания в бою',
         effectMechanicDefenseChance: 'Шанс защиты/уклонения',
-        effectMechanicFleeChance: 'Шанс побега из боя',
+        effectMechanicFleeChance: 'Шанс уйти от удара при отходе',
         effectMechanicDamage: 'Наносимый урон',
         effectMechanicHpTick: 'Потеря здоровья за раунд боя',
         effectMechanicCheck: 'Проверки действий (бросок d20)',
@@ -17816,6 +17816,7 @@ const TRANSLATIONS = {
         // someone standing right next to them, and again afterward only if one
         // of those swings actually landed and cancelled the move.
         combatLogOpportunityAttackText: 'пытается вырваться из ближнего боя',
+        combatLogDisengageText: 'ускользает от удара при отходе',
         combatLogMoveBlockedText: 'не может оторваться от противника и остаётся на месте — ход потерян',
         combatLogSkipTurnText: 'пропускает ход',
         combatLogLeaveEdgeText: 'покидает поле боя',
@@ -17849,8 +17850,6 @@ const TRANSLATIONS = {
         combatUseItemCancelLabel: 'Отмена',
         combatItemUsedLogVerb: 'использует',
         combatItemCuredSuffix: 'недуги сняты: {n}',
-        combatLogFleeSuccessText: 'Побег удаётся!',
-        combatLogFleeFailTag: 'Побег не удался',
         combatFledTitle: 'Побег',
         combatFledText: 'Тебе удалось вырваться из боя. Урон и потери учтены в состоянии героя.',
         lootIntroText: 'Можно осмотреть побеждённого противника и забрать часть того, что при нём было.',
@@ -18348,7 +18347,7 @@ const TRANSLATIONS = {
         abilityName_resilientBody: 'Resilient Body',
         abilityDesc_resilientBody: 'Recovers a little extra health after every fight you win.',
         abilityName_coldBlood: 'Cold Blood',
-        abilityDesc_coldBlood: 'A permanent bonus to your chance of breaking off from a losing fight.',
+        abilityDesc_coldBlood: 'A permanent bonus to your chance of slipping a parting blow when you step away from melee.',
         abilityName_scavengerEye: "Scavenger's Eye",
         abilityDesc_scavengerEye: 'Defeated enemies yield noticeably more coin.',
         abilityName_bloodlust: 'Bloodlust',
@@ -18382,7 +18381,7 @@ const TRANSLATIONS = {
         talentTrack_healBonus: 'Recovery',
         talentTrack_stealthKill: 'Stealth Kill',
         talentTrack_hitChance: 'Accuracy',
-        talentTrack_fleeChance: 'Escape',
+        talentTrack_fleeChance: 'Disengage',
         talentTrack_lootBonus: 'Plunder',
         // -- Effect detail popup (tap an effect on the sheet) --
         effectKindLabel_bleed: 'Bleeding',
@@ -18400,7 +18399,7 @@ const TRANSLATIONS = {
         effectSeverityLabel_severe: 'severe',
         effectMechanicHitChance: 'Hit chance in combat',
         effectMechanicDefenseChance: 'Defense/dodge chance',
-        effectMechanicFleeChance: 'Chance to flee combat',
+        effectMechanicFleeChance: 'Chance to slip a parting blow',
         effectMechanicDamage: 'Damage dealt',
         effectMechanicHpTick: 'Health lost per combat round',
         effectMechanicCheck: 'Action checks (d20 roll)',
@@ -18592,6 +18591,7 @@ const TRANSLATIONS = {
         combatLogEnemyRallyText: 'steadies its nerve and rejoins the fight',
         combatLogMoveText: 'repositions',
         combatLogOpportunityAttackText: 'tries to break away from melee',
+        combatLogDisengageText: 'slips the blow while pulling back',
         combatLogMoveBlockedText: "can't break away and stays put — turn lost",
         combatLogSkipTurnText: 'skips the turn',
         combatLogLeaveEdgeText: 'leaves the battlefield',
@@ -18625,8 +18625,6 @@ const TRANSLATIONS = {
         combatUseItemCancelLabel: 'Cancel',
         combatItemUsedLogVerb: 'uses',
         combatItemCuredSuffix: 'ailments cured: {n}',
-        combatLogFleeSuccessText: 'The escape succeeds!',
-        combatLogFleeFailTag: 'Escape failed',
         combatFledTitle: 'Escape',
         combatFledText: "You managed to break away from the fight. Damage and losses are reflected in the hero's condition.",
         lootIntroText: "You can search the defeated enemy and take some of what they were carrying.",
@@ -19064,7 +19062,7 @@ function computeXpBarInfo(level, xp) {
 // elsewhere hardcodes a bonus number, it's always read off ABILITY_DEFS[id]:
 //  - type 'passive': a permanent combat modifier, folded into the hero's
 //    own mods object by applyHeroAbilityMods (see COMBAT PURE HELPERS)
-//    everywhere the hero's mods are computed (attack, defense, flee), or
+//    everywhere the hero's mods are computed (attack, defense, disengage), or
 //    into rollStealthKillOutcome for silentStep specifically.
 //  - type 'active': has a per-fight or per-N-round usage limit (frequency/
 //    cooldownRounds), tracked in combat.abilityState (see
@@ -24158,10 +24156,6 @@ const COMBAT_TUNING = {
     partialDamageFraction: 0.5, // fraction of a hit's damage that still gets through on a partial parry (mirrors blockChipDamageFraction's role for block)
     defensePrecisionScale: 1.0, // agility's weight on dodge/block chance
     defensePrecisionScaleParry: 1.4, // parry rewards skill more heavily than dodge/block — it's the "high skill ceiling" option
-    fleeBase: 55, // base % chance to flee an "ordinary" opponent
-    fleeDifficultyScale: 1.5, // % penalty per point enemy power+precision exceeds baseline (combined)
-    fleeHpDifficultyScale: 0.8, // % penalty per 10 (narrative-scale) HP the enemy's pool exceeds the ordinary baseline (50)
-    fleeAgilityScale: 1.0, // % bonus per point of hero agility above baseline
     // Stealth kill (see rollStealthKillOutcome): three-way roll for an ambush
     // attempt — instant kill, damage-only (normal combat follows, enemy
     // already wounded), or a clean miss (normal combat follows, enemy at full
@@ -25465,7 +25459,8 @@ function clampDamageMultiplier(n) {
 // The battlefield is a coordinate grid (see startCombat/layoutInitialPositions
 // for how hero/allies/enemies get their starting {x,y}, and CombatModal's
 // combat-grid-viewport for the pannable on-screen rendering of it). y grows
-// from the hero's side (y=0) toward the enemy's side; x is centered on 0.
+// from the top of the board down; a fight opens at the board's center, hero
+// + allies on the left and enemies on the right (see layoutInitialPositions).
 // Every cell is the same size (GRID_CELL_PX, screen pixels per cell) — the
 // board itself has no fixed edge, it's just as large as GRID_RENDER_* below
 // actually renders, which is generous enough for any realistic fight and
@@ -25507,10 +25502,15 @@ function unitCenterPx(coord, minCoord) { return (coord - minCoord + UNIT_SPAN / 
 // The map "edge" a side must physically retreat a character to before that
 // character can actually leave combat (see CombatModal's per-card leave
 // button and resolveLeaveCombat, plus runAutoTurn's routing branches) — the
-// player's own edge is behind their starting row (y=0), the enemy's is
-// behind theirs (ENEMY_ROW_Y below).
+// player's own edge is the top of the board (y), the enemy's the bottom —
+// independent of where the fight opens (see layoutInitialPositions).
 const PLAYER_EDGE_Y = GRID_RENDER_MIN_Y;
 const ENEMY_EDGE_Y = GRID_RENDER_MAX_Y;
+// A footprint's stored y is its TOP row, so the lowest row a footprint can
+// stand on while still fully inside the grid is one less than ENEMY_EDGE_Y
+// (UNIT_SPAN - 1 rows are below it). That's the row an enemy has to reach
+// to count as "at its edge".
+const ENEMY_EDGE_POS_Y = ENEMY_EDGE_Y - (UNIT_SPAN - 1);
 const BASE_MOVEMENT_RANGE = 6; // small cells per turn (3 character-widths — UNIT_SPAN just doubled the grid's resolution, not how far anyone actually walks) before any modifier below
 const RANGED_ATTACK_MAX_DISTANCE = 9; // a ranged weapon can threaten the whole rendered board — old-cell-equivalent units, see gridDistance
 const MELEE_ATTACK_MAX_DISTANCE = 1; // Chebyshev — must be in an adjacent footprint (incl. diagonal), see chebyshevDistance
@@ -25842,20 +25842,26 @@ function computeClampedPath(from, to, range, combat, exclude) {
     const beyond = full.slice(range);
     return { full, reachable, beyond };
 }
-// hero's row (y=0) and the enemy row (see layoutInitialPositions) —
-// generated locally at combat start, never by the narrator (see the
-// grimoire.jsx cover-system notes: it's a client-side mechanical layer, not
-// something the prose is expected to describe tile-by-tile). Count scales
-// gently with how many combatants are actually in the fight, capped so a
-// small skirmish doesn't turn into a maze.
-function generateCoverLayout(combatantCount, enemyRowY) {
+// Cover blocks scattered in the corridor between the two opening columns
+// (see layoutInitialPositions: hero + allies at heroX on the left, enemies at
+// enemyX on the right), spread over most of the board's height. Generated
+// locally at combat start, never by the narrator (see the grimoire.jsx
+// cover-system notes: it's a client-side mechanical layer, not something the
+// prose is expected to describe tile-by-tile). Count scales gently with how
+// many combatants are actually in the fight, capped so a small skirmish
+// doesn't turn into a maze.
+function generateCoverLayout(combatantCount, heroX, enemyX) {
     const count = Math.max(2, Math.min(6, Math.round(combatantCount / 2)));
+    const minX = heroX + UNIT_SPAN;
+    const maxX = enemyX - UNIT_SPAN;
+    const minY = GRID_RENDER_MIN_Y + 2 * UNIT_SPAN;
+    const spanY = GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y - 4 * UNIT_SPAN;
     const cover = [];
     let attempts = 0;
     while (cover.length < count && attempts < count * 12) {
         attempts++;
-        const x = Math.round((Math.random() * (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X - 4 * UNIT_SPAN)) + GRID_RENDER_MIN_X + 2 * UNIT_SPAN);
-        const y = UNIT_SPAN + Math.floor(Math.random() * Math.max(1, enemyRowY - 2 * UNIT_SPAN + 1));
+        const x = minX + Math.floor(Math.random() * Math.max(1, maxX - minX + 1));
+        const y = minY + Math.floor(Math.random() * Math.max(1, spanY + 1));
         // Footprint-aware now that a cover block spans UNIT_SPAN x UNIT_SPAN
         // cells (see UNIT_SPAN) — two candidates only actually collide if their
         // whole blocks overlap, not just their top-left corners.
@@ -25976,6 +25982,62 @@ function chooseMoveStep(from, to, combat, exclude, range = BASE_MOVEMENT_RANGE) 
     }
     return null;
 }
+// Routing (fleeing) movement: shortest walk, staying fully inside the
+// playable grid and around cover/other bodies, to ANY footprint standing on
+// row `goalY` (enemy: ENEMY_EDGE_POS_Y, party: PLAYER_EDGE_Y). Unlike
+// chooseMoveStep this doesn't stop "close enough to touch" — a retreating
+// unit has to physically get onto the edge row. Returns the position reached
+// this turn (up to `range` small cells along the path), or null if already on
+// the row / boxed in.
+function chooseRouteStepToRow(from, goalY, combat, exclude, range = BASE_MOVEMENT_RANGE) {
+    const onGoal = (p) => (goalY <= PLAYER_EDGE_Y ? p.y <= goalY : p.y >= goalY);
+    if (onGoal(from))
+        return null;
+    const minX = GRID_RENDER_MIN_X, maxX = GRID_RENDER_MAX_X - (UNIT_SPAN - 1);
+    const minY = GRID_RENDER_MIN_Y, maxY = GRID_RENDER_MAX_Y - (UNIT_SPAN - 1);
+    const key = (p) => p.x + ',' + p.y;
+    const visited = new Set([key(from)]);
+    const cameFrom = new Map();
+    const queue = [from];
+    let head = 0;
+    const dirs = [
+        { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
+        { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 }
+    ];
+    let goalPos = null;
+    while (head < queue.length && visited.size < 6000 && !goalPos) {
+        const cur = queue[head++];
+        for (const d of dirs) {
+            const next = { x: cur.x + d.x, y: cur.y + d.y };
+            if (next.x < minX || next.x > maxX || next.y < minY || next.y > maxY)
+                continue;
+            const k = key(next);
+            if (visited.has(k))
+                continue;
+            if (isFootprintBlocked(next, combat, exclude))
+                continue;
+            visited.add(k);
+            cameFrom.set(k, cur);
+            if (onGoal(next)) {
+                goalPos = next;
+                break;
+            }
+            queue.push(next);
+        }
+    }
+    if (!goalPos)
+        return null;
+    const path = [];
+    let cur = goalPos;
+    while (key(cur) !== key(from)) {
+        path.push(cur);
+        cur = cameFrom.get(key(cur));
+        if (!cur)
+            return null;
+    }
+    path.reverse();
+    return path[Math.min(path.length, range) - 1];
+}
 // Picks whichever of `targets` (each `{ pos, ... }`) sits closest to
 // `fromPos`, by plain distance — used to decide who a melee/tank enemy (or
 // an AI-run reinforcement ally) tries to close with first.
@@ -26009,6 +26071,16 @@ function nearestReachableTarget(fromPos, targets, combat, exclude) {
     return best || nearestTarget(fromPos, targets);
 }
 const AI_MOVEMENT_RANGE = BASE_MOVEMENT_RANGE; // enemies/reinforcements have no tracked encumbrance, so just the flat baseline
+// The hero's old "flee chance" modifiers (Disengage talent track, Cold Blood,
+// status effects — all summed into mods.fleeChanceDelta) now decide whether
+// the hero slips a parting blow when stepping away from melee: each free
+// swing of an attack of opportunity (see attemptOpportunityAttacks) is
+// skipped outright with this chance, in percent.
+const DISENGAGE_BASE_CHANCE = 10;
+const DISENGAGE_MAX_CHANCE = 75;
+function heroDisengageChance(mods) {
+    return Math.max(0, Math.min(DISENGAGE_MAX_CHANCE, DISENGAGE_BASE_CHANCE + ((mods && mods.fleeChanceDelta) || 0)));
+}
 // A ranged (or caster) enemy already standing somewhere that shields it
 // from every one of `threats` doesn't need to move at all (returns null).
 // Otherwise looks for the closest reachable cell (see
@@ -26031,12 +26103,15 @@ function findCoverSeekingMove(fromPos, threats, combat, exclude) {
         return null;
     return candidates.reduce((best, c) => !best || gridDistance(fromPos, c) < gridDistance(fromPos, best) ? c : best, null);
 }
-// opening enemy (reinforcements get placed separately when their wave
-// fires — see placeReinforcementPositions). Both sides are centered on
-// x=0 and fanned outward (±1, ±2, …) so nobody starts stacked on the
-// hero's own tile; enemies start a fixed distance away on the far row,
-// which is the entire point of the grid rework — closing that distance
-// (or not, for a ranged loadout) is now a real tactical choice instead of
+// Where a fight opens (see layoutInitialPositions below): both sides start
+// in the CENTER of the board, facing each other across START_GAP — hero +
+// allies in a column on the left, the opening enemies in a column on the
+// right. Reinforcements are placed separately, anywhere on the board, when
+// their wave fires (see placeReinforcementPositions). Each column is
+// centered vertically on the board's middle row and fanned outward (±1,
+// ±2, …) so nobody starts stacked on the hero's own tile; the fixed distance
+// between the columns is the entire point of the grid rework — closing it
+// (or not, for a ranged loadout) is a real tactical choice instead of
 // combat starting already nose-to-nose.
 function sideOffsets(count) {
     const offsets = [];
@@ -26054,66 +26129,87 @@ function centeredOffsets(count) {
         offsets.push(Math.round(start + i));
     return offsets;
 }
-const ENEMY_ROW_Y = 5 * UNIT_SPAN; // 5 character-widths from the hero's row, expressed on the finer grid
+const GRID_CENTER_X = Math.round((GRID_RENDER_MIN_X + GRID_RENDER_MAX_X) / 2);
+const GRID_CENTER_Y = Math.round((GRID_RENDER_MIN_Y + GRID_RENDER_MAX_Y) / 2);
+const START_GAP = 5 * UNIT_SPAN; // 5 character-widths between the two opening columns on the finer grid — the same distance the old top/bottom rows had
+const HERO_START_X = GRID_CENTER_X - START_GAP / 2;
+const ENEMY_START_X = GRID_CENTER_X + START_GAP / 2;
+// A column taller than this wraps into a second one further from the middle
+// (party: further left, enemies: further right) instead of running off the
+// top/bottom of the board.
+const START_UNITS_PER_COLUMN = 8;
+function startColumnSlots(count, baseX, outwardSign, offsetsFor) {
+    const slots = [];
+    for (let start = 0, col = 0; start < count; start += START_UNITS_PER_COLUMN, col++) {
+        const inCol = Math.min(START_UNITS_PER_COLUMN, count - start);
+        const offsets = offsetsFor(inCol);
+        for (let i = 0; i < inCol; i++) {
+            // Offsets are in character-widths (sideOffsets/centeredOffsets don't
+            // know about the grid) — multiplied by UNIT_SPAN so neighbours land
+            // edge-to-edge with no gap and no overlap.
+            slots.push({ x: baseX + outwardSign * col * UNIT_SPAN, y: GRID_CENTER_Y + offsets[i] * UNIT_SPAN });
+        }
+    }
+    return slots;
+}
 function layoutInitialPositions(allies, enemies) {
-    const heroPos = { x: 0, y: 0 };
-    // Offsets are in character-widths (sideOffsets/centeredOffsets themselves
-    // don't know about the grid at all) — multiplied by UNIT_SPAN here so
-    // side-by-side footprints land edge-to-edge with no gap and no overlap,
-    // same spacing as before this rework.
-    const allyOffsets = sideOffsets(allies.length);
-    const alliesWithPos = allies.map((a, i) => ({ ...a, pos: { x: allyOffsets[i] * UNIT_SPAN, y: 0 } }));
-    const enemyOffsets = centeredOffsets(enemies.length);
-    const enemiesWithPos = enemies.map((e, i) => ({ ...e, pos: { x: enemyOffsets[i] * UNIT_SPAN, y: ENEMY_ROW_Y } }));
-    const coverCells = generateCoverLayout(allies.length + enemies.length, ENEMY_ROW_Y);
+    const heroPos = { x: HERO_START_X, y: GRID_CENTER_Y };
+    const allySlots = startColumnSlots(allies.length, HERO_START_X, -1, sideOffsets);
+    const alliesWithPos = allies.map((a, i) => ({ ...a, pos: allySlots[i] }));
+    const enemySlots = startColumnSlots(enemies.length, ENEMY_START_X, 1, centeredOffsets);
+    const enemiesWithPos = enemies.map((e, i) => ({ ...e, pos: enemySlots[i] }));
+    const coverCells = generateCoverLayout(allies.length + enemies.length, HERO_START_X, ENEMY_START_X);
     return { heroPos, allies: alliesWithPos, enemies: enemiesWithPos, coverCells };
 }
 // Positions for a freshly-arrived reinforcement wave (see
-// checkReinforcementWaves) — placed near their own side's row, fanned out
-// from whatever x offset is already free rather than recomputing everyone
-// else's position. Falls back to a fresh row one step further behind the
-// front line whenever the current row's nearby cells are all taken (a very
-// crowded fight — realistic now that reinforcement waves have no headcount
-// cap, see MAX_REINFORCEMENT_WAVE_COMBATANTS) rather than silently reusing
-// an already-occupied cell: two combatants sharing a position isn't just a
-// visual overlap, it would also let both independently threaten an attack
-// of opportunity from what looks like a single spot (see
-// attemptOpportunityAttacks).
+// checkReinforcementWaves) — from ANYWHERE on the board, for either side:
+// a wave has no row or column of its own. Each wave picks one random free
+// spot (preferring one that isn't already touching anybody, so it doesn't
+// land straight in someone's melee reach) and arrives there as a cluster,
+// spiralling outward from that anchor to the nearest free cells for the
+// rest of its members. Free means clear of cover, the hero, every already-
+// placed combatant (see isFootprintBlocked) and earlier members of this same
+// wave: two combatants sharing a position isn't just a visual overlap, it
+// would also let both independently threaten an attack of opportunity from
+// what looks like a single spot (see attemptOpportunityAttacks). `side` no
+// longer changes where a wave lands; it's kept so the callers stay as-is.
 function placeReinforcementPositions(freshUnits, side, combat) {
-    const baseRowY = side === 'enemy' ? ENEMY_ROW_Y + 2 * UNIT_SPAN : -1 * UNIT_SPAN;
-    const rowStep = side === 'enemy' ? UNIT_SPAN : -UNIT_SPAN;
-    const usedXByRow = new Map();
-    const markUsed = (y, x) => usedXByRow.set(y, [...(usedXByRow.get(y) || []), x]);
-    for (const c of (side === 'enemy' ? combat.enemies : combat.allies)) {
-        if (c.pos)
-            markUsed(c.pos.y, c.pos.x);
+    const minX = GRID_RENDER_MIN_X, maxX = GRID_RENDER_MAX_X - (UNIT_SPAN - 1);
+    const minY = GRID_RENDER_MIN_Y, maxY = GRID_RENDER_MAX_Y - (UNIT_SPAN - 1);
+    const placed = [];
+    const isFree = (p) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
+        && !isFootprintBlocked(p, combat)
+        && !placed.some(q => Math.abs(q.x - p.x) < UNIT_SPAN && Math.abs(q.y - p.y) < UNIT_SPAN);
+    const fighters = [combat.heroPos, ...(combat.allies || []).map(a => a.pos), ...(combat.enemies || []).map(e => e.pos)].filter(Boolean);
+    const isClear = (p) => fighters.every(f => chebyshevDistance(p, f) > 1);
+    let anchor = null;
+    for (let tries = 0; tries < 80 && !anchor; tries++) {
+        const p = { x: minX + Math.floor(Math.random() * (maxX - minX + 1)), y: minY + Math.floor(Math.random() * (maxY - minY + 1)) };
+        if (isFree(p) && isClear(p))
+            anchor = p;
     }
-    let nextOffset = 1;
+    if (!anchor)
+        anchor = { x: GRID_CENTER_X, y: GRID_CENTER_Y };
     return freshUnits.map(unit => {
-        for (let row = 0; row < 200; row++) {
-            const y = baseRowY + row * rowStep;
-            const usedX = usedXByRow.get(y) || [];
-            for (let tries = 0; tries < 20; tries++) {
-                const candidate = (nextOffset % 2 === 1 ? 1 : -1) * Math.ceil(nextOffset / 2) * UNIT_SPAN;
-                nextOffset++;
-                // Footprint-aware: a fresh unit just needs to clear UNIT_SPAN of
-                // every already-placed x on this same row, not land on an exact
-                // duplicate of one.
-                if (!usedX.some(ux => Math.abs(ux - candidate) < UNIT_SPAN)) {
-                    markUsed(y, candidate);
-                    return { ...unit, pos: { x: candidate, y } };
+        for (const needClear of [true, false]) {
+            for (let r = 0; r < 60; r++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    for (let dy = -r; dy <= r; dy++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r)
+                            continue;
+                        const p = { x: anchor.x + dx * UNIT_SPAN, y: anchor.y + dy * UNIT_SPAN };
+                        if (!isFree(p) || (needClear && !isClear(p)))
+                            continue;
+                        placed.push(p);
+                        return { ...unit, pos: p };
+                    }
                 }
             }
-            nextOffset = 1;
         }
-        // 200 rows deep and still nothing free — an unreasonably packed fight
-        // even by this game's own no-cap standard. Place at that last row's
-        // origin rather than loop forever; still logged as used so the next
-        // unit in this same wave tries yet another row instead of stacking
-        // here too.
-        const y = baseRowY + 199 * rowStep;
-        markUsed(y, 0);
-        return { ...unit, pos: { x: 0, y } };
+        // Nothing free anywhere (an absurdly packed board) — stack on the anchor
+        // rather than loop forever.
+        placed.push({ ...anchor });
+        return { ...unit, pos: { ...anchor } };
     });
 }
 function buildCombatantParts(currentHp, maxHp, partKeys) {
@@ -26638,7 +26734,7 @@ function describeEffectMechanics(effect, t) {
 }
 // Combines every active effect's combat-relevant numbers into one bundle
 // that computeHitChance/computeWeaponDamage/computeDefenseChance/
-// computeFleeChance each read a slice of. A "kind": "other" entry (or any
+// computeDefenseChance each read a slice of. A "kind": "other" entry (or any
 // unrecognized kind) contributes nothing — same as the old plain-text
 // system, just no longer silently true for EVERY entry.
 function aggregateEffectModifiers(effects) {
@@ -26667,12 +26763,12 @@ function aggregateEffectModifiers(effects) {
 // conditional bonuses) into an existing mods object — same shape
 // aggregateEffectModifiers returns, so every call site that already knows
 // how to consume mods (computeHitChance/computeWeaponDamage/
-// computeDefenseChance/computeFleeChance) needs no changes of its own to
+// computeDefenseChance) needs no changes of its own to
 // benefit from it, and reads back only whichever one field is relevant to
 // it regardless of what this adds to the others. Always call this with the
 // hero's OWN effect-mods (never an ally's or an enemy's) — every call site
 // is one of the four places in the file that computes mods specifically
-// for the hero's own attack, defense, or flee roll.
+// for the hero's own attack, defense, or disengage roll.
 // `fightState` is this fight's combat.abilityState (see
 // createAbilityFightState) — passed null wherever no fight exists yet
 // (attemptStealthKill's pre-combat ambush strike), which simply skips
@@ -26703,7 +26799,7 @@ function applyHeroAbilityMods(mods, abilityIds, fightState, healthRatio) {
 }
 // ---- SINGLE SOURCES OF TRUTH FOR COMBAT MODIFIERS ---------------------------
 // Every place that rolls something for the hero (an attack, a defense, a
-// flee attempt, a stealth strike) must build its mods through
+// disengage roll, a stealth strike) must build its mods through
 // computeHeroMods, and every place that rolls for a party member must use
 // computeAllyMods. Assembling them by hand at each call site is how the two
 // drifted apart before: allies used to be handed the HERO's status effects
@@ -26916,21 +27012,6 @@ function computeDefenseChance(defenseKey, defenderPrecision, blockChanceBase, ha
     }
     return 0;
 }
-// Chance of successfully breaking away instead of fighting. Difficulty is
-// read straight from the enemy's own generated stats relative to the same
-// "ordinary" baselines used everywhere else in combat (enemyTotalHp here is
-// the original narrative-scale figure, not the ×hpScale combat pool — see
-// where this is called), so an ordinary rat (power/precision ~10, hp ~50)
-// is easy to outrun while a boss-tier opponent leaves almost no room to
-// flee — exactly the "almost impossible to flee a tough opponent" the flee
-// button is meant to model.
-function computeFleeChance(enemyPower, enemyPrecision, enemyTotalHp, playerAgility, mods) {
-    const powerPrecisionExcess = (enemyPower - COMBAT_TUNING.powerBaseline) + (enemyPrecision - COMBAT_TUNING.precisionBaseline);
-    const hpExcess = (enemyTotalHp - 50) / 10;
-    const difficultyPenalty = powerPrecisionExcess * COMBAT_TUNING.fleeDifficultyScale + hpExcess * COMBAT_TUNING.fleeHpDifficultyScale;
-    const agilityBonus = (playerAgility - COMBAT_TUNING.precisionBaseline) * COMBAT_TUNING.fleeAgilityScale;
-    return clampPercent(COMBAT_TUNING.fleeBase - difficultyPenalty + agilityBonus + (mods ? mods.fleeChanceDelta : 0));
-}
 // Shared ramp used by both morale-break paths: how likely a break/flee
 // attempt is to succeed, purely as a function of how far under
 // moraleFleeThreshold the combatant's morale has fallen. 0 at/above the
@@ -26973,16 +27054,17 @@ function rollMoraleBreak(morale, canBreak = true) {
 }
 // Splits a resolveOneAttack outcome's moraleBreak ('surrender' | 'flee' |
 // null) into the two flags an enemy/ally object actually carries.
-// 'surrender' gives up on the spot — fled immediately, same as always.
+// 'surrender' used to vanish on the spot; it now routes exactly like 'flee'.
 // 'flee' now has to actually reach its own side's map edge before it's
 // truly gone (see runAutoTurn's routing branches for both enemies and
 // allies) — so it only sets `routing` here; `fled` stays false until
 // PLAYER_EDGE_Y/ENEMY_EDGE_Y is actually reached. No break at all (null)
 // returns an empty object so a spread leaves existing flags untouched.
 function moraleBreakFlags(moraleBreak) {
-    if (moraleBreak === 'surrender')
-        return { fled: true, routing: false };
-    if (moraleBreak === 'flee')
+    // Both kinds of break (a 'surrender' is only a log-flavor difference) must
+    // actually walk to their own edge before they're gone — nobody vanishes
+    // from the fight on the spot.
+    if (moraleBreak === 'surrender' || moraleBreak === 'flee')
         return { fled: false, routing: true };
     return {};
 }
@@ -27245,7 +27327,7 @@ const PRESETS = {
 // A general-purpose hidden skill-check resolver for freeform narrative actions
 // (picking a lock, talking a guard down, deciphering an old script) — NOT the
 // turn-based body-part combat above, which already has its own resolution
-// (computeHitChance/computeWeaponDamage/computeDefenseChance/computeFleeChance)
+// (computeHitChance/computeWeaponDamage/computeDefenseChance)
 // and is never double-resolved by this system; callGameMaster skips this
 // entirely on the opening turn and while a combat encounter is still
 // unresolved (same condition the render layer uses for combatPending).
@@ -30875,7 +30957,7 @@ function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isArriving, is
     // can never lift it above a *different* card's wrap. Lunge (the attacker
     // flying toward its target) ranks above a plain reaction so the attacker
     // reads as in front on the frames where the two overlap.
-    const wrapFxCls = (fxCls === 'combat-fx-lunge' || fxCls === 'combat-fx-archer-draw' || fxCls === 'combat-fx-archer-release') ? ' combat-portrait-wrap-lunge' : (fxCls ? ' combat-portrait-wrap-reacting' : '');
+    const wrapFxCls = (fxCls === 'combat-fx-lunge' || fxCls === 'combat-fx-archer-draw' || fxCls === 'combat-fx-archer-release' || lockFxCls === 'combat-lock-lunge') ? ' combat-portrait-wrap-lunge' : (fxCls ? ' combat-portrait-wrap-reacting' : '');
     return (React.createElement("div", { className: 'combat-portrait-wrap' + wrapFxCls + (isLeaving ? ' combat-portrait-wrap-leaving' : '') + (isArriving ? ' combat-portrait-wrap-arrived' : '') + (isActive ? ' combat-portrait-wrap-active' : '') + (locked ? ' combat-portrait-wrap-locked' : ''), ref: portraitRef },
         React.createElement("div", { className: 'combat-portrait-sway' + (swayCls ? ' ' + swayCls : '') + (fxCls ? ' ' + fxCls : ''), style: fxCls ? lungeStyle : swayStyle },
             React.createElement("button", { type: "button", onClick: () => { if (targetable && onClick)
@@ -31029,7 +31111,7 @@ function getAbilityStatus(id, fightState, round) {
     }
     return { available: true, cooldown: null, usedUp: false };
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, introActive, abilities, onAttack, onMove, movementRange, onLeave, onFlee, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {} }) {
+function CombatModal({ combat, heroName, inventory, itemRarities, introActive, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {} }) {
     // The hero portrait's two armor bars — cur/max straight off combat state
     // (see startCombat/attemptStealthKill for where these are rolled, and
     // resolveOneAttack for where cur drains as hits land).
@@ -31123,12 +31205,15 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             return;
         if (!viewportSize.w || !viewportSize.h)
             return;
-        // Midpoint between the hero's row (y=0) and the enemy row gives an
-        // overview of both sides at once, rather than centering tightly on
-        // just the hero or just whoever's turn it happens to be first.
-        const worldX = unitCenterPx(0, GRID_RENDER_MIN_X);
-        const worldY = unitCenterPx(ENEMY_ROW_Y / 2, GRID_RENDER_MIN_Y);
-        setPan({ x: viewportSize.w / 2 - worldX * zoom, y: viewportSize.h / 2 - worldY * zoom });
+        // The fight opens in the middle of the board (see
+        // layoutInitialPositions), so open the view on that middle — an overview
+        // of both sides at once, zoomed out just enough (never past the pinch
+        // minimum) that the two opening columns fit side by side.
+        const fitZoom = Math.min(1, Math.max(0.5, viewportSize.w / ((START_GAP + 2 * UNIT_SPAN) * GRID_CELL_PX)));
+        const worldX = unitCenterPx(GRID_CENTER_X, GRID_RENDER_MIN_X);
+        const worldY = unitCenterPx(GRID_CENTER_Y, GRID_RENDER_MIN_Y);
+        setZoom(fitZoom);
+        setPan({ x: viewportSize.w / 2 - worldX * fitZoom, y: viewportSize.h / 2 - worldY * fitZoom });
         hasCenteredRef.current = true;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewportSize.w, viewportSize.h]);
@@ -31225,21 +31310,33 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // — moves to whichever cell the preview actually reached (see
     // computeClampedPath's `reachable`, clamped at range/obstacles, never the
     // raw clicked cell itself if that's further than you can walk).
+    function confirmPlannedMove() {
+        if (!planningMove || !activeMoverPos || !pathTarget)
+            return;
+        const path = computeClampedPath(activeMoverPos, pathTarget, movementRange || 0, combat, activeMoverExclude);
+        if (path.reachable.length > 0) {
+            const dest = path.reachable[path.reachable.length - 1];
+            onMove(dest.x, dest.y);
+            setPlanningMove(false);
+        }
+        setPathTarget(null);
+    }
+    // A tap confirms if it lands anywhere on the ghost (the spot you'd
+    // actually stand on — it can differ from the tapped cell when the route
+    // is clamped by range/obstacles) or on the originally tapped cell.
+    // Anything else just moves the preview.
     function onCellTap(x, y) {
         if (!planningMove || !activeMoverPos)
             return;
-        if (pathTarget && pathTarget.x === x && pathTarget.y === y) {
+        if (pathTarget) {
             const path = computeClampedPath(activeMoverPos, pathTarget, movementRange || 0, combat, activeMoverExclude);
-            if (path.reachable.length > 0) {
-                const dest = path.reachable[path.reachable.length - 1];
-                onMove(dest.x, dest.y);
+            const dest = path.reachable.length > 0 ? path.reachable[path.reachable.length - 1] : null;
+            if (dest && (posContains(dest, x, y) || (pathTarget.x === x && pathTarget.y === y))) {
+                confirmPlannedMove();
+                return;
             }
-            setPlanningMove(false);
-            setPathTarget(null);
         }
-        else {
-            setPathTarget({ x, y });
-        }
+        setPathTarget({ x, y });
     }
     const ownedActiveAbilities = (abilities || []).filter(id => ABILITY_DEFS[id] && ABILITY_DEFS[id].type === 'active');
     const resultCopy = combat.result ? RESULT_COPY[combat.result] : null;
@@ -31400,7 +31497,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // ---- Hit/block/dodge/stun animation state ----
     // Driven off combat.lastAction, a compact { attacker, defender, resultKind,
     // dmg, partKey, partLabel, justDisabled, stunApplied, seq } summary that
-    // resolveHeroAttack/runAutoTurn/resolveFleeAttempt/resolveStunSkip attach
+    // resolveHeroAttack/runAutoTurn/resolveStunSkip attach
     // to combat state alongside the HP changes they already make (see those
     // functions). Keyed by "type:id" (e.g. "enemy:enemy-3", "hero:hero") so
     // any of the three portrait kinds can be targeted uniformly. Each fx/
@@ -31411,6 +31508,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     const [fx, setFx] = useState({});
     const [popups, setPopups] = useState({});
     const seenSeqRef = useRef(0);
+    const fxTimersRef = useRef([]);
     // Live DOM node for every portrait currently on screen, keyed the same
     // "type:id" way as fx/popups — lets the attacker's lunge aim at the
     // defender's actual on-screen position (see below) instead of just
@@ -31481,7 +31579,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             await lockSleep(randLock(900, 1700), isCurrent);
             if (!isCurrent())
                 return;
-            if (fxRef.current[keyA] || fxRef.current[keyB]) {
+            if ((fxRef.current[keyA] && fxRef.current[keyA].cls) || (fxRef.current[keyB] && fxRef.current[keyB].cls)) {
                 await lockSleep(150, isCurrent);
                 continue;
             }
@@ -31726,6 +31824,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         if (action.justDisabled)
             popupItems.push({ text: action.partLabel + ': ' + t('combatPartDisabledSuffix'), tone: 'disabled', ...randomFxVector(130, 26, 42), delay: action.stunApplied ? 180 : 90 });
         const timers = [];
+        fxTimersRef.current.push(timers);
         const clearFxAndPopups = () => {
             setFx(prev => {
                 const next = { ...prev };
@@ -31774,8 +31873,15 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 setPopups(prev => ({ ...prev, [defenderKey]: { seq, items: popupItems } }));
             timers.push(setTimeout(clearFxAndPopups, 900));
         }
-        return () => timers.forEach(clearTimeout);
+        // Deliberately NO per-run cleanup here: a newer lastAction re-runs this
+        // effect, and cancelling the previous run's clear-timer left its fx entry
+        // stuck forever (which froze idle sway and starved the lock loop).
+        // Timers are only cancelled on unmount, see the effect below.
     }, [combat.lastAction]);
+    useEffect(() => () => {
+        fxTimersRef.current.forEach(arr => arr.forEach(clearTimeout));
+        fxTimersRef.current = [];
+    }, []);
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget && combat.result)
             onClose(); } },
         React.createElement("div", { className: "modal-card combat-card combat-card-group" },
@@ -42992,9 +43098,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 : (prev.enemies.find(e => e.id === mover.id) || {}).enemyName;
         let state = { ...prev, log: [...prev.log, { text: moverName + ' — ' + t('combatLogOpportunityAttackText'), kind: 'defended' }] };
         let blocked = false;
+        const disengagePct = mover.type === 'hero' ? heroDisengageChance(computeHeroMods(gameState, prev.abilityState, heroPartsHealthRatio(prev.heroParts))) : 0;
         for (const h of adjacent) {
             if (!moverStillUp(state))
                 break;
+            if (disengagePct > 0 && Math.random() * 100 < disengagePct) {
+                state = { ...state, log: [...state.log, { text: moverName + ' — ' + t('combatLogDisengageText'), kind: 'defended' }] };
+                continue;
+            }
             const attacker = makeActorFor(state, h);
             const defender = makeDefenderFor(state, mover);
             const attackerKey = h.type === 'hero' ? 'hero:hero' : h.type + ':' + h.id;
@@ -43203,7 +43314,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // Deliberately doing nothing this turn (see CombatModal's skip-turn
     // button, shown whenever it's the hero's or a player-controlled ally's
     // turn) — ends the turn immediately with no roll, no movement and no
-    // punish hit, unlike resolveFleeAttempt or the morale-panic branch in
+    // punish hit, unlike the morale-panic branch in
     // runAutoTurn. Exists for whenever an attack and a move both make no
     // sense (nothing in range, nowhere useful to go) and just waiting out the
     // round actually is the best move.
@@ -43234,17 +43345,15 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // having reached your own side's map edge (PLAYER_EDGE_Y) — see
     // CombatModal's per-card leave button, shown only once that character is
     // actually there. The hero leaving still ends the whole encounter the
-    // same way resolveFleeAttempt's success already does (result: 'fled',
+    // same way a whole-party escape always ended it (result: 'fled',
     // reusing RESULT_COPY's existing copy/objective handling for it) — the
     // fight can't meaningfully continue without the hero. An ally leaving
     // just removes that one ally from the fight (reuses the same fled/
     // isAllyOut plumbing a morale-broken ally already leaves through) —
     // everyone else keeps fighting. This is the player's own deliberate
-    // choice, a guaranteed exit with no punish-hit roll — unlike
-    // resolveFleeAttempt, which is a whole-party escape attempt made from
-    // wherever you're standing and can fail. Enemies get the equivalent via
-    // the routing branches in runAutoTurn instead (no player-facing button,
-    // since they're AI).
+    // choice, a guaranteed exit with no punish-hit roll. Enemies get the
+    // equivalent via the routing branches in runAutoTurn instead (no
+    // player-facing button, since they're AI).
     function resolveLeaveCombat(actorType, actorId) {
         if (combatIntroActive)
             return;
@@ -43427,6 +43536,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const allyIsRanged = allyWeaponType === 'ranged';
                 if (!allyIsRanged && chebyshevDistance(ally.pos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                     return prev;
+                {
+                    const lockP = getActiveLockPartner(prev, 'ally:' + ally.id);
+                    if (lockP && lockP !== 'enemy:' + enemy.id)
+                        return prev;
+                }
                 let friendlyBlocker = null;
                 if (allyIsRanged) {
                     const blocker = rollLineBlockRedirect(prev, { type: 'ally', id: ally.id }, ally.pos, { type: 'enemy', id: enemy.id }, enemy.pos);
@@ -43479,6 +43593,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const heroIsRanged = heroWeaponType === 'ranged';
             if (!heroIsRanged && chebyshevDistance(prev.heroPos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                 return prev;
+            {
+                const lockP = getActiveLockPartner(prev, 'hero:hero');
+                if (lockP && lockP !== 'enemy:' + enemy.id)
+                    return prev;
+            }
             let friendlyBlocker = null;
             if (heroIsRanged) {
                 const blocker = rollLineBlockRedirect(prev, { type: 'hero', id: 'hero' }, prev.heroPos, { type: 'enemy', id: enemy.id }, enemy.pos);
@@ -43628,12 +43747,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (wave.side === 'enemy') {
                 const fallbackName = uiLang === 'en' ? 'Enemy' : 'Противник';
                 const unarmedLabel = t('combatUnarmedEnemyLabel');
-                const fresh = placeReinforcementPositions(combatantSpecs.map((spec, i) => makeEnemyCombatant(rollEnemyFromSpec(spec, wave.id + '_' + i, fallbackName, unarmedLabel))), 'enemy', { enemies, allies });
+                const fresh = placeReinforcementPositions(combatantSpecs.map((spec, i) => makeEnemyCombatant(rollEnemyFromSpec(spec, wave.id + '_' + i, fallbackName, unarmedLabel))), 'enemy', { ...combat, enemies, allies });
                 enemies = [...enemies, ...fresh];
                 ({ order, turnPos } = insertIntoOrder(order, fresh.map(e => ({ type: 'enemy', id: e.id, initiative: e.initiative })), turnPos));
             }
             else {
-                const fresh = placeReinforcementPositions(combatantSpecs.map((spec, i) => makeAllyCombatant(spec, wave.id + '_' + i)), 'ally', { enemies, allies });
+                const fresh = placeReinforcementPositions(combatantSpecs.map((spec, i) => makeAllyCombatant(spec, wave.id + '_' + i)), 'ally', { ...combat, enemies, allies });
                 allies = [...allies, ...fresh];
                 ({ order, turnPos } = insertIntoOrder(order, fresh.map(a => ({ type: 'ally', id: a.id, initiative: a.stats.initiative })), turnPos));
             }
@@ -43917,7 +44036,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             return { ...prev, allies, log, result: 'victory' };
                         return advanceTurn({ ...prev, allies, log });
                     }
-                    const step = chooseMoveStep(ally.pos, { x: ally.pos.x, y: PLAYER_EDGE_Y }, prev, { type: 'ally', id: ally.id }, computeActorMovementRange({ type: 'ally', id: ally.id }));
+                    const step = chooseRouteStepToRow(ally.pos, PLAYER_EDGE_Y, prev, { type: 'ally', id: ally.id }, computeActorMovementRange({ type: 'ally', id: ally.id }));
                     if (step) {
                         // Attack of opportunity (see attemptOpportunityAttacks): a
                         // routing ally is still stepping away from melee like anyone
@@ -43954,8 +44073,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         return advanceTurn({ ...prev, allies, log });
                     }
                     // Failed attempt: an unopposed punish hit from a random living
-                    // enemy, same shape as the hero's own resolveFleeAttempt — no
-                    // dodge/block/parry since they were busy running, not fighting.
+                    // enemy — no dodge/block/parry since they were busy running,
+                    // not fighting.
                     // Costs the turn either way; nothing here is "sticky", so if
                     // still under the threshold next time it's simply tried again.
                     const punishers = prev.enemies.filter(e => !isEnemyOut(e));
@@ -44040,7 +44159,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // scoreCombatTarget) rather than always the nearest. Falls back to
                 // the old nearest/random chain if, for whatever reason, nothing
                 // scores (e.g. the closer gets bumped out of range some other way).
-                const meleeReachableEnemies = ally.pos ? prev.enemies.filter(e => !isEnemyOut(e) && e.pos && chebyshevDistance(ally.pos, e.pos) <= MELEE_ATTACK_MAX_DISTANCE) : [];
+                const meleeReachableAll = ally.pos ? prev.enemies.filter(e => !isEnemyOut(e) && e.pos && chebyshevDistance(ally.pos, e.pos) <= MELEE_ATTACK_MAX_DISTANCE) : [];
+                // Locked in melee: may only swing at the lock partner (if still in reach).
+                const allyLockKey = getActiveLockPartner(prev, 'ally:' + ally.id);
+                const allyLockedOnly = allyLockKey ? meleeReachableAll.filter(e => 'enemy:' + e.id === allyLockKey) : [];
+                const meleeReachableEnemies = allyLockedOnly.length > 0 ? allyLockedOnly : meleeReachableAll;
                 const target = pickBestTarget(meleeReachableEnemies, e => scoreCombatTarget({ hpFraction: hpFractionOfParts(e.parts), squishy: e.role === 'ranged' || e.role === 'caster', tankish: e.role === 'tank' }, { role: 'melee' }))
                     || (ally.pos ? nearestTarget(ally.pos, prev.enemies.filter(e => !isEnemyOut(e)).map(e => ({ e, pos: e.pos })))?.e : null)
                     || pickLivingTarget(prev.enemies, isEnemyOut);
@@ -44133,7 +44256,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 enemy = prev.enemies.find(e => e.id === enemy.id);
             }
             // ---- routing: morale broke into a 'flee' (see moraleBreakFlags —
-            // 'surrender' is instant and never reaches here) — no longer fights
+            // 'surrender' routes the same way now) — no longer fights
             // at all, just retreats toward its own edge (ENEMY_EDGE_Y) every
             // turn until it actually gets there, at which point it finally
             // leaves for real (fled:true). Still a valid attack target the whole
@@ -44150,14 +44273,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogEnemyRallyText'), kind: 'defended' }];
                     return advanceTurn({ ...prev, enemies, log });
                 }
-                if (enemy.pos.y >= ENEMY_EDGE_Y) {
+                if (enemy.pos.y >= ENEMY_EDGE_POS_Y) {
                     const enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, morale: recovered, fled: true, routing: false } : e);
                     log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogEnemyEscapedText'), kind: 'defended' }];
                     if (enemies.every(isEnemyOut))
                         return { ...prev, enemies, log, result: 'victory' };
                     return advanceTurn({ ...prev, enemies, log });
                 }
-                const step = chooseMoveStep(enemy.pos, { x: enemy.pos.x, y: ENEMY_EDGE_Y }, prev, { type: 'enemy', id: enemy.id }, AI_MOVEMENT_RANGE);
+                const step = chooseRouteStepToRow(enemy.pos, ENEMY_EDGE_POS_Y, prev, { type: 'enemy', id: enemy.id }, AI_MOVEMENT_RANGE);
                 if (step) {
                     // Attack of opportunity (see attemptOpportunityAttacks): a
                     // routing enemy is still stepping away from melee like anyone
@@ -44337,7 +44460,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // at least one target (see the movement gate above) — but "adjacent
             // to the nearest one" doesn't mean adjacent to all of them, so the
             // scored pick below is still narrowed to whoever's actually in reach.
-            const targets = isMeleeAttacker && enemy.pos ? allTargets.filter(tg => chebyshevDistance(enemy.pos, tg.pos) <= MELEE_ATTACK_MAX_DISTANCE) : allTargets;
+            const targetsInReach = isMeleeAttacker && enemy.pos ? allTargets.filter(tg => chebyshevDistance(enemy.pos, tg.pos) <= MELEE_ATTACK_MAX_DISTANCE) : allTargets;
+            // Locked in melee: may only attack the lock partner (if still a valid target).
+            const enemyLockKey = getActiveLockPartner(prev, 'enemy:' + enemy.id);
+            const lockedOnlyTargets = enemyLockKey ? targetsInReach.filter(tg => (tg.kind === 'hero' ? 'hero:hero' : 'ally:' + tg.ally.id) === enemyLockKey) : [];
+            const targets = lockedOnlyTargets.length > 0 ? lockedOnlyTargets : targetsInReach;
             // Deepened AI: scored target choice (see scoreCombatTarget) instead of
             // a flat random pick — favors a wounded or lightly-armored/ranged-type
             // target, and gives a 'tank' a bonus for peeling toward whoever is
@@ -44610,89 +44737,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const timer = setTimeout(() => runAutoTurn(), 650);
         return () => clearTimeout(timer);
     }, [combat, combatModalOpen, combatIntroActive]);
-    // The "leave combat" option, available on the hero's own turn as an
-    // alternative to attacking. Success ends the fight immediately (result:
-    // 'fled'); failure means one random living enemy gets an unopposed hit on
-    // the hero (fleeing forfeits any chance to dodge/block/parry, though armor
-    // still helps) and, like any other action, spends the hero's turn — a
-    // failed attempt is a real (costly) action, not a free re-roll, so it
-    // hands off to advanceTurn same as an attack or item use would. Difficulty
-    // is judged against the toughest enemy still standing, so a fight that's
-    // down to one weak straggler is easy to outrun even if the original group
-    // was fearsome.
-    function resolveFleeAttempt() {
-        // Nothing should happen while the pre-battle intro is still playing.
-        if (combatIntroActive)
-            return;
-        setCombat(prev => {
-            if (!prev || prev.result)
-                return prev;
-            const current = prev.order[prev.turnPos];
-            if (!current || current.type !== 'hero')
-                return prev;
-            const living = prev.enemies.filter(e => !isEnemyOut(e));
-            if (living.length === 0)
-                return prev;
-            const toughest = living.reduce((a, b) => (a.power + a.precision >= b.power + b.precision ? a : b));
-            const chance = computeFleeChance(toughest.power, toughest.precision, toughest.totalHp, gameState.stats.agility, computeHeroMods(gameState, prev.abilityState));
-            const succeeded = Math.random() * 100 < chance;
-            let log = prev.log;
-            if (succeeded) {
-                log = [...log, { text: t('combatLogFleeSuccessText'), kind: 'defended' }];
-                return { ...prev, log, result: 'fled' };
-            }
-            const punisher = living[Math.floor(Math.random() * living.length)];
-            const partKey = pickEnemyTargetPart(prev.heroParts);
-            const part = BODY_PARTS.find(p => p.key === partKey);
-            const partLabel = t(part.labelKey);
-            const targetState = prev.heroParts[partKey];
-            const rolled = computeEnemyDamage(punisher.power, punisher.precision);
-            // Same armor-pool absorption as a normal landed hit (see
-            // resolveOneAttack) — an unopposed punish hit still has to go
-            // through the relevant armor bar before it reaches HP.
-            const poolKey = armorPoolKeyForPart(partKey);
-            const curPool = Math.max(0, (prev.heroArmorCur && prev.heroArmorCur[poolKey]) || 0);
-            const rawDmg = Math.max(1, Math.round(rolled.dmg));
-            const armored = curPool > 0 && !(punisher.armorPiercing === true);
-            const absorbed = armored ? Math.min(curPool, rawDmg) : 0;
-            const dmg = rawDmg - absorbed;
-            const nextPool = curPool - absorbed;
-            const armorJustBroke = armored && nextPool <= 0;
-            const heroArmorCur = { ...(prev.heroArmorCur || {}), [poolKey]: nextPool };
-            const newHp = Math.max(0, targetState.hp - dmg);
-            const justDisabled = newHp === 0 && !targetState.disabled;
-            const heroParts = { ...prev.heroParts, [partKey]: { ...targetState, hp: newHp, disabled: newHp === 0 } };
-            const defeated = justDisabled && isBodyDestroyed(heroParts);
-            // Same head-stun chance as a normal swing (see resolveOneAttack) — an
-            // unopposed punish hit is still just a hit.
-            const stunApplied = !defeated && partKey === 'head' && (justDisabled || Math.random() * 100 < COMBAT_TUNING.headStunChance);
-            const punishTag = (rolled.isCrit ? '💥 ' + t('combatLogCritTag') + ' ' : '') + t('combatLogFleeFailTag');
-            const dmgSuffix = dmg === 0 ? ' — ' + t('combatLogArmorAbsorbSuffix') : ' −' + dmg + ' HP';
-            log = [...log, { text: punishTag + ' (' + punisher.weaponDescription + '): ' + partLabel + dmgSuffix, kind: rolled.isCrit ? 'crit' : 'hit' }];
-            if (armorJustBroke) {
-                log = [...log, { text: t(poolKey === 'head' ? 'combatHeadArmorBrokenLog' : 'combatBodyArmorBrokenLog'), kind: 'disabled' }];
-            }
-            // An unopposed punish hit still wears armor/cloak/jewelry like any hit.
-            const wearRes = heroHitWear(prev.gearWear || {}, partKey, dmg, rolled.isCrit, justDisabled, targetState.maxHp);
-            const gearWear = wearRes.gearWear;
-            log = [...log, ...wearRes.log];
-            const stunned = stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: punisher.id, defenderType: 'hero', defenderId: 'hero', resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied };
-            // A failed flee/retreat is still a real exchange — same as any other
-            // punish swing, it can start (or simply hold) a связаны боем pairing
-            // with whoever caught the hero. See deriveLocksAfterAction.
-            const locks = deriveLocksAfterAction(prev, 'enemy:' + punisher.id, 'hero:hero');
-            if (defeated) {
-                log = [...log, { text: partLabel + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
-                return { ...prev, heroParts, heroArmorCur, log, lastAction, stunned, gearWear, locks, result: 'death', killedBy: punisher.enemyName };
-            }
-            if (justDisabled)
-                log = [...log, { text: partLabel + ': ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
-            if (stunApplied)
-                log = [...log, { text: t('combatLogStunAppliedText'), kind: 'effect' }];
-            return advanceTurn({ ...prev, heroParts, heroArmorCur, log, lastAction, stunned, gearWear, locks });
-        });
-    }
     function buildCombatSummaryTag(finalCombat, failedQuests, bondChanges) {
         const defeatedNames = finalCombat.enemies.filter(isEnemyDown).map(e => e.enemyName);
         // Broken enemies (see the morale system: rollMoraleBreak/applyMoraleShockToGroup)
@@ -46707,7 +46751,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroWeaponType: getLoadoutWeaponType(equipment, gameState.inventory), allyWeaponTypes: Object.fromEntries((combat.allies || []).map(a => {
                 const k = a.name.trim().toLowerCase();
                 return [k, getLoadoutWeaponType(partyEquipment[k], partyInventories[k] || [])];
-            })), introActive: combatIntroActive, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onFlee: resolveFleeAttempt, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
+            })), introActive: combatIntroActive, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
         talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, onLearn: isLatestTurn ? learnTalent : undefined, onClose: () => setTalentTreeModalOpen(false), t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: viewedState, itemRarities: viewedItemRarities, equipment: viewedEquipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, party: viewedParty, partyInventories: partyInventories, partyEquipment: partyEquipment, repairKitName: isLatestTurn && repairKitIndex !== null && gameState.inventory[repairKitIndex] && gameState.inventory[repairKitIndex].slot === 'repairKit' ? gameState.inventory[repairKitIndex].name : null, onApplyRepairKit: isLatestTurn ? applyRepairKitToIndex : undefined, onCancelRepairKit: cancelRepairKit, onClose: () => { setInventoryModalOpen(false); setRepairKitIndex(null); }, t: t })),
