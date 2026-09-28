@@ -7,7 +7,9 @@
 <title>Гримуар</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Non-blocking: a slow fonts.googleapis.com must not hold the page hostage (fonts swap in when they arrive). -->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <style>
   html, body { margin: 0; padding: 0; background: #0c0a09; }
   #root { min-height: 100vh; }
@@ -17195,11 +17197,59 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
 
 
 </script>
-<script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div id="root"></div>
+<script>
+  // Startup-failure safety net. If the app script throws before it mounts, or
+  // React unmounts everything after an uncaught render error, the page used to
+  // be a blank dark screen with no hint why. Show the error instead. It ignores
+  // errors from third-party CDN scripts and only fires while #root is empty or
+  // still holds the loading note, so a harmless error inside a working app
+  // never triggers it. Nothing here touches saved data.
+  (function () {
+    var shown = false;
+    function rootIsBlank() {
+      var r = document.getElementById('root');
+      if (!r || r.children.length === 0) return true;
+      return r.children.length === 1 && r.firstElementChild.id === 'boot-note';
+    }
+    function button(label, onClick) {
+      var b = document.createElement('button');
+      b.textContent = label;
+      b.onclick = onClick;
+      b.style.cssText = 'margin-right:10px;padding:10px 16px;border-radius:8px;border:1px solid #d97706;background:#d97706;color:#1c1917;font:600 14px sans-serif;cursor:pointer';
+      return b;
+    }
+    function show(msg, stack) {
+      if (shown) return;
+      shown = true;
+      var text = String(msg || 'unknown error') + (stack ? '\n\n' + String(stack).slice(0, 1500) : '') + '\n\n' + navigator.userAgent;
+      var box = document.createElement('div');
+      box.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#0c0a09;color:#e7e5e4;padding:24px;overflow:auto;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace';
+      var h = document.createElement('div');
+      h.style.cssText = 'font:600 20px Georgia,serif;color:#f59e0b;margin-bottom:8px';
+      h.textContent = 'Не удалось запустить игру';
+      var note = document.createElement('div');
+      note.style.cssText = 'margin-bottom:12px;color:#a8a29e';
+      note.textContent = 'Сохранения не затронуты. Скопируйте текст ниже и пришлите разработчику.';
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'white-space:pre-wrap;word-break:break-word;background:#1c1917;border:1px solid #44403c;border-radius:8px;padding:12px;margin:0 0 16px';
+      pre.textContent = text;
+      box.appendChild(h); box.appendChild(note); box.appendChild(pre);
+      box.appendChild(button('Перезагрузить', function () { location.reload(); }));
+      box.appendChild(button('Скопировать текст', function () {
+        try { navigator.clipboard.writeText(text); } catch (e) { var r = document.createRange(); r.selectNodeContents(pre); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+      }));
+      document.body.appendChild(box);
+    }
+    window.addEventListener('error', function (e) {
+      if (e.filename && /^https?:\/\/(unpkg\.com|fonts\.)/.test(e.filename)) return;
+      var msg = e.message, stack = e.error && e.error.stack;
+      setTimeout(function () { if (rootIsBlank()) show(msg, stack); }, 400);
+    });
+  })();
+</script>
+<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em">Гримуар — загрузка…</div></div>
 <script>
   // Minimal localStorage-backed stand-in for the window.storage API that
   // Claude.ai artifacts provide. grimoire.jsx was written against that
@@ -17254,9 +17304,46 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
     // See README.md for the exact policy SQL and where to find your key.
     var SUPABASE_URL = 'https://nftbvhmwfselibtzxepj.supabase.co';
     var SUPABASE_ANON_KEY = 'sb_publishable_PgYOHuJYazA3IQ1ZSekcrg_9li_uzbI';
-    window.supabaseClient = (SUPABASE_ANON_KEY.indexOf('PASTE_YOUR_') !== 0 && window.supabase)
-      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-      : null;
+    window.supabaseClient = null;
+    function initSupabaseClient() {
+      if (window.supabaseClient || !window.supabase) return;
+      if (SUPABASE_ANON_KEY.indexOf('PASTE_YOUR_') === 0) return;
+      window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    // ---- Third-party scripts, loaded WITHOUT blocking the page ----
+    // mammoth (.docx import) and supabase-js (cloud saves) used to be plain
+    // <script src> tags in <head>. Those block HTML parsing, so on a network
+    // where unpkg.com was slow or unreachable the browser never got as far as
+    // <div id="root"> and the page stayed a blank dark screen. They now load
+    // asynchronously. The app needs supabase-js at first render (it subscribes
+    // to auth changes then), so mounting waits for it — but never longer than
+    // SCRIPT_WAIT_MS: if the CDN is that slow the app starts without cloud
+    // saves instead of not starting. A late arrival still creates the client
+    // (later calls work; only the mount-time auth subscription is missed until
+    // the next reload). mammoth is only used on file upload, so nothing waits
+    // for it.
+    var SCRIPT_WAIT_MS = 5000;
+    function loadScript(src, done) {
+      var el = document.createElement('script');
+      el.src = src;
+      el.async = true;
+      el.onload = function () { done(true); };
+      el.onerror = function () { done(false); };
+      document.head.appendChild(el);
+    }
+    loadScript('https://unpkg.com/mammoth/mammoth.browser.min.js', function () {});
+    window.__scriptsReady = new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(settle, SCRIPT_WAIT_MS);
+      function settle() {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      }
+      loadScript('https://unpkg.com/@supabase/supabase-js@2', function () { initSupabaseClient(); settle(); });
+    });
 </script>
 <script>
 "use strict";
@@ -17723,6 +17810,7 @@ const TRANSLATIONS = {
         combatChooseTargetHint: 'Выбери противника для атаки',
         combatChooseDefenseHint: 'Как будешь защищаться?',
         combatWaitingHint: 'Ход противника...',
+        combatAllyTurnHint: 'Ход союзника...',
         combatRoundLabel: 'Раунд',
         // Combat objectives (see COMBAT_OBJECTIVE_TYPES/combat.objective) — the
         // objective's own on-screen text ("label") comes straight from the
@@ -18505,6 +18593,7 @@ const TRANSLATIONS = {
         combatChooseTargetHint: 'Choose an enemy to attack (the hit lands on a random body part)',
         combatChooseDefenseHint: 'How will you defend?',
         combatWaitingHint: "Waiting for the other side's turn...",
+        combatAllyTurnHint: "Ally's turn...",
         combatRoundLabel: 'Round',
         // Combat objectives (see COMBAT_OBJECTIVE_TYPES/combat.objective) — the
         // objective's own on-screen text ("label") comes straight from the
@@ -25871,14 +25960,6 @@ function generateCoverLayout(combatantCount, heroX, enemyX) {
     }
     return cover;
 }
-// One step of naive pathing toward `to` from `from` — tries the diagonal
-// step first, then each orthogonal component, skipping any cell that's
-// cover or already occupied; returns null if boxed in on every option
-// (stays put that turn rather than erroring). This is deliberately simple
-// (no real pathfinding around obstacles) — see runAutoTurn's melee/tank
-// enemy branch and the AI-reinforcement-ally branch, the only two callers,
-// both of which just want "close the distance a bit this turn", not a
-// guaranteed shortest route.
 // True pathfinding: breadth-first search over footprint positions (each
 // step one small cell in any of the 8 directions), so a mover actually
 // routes AROUND cover blocks and other combatants standing between it and
@@ -26053,18 +26134,31 @@ function nearestTarget(fromPos, targets) {
 // walled off behind cover/other combatants and a different target is a much
 // shorter real walk away. Falls back to plain nearestTarget if every
 // candidate turns out to be completely unreachable (fully boxed in).
-function nearestReachableTarget(fromPos, targets, combat, exclude) {
+//
+// `congestionAttackers` (optional, the mover's own side — other enemies for
+// an enemy mover, other allies for an ally mover) adds a mild penalty for
+// targets that already have other attackers standing in melee range of
+// them, so several attackers spread across hero+allies instead of all
+// funneling into the same one or two melee squares around a single
+// target — purely a tie-breaker: a target that is genuinely closer still
+// wins outright, this only nudges roughly-equidistant choices apart.
+function countEngagedAttackers(pos, attackers, excludeId) {
+    return (attackers || []).filter(a => a.pos && a.id !== excludeId && chebyshevDistance(a.pos, pos) <= MELEE_ATTACK_MAX_DISTANCE).length;
+}
+const TARGET_CONGESTION_PENALTY = 2; // "virtual" extra path steps per attacker already adjacent to a candidate target
+function nearestReachableTarget(fromPos, targets, combat, exclude, congestionAttackers) {
     if (!targets || targets.length === 0)
         return null;
     let best = null;
-    let bestLen = Infinity;
+    let bestScore = Infinity;
     for (const cand of targets) {
         const path = findPathToAdjacent(fromPos, cand.pos, combat, exclude);
         if (path === null)
             continue; // genuinely unreachable this turn, skip
-        const len = path.length;
-        if (len < bestLen) {
-            bestLen = len;
+        const congestion = congestionAttackers ? countEngagedAttackers(cand.pos, congestionAttackers, exclude && exclude.id) : 0;
+        const score = path.length + congestion * TARGET_CONGESTION_PENALTY;
+        if (score < bestScore) {
+            bestScore = score;
             best = cand;
         }
     }
@@ -26083,25 +26177,35 @@ function heroDisengageChance(mods) {
 }
 // A ranged (or caster) enemy already standing somewhere that shields it
 // from every one of `threats` doesn't need to move at all (returns null).
-// Otherwise looks for the closest reachable cell (see
-// computeReachableCells) that would put it under cover specifically from
-// the nearest threat — the same single-nearest-target simplification
-// chooseMoveStep's melee callers use, not a full multi-attacker
-// optimization. No such cell in range simply means it stays and fires from
-// the open, same as before this system existed.
+// Otherwise scans every reachable cell (see computeReachableCells) and
+// picks the one that shields it from the MOST threats at once (not just the
+// nearest one), breaking ties by the shortest walk. Only genuine
+// improvements over the current spot count: if nothing reachable shields
+// it from more threats than it already is, it stays and fires from where
+// it stands, same as before this system existed.
 function findCoverSeekingMove(fromPos, threats, combat, exclude) {
     if (!threats || threats.length === 0)
         return null;
-    if (threats.every(th => coverProtectionTier(th.pos, fromPos, combat.coverCells)))
-        return null;
-    const nearest = nearestTarget(fromPos, threats);
-    if (!nearest)
+    const shieldedFrom = (pos) => threats.filter(th => coverProtectionTier(th.pos, pos, combat.coverCells)).length;
+    const currentShielded = shieldedFrom(fromPos);
+    if (currentShielded === threats.length)
         return null;
     const reachable = computeReachableCells(fromPos, AI_MOVEMENT_RANGE, combat, exclude);
-    const candidates = reachable.filter(c => coverProtectionTier(nearest.pos, c, combat.coverCells));
-    if (candidates.length === 0)
-        return null;
-    return candidates.reduce((best, c) => !best || gridDistance(fromPos, c) < gridDistance(fromPos, best) ? c : best, null);
+    let best = null;
+    let bestShielded = currentShielded;
+    let bestDist = Infinity;
+    for (const c of reachable) {
+        const sh = shieldedFrom(c);
+        if (sh <= currentShielded)
+            continue;
+        const d = gridDistance(fromPos, c);
+        if (sh > bestShielded || (sh === bestShielded && d < bestDist)) {
+            best = c;
+            bestShielded = sh;
+            bestDist = d;
+        }
+    }
+    return best;
 }
 // Where a fight opens (see layoutInitialPositions below): both sides start
 // in the CENTER of the board, facing each other across START_GAP — hero +
@@ -31087,6 +31191,18 @@ const COMBAT_CARD_LEAVE_MS = 1250;
 // animation before settling into an ordinary card — see arrivedKeys in
 // CombatModal.
 const COMBAT_CARD_ARRIVE_MS = 1000;
+// Ranged attack timing (ms). The archer's bow-draw plays for RANGED_DRAW_MS
+// (matches the archer-draw keyframes in the CSS), then the arrow flies for
+// ARROW_FLIGHT_MS and lands. Nothing about the hit may show on the target
+// before that landing: its hit reaction, its damage popup AND its armor/HP
+// bars all wait for it (see pendingShots in CombatModal).
+const RANGED_DRAW_MS = 420;
+const ARROW_FLIGHT_MS = 260;
+// Detached deep copy of a plain-data combat snapshot (parts / armor pools),
+// so a held "before the hit" picture can never change underneath us.
+function cloneCombatSnap(x) {
+    return x == null ? x : JSON.parse(JSON.stringify(x));
+}
 function splitForFlanking(list) {
     const half = Math.ceil(list.length / 2);
     return { left: list.slice(0, half), right: list.slice(half) };
@@ -31115,10 +31231,13 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // The hero portrait's two armor bars — cur/max straight off combat state
     // (see startCombat/attemptStealthKill for where these are rolled, and
     // resolveOneAttack for where cur drains as hits land).
-    const heroArmorPools = {
-        body: { cur: Math.max(0, (combat.heroArmorCur && combat.heroArmorCur.body) || 0), max: (combat.heroArmorMax && combat.heroArmorMax.body) || 0 },
-        head: { cur: Math.max(0, (combat.heroArmorCur && combat.heroArmorCur.head) || 0), max: (combat.heroArmorMax && combat.heroArmorMax.head) || 0 }
-    };
+    function buildHeroArmorPools(c) {
+        return {
+            body: { cur: Math.max(0, (c.heroArmorCur && c.heroArmorCur.body) || 0), max: (c.heroArmorMax && c.heroArmorMax.body) || 0 },
+            head: { cur: Math.max(0, (c.heroArmorCur && c.heroArmorCur.head) || 0), max: (c.heroArmorMax && c.heroArmorMax.head) || 0 }
+        };
+    }
+    const heroArmorPools = buildHeroArmorPools(combat);
     // Allies/enemies carry their own per-fight armor pool the same shape the
     // hero's does (see buildAllyCombatants/rollEnemyFromSpec) but flattened
     // slightly differently ({max:{head,body}, cur:{head,body}} for an ally vs
@@ -31343,6 +31462,72 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     const showLoot = combat.result === 'victory' && combat.loot;
     const lootReadyWithItems = showLoot && combat.loot.status === 'ready' && (combat.loot.items.length > 0 || combat.loot.currency > 0);
     const enemyNames = combat.enemies.map(e => e.enemyName).join(', ');
+    // ---- Ranged hits: nothing shows on the target until the arrow lands ----
+    // combat state already holds the OUTCOME of an attack the instant it is
+    // resolved, but a ranged attack still spends RANGED_DRAW_MS drawing the bow
+    // and ARROW_FLIGHT_MS flying before it actually hits. For that whole time
+    // the target keeps showing how it looked BEFORE the hit — armor/HP bars
+    // unchanged, still standing, no exit animation — and only changes at the
+    // moment of impact. pendingShots holds, per arrow in flight, a copy of its
+    // target's parts/armor pools taken from the state just before the attack
+    // (see the layout effect further down); the portraits render that copy
+    // instead of the live state until the shot lands. Kept oldest-first, so
+    // with several arrows in flight at one target the first still-pending one
+    // wins — exactly the state right before that arrow's hit, i.e. every
+    // earlier hit has already visibly landed.
+    const [pendingShots, setPendingShots] = useState([]);
+    // Same list as pendingShots, kept in a ref as well: the leave-timer effect
+    // below can run in the very commit that carries the post-hit state, i.e.
+    // before the re-render that applies the hold, and must still see it.
+    const pendingShotsRef = useRef([]);
+    const pendingShotTimersRef = useRef([]);
+    const combatPrevRef = useRef(combat);
+    const heldSeqRef = useRef(0);
+    const shotsInFlight = pendingShots.length > 0;
+    // The combat log states the damage the moment an attack is resolved ("… −12"),
+    // so while an arrow is still flying the log is cut back to what it said
+    // before that attack; its lines appear together with the hit itself.
+    // (combat.log is append-only, so the pre-attack length is a clean cut point.)
+    const shownLog = shotsInFlight ? combat.log.slice(0, pendingShots[0].logLen) : combat.log;
+    useEffect(() => () => {
+        pendingShotTimersRef.current.forEach(clearTimeout);
+        pendingShotTimersRef.current = [];
+    }, []);
+    function heldShotFor(key) {
+        return pendingShots.find(s => s.key === key) || null;
+    }
+    function releaseShot(seq) {
+        if (!pendingShotsRef.current.some(s => s.seq === seq))
+            return;
+        pendingShotsRef.current = pendingShotsRef.current.filter(s => s.seq !== seq);
+        setPendingShots(pendingShotsRef.current);
+    }
+    function snapshotCombatant(c, type, id) {
+        if (type === 'hero')
+            return { parts: cloneCombatSnap(c.heroParts), armorPools: buildHeroArmorPools(c), fled: false };
+        if (type === 'ally') {
+            const a = (c.allies || []).find(x => x.id === id);
+            return a ? { parts: cloneCombatSnap(a.parts), armorPools: cloneCombatSnap(toAllyPortraitArmorPools(a.armorPools)), fled: !!a.fled } : null;
+        }
+        if (type === 'enemy') {
+            const e = (c.enemies || []).find(x => x.id === id);
+            return e ? { parts: cloneCombatSnap(e.parts), armorPools: cloneCombatSnap(e.armorPools), fled: !!e.fled } : null;
+        }
+        return null;
+    }
+    // Body parts as they should be DRAWN right now (held pre-hit copy while an
+    // arrow is still on its way, live state otherwise).
+    function shownPartsOf(kind, c) {
+        const held = heldShotFor(kind + ':' + c.id);
+        return held ? held.parts : c.parts;
+    }
+    // Same idea for "fled / surrendered" — a hit that breaks an enemy's nerve
+    // must not send it running before the arrow has even arrived.
+    function shownFledOf(kind, c) {
+        const held = heldShotFor(kind + ':' + c.id);
+        return held ? !!held.fled : !!c.fled;
+    }
+    const heldHeroShot = heldShotFor('hero:hero');
     // A combatant that has left the fight — an enemy that died, fled or
     // surrendered, or an ally that fled (see runAutoTurn's ally branch/
     // COMBAT_TUNING's morale* block) — is kept in combat.enemies/combat.allies
@@ -31358,7 +31543,9 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // the ones whose exit has finished; cards already out when the modal
     // first mounts (e.g. an enemy killed by a stealth strike before the fight
     // began) start gone with no animation.
-    const isCardOut = (kind, c) => kind === 'enemy' ? (!!c.fled || isBodyDestroyed(c.parts)) : !!c.fled;
+    // (An enemy whose killing arrow is still in flight isn't out yet — it starts
+    // leaving the moment the arrow lands, see pendingShots above.)
+    const isCardOut = (kind, c) => kind === 'enemy' ? (shownFledOf('enemy', c) || isBodyDestroyed(shownPartsOf('enemy', c))) : shownFledOf('ally', c);
     const [goneKeys, setGoneKeys] = useState(() => {
         const init = {};
         combat.enemies.forEach(e => { if (isCardOut('enemy', e))
@@ -31371,6 +31558,9 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     useEffect(() => {
         const check = (kind, c) => {
             const key = kind + ':' + c.id;
+            // Its killing arrow is still in flight: the exit hasn't started, so neither has its timer.
+            if (pendingShotsRef.current.some(s => s.key === key))
+                return;
             if (!isCardOut(kind, c) || goneKeys[key] || leaveTimersRef.current[key])
                 return;
             leaveTimersRef.current[key] = setTimeout(() => {
@@ -31380,7 +31570,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         };
         combat.enemies.forEach(e => check('enemy', e));
         combat.allies.forEach(a => check('ally', a));
-    }, [combat.enemies, combat.allies, goneKeys]);
+    }, [combat.enemies, combat.allies, goneKeys, pendingShots]);
     useEffect(() => () => {
         Object.values(leaveTimersRef.current).forEach(clearTimeout);
         leaveTimersRef.current = {};
@@ -31697,7 +31887,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 x2: (end.x - 16) + 'px', y2: (end.y - 5) + 'px',
                 angle: angleDeg + 'deg'
             }]);
-        timers.push(setTimeout(onArrive, 260));
+        timers.push(setTimeout(onArrive, ARROW_FLIGHT_MS));
         // Matches the arrow-flight keyframe's own duration (see the CSS) —
         // the element only gets removed once it's already faded out.
         timers.push(setTimeout(() => setArrows(prev => prev.filter(a => a.id !== id)), 480));
@@ -31731,6 +31921,40 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         const dist = minDist + Math.random() * (maxDist - minDist);
         return { dx: Math.round(Math.sin(rad) * dist), dy: Math.round(-Math.cos(rad) * dist) };
     }
+    // Registers a ranged attack's target for the "nothing changes until the
+    // arrow lands" hold (see pendingShots above). A LAYOUT effect on purpose:
+    // the render that first carries the post-hit combat state has to be replaced
+    // by the held pre-hit one before the browser paints, or the bars would show
+    // their new values for a frame first. Runs once per new lastAction.seq and
+    // uses the same "is this a bow shot" test as the effect below, which is what
+    // picks the archer sequence over a melee lunge. `before` is the combat state
+    // from the previous commit, i.e. the target exactly as it stood pre-attack.
+    useLayoutEffect(() => {
+        const before = combatPrevRef.current;
+        combatPrevRef.current = combat;
+        const action = combat.lastAction;
+        if (!action || action.seq === heldSeqRef.current)
+            return;
+        heldSeqRef.current = action.seq;
+        if (!before || action.resultKind === 'stunSkip')
+            return;
+        const attackerKey = action.attackerType + ':' + action.attackerId;
+        const defenderKey = action.defenderType + ':' + action.defenderId;
+        if (!attackerIsRanged(action.attackerType, action.attackerId))
+            return;
+        if (!portraitRefs.current[attackerKey] || !portraitRefs.current[defenderKey])
+            return;
+        const snap = snapshotCombatant(before, action.defenderType, action.defenderId);
+        if (!snap)
+            return;
+        const seq = action.seq;
+        pendingShotsRef.current = [...pendingShotsRef.current, { seq, key: defenderKey, parts: snap.parts, armorPools: snap.armorPools, fled: snap.fled, logLen: Array.isArray(before.log) ? before.log.length : undefined }];
+        setPendingShots(pendingShotsRef.current);
+        // Normally the arrival callback below releases the hold at the exact moment
+        // the arrow lands; this timer is only a safety net for the case where that
+        // callback never runs, so a target can never stay frozen on its old bars.
+        pendingShotTimersRef.current.push(setTimeout(() => releaseShot(seq), RANGED_DRAW_MS + ARROW_FLIGHT_MS + 150));
+    }, [combat]);
     useEffect(() => {
         const action = combat.lastAction;
         if (!action || action.seq === seenSeqRef.current)
@@ -31855,15 +32079,20 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                     ? { ...prev, [attackerKey]: { cls: 'combat-fx-archer-release', seq, spark: null, vec: archerVec } }
                     : prev);
                 fireArrow(attackerPos, defenderPos, isMiss, () => {
+                    // The arrow has landed: only now do the target's bars, standing/down
+                    // state and hit reaction change (see pendingShots).
+                    releaseShot(seq);
                     if (defenderCls)
                         setFx(prev => ({ ...prev, [defenderKey]: { cls: defenderCls, seq, spark, vec: null } }));
                     if (popupItems.length > 0)
                         setPopups(prev => ({ ...prev, [defenderKey]: { seq, items: popupItems } }));
                     timers.push(setTimeout(clearFxAndPopups, 900));
                 }, timers);
-            }, 420));
+            }, RANGED_DRAW_MS));
         }
         else {
+            // No arrow to wait for (melee, or no bow shot) — nothing is held back.
+            releaseShot(seq);
             setFx(prev => ({
                 ...prev,
                 [attackerKey]: isSelfEvent ? prev[attackerKey] : { cls: 'combat-fx-lunge', seq, spark: null, vec: lungeVec },
@@ -31882,7 +32111,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         fxTimersRef.current.forEach(arr => arr.forEach(clearTimeout));
         fxTimersRef.current = [];
     }, []);
-    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget && combat.result)
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget && combat.result && !shotsInFlight)
             onClose(); } },
         React.createElement("div", { className: "modal-card combat-card combat-card-group" },
             React.createElement("h2", { className: "modal-title" },
@@ -31953,39 +32182,45 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                         })(),
                         visibleEnemies.map((enemy, i) => {
                             const isThisActive = !combat.result && current && current.type === 'enemy' && current.id === enemy.id;
+                            // An arrow aimed at this enemy that hasn't landed yet: keep drawing its pre-hit state.
+                            const heldShot = heldShotFor('enemy:' + enemy.id);
+                            const shownParts = heldShot ? heldShot.parts : enemy.parts;
                             return (React.createElement("div", { key: enemy.id, className: "combat-grid-token", style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
-                                        React.createElement(CombatPortrait, { name: enemy.enemyName, parts: enemy.parts, isDown: isBodyDestroyed(enemy.parts), isFled: !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, 
+                                        React.createElement(CombatPortrait, { name: enemy.enemyName, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, 
                                             // Attacking and planning a move are two different
                                             // things you can reach for on your turn, not an
                                             // exclusive toggle — enemies stay targetable even
                                             // while planningMove (below) is active, so tapping
                                             // your own card to preview a route never locks out
                                             // tapping an enemy to attack instead.
-                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
+                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
                         }),
                         visibleAllies.map(ally => {
                             const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !introActive && pendingItemIndex === null;
                             const isThisActive = !combat.result && current && current.type === 'ally' && current.id === ally.id;
                             const canLeaveHere = isThisAllyPlanner && ally.pos.y <= PLAYER_EDGE_Y;
+                            // Same hold as for enemies: an arrow still in flight at this ally hasn't hit yet.
+                            const heldShot = heldShotFor('ally:' + ally.id);
+                            const shownParts = heldShot ? heldShot.parts : ally.parts;
                             return (React.createElement("div", { key: ally.id, className: "combat-grid-token", style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { name: ally.name, parts: ally.parts, isDown: isBodyDestroyed(ally.parts), isFled: !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: allyWeaponTypes[ally.name.trim().toLowerCase()], t: t }),
+                                        React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: allyWeaponTypes[ally.name.trim().toLowerCase()], t: t }),
                                         canLeaveHere && (React.createElement("button", { type: "button", className: "combat-grid-leave-btn", title: t('combatLeaveButtonLabel'), onClick: gridClick(() => onLeave('ally', ally.id)) }, "\uD83D\uDEAA"))))));
                         }),
                         React.createElement("div", { className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
-                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heroArmorPools, weaponType: heroWeaponType, t: t }),
+                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: heroWeaponType, t: t }),
                                     isHeroTurn && !introActive && pendingItemIndex === null && combat.heroPos.y <= PLAYER_EDGE_Y && (React.createElement("button", { type: "button", className: "combat-grid-leave-btn", title: t('combatLeaveButtonLabel'), onClick: gridClick(() => onLeave('hero', null)) }, "\uD83D\uDEAA")))))))),
-            React.createElement("div", { className: "combat-log" }, combat.log.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
+            React.createElement("div", { className: "combat-log" }, shownLog.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
             !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null
                 ? t('combatUseItemPickTargetHint')
                 : (isPlayerTurn && !introActive
                     ? (isAllyPlayerTurn ? currentAlly.name + ' — ' + t('combatChooseTargetHint') : t('combatChooseTargetHint'))
-                    : t('combatWaitingHint')))),
+                    : (currentAlly ? t('combatAllyTurnHint') : t('combatWaitingHint'))))),
             !combat.result && pendingItemIndex === null && ownedActiveAbilities.length > 0 && (React.createElement("div", { className: "combat-ability-row" }, ownedActiveAbilities.map(id => {
                 const def = ABILITY_DEFS[id];
                 const status = getAbilityStatus(id, combat.abilityState, combat.round);
@@ -32016,7 +32251,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 React.createElement("button", { onClick: () => setPendingItemIndex(null), className: "btn btn-ghost combat-item-cancel-btn", type: "button" },
                     "\u2715 ",
                     t('combatUseItemCancelLabel')))),
-            resultCopy && (React.createElement("div", { className: "combat-result" },
+            resultCopy && !shotsInFlight && (React.createElement("div", { className: "combat-result" },
                 React.createElement("h3", { className: resultCopy.className }, t(resultCopy.titleKey)),
                 React.createElement("p", { className: "hint-text hint-text-block" }, t(resultCopy.textKey)),
                 showLoot && React.createElement(CombatLootPanel, { loot: combat.loot, onToggle: onToggleLoot, t: t }),
@@ -44135,7 +44370,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // distance on the grid before they can swing.
                 if (ally.pos) {
                     const livingEnemyPositions = prev.enemies.filter(e => !isEnemyOut(e)).map(e => ({ pos: e.pos }));
-                    const nearest = nearestReachableTarget(ally.pos, livingEnemyPositions, prev, { type: 'ally', id: ally.id });
+                    const nearest = nearestReachableTarget(ally.pos, livingEnemyPositions, prev, { type: 'ally', id: ally.id }, prev.allies.filter(x => !isAllyOut(x)));
                     if (nearest && chebyshevDistance(ally.pos, nearest.pos) > MELEE_ATTACK_MAX_DISTANCE) {
                         const step = chooseMoveStep(ally.pos, nearest.pos, prev, { type: 'ally', id: ally.id }, computeActorMovementRange({ type: 'ally', id: ally.id }));
                         if (step) {
@@ -44316,8 +44551,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // the field now. ranged/caster are exempt: a ranged shot threatens
             // the whole board (see RANGED_ATTACK_MAX_DISTANCE) and a caster's
             // effect roll below doesn't care about range either, so neither
-            // needs to close in first. This only ever moves toward the single
-            // nearest target — no real pathfinding, no group tactics. ----
+            // needs to close in first. Moves via real pathfinding around cover
+            // and other combatants (see findPathToAdjacent/chooseMoveStep), and
+            // picks which target to close with via nearestReachableTarget below —
+            // real path length, not raw distance, with a mild penalty for a
+            // target already crowded by other attackers so several enemies
+            // spread out instead of all funneling onto the same one. ----
             if ((enemy.role === 'melee' || enemy.role === 'tank' || !enemy.role) && enemy.pos) {
                 const meleeTargets = [{ pos: prev.heroPos }, ...prev.allies.filter(a => !isAllyOut(a)).map(a => ({ pos: a.pos }))];
                 // Deepened AI: a 'tank' with a ranged/caster ally on the field
@@ -44335,7 +44574,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             moveTargets = [ranked[0].tg];
                     }
                 }
-                const nearest = nearestReachableTarget(enemy.pos, moveTargets, prev, { type: 'enemy', id: enemy.id });
+                const nearest = nearestReachableTarget(enemy.pos, moveTargets, prev, { type: 'enemy', id: enemy.id }, prev.enemies.filter(x => !isEnemyOut(x)));
                 if (nearest && chebyshevDistance(enemy.pos, nearest.pos) > MELEE_ATTACK_MAX_DISTANCE) {
                     const step = chooseMoveStep(enemy.pos, nearest.pos, prev, { type: 'enemy', id: enemy.id }, AI_MOVEMENT_RANGE);
                     if (step) {
@@ -48574,8 +48813,13 @@ const APP_STYLES = `
 
 
 // ---- Mount ----
+// Starts once the third-party scripts have settled (loaded, failed, or timed
+// out — see the loader in the shim script above): a slow CDN can delay the
+// start by a few seconds at most, never block it.
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App, null));
+(window.__scriptsReady || Promise.resolve()).then(function () {
+  root.render(React.createElement(App, null));
+});
 </script>
 </body>
 </html>
