@@ -17555,6 +17555,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Дальше',
         sendFailedPrefix: 'Мастер игры не ответил: ',
         rateLimitError: 'У ключа закончились доступные сейчас запросы к нейросети (лимит Gemini API) — он сбрасывается примерно раз в 24 часа. Попробуй вернуться через сутки или используй другой аккаунт с другим ключом.',
+        overloadedError: 'Модель Gemini сейчас перегружена (это не проблема твоего ключа) — я уже попробовал несколько раз. Подожди минуту-другую и нажми ещё раз; если упорно повторяется — в Настройках выбери другую модель, например gemini-3.8-flash.',
         busyTurnNotice: 'Подожди, пока рассказчик закончит ход.',
         giftedItemNotice: 'Это подарок — обратно его не забрать.',
         autosaveFailedNotice: 'Автосохранение не удалось — экспортируй сохранение вручную, чтобы не потерять прогресс.',
@@ -18325,6 +18326,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Next',
         sendFailedPrefix: "The game master didn't respond: ",
         rateLimitError: "This key is out of available AI requests for now (Gemini API limit) — it resets roughly once every 24 hours. Try again in a day, or use a different account with a different key.",
+        overloadedError: "The Gemini model is overloaded right now (not a problem with your key) — I already retried a few times. Wait a minute or two and try again; if it keeps happening, pick another model in Settings, e.g. gemini-3.8-flash.",
         busyTurnNotice: "Wait for the narrator to finish this turn first.",
         giftedItemNotice: "That was a gift — it can't be taken back.",
         autosaveFailedNotice: "Autosave failed — export your save manually so you don't lose progress.",
@@ -37486,6 +37488,19 @@ function App() {
     // generateNarrative and the other call sites below) — Gemini calls the
     // assistant's turn 'model' instead of 'assistant', everything else maps
     // straight across into Gemini's {role, parts:[{text}]} content shape.
+    // Gemini answers 503 UNAVAILABLE ("This model is currently experiencing high
+    // demand") when the model is temporarily overloaded — unrelated to the key's
+    // quota, and usually gone within seconds. Retry those a few times with a
+    // growing pause before surfacing an error to the player.
+    async function geminiFetch(url, init) {
+        const delays = [2000, 4000, 8000];
+        let response = await fetch(url, init);
+        for (let i = 0; i < delays.length && response.status === 503; i++) {
+            await new Promise(resolve => setTimeout(resolve, delays[i]));
+            response = await fetch(url, init);
+        }
+        return response;
+    }
     function toGeminiContents(messages) {
         return messages.map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
@@ -37497,6 +37512,8 @@ function App() {
         const message = (data && data.error && data.error.message) || 'API request failed';
         const err = new Error(message);
         err.apiStatus = status || '';
+        if (status === 'UNAVAILABLE')
+            err.overloaded = true;
         if (status === 'RESOURCE_EXHAUSTED' || status === 'UNAVAILABLE') {
             err.code = 'rate_limit';
         }
@@ -37512,10 +37529,12 @@ function App() {
     }
     function describeError(e, prefixKey) {
         if (e.code === 'rate_limit') {
-            // Google's own status/text is appended so a real quota hit (RESOURCE_EXHAUSTED)
-            // can be told apart from a temporary overload (UNAVAILABLE) or a per-minute limit.
-            const raw = String(e.message || '').replace(/\s+/g, ' ').slice(0, 400);
-            return t('rateLimitError') + ' [' + (e.apiStatus || 'rate_limit') + (raw ? ': ' + raw : '') + ']';
+            if (e.overloaded)
+                return t('overloadedError');
+            // Real quota hit (RESOURCE_EXHAUSTED) — Google's own text is appended so
+            // a per-minute limit can be told apart from the daily one.
+            const raw = String(e.message || '').replace(/\s+/g, ' ').slice(0, 300);
+            return t('rateLimitError') + (raw ? ' [' + raw + ']' : '');
         }
         if (e.code === 'auth')
             return t('authError');
@@ -37556,7 +37575,7 @@ function App() {
             throw new Error('DEV: offline mode — model calls are disabled');
         if (retriesLeft === undefined)
             retriesLeft = 2;
-        const response = await fetch(geminiEndpoint(geminiModel, 'generateContent'), {
+        const response = await geminiFetch(geminiEndpoint(geminiModel, 'generateContent'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
             body: JSON.stringify({
@@ -37622,7 +37641,7 @@ function App() {
     async function callGeminiStreaming(system, messages, onChunk, retriesLeft) {
         if (retriesLeft === undefined)
             retriesLeft = 2;
-        const response = await fetch(geminiEndpoint(geminiModel, 'streamGenerateContent') + '?alt=sse', {
+        const response = await geminiFetch(geminiEndpoint(geminiModel, 'streamGenerateContent') + '?alt=sse', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
             body: JSON.stringify({
