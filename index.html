@@ -37496,6 +37496,7 @@ function App() {
         const status = data && data.error && data.error.status;
         const message = (data && data.error && data.error.message) || 'API request failed';
         const err = new Error(message);
+        err.apiStatus = status || '';
         if (status === 'RESOURCE_EXHAUSTED' || status === 'UNAVAILABLE') {
             err.code = 'rate_limit';
         }
@@ -37510,8 +37511,12 @@ function App() {
         throw err;
     }
     function describeError(e, prefixKey) {
-        if (e.code === 'rate_limit')
-            return t('rateLimitError');
+        if (e.code === 'rate_limit') {
+            // Google's own status/text is appended so a real quota hit (RESOURCE_EXHAUSTED)
+            // can be told apart from a temporary overload (UNAVAILABLE) or a per-minute limit.
+            const raw = String(e.message || '').replace(/\s+/g, ' ').slice(0, 400);
+            return t('rateLimitError') + ' [' + (e.apiStatus || 'rate_limit') + (raw ? ': ' + raw : '') + ']';
+        }
         if (e.code === 'auth')
             return t('authError');
         return t(prefixKey) + e.message;
