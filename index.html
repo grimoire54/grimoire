@@ -17309,6 +17309,8 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
       if (window.supabaseClient || !window.supabase) return;
       if (SUPABASE_ANON_KEY.indexOf('PASTE_YOUR_') === 0) return;
       window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      // Tells the app if the client turned up after it had already started.
+      window.dispatchEvent(new Event('grimoire:supabase-ready'));
     }
 
     // ---- Third-party scripts, loaded WITHOUT blocking the page ----
@@ -17351,8 +17353,10 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
 // (JSX -> React.createElement, via `tsc --jsx react`) and loaded by
 // index.html as a plain <script> — no bundler, no ES modules, no in-browser
 // Babel transform. React/ReactDOM are inlined directly in index.html's
-// <head>; mammoth and supabase-js load from a CDN. See index.html for all
-// of that wiring. This line just pulls the hooks out of the global React
+// <head>; mammoth and supabase-js load from a CDN, asynchronously, so a slow
+// CDN can't blank the page (index.html holds the first render back for
+// supabase-js, but for a few seconds at most). See index.html for all of
+// that wiring. This line just pulls the hooks out of the global React
 // object instead of an ES import — everything else below is untouched by
 // the precompile step except JSX syntax itself.
 const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
@@ -17414,8 +17418,8 @@ const TRANSLATIONS = {
         appTitle: 'Grimoire RPG',
         menuButton: 'Меню',
         apiKeyLabel: 'Ключ Gemini API',
-        apiKeyPlaceholder: 'Вставь свой ключ',
-        apiKeyHint: 'Нужен собственный ключ — получи бесплатно в Google AI Studio (aistudio.google.com → «Get API key»). Хранится только в этом браузере и отправляется напрямую в Google, больше никуда.',
+        apiKeyPlaceholder: 'Ключ Gemini API',
+        apiKeyHint: 'Нужен собственный ключ — его можно бесплатно получить в Google AI Studio (aistudio.google.com → «Get API key»). Хранится только в этом браузере и отправляется напрямую в Google, больше никуда.',
         // -- API key guide: callout + step-by-step wizard --
         apiKeyGuideBannerTitleMissing: 'Нужен ключ Gemini API',
         apiKeyGuideBannerTitleSet: 'Ключ Gemini API настроен',
@@ -17425,21 +17429,21 @@ const TRANSLATIONS = {
         apiKeyGuideKicker: 'Гайд: ключ API',
         apiKeyGuideStep1Title: 'Зачем нужен ключ',
         apiKeyGuideStep1Body: 'Мастер игры в «Grimoire RPG» работает на Gemini — модели Google. У каждого игрока свой ключ, поэтому использование и лимиты не пересекаются. Ключ бесплатный и хранится только в этом браузере.',
-        apiKeyGuideStep2Title: 'Открой Google AI Studio',
-        apiKeyGuideStep2Body: 'Перейди на aistudio.google.com и войди с любым Google-аккаунтом — подойдёт обычный Gmail, отдельная регистрация не нужна.',
+        apiKeyGuideStep2Title: 'Открыть Google AI Studio',
+        apiKeyGuideStep2Body: 'Нужно перейти на aistudio.google.com и войти с любым Google-аккаунтом — подойдёт обычный Gmail, отдельная регистрация не нужна.',
         apiKeyGuideStep2LinkButton: 'Открыть aistudio.google.com ↗',
-        apiKeyGuideStep3Title: 'Создай ключ',
-        apiKeyGuideStep3Body: 'В левой панели нажми «Get API key», затем «Create API key». Если предложит выбрать проект — жми «Create API key in new project»: Google сделает всё сам, платить не нужно.',
-        apiKeyGuideStep4Title: 'Скопируй ключ',
-        apiKeyGuideStep4Body: 'Ключ появится строкой, начинающейся с «AIza…». Нажми на иконку копирования рядом с ним.',
-        apiKeyGuideStep5Title: 'Вставь сюда',
-        apiKeyGuideStep5Body: 'Вставь скопированный ключ в поле ниже. Он сохранится только в этом браузере и отправится напрямую в Google, больше никуда.',
+        apiKeyGuideStep3Title: 'Создать ключ',
+        apiKeyGuideStep3Body: 'В левой панели — «Get API key», затем «Create API key». Если предложат выбрать проект, подойдёт «Create API key in new project»: Google сделает всё сам, платить не нужно.',
+        apiKeyGuideStep4Title: 'Скопировать ключ',
+        apiKeyGuideStep4Body: 'Ключ появится строкой, начинающейся с «AIza…». Рядом с ним есть иконка копирования.',
+        apiKeyGuideStep5Title: 'Вставить сюда',
+        apiKeyGuideStep5Body: 'Скопированный ключ нужно вставить в поле ниже. Он сохранится только в этом браузере и отправится напрямую в Google, больше никуда.',
         apiKeyGuideStep5Confirm: '✓ Ключ вставлен',
         apiKeyGuideBackButton: '← Назад',
         apiKeyGuideNextButton: 'Дальше →',
         apiKeyGuideDoneButton: 'Готово',
         modelLabel: 'Модель',
-        modelHint: 'Например: gemini-3.8-flash, gemini-3.6-flash, gemini-3-pro — полный список смотри в Google AI Studio. Google часто снимает старые модели с поддержки быстрее заявленных сроков — если появится ошибка «is no longer available», впиши сюда модель из текста ошибки.',
+        modelHint: 'Например: gemini-3.8-flash, gemini-3.6-flash, gemini-3-pro — полный список в Google AI Studio. Google часто снимает старые модели с поддержки быстрее заявленных сроков — если появится ошибка «is no longer available», сюда можно вписать модель из текста ошибки.',
         languageLabel: 'Язык',
         toggleOn: 'Включено',
         toggleOff: 'Выключено',
@@ -17498,14 +17502,14 @@ const TRANSLATIONS = {
         cloudDeleteAccountConfirmButton: 'Да, удалить аккаунт',
         cloudAccountDeletedNotice: 'Аккаунт и облачные сохранения удалены.',
         privacyLink: 'Политика конфиденциальности',
-        cloudCheckEmailNotice: 'Проверь почту и подтверди адрес — после этого сможешь войти.',
+        cloudCheckEmailNotice: 'Осталось подтвердить адрес по письму на почте — после этого можно войти.',
         cloudErrorPrefix: 'Ошибка: ',
         cloudLoadingLabel: 'Загрузка…',
         cloudSavesLoadingLabel: 'Загрузка',
         cloudNotConfigured: 'Supabase ещё не настроен — впиши свой anon key в index.html (см. README).',
         // -- Setup screen: world & hero creation --
         worldLabel: 'Мир',
-        worldPlaceholder: 'Опиши мир, эпоху и тон истории — или возьми набросок ниже',
+        worldPlaceholder: 'Мир, эпоха и тон истории — или один из набросков ниже',
         uploadButton: 'Загрузить файл',
         uploadHint: '.txt, .md или .docx — текст встанет в поле «Мир»',
         fileUnsupportedError: 'Не удалось прочитать файл. Поддерживаются .txt, .md, .docx.',
@@ -17514,14 +17518,14 @@ const TRANSLATIONS = {
         heroNamePlaceholder: 'Дарен',
         heroConceptLabel: 'Кто он',
         heroConceptPlaceholder: 'беглый наёмник (необязательно)',
-        missingFieldsError: 'Опиши мир и укажи имя героя, прежде чем открыть книгу.',
-        missingApiKeyError: 'Укажи ключ Gemini API в настройках, прежде чем открыть книгу.',
+        missingFieldsError: 'Нужно описать мир и указать имя героя, прежде чем начать игру.',
+        missingApiKeyError: 'Нужно указать ключ Gemini API в настройках, прежде чем начать игру.',
         openBookButton: 'Начать игру',
         openingBookLoading: 'Мастер начинает игру…',
         startFailedPrefix: 'Не удалось связаться с мастером игры: ',
         // -- Director note modal --
         directorTitle: 'Указание сюжету',
-        directorExplain: 'Это не действие героя, а пожелание о том, что должно произойти в истории. Указание не запускает ход само по себе — оно добавится к следующему действию, которое ты отправишь.',
+        directorExplain: 'Это не действие героя, а пожелание о том, что должно произойти в истории. Указание не запускает ход само по себе — оно добавится к следующему отправленному действию.',
         directorPlaceholder: 'Например: пусть в таверне появится подозрительный незнакомец с картой',
         addButton: 'Добавить',
         cancelButton: 'Отмена',
@@ -17531,15 +17535,15 @@ const TRANSLATIONS = {
         removeNoteAria: 'Убрать указание',
         // -- Export save --
         exportTitle: 'Экспорт сохранения',
-        exportExplain: 'Скопируй этот текст и сохрани где угодно (заметки, файл) — потом сможешь вставить его на экране создания мира, чтобы вернуть историю целиком.',
+        exportExplain: 'Этот текст можно сохранить где угодно (заметки, файл) — потом его можно вставить на экране создания мира, чтобы вернуть историю целиком.',
         exportGenerating: 'Готовлю сохранение…',
         copyButton: 'Скопировать',
         downloadButton: 'Скачать файл',
         copiedFeedback: 'Скопировано ✓',
         // -- Import save --
         importTitle: 'Импорт сохранения',
-        importExplain: 'Вставь текст, который получил при экспорте.',
-        importPrefixError: 'Похоже, это не сохранение Grimoire RPG — проверь, что скопировал текст целиком.',
+        importExplain: 'Сюда вставляется текст, полученный при экспорте.',
+        importPrefixError: 'Похоже, это не сохранение Grimoire RPG. Текст должен быть скопирован целиком.',
         importParseError: 'Не удалось прочитать сохранение — возможно, текст повреждён или скопирован не полностью.',
         loadButton: 'Загрузить',
         // -- Play-screen menu & restart --
@@ -17547,23 +17551,23 @@ const TRANSLATIONS = {
         sheetToggleButton: 'Лист героя',
         restartButton: 'Начать новое приключение',
         restartConfirmTitle: 'Начать заново?',
-        restartConfirmText: 'История будет удалена безвозвратно. Ты точно хочешь начать заново?',
+        restartConfirmText: 'История будет удалена безвозвратно. Начать заново?',
         restartConfirmButton: 'Да, удалить',
         // -- Action input & turn errors --
-        actionPlaceholder: 'Что ты делаешь?',
+        actionPlaceholder: 'Любое желаемое действие',
         directorBtnAria: 'Указание сюжету',
         sendTurnButton: 'Дальше',
         sendFailedPrefix: 'Мастер игры не ответил: ',
-        rateLimitError: 'У ключа закончились доступные сейчас запросы к нейросети (лимит Gemini API) — он сбрасывается примерно раз в 24 часа. Попробуй вернуться через сутки или используй другой аккаунт с другим ключом.',
-        overloadedError: 'Модель Gemini сейчас перегружена (это не проблема твоего ключа) — я уже попробовал несколько раз. Подожди минуту-другую и нажми ещё раз; если упорно повторяется — в Настройках выбери другую модель, например gemini-3.8-flash.',
-        busyTurnNotice: 'Подожди, пока рассказчик закончит ход.',
+        rateLimitError: 'У ключа закончились запросы к ИИ (лимит Gemini API) - он сбрасывается раз в 24 часа. Можно взять ключ от другого аккаунта или подождать до завтра.',
+        overloadedError: 'Модель Gemini сейчас перегружена. Через несколько минут можно попробовать ещё раз. Если повторяется - в настройках можно выбрать другую модель, например {model}.',
+        busyTurnNotice: 'Рассказчик ещё не закончил ход.',
         giftedItemNotice: 'Это подарок — обратно его не забрать.',
-        autosaveFailedNotice: 'Автосохранение не удалось — экспортируй сохранение вручную, чтобы не потерять прогресс.',
-        autosaveUnreadableNotice: 'Не удалось прочитать автосохранение. Его копия сохранена отдельно и не будет затёрта новой игрой.',
+        autosaveFailedNotice: 'Автосохранение не удалось — чтобы не потерять прогресс, сохранение нужно экспортировать вручную.',
+        autosaveUnreadableNotice: 'Не удалось прочитать автосохранение. Старая копия сохранена отдельно.',
         autosaveUnreadableNoCopyNotice: 'Не удалось прочитать автосохранение, и отдельную копию сделать тоже не вышло — новая игра его затрёт.',
         importReplaceWarning: 'Текущая игра и её автосохранение будут заменены.',
         importReplaceButton: 'Да, заменить',
-        authError: 'Ключ Gemini API не принят — проверь, что он вставлен правильно, в настройках.',
+        authError: 'Ключ Gemini API не принят. Стоит проверить в настройках, правильно ли он вставлен.',
         // -- Turn labels & play-screen menu items --
         playerLabel: 'Ты',
         directorLabel: '📝 Указание',
@@ -17612,12 +17616,12 @@ const TRANSLATIONS = {
         secretsModalTitle: 'Скрытая информация',
         secretsEmptyText: 'Скрытая информация появится после первого хода.',
         secretsNoneThisTurnText: 'На этот раз ничего скрытого не было.',
-        fallbackNarrative: 'Мастер игры на мгновение замолчал. Попробуй повторить действие.',
+        fallbackNarrative: 'Мастер игры на мгновение замолчал. Можно повторить действие.',
         // -- Character sheet: overlay & vitals --
         sheetOverlayTitle: 'Лист героя',
         closeAria: 'Закрыть',
         heroFallback: 'Герой',
-        heroNameRecoveryHint: 'Имя героя потерялось в сохранении. Введи его заново:',
+        heroNameRecoveryHint: 'Имя героя потерялось в сохранении. Имя нужно ввести заново:',
         heroNameRecoverySave: 'Сохранить',
         sheetEmpty: 'Остальное — эффекты, инвентарь, персонажи — появится по ходу истории.',
         timeLabel: 'Время',
@@ -17713,7 +17717,7 @@ const TRANSLATIONS = {
         effectMechanicDurationUntilResolved: 'Проходит только когда это вылечат или разрешится по сюжету — само по себе не пройдёт',
         effectMechanicNone: 'Никак не влияет на бой — это чисто повествовательная деталь.',
         effectMechanicCaptivityCountdown: 'Похитители могут что-то предпринять примерно через {n} ход(а/ов)',
-        effectDetailCloseHint: 'Нажми на эффект в списке, чтобы увидеть, что именно он делает.',
+        effectDetailCloseHint: 'Если нажать на эффект в списке, будет видно, что именно он делает.',
         // -- Character sheet: inventory & items --
         inventoryHeading: 'Инвентарь',
         currencyLabel: 'Валюта',
@@ -17785,7 +17789,6 @@ const TRANSLATIONS = {
         questsButton: 'Журнал заданий',
         // -- Combat --
         combatButtonLabel: 'Бой',
-        combatPendingInputBlocked: 'Сначала нужно разыграть бой — используй кнопки под текстом.',
         combatThresholdStub: 'Ты бросаешься в схватку — и всё, что будет дальше, решится в бою.',
         combatModalTitle: 'Бой',
         stealthKillPromptLabel: 'Скрытое убийство',
@@ -17808,7 +17811,7 @@ const TRANSLATIONS = {
         bodyPartLeftLegAcc: 'левую ногу',
         bodyPartRightLegAcc: 'правую ногу',
         combatYouLabel: 'Ты',
-        combatChooseTargetHint: 'Выбери противника для атаки',
+        combatChooseTargetHint: 'Кого атаковать?',
         combatChooseDefenseHint: 'Как будешь защищаться?',
         combatWaitingHint: 'Ход противника...',
         combatAllyTurnHint: 'Ход союзника...',
@@ -17929,9 +17932,9 @@ const TRANSLATIONS = {
         combatCoverPartialLabel: 'Частичное укрытие',
         combatSkipTurnButtonLabel: 'Пропустить ход',
         combatUseItemButtonLabel: 'Применить предмет',
-        combatUseItemPanelTitle: 'Выбери расходник',
+        combatUseItemPanelTitle: 'Какой расходник использовать?',
         combatUseItemPanelEmpty: 'Нет подходящих предметов',
-        combatUseItemPickTargetHint: 'Выбери, на кого применить предмет',
+        combatUseItemPickTargetHint: 'На кого применить предмет?',
         combatUseItemCancelLabel: 'Отмена',
         combatItemUsedLogVerb: 'использует',
         combatItemCuredSuffix: 'недуги сняты: {n}',
@@ -18014,11 +18017,11 @@ const TRANSLATIONS = {
         npcIncapacitatedTag: '[беспомощен]',
         // Shown in place of the trade/gift/repair links when the character is
         // present but the hero can't deal with them (see getNpcTradeBlockReason).
-        npcInteractBlockedEnemy: 'Он твой враг — ни торговли, ни подарков.',
+        npcInteractBlockedEnemy: 'Он враг героя — ни торговли, ни подарков.',
         npcInteractBlockedIncapacitated: 'Он сейчас не в состоянии ни торговать, ни принимать подарки.',
-        npcInteractBlockedHostile: 'Он открыто враждебен к тебе — ни торговли, ни подарков.',
-        npcInteractBlockedResentful: 'Он затаил обиду на тебя и торговать не станет.',
-        npcInteractBlockedFaction: 'Его фракция враждебна к тебе — торговля закрыта.',
+        npcInteractBlockedHostile: 'Он открыто враждебен — ни торговли, ни подарков.',
+        npcInteractBlockedResentful: 'Он затаил обиду и торговать не станет.',
+        npcInteractBlockedFaction: 'Его фракция враждебна — торговля закрыта.',
         // -- NPC-to-NPC relationship web (see NPC_RELATION_TYPES) --
         npcRelationsLabel: 'Отношения с другими',
         npcRelationFriend: 'друг',
@@ -18038,7 +18041,7 @@ const TRANSLATIONS = {
         // -- Gift item to NPC --
         giftItemLink: 'Подарить предмет',
         giftModalTitle: 'Подарить предмет',
-        giftEmptyInventory: 'Тебе нечего подарить.',
+        giftEmptyInventory: 'Нечего подарить.',
         giftRecipientLabel: 'Получатель',
         giftReputationHint: 'Отношение немного улучшится — тем сильнее, чем ценнее подарок. Сломанные и потрёпанные вещи ценятся ниже.',
         giftConfirmButton: 'Подарить',
@@ -18047,7 +18050,7 @@ const TRANSLATIONS = {
         giftCurrencyOption: 'Подарить деньги',
         giftCurrencyAvailableLabel: 'Доступно',
         giftCurrencyMaxButton: 'Всё',
-        giftCurrencyReputationHint: 'Отношение улучшится тем сильнее, чем бо́льшую долю своих денег ты отдашь.',
+        giftCurrencyReputationHint: 'Отношение улучшится тем сильнее, чем бо́льшая доля денег будет отдана.',
         // -- Hand-over tray: shared by Gift and party Give --
         transferSlotEmptyAria: 'Пустой слот — выбрать предмет',
         transferPickerEmpty: 'Выбирать больше не из чего.',
@@ -18056,7 +18059,7 @@ const TRANSLATIONS = {
         tradeModalTitle: 'Торговля',
         tradeYouLabel: 'Ты',
         tradeNpcEmptyText: 'У него нечего купить прямо сейчас.',
-        tradeHeroEmptyText: 'Тебе нечего продать.',
+        tradeHeroEmptyText: 'Нечего продать.',
         tradeNotForSale: 'не продаётся',
         tradeBuyTrayTitle: 'Купить',
         tradeSellTrayTitle: 'Продать',
@@ -18079,15 +18082,15 @@ const TRANSLATIONS = {
         groupMenuLabel: '🤝 Группа',
         groupModalTitle: 'Группа',
         groupCapacityLabel: 'Спутников',
-        groupEmptyText: 'Пока никто не путешествует с тобой.',
+        groupEmptyText: 'Пока никто не путешествует с героем.',
         dismissFromPartyButton: 'Отпустить',
         dismissConfirmTitle: 'Отпустить спутника?',
-        dismissConfirmText: 'Он покинет группу и продолжит свой путь один, пока ты не решишь позвать его снова.',
+        dismissConfirmText: 'Он покинет группу и продолжит свой путь один, пока его не позовут снова.',
         dismissConfirmButton: 'Да, отпустить',
         recruitLink: 'Позвать в группу',
         recruitModalTitle: 'Приглашение в группу',
-        recruitConfirmText: 'Он присоединится к тебе и будет путешествовать вместе, пока ты не решишь иначе.',
-        recruitUnyieldingHint: 'Он никогда не бросит своё дело, чтобы отправиться с тобой в путь — какими бы ни были ваши отношения.',
+        recruitConfirmText: 'Он присоединится к герою и будет путешествовать вместе, пока не будет решено иначе.',
+        recruitUnyieldingHint: 'Он никогда не бросит своё дело, чтобы отправиться в путь с героем — какими бы ни были отношения.',
         recruitConfirmAria: 'Пригласить',
         groupFullText: 'Группа уже полна — сначала отпусти кого-то из спутников.',
         startingPartyButton: 'Группа',
@@ -18119,12 +18122,12 @@ const TRANSLATIONS = {
         partyGearGoldHint: 'Спутник получил эти деньги в подарок и не готов отдать их просто так.',
         partyGiveItemLink: 'Дать предмет',
         partyGiveModalTitle: 'Дать предмет',
-        partyGiveEmptyInventory: 'Тебе нечего дать.',
+        partyGiveEmptyInventory: 'Нечего дать.',
         partyGiveConfirmAria: 'Дать',
         partyTakeTrayTitle: 'Забрать предмет',
         partyTakeTrayEmpty: 'Здесь нечего забрать.',
         partyTakeBackConfirmTitle: 'Забрать предмет?',
-        partyTakeBackConfirmText: 'Предмет вернётся в твой инвентарь:',
+        partyTakeBackConfirmText: 'Предмет вернётся в инвентарь героя:',
         partyTakeBackConfirmButton: 'Забрать',
         // -- Factions, set bonuses, territory (see FACTION REPUTATION / SET BONUSES) --
         factionsHeading: 'Фракции',
@@ -18160,11 +18163,11 @@ const TRANSLATIONS = {
         suggestionsLabel: 'Возможные действия',
         regenerateButton: 'Повтор',
         regenerateConfirmTitle: 'Перегенерировать ответ?',
-        regenerateConfirmText: 'Текущий ответ мастера будет заменён новым. Ты точно хочешь перегенерировать ответ?',
-        regenerateConfirmTextWithLoss: 'Это заменит выбранный ответ и удалит ВСЕ ходы, которые были после него — их будет не восстановить. Ты точно хочешь перегенерировать?',
+        regenerateConfirmText: 'Текущий ответ мастера будет заменён новым. Перегенерировать ответ?',
+        regenerateConfirmTextWithLoss: 'Это заменит выбранный ответ и удалит ВСЕ ходы, которые были после него — их будет не восстановить. Перегенерировать?',
         regenerateConfirmButton: 'Да, перегенерировать',
         // -- Inline item offers --
-        resolveItemsErrorPrefix: 'Выбери, что делать с предметом: ',
+        resolveItemsErrorPrefix: 'Нужно выбрать, что делать с предметом: ',
         itemTakeAria: 'Взять',
         itemDeclineAria: 'Оставить',
         itemChoiceConfirmButton: 'Подтвердить',
@@ -18326,7 +18329,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Next',
         sendFailedPrefix: "The game master didn't respond: ",
         rateLimitError: "This key is out of available AI requests for now (Gemini API limit) — it resets roughly once every 24 hours. Try again in a day, or use a different account with a different key.",
-        overloadedError: "The Gemini model is overloaded right now (not a problem with your key) — I already retried a few times. Wait a minute or two and try again; if it keeps happening, pick another model in Settings, e.g. gemini-3.8-flash.",
+        overloadedError: "The Gemini model is overloaded right now (not a problem with your key) — I already retried a few times. Wait a minute or two and try again; if it keeps happening, pick another model in Settings, e.g. {model}.",
         busyTurnNotice: "Wait for the narrator to finish this turn first.",
         giftedItemNotice: "That was a gift — it can't be taken back.",
         autosaveFailedNotice: "Autosave failed — export your save manually so you don't lose progress.",
@@ -18556,7 +18559,6 @@ const TRANSLATIONS = {
         questsButton: 'Quest journal',
         // -- Combat --
         combatButtonLabel: 'Fight',
-        combatPendingInputBlocked: 'The fight has to be played out first — use the buttons under the text.',
         combatThresholdStub: 'You throw yourself into the clash — and whatever comes next will be settled in the fight.',
         combatModalTitle: 'Combat',
         stealthKillPromptLabel: 'Stealth kill',
@@ -21802,6 +21804,36 @@ function isRangedWeaponName(name) {
         return true;
     return hasToken(RANGED_WEAPON_TOKEN_PATTERNS);
 }
+// Draw weapons only — bows and crossbows (and whoever carries them: an
+// "archer" enemy). Unlike firearms (rifles, автоматы, SMGs, muskets — all of
+// which are 'ranged' too) these can't be used at point-blank range: a shooter
+// locked in melee (see getActiveLockPartner) with one in hand can only throw
+// a fist, while a firearm can still be fired at the enemy in their face.
+const BOW_WEAPON_TOKEN_PATTERNS = [
+    /^лук(а|у|ом|е|и|ов|ам|ами|ах)?$/, /^лучни/, /^арбалет/, /^самострел/,
+    /^(long|short|war|cross|compound|recurve|hunting)?bows?$/, /^crossbow/, /^archer/
+];
+function isBowWeaponName(name) {
+    if (typeof name !== 'string' || !name.trim())
+        return false;
+    const tokens = narrativeItemNameTokens(name);
+    return tokens.some(tok => BOW_WEAPON_TOKEN_PATTERNS.some(re => re.test(tok)));
+}
+// Hero/ally: is a bow or crossbow one of the equipped weapons?
+function isBowLoadout(equipmentObj) {
+    const eq = equipmentObj || {};
+    return [eq.weaponRight, eq.weaponLeft].some(n => !!n && isBowWeaponName(n));
+}
+// Enemy: same source order as getEnemyWeaponType (its weaponDescription, then
+// its plain name) so the two always agree on what it's holding.
+function isEnemyBowUser(enemy) {
+    if (!enemy)
+        return false;
+    if (enemy.kind && enemy.kind !== ENEMY_KIND_DEFAULT)
+        return false;
+    const src = getWeaponTypeFromName(enemy.weaponDescription) !== WEAPON_TYPE_DEFAULT ? enemy.weaponDescription : enemy.enemyName;
+    return isBowWeaponName(src);
+}
 // True for a weapon-slot item of the ranged type (never a shield).
 function isRangedWeaponItem(item) {
     if (!item || item.slot !== 'weapon')
@@ -24842,24 +24874,23 @@ function isShieldItemName(name) {
 // ever written into a narrator/state prompt (prompts only see item names).
 //
 // Three wear mechanics (see the *_PCT tables below):
-//   armor  — worn only by hits that land on the body part it protects
+//   armor  — worn only by hits that land on the body part it protects, by
+//            exactly the damage its protection absorbed (see ARMOR below)
 //   cloak  — worn by ANY hit on the hero, slower than armor
 //   jewelry — worn by ANY hit on the hero, slowest of all
 //   weapon — worn by the hero's own landed strikes (same vs. every enemy)
 //   shield — worn by successful blocks
 // Misses, dodges and parries wear nothing.
 const DURABILITY_RARITY_ORDER = ['junk', 'common', 'uncommon', 'rare', 'unique', 'mythic'];
-// ---- ARMOR: durability grows with defense, but with diminishing returns ----
-// max = BASE + SCALE * sqrt(defense) — the raw number grows ~3.6x between
-// the worst and best piece, but the number of hits a piece SURVIVES only
-// spans ~2.4x (see DURABILITY_ARMOR_HITS): wear per hit is a % of the
-// piece's own max, tuned per rarity so that a "normal" hit (1% base) wears
-// a piece out in exactly the tabled number of hits.
-const DURABILITY_ARMOR_BASE = 30;
-const DURABILITY_ARMOR_SCALE = 26;
-const DURABILITY_ARMOR_HITS = { junk: 55, common: 60, uncommon: 68, rare: 82, unique: 103, mythic: 130 };
-// % of max durability lost per hit, by how serious the hit was.
-const DURABILITY_ARMOR_PCT = { graze: 0.5, normal: 1, strong: 3, disable: 5 };
+// ---- ARMOR: durability IS the piece's own protection value ----
+// An armor piece's max durability equals its own defense number (the same
+// getArmorDefenseForSlot the equipment screen shows), and every hit that
+// lands on the body part it protects wears it by exactly the damage its
+// protection absorbed from that hit (see the 'absorbed' field on a hit event
+// in collectWearOps). So a piece with 100 protection that soaks 50 damage per
+// hit is gone after two hits; one that soaks 10 lasts ten. A hit that gets
+// past no armor (empty pool, or an armor-piercing weapon) wears nothing.
+// No per-hit percentage, no severity tiers, no rarity hit-count table.
 // ---- CLOAK: max from rarity, wear from ANY hit, slower than armor ----
 // Wear per hit is the base % below (0.3-2%) scaled down for better rarities
 // by the ratio of the tabled hit counts (junk = 1x, mythic ~0.46x).
@@ -24923,8 +24954,8 @@ function getItemMaxDurability(item, rarityKey, category) {
         return null;
     const rarity = normalizeDurabilityRarity(rarityKey);
     if (cat === 'armor') {
-        const defense = getArmorDefenseForSlot(item.slot, rarity, item.weightCategory) || 1;
-        return applyDurabilityRoll(Math.round(DURABILITY_ARMOR_BASE + DURABILITY_ARMOR_SCALE * Math.sqrt(defense)), item);
+        // Durability == the piece's own protection (rarity, weight class and its own stat roll).
+        return Math.max(1, getArmorDefenseForSlot(item.slot, rarity, item.weightCategory, item.statRoll) || 1);
     }
     if (cat === 'cloak' || cat === 'shield')
         return applyDurabilityRoll(DURABILITY_CLOAK_MAX[rarity], item);
@@ -24970,7 +25001,8 @@ function getConditionMultiplierByName(item, itemRarities, floor) {
 }
 // % of the item's own max lost by one event. Returns 0 when the event
 // doesn't apply to this kind of item.
-//   { type: 'hit', severity }        — the hero took a hit (armor/cloak/jewelry)
+//   { type: 'hit', severity, absorbed } — the hero took a hit (cloak/jewelry by severity %;
+//                                      armor by `absorbed` damage points, see collectWearOps)
 //   { type: 'strike' }               — the hero landed a strike (weapon)
 //   { type: 'block', tier }          — the hero blocked (shield)
 function getItemWearPct(item, rarityKey, event) {
@@ -24980,8 +25012,9 @@ function getItemWearPct(item, rarityKey, event) {
     const rarity = normalizeDurabilityRarity(rarityKey);
     if (event.type === 'hit') {
         const sev = event.severity || 'normal';
+        // armor is not percent-based: it wears by the damage it absorbed (see collectWearOps).
         if (category === 'armor')
-            return (DURABILITY_ARMOR_PCT[sev] || DURABILITY_ARMOR_PCT.normal) * (100 / DURABILITY_ARMOR_HITS[rarity]);
+            return 0;
         if (category === 'cloak')
             return (DURABILITY_CLOAK_PCT[sev] || DURABILITY_CLOAK_PCT.normal) * (DURABILITY_CLOAK_HITS.junk / DURABILITY_CLOAK_HITS[rarity]);
         if (category === 'jewelry')
@@ -25080,19 +25113,27 @@ function collectWearOps(slotKeys, equipment, inventory, itemRarities, event) {
         const info = getItemDurability(item, rarity);
         if (!info || info.broken)
             continue;
-        const pct = getItemWearPct(item, rarity, event);
-        if (pct <= 0)
+        let units;
+        if (event.type === 'hit' && info.category === 'armor') {
+            // Armor wears by the damage it actually absorbed from this hit.
+            units = Math.max(0, event.absorbed || 0);
+        }
+        else {
+            const pct = getItemWearPct(item, rarity, event);
+            units = pct > 0 ? info.max * pct / 100 : 0;
+        }
+        if (units <= 0)
             continue;
         seen.add(name);
-        ops.push({ name, units: info.max * pct / 100 });
+        ops.push({ name, units });
     }
     return ops;
 }
 // The hero took a hit that landed on `partKey`: the armor covering that
 // part wears, plus the cloak and any jewelry (those take every hit).
-function buildHeroHitWearOps({ equipment, inventory, itemRarities, partKey, severity }) {
+function buildHeroHitWearOps({ equipment, inventory, itemRarities, partKey, severity, absorbed }) {
     const armorSlots = Object.keys(ARMOR_SLOT_PROTECTION).filter(k => ARMOR_SLOT_PROTECTION[k].includes(partKey));
-    return collectWearOps([...armorSlots, 'cloak', 'amulet', 'ringLeft', 'ringRight'], equipment, inventory, itemRarities, { type: 'hit', severity });
+    return collectWearOps([...armorSlots, 'cloak', 'amulet', 'ringLeft', 'ringRight'], equipment, inventory, itemRarities, { type: 'hit', severity, absorbed });
 }
 // The hero landed a strike: whatever weapon(s) they swung wear (not shields).
 function buildHeroStrikeWearOps({ equipment, inventory, itemRarities }) {
@@ -25113,10 +25154,11 @@ function buildHeroBlockWearOps({ equipment, inventory, itemRarities, enemyTier }
 // setCombat updaters). event: { type: 'hit', partKey, dmg, isCrit,
 // justDisabled, partMaxHp } | { type: 'strike' } | { type: 'block', tier }.
 // Wear is deliberately IDENTICAL for everyone (hero, companions, enemies,
-// reinforcements): the same per-event % of the item's own max durability from
-// getItemWearPct, so how fast a piece breaks depends only on the piece itself
-// (slot, rarity, weight class, its own rolled max) and on how hard it is hit
-// — never on who wears it. No per-side multiplier, on purpose.
+// reinforcements): armor wears by the damage it absorbed (its durability is
+// its own protection value); cloak/jewelry/weapon/shield by the shared
+// getItemWearPct tables — so how fast a piece breaks depends only on the piece
+// itself and on how hard it is hit, never on who wears it. No per-side
+// multiplier, on purpose.
 function wearEnemyGear(enemy, event, t) {
     const prev = (enemy && enemy.gearWear) || {};
     if (!enemy || !Array.isArray(enemy.inventory) || !enemy.equipment || enemy.inventory.length === 0)
@@ -25125,7 +25167,7 @@ function wearEnemyGear(enemy, event, t) {
     const inv = overlayGearWear(enemy.inventory, prev, rarities);
     let ops = [];
     if (event.type === 'hit') {
-        ops = buildHeroHitWearOps({ equipment: enemy.equipment, inventory: inv, itemRarities: rarities, partKey: event.partKey, severity: getHitSeverityKey(event.dmg, event.partMaxHp, event.isCrit, event.justDisabled) });
+        ops = buildHeroHitWearOps({ equipment: enemy.equipment, inventory: inv, itemRarities: rarities, partKey: event.partKey, severity: getHitSeverityKey(event.dmg, event.partMaxHp, event.isCrit, event.justDisabled), absorbed: event.absorbed });
     }
     else if (event.type === 'strike') {
         ops = buildHeroStrikeWearOps({ equipment: enemy.equipment, inventory: inv, itemRarities: rarities });
@@ -31693,7 +31735,7 @@ function CombatLootPanel({ loot, onToggle, t }) {
                             " ",
                             item.durability <= 0 ? t('lootBrokenTag') : t('lootDamagedTag')))),
                     React.createElement("div", { className: "item-offer-choice" },
-                        React.createElement("button", { onClick: () => onToggle(item.id, true), className: 'item-choice-btn' + (resolution === true ? ' item-choice-active-take' : ''), "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
+                        React.createElement("button", { onClick: () => onToggle(item.id, true), className: 'item-choice-btn' + (resolution !== false ? ' item-choice-active-take' : ''), "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
                         React.createElement("button", { onClick: () => onToggle(item.id, false), className: 'item-choice-btn' + (resolution === false ? ' item-choice-active-decline' : ''), "aria-label": t('itemDeclineAria'), type: "button" }, "\u2717"))));
             }))))));
 }
@@ -31745,7 +31787,7 @@ function getAbilityStatus(id, fightState, round) {
     }
     return { available: true, cooldown: null, usedUp: false };
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, introActive, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {} }) {
+function CombatModal({ combat, heroName, inventory, itemRarities, introActive, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {} }) {
     // The hero portrait's two armor bars — cur/max straight off combat state
     // (see startCombat/attemptStealthKill for where these are rolled, and
     // resolveOneAttack for where cur drains as hits land).
@@ -32013,6 +32055,21 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     function heldShotFor(key) {
         return pendingShots.find(s => s.key === key) || null;
     }
+    // An archer/crossbowman locked in melee can't draw (see resolveAttack), so
+    // their card shows the bare-handed portrait for as long as the lock holds
+    // and flips back to the archer the moment it ends (getActiveLockPartner
+    // is live — a kill, a flee or a step away all release it). Exception: the
+    // shooter of an arrow still in flight keeps the archer portrait until it
+    // lands — a shot fired from point-blank range creates the lock in the very
+    // same state update, and the draw/release animation must not play on a
+    // bare-handed card (see pendingShots' attackerKey).
+    const portraitTypeFor = (key, baseType, isBow) => {
+        if (baseType !== 'ranged' || !isBow)
+            return baseType;
+        if (pendingShots.some(sh => sh.attackerKey === key))
+            return baseType;
+        return getActiveLockPartner(combat, key) ? 'unarmed' : baseType;
+    };
     function releaseShot(seq) {
         if (!pendingShotsRef.current.some(s => s.seq === seq))
             return;
@@ -32457,7 +32514,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             return;
         const attackerKey = action.attackerType + ':' + action.attackerId;
         const defenderKey = action.defenderType + ':' + action.defenderId;
-        if (!attackerIsRanged(action.attackerType, action.attackerId))
+        if (!(typeof action.ranged === 'boolean' ? action.ranged : attackerIsRanged(action.attackerType, action.attackerId)))
             return;
         if (!portraitRefs.current[attackerKey] || !portraitRefs.current[defenderKey])
             return;
@@ -32465,7 +32522,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         if (!snap)
             return;
         const seq = action.seq;
-        pendingShotsRef.current = [...pendingShotsRef.current, { seq, key: defenderKey, parts: snap.parts, armorPools: snap.armorPools, fled: snap.fled, logLen: Array.isArray(before.log) ? before.log.length : undefined }];
+        pendingShotsRef.current = [...pendingShotsRef.current, { seq, key: defenderKey, attackerKey, parts: snap.parts, armorPools: snap.armorPools, fled: snap.fled, logLen: Array.isArray(before.log) ? before.log.length : undefined }];
         setPendingShots(pendingShotsRef.current);
         // Normally the arrival callback below releases the hold at the exact moment
         // the arrow lands; this timer is only a safety net for the case where that
@@ -32521,7 +32578,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             navigator.vibrate(25);
         }
         const isMiss = action.resultKind === 'dodged' || action.resultKind === 'miss';
-        const isRanged = !isSelfEvent && attackerIsRanged(action.attackerType, action.attackerId);
+        const isRanged = !isSelfEvent && (typeof action.ranged === 'boolean' ? action.ranged : attackerIsRanged(action.attackerType, action.attackerId));
         // A ranged miss is a clean whiff — the arrow just sails past nearby
         // (see fireArrow below), so the defender gets no dodge side-step here
         // the way a melee miss still does.
@@ -32708,7 +32765,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                                             // while planningMove (below) is active, so tapping
                                             // your own card to preview a route never locks out
                                             // tapping an enemy to attack instead.
-                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: getEnemyWeaponType(enemy), t: t })))));
+                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: portraitTypeFor('enemy:' + enemy.id, getEnemyWeaponType(enemy), isEnemyBowUser(enemy)), t: t })))));
                         }),
                         visibleAllies.map(ally => {
                             const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !introActive && pendingItemIndex === null;
@@ -32720,13 +32777,13 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             return (React.createElement("div", { key: ally.id, className: "combat-grid-token", style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: allyWeaponTypes[ally.name.trim().toLowerCase()], t: t }),
+                                        React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t }),
                                         canLeaveHere && (React.createElement("button", { type: "button", className: "combat-grid-leave-btn", title: t('combatLeaveButtonLabel'), onClick: gridClick(() => onLeave('ally', ally.id)) }, "\uD83D\uDEAA"))))));
                         }),
                         React.createElement("div", { className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
-                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: heroWeaponType, t: t }),
+                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t }),
                                     isHeroTurn && !introActive && pendingItemIndex === null && combat.heroPos.y <= PLAYER_EDGE_Y && (React.createElement("button", { type: "button", className: "combat-grid-leave-btn", title: t('combatLeaveButtonLabel'), onClick: gridClick(() => onLeave('hero', null)) }, "\uD83D\uDEAA")))))))),
             React.createElement("div", { className: "combat-log" }, shownLog.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
             !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null
@@ -33406,7 +33463,7 @@ function smoothClosedLoopPath(points) {
 // pixels) of the Gaussian that blurs the ownership map before the
 // outlines are traced (see computeTerritoryOutlines). Bigger = rounder;
 // 0 = no rounding at all (the raw grid staircase).
-const MAP_TERRITORY_ROUNDING = 28;
+const MAP_TERRITORY_ROUNDING = 60;
 // Where two different factions both have a location within this distance
 // of a point, the gap between their claims is closed instead of being
 // left empty. Bigger closes wider gaps.
@@ -33420,6 +33477,19 @@ const MAP_TERRITORY_INDEPENDENT_CLEARANCE = 75;
 // ...but never wider than this share of the distance to the nearest faction
 // location, so a faction's own location is never left standing in the clearing.
 const MAP_TERRITORY_CLEARANCE_SHARE = 0.55;
+// How much several similarly-placed rivals blend together, in the same
+// units as a blurred mask's own value (roughly 0 to 1), when deciding what
+// counts as "the" competing claim on a point — see the note beside its use
+// in computeTerritoryOutlines for why a single named runner-up isn't enough.
+// 0 disables the blend. Kept well under 1 so it only smooths a close
+// three-or-more-way call and leaves a lopsided one (one clearly dominant
+// rival) reading the same as before.
+// Checked visually at several settings; anything above 0 read as a worse
+// border than plain top1/top2, so this stays off by default. Left wired up
+// behind computeTerritoryOutlines' options.softness in case that's worth
+// revisiting later (e.g. if MAP_TERRITORY_ROUNDING or the map's own
+// density of nearby holdings changes enough to change that verdict).
+const MAP_TERRITORY_RIVAL_SOFTNESS = 0;
 // Blurs one W x H plane of grid values with a separable kernel (edges clamp).
 function blurPlane(src, W, H, kernel, half) {
     const tmp = new Float32Array(src.length), out = new Float32Array(src.length);
@@ -33522,8 +33592,9 @@ function stitchSegmentsIntoLoops(segments) {
 // can be run and tested on its own.
 //   seeds:        [{ x, y, faction }] every location that belongs to a faction
 //   independents: [{ x, y }] locations with no faction
-//   options:      { sigma, fillGaps } overrides for MAP_TERRITORY_ROUNDING and
-//                 for gap-closing (on by default)
+//   options:      { sigma, fillGaps, softness } overrides for
+//                 MAP_TERRITORY_ROUNDING, gap-closing (on by default), and
+//                 MAP_TERRITORY_RIVAL_SOFTNESS
 // Returns [{ key, d }]: one SVG path per faction (all its blobs and holes
 // together, so draw it with fill-rule: evenodd); key = lowercased name.
 //
@@ -33569,7 +33640,7 @@ function computeTerritoryOutlines(seeds, independents, options) {
         let dMin = Infinity;
         seeds.forEach(s => { dMin = Math.min(dMin, Math.hypot(s.x - q.x, s.y - q.y)); });
         return { x: q.x, y: q.y, r: Math.min(MAP_TERRITORY_INDEPENDENT_CLEARANCE, dMin * MAP_TERRITORY_CLEARANCE_SHARE) };
-    }).filter(h => h.r >= 8);
+    }).filter(h => h.r >= G * 1.5); // a clearing much narrower than the grid can't be drawn as a circle (and would be smaller than the location's own icon anyway)
     const nearIndependent = (x, y) => holes.some(h => (h.x - x) * (h.x - x) + (h.y - y) * (h.y - y) < h.r * h.r);
     // 1. one label per grid point: 0 = empty, k + 1 = faction k
     const label = new Uint16Array(N);
@@ -33689,11 +33760,55 @@ function computeTerritoryOutlines(seeds, independents, options) {
             }
         }
     });
+    // A location's own two nearest rivals are rarely its only real competition:
+    // several other factions (and open ground) usually sit at similar-enough
+    // distance that whichever one is technically 2nd-closest keeps swapping
+    // from one grid point to the next along a long stretch of border. Reading
+    // off a single "2nd place" the way top2 above does treats that swap as a
+    // real change and puts a small kink in the boundary at every point it
+    // happens — a border with many nearby holdings ends up with many small
+    // kinks along it, which is the actual shape of the "small burrs" a very
+    // round MAP_TERRITORY_ROUNDING alone doesn't smooth away (rounding softens
+    // the grid's own staircase; it does nothing about a kink that's a genuine
+    // feature of the field). MAP_TERRITORY_RIVAL_SOFTNESS blends every rival
+    // together with a softmax (a log-sum-exp, shifted for stability by
+    // whichever rival the hard top1/top2 comparison above already names as
+    // strongest) instead of reading off a single named 2nd place, so a border
+    // eases through such a swap instead of creasing at it. 0 disables this and
+    // falls back to top1/top2 exactly, unblended.
+    const T = options && typeof options.softness === 'number' ? options.softness : MAP_TERRITORY_RIVAL_SOFTNESS;
+    // Blending several rivals together always pulls a field down a little
+    // (adding a comparably-strong 3rd or 4th claim on top of the 2nd only ever
+    // raises the softened "rival" estimate), so a point contested by several
+    // factions at once can, in the worst case, end up with every one of them
+    // just barely negative — nobody left to claim it, a gap up to roughly
+    // T*log(number of similarly-close rivals) wide. MAP_TERRITORY_
+    // RIVAL_SOFTNESS is kept small enough that this stays well under a grid
+    // step for any realistic cluster of nearby holdings, small enough that
+    // MAP_TERRITORY_GAP_REACH's own closing (above) or the ordinary rounding
+    // already covers it; a still-visible gap right at a crowded three- or
+    // four-way meeting point, rather than the many small kinks a harder blend
+    // would leave along the plainer stretches on either side of it, is the
+    // trade this constant is deliberately making.
     const out = [];
     for (let f = 0; f < K; f += 1) {
         const field = new Float32Array(N), plane = planes[f + 1];
-        for (let i = 0; i < N; i += 1)
-            field[i] = Math.min(plane[i] - (top1Label[i] === f + 1 ? top2[i] : top1[i]), holeS[i]);
+        for (let i = 0; i < N; i += 1) {
+            let rival;
+            if (T > 0) {
+                const shift = top1Label[i] === f + 1 ? top2[i] : top1[i]; // the strongest actual rival, for a numerically safe log-sum-exp
+                let sumExp = 0;
+                for (let k = 0; k <= K; k += 1) {
+                    if (k !== f + 1)
+                        sumExp += Math.exp((planes[k][i] - shift) / T);
+                }
+                rival = shift + T * Math.log(Math.max(sumExp, 1e-12));
+            }
+            else {
+                rival = top1Label[i] === f + 1 ? top2[i] : top1[i];
+            }
+            field[i] = Math.min(plane[i] - rival, holeS[i]);
+        }
         const cache = new Map();
         const crossing = (i1, i2) => {
             const id = i1 * N + i2;
@@ -36877,14 +36992,32 @@ function App() {
     // exists — including one just completed via a Google OAuth redirect back
     // to this page, which supabase-js resolves from the URL on its own before
     // this first fires — and again on every future sign-in/out/token refresh.
+    //
+    // supabase-js normally exists before first render (index.html holds the
+    // mount back for it), but on a very slow CDN the app starts without it and
+    // the client appears later. supabaseReady tracks that, so the subscription
+    // below attaches whenever the client actually exists, not only if it was
+    // already there at mount.
+    const [supabaseReady, setSupabaseReady] = useState(!!window.supabaseClient);
     useEffect(() => {
-        if (!window.supabaseClient)
+        if (supabaseReady)
+            return;
+        if (window.supabaseClient) {
+            setSupabaseReady(true);
+            return;
+        }
+        const onReady = () => setSupabaseReady(!!window.supabaseClient);
+        window.addEventListener('grimoire:supabase-ready', onReady);
+        return () => window.removeEventListener('grimoire:supabase-ready', onReady);
+    }, [supabaseReady]);
+    useEffect(() => {
+        if (!supabaseReady || !window.supabaseClient)
             return;
         const { data: listener } = window.supabaseClient.auth.onAuthStateChange((event, session) => {
             setCloudUser(session ? session.user : null);
         });
         return () => { listener && listener.subscription && listener.subscription.unsubscribe(); };
-    }, []);
+    }, [supabaseReady]);
     useEffect(() => {
         if (cloudUser)
             refreshCloudSaves();
@@ -37165,7 +37298,10 @@ function App() {
     // ---- CLOUD SAVES (Supabase) ----
     // window.supabaseClient is created once in index.html's own wrapper script
     // (same pattern as window.storage) from a project URL + anon key baked in
-    // there — see that file. The anon key is safe to ship in the page; access
+    // there — see that file. It can be null (CDN unreachable) or show up a few
+    // seconds after first render (index.html then fires
+    // "grimoire:supabase-ready"; see supabaseReady above). The anon key is safe
+    // to ship in the page; access
     // control comes from the grimoire_rpg_saves table's row-level security
     // policies (auth.uid() = user_id), not from keeping the key secret.
     async function refreshCloudSaves() {
@@ -37530,7 +37666,7 @@ function App() {
     function describeError(e, prefixKey) {
         if (e.code === 'rate_limit') {
             if (e.overloaded)
-                return t('overloadedError');
+                return t('overloadedError').replace('{model}', DEFAULT_GEMINI_MODEL);
             // Real quota hit (RESOURCE_EXHAUSTED) — Google's own text is appended so
             // a per-minute limit can be told apart from the daily one.
             const raw = String(e.message || '').replace(/\s+/g, ' ').slice(0, 300);
@@ -42918,6 +43054,20 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     //    weaponDescription is flavor only (shown nowhere mechanical); its
     //    actual swing damage still comes from its rolled "power" (mapped to
     //    stats.strength) same as any other unarmed combatant.
+    // A reinforcement ally with no NPC record has no partyEquipment/
+    // partyInventories entry, so it gets a real loadout of its own, rolled
+    // exactly like an enemy's (rollEnemyInventory): armor pieces from the very
+    // armorGear its pools were rolled from, plus a weapon (and shield) from its
+    // weaponDescription. It then fights, defends and wears/breaks gear through
+    // the same code as the hero and party members (see getAllyLoadout). Wear is
+    // tracked on the combat state and dies with the fight.
+    function rollAllyOwnGear(tierKey, armorGear, allyName, weaponDescription, armorPiercing) {
+        const desc = (typeof weaponDescription === 'string' && weaponDescription.trim()) ? weaponDescription.trim() : t('combatUnarmedEnemyLabel');
+        const g = rollEnemyInventory(tierKey, ENEMY_KIND_DEFAULT, armorGear, desc, allyName);
+        if (armorPiercing === true)
+            g.inventory = g.inventory.map(it => (it.slot === 'weapon' && !it.shield) ? { ...it, armorPiercing: true } : it);
+        return g;
+    }
     function makeAllyCombatant(raw, id) {
         if (raw && typeof raw.npcName === 'string' && raw.npcName.trim()) {
             const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === raw.npcName.trim().toLowerCase());
@@ -42938,7 +43088,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // makeAllyDefender expects ally.armorPools.cur as a flat {head,body}
                 // map (same shape buildAllyCombatants/the hero use) — rollEnemyStatsForTier
                 // hands back the nested {max,cur} shape enemies use instead, so flatten it here.
-                armor: rolled.armor, armorPools: { max: { head: rolled.armorPools.head.max, body: rolled.armorPools.body.max }, cur: { head: rolled.armorPools.head.cur, body: rolled.armorPools.body.cur } }, morale: COMBAT_TUNING.moraleStart, playerControlled: false
+                armor: rolled.armor, armorPools: { max: { head: rolled.armorPools.head.max, body: rolled.armorPools.body.max }, cur: { head: rolled.armorPools.head.cur, body: rolled.armorPools.body.cur } }, morale: COMBAT_TUNING.moraleStart, playerControlled: false,
+                ownGear: rollAllyOwnGear('average', rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing)
             };
         }
         const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : t('combatReinforcementAllyFallbackName');
@@ -42951,6 +43102,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             parts: buildCombatantParts(rolled.totalHp, rolled.totalHp),
             // Same flattening as the npcName branch above — see its comment.
             armor: rolled.armor, armorPools: { max: { head: rolled.armorPools.head.max, body: rolled.armorPools.body.max }, cur: { head: rolled.armorPools.head.cur, body: rolled.armorPools.body.cur } }, morale: COMBAT_TUNING.moraleStart, playerControlled: false,
+            ownGear: rollAllyOwnGear(tier, rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing),
             weaponDescription: typeof raw.weaponDescription === 'string' ? raw.weaponDescription.trim() : '',
             armorPiercing: raw.armorPiercing === true,
             anonymousReinforcement: true
@@ -43192,13 +43344,15 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return { ...prev, loot: { ...prev.loot, resolutions: { ...prev.loot.resolutions, [itemId]: takeValue } } };
         });
     }
-    // Everything the player actually checked ✓ on in the loot panel, read
-    // once at the moment combat closes — see endCombatAndClose.
+    // Everything the player did NOT explicitly leave behind (✗) in the loot
+    // panel, read once at the moment combat closes — see endCombatAndClose.
+    // An item with no choice made (undefined) is taken automatically, same as
+    // an explicit ✓; only an explicit ✗ (false) leaves it on the body.
     function collectTakenLoot(finalCombat) {
         if (!finalCombat.loot || finalCombat.loot.status !== 'ready')
             return [];
         const resolutions = finalCombat.loot.resolutions || {};
-        return finalCombat.loot.items.filter(it => resolutions[it.id] === true);
+        return finalCombat.loot.items.filter(it => resolutions[it.id] !== false);
     }
     // What the hero is actually swinging right now: equipped weapon(s) by
     // rarity tier (see WEAPON_DAMAGE_BY_RARITY), doubled for a two-handed
@@ -43213,7 +43367,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // WEAPON_DAMAGE_BY_RARITY), doubled for a two-handed weapon, summed if two
     // one-handers are dual-wielded, or a bare fist if both hands are empty.
     // label is what the combat log shows in parentheses next to a hit.
-    function getWeaponInfoForLoadout(equipmentObj, inventoryList, unarmedLabel) {
+    function getWeaponInfoForLoadout(equipmentObj, inventoryList, unarmedLabel, rarities = itemRarities) {
         const eq = equipmentObj || EMPTY_EQUIPMENT;
         const weaponNames = [eq.weaponRight, eq.weaponLeft].filter(Boolean);
         if (weaponNames.length === 0) {
@@ -43228,7 +43382,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (!name)
                 continue;
             const item = resolvedHands[handKey];
-            const rarity = findItemRarity(name, itemRarities) || 'common';
+            const rarity = findItemRarity(name, rarities) || 'common';
             // A broken weapon/shield swings for nothing (see ITEM DURABILITY).
             if (item && isItemBroken(item, rarity))
                 continue;
@@ -43257,9 +43411,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // ARMOR_SLOT_PROTECTION/ARMOR_DEFENSE_BY_RARITY). An unarmored part
     // returns 0 — armor mitigates, it never grants immunity (a hit always
     // deals at least 1; see where this is subtracted).
-    function getDefenseForPartOfLoadout(equipmentObj, inventoryList, partKey) {
+    function getDefenseForPartOfLoadout(equipmentObj, inventoryList, partKey, rarities = itemRarities) {
         const eq = equipmentObj || EMPTY_EQUIPMENT;
-        const activeSets = computeActiveEquipmentSets(eq, inventoryList || [], itemRarities);
+        const activeSets = computeActiveEquipmentSets(eq, inventoryList || [], rarities);
         let defense = 0;
         const resolvedWorn = resolveEquippedItems(eq, inventoryList || []);
         for (const slotKey of Object.keys(ARMOR_SLOT_PROTECTION)) {
@@ -43268,7 +43422,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const itemName = eq[slotKey];
             if (!itemName)
                 continue;
-            const rarity = findItemRarity(itemName, itemRarities) || 'common';
+            const rarity = findItemRarity(itemName, rarities) || 'common';
             const item = resolvedWorn[slotKey];
             if (item && isItemBroken(item, rarity))
                 continue;
@@ -43293,38 +43447,57 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     }
     // The hero just took a landed hit on `partKey` (also used for a flee
     // punish hit): armor covering it, the cloak and any jewelry wear.
-    function heroHitWear(prevWear, partKey, dmg, isCrit, justDisabled, partMaxHp) {
+    function heroHitWear(prevWear, partKey, dmg, isCrit, justDisabled, partMaxHp, absorbed) {
         const inv = overlayGearWear(gameState.inventory, prevWear, itemRarities);
-        return applyHeroWearOps(prevWear, buildHeroHitWearOps({ equipment, inventory: inv, itemRarities, partKey, severity: getHitSeverityKey(dmg, partMaxHp, isCrit, justDisabled) }));
+        return applyHeroWearOps(prevWear, buildHeroHitWearOps({ equipment, inventory: inv, itemRarities, partKey, severity: getHitSeverityKey(dmg, partMaxHp, isCrit, justDisabled), absorbed }));
     }
+    // The gear an ally fights with: a party member's own partyEquipment/
+    // partyInventories entry, or — for an anonymous reinforcement — the loadout
+    // it was rolled with (ally.ownGear). Everything in combat that reads an
+    // ally's gear goes through here. wearKey is the combat.allyGearWear key
+    // (unique combat id for own gear, since two "Guard" reinforcements share a name).
+    function getAllyLoadout(ally) {
+        if (ally.ownGear)
+            return { equipment: ally.ownGear.equipment, inventory: ally.ownGear.inventory, itemRarities: ally.ownGear.itemRarities, wearKey: 'own:' + ally.id };
+        const key = ally.name.trim().toLowerCase();
+        return { equipment: partyEquipment[key] || EMPTY_EQUIPMENT, inventory: partyInventories[key] || [], itemRarities, wearKey: key };
+    }
+    function allyWearOf(state, ally) { return ((state && state.allyGearWear) || {})[getAllyLoadout(ally).wearKey]; }
     // A companion's gear wears exactly like the hero's, tracked per companion
     // (combat.allyGearWear[key] = { [itemName]: unitsLost }) against their own
     // partyInventories/partyEquipment loadout, and folded into
     // partyInventories once the fight closes. event is one of
     // { type: 'strike' } | { type: 'hit', partKey, dmg, isCrit, justDisabled } |
     // { type: 'block', enemyTier }. Pure w.r.t. React state.
+    // An anonymous reinforcement ally (see makeAllyCombatant) carries its own
+    // rolled loadout on the combatant (ally.ownGear, same shape enemies use; see
+    // getAllyLoadout), and its wear is keyed by its unique combat id — a name could collide between two
+    // "Guard" reinforcements. endCombatAndClose skips those keys (nothing
+    // persistent to fold them into: a reinforcement isn't in the party).
     function applyAllyWear(prev, ally, event) {
-        const key = ally.name.trim().toLowerCase();
+        const load = getAllyLoadout(ally);
+        const key = load.wearKey;
         const allWear = prev.allyGearWear || {};
         const wear = allWear[key] || {};
-        const eq = partyEquipment[key] || EMPTY_EQUIPMENT;
-        const base = partyInventories[key] || [];
-        const inv = overlayGearWear(base, wear, itemRarities);
+        const eq = load.equipment;
+        const base = load.inventory;
+        const rarities = load.itemRarities;
+        const inv = overlayGearWear(base, wear, rarities);
         let ops = [];
         if (event.type === 'strike') {
-            ops = buildHeroStrikeWearOps({ equipment: eq, inventory: inv, itemRarities });
+            ops = buildHeroStrikeWearOps({ equipment: eq, inventory: inv, itemRarities: rarities });
         }
         else if (event.type === 'hit') {
             const part = ally.parts[event.partKey];
-            ops = buildHeroHitWearOps({ equipment: eq, inventory: inv, itemRarities, partKey: event.partKey, severity: getHitSeverityKey(event.dmg, part ? part.maxHp : 0, event.isCrit, event.justDisabled) });
+            ops = buildHeroHitWearOps({ equipment: eq, inventory: inv, itemRarities: rarities, partKey: event.partKey, severity: getHitSeverityKey(event.dmg, part ? part.maxHp : 0, event.isCrit, event.justDisabled), absorbed: event.absorbed });
         }
         else if (event.type === 'block') {
-            ops = buildHeroBlockWearOps({ equipment: eq, inventory: inv, itemRarities, enemyTier: event.enemyTier });
+            ops = buildHeroBlockWearOps({ equipment: eq, inventory: inv, itemRarities: rarities, enemyTier: event.enemyTier });
         }
         if (ops.length === 0)
             return { allyGearWear: allWear, log: [] };
         const nextWear = addGearWear(wear, ops);
-        const broken = findNewlyBrokenItems(base, itemRarities, wear, nextWear, ops.map(o => o.name));
+        const broken = findNewlyBrokenItems(base, rarities, wear, nextWear, ops.map(o => o.name));
         return {
             allyGearWear: { ...allWear, [key]: nextWear },
             log: broken.map(name => ({ text: t('durabilityBrokenAllyLog').replace('{item}', name).replace('{owner}', ally.name), kind: 'effect' }))
@@ -43442,7 +43615,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             log.push({ text: enemy.enemyName + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' });
         if (moraleBreak)
             log.push({ text: enemy.enemyName + ' — ' + t(moraleBreak === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' });
-        const wornNow = wearEnemyGear(enemy, { type: 'hit', partKey, dmg, isCrit: false, justDisabled, partMaxHp: targetState.maxHp }, t);
+        const wornNow = wearEnemyGear(enemy, { type: 'hit', partKey, dmg, absorbed, isCrit: false, justDisabled, partMaxHp: targetState.maxHp }, t);
         wornNow.log.forEach(l => log.push(l));
         return { parts, armorPools, dmg, partLabel, justDisabled, defeated, morale, moraleBreak, defended: null, gearWear: wornNow.gearWear, log };
     }
@@ -43460,8 +43633,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const entries = [
             { type: 'hero', initiative: gameState.stats.initiative + computeEquipmentInitiativeModifier(equipment, gameState.inventory) },
             ...allies.map(a => {
-                const key = a.name.trim().toLowerCase();
-                return { type: 'ally', id: a.id, initiative: a.stats.initiative + computeEquipmentInitiativeModifier(partyEquipment[key], partyInventories[key]) };
+                const load = getAllyLoadout(a);
+                return { type: 'ally', id: a.id, initiative: a.stats.initiative + computeEquipmentInitiativeModifier(load.equipment, load.inventory) };
             }),
             ...enemies.map(e => ({ type: 'enemy', id: e.id, initiative: e.initiative }))
         ];
@@ -43637,6 +43810,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     //    swing, where distance/cover never apply) — multiplies the attacker's
     //    hit chance only; the defender's own dodge/block/parry roll is
     //    unaffected by how far away the shot came from.
+    //  - isRanged: true when the attack is a shot (bow/crossbow/gun, a ranged
+    //    enemy's volley, a friendly-fire arrow). A shot can't be parried — a
+    //    parry is a blade-on-blade deflection — so 'parry' is dropped from the
+    //    defender's roll order (and therefore no riposte either). Dodge and
+    //    block are unaffected.
     // Returns { parts: <defender's updated parts>, riposteDamage, log: [...],
     // resultKind, dmg, partKey, partLabel, justDisabled, stunApplied } —
     // riposteDamage (0 if none) is the caller's job to apply back to the
@@ -43646,7 +43824,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // combat-arena hit/block/miss/stun animations and floating callouts (see
     // CombatModal's fx effect) rather than for any game-logic use —
     // resultKind is 'miss' | 'dodged' | 'blocked' | 'parried' | 'hit' | 'vital'.
-    function resolveOneAttack(attacker, defender, t, rangedHitMult, forceCrit) {
+    function resolveOneAttack(attacker, defender, t, rangedHitMult, forceCrit, isRanged) {
         const partKey = pickEnemyTargetPart(defender.parts);
         const part = BODY_PARTS.find(p => p.key === partKey);
         const targetState = defender.parts[partKey];
@@ -43676,9 +43854,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const poolKey = armorPoolKeyForPart(partKey);
             const curPool = Math.max(0, (defender.armorPools && defender.armorPools.cur && defender.armorPools.cur[poolKey]) || 0);
             const armored = curPool > 0 && !attacker.armorPiercing;
-            let dmg, armorJustBroke = false, armorPoolNext = null;
+            let dmg, armorJustBroke = false, armorPoolNext = null, absorbedDmg = 0;
             if (armored) {
                 const absorbed = Math.min(curPool, rawDmg);
+                absorbedDmg = absorbed;
                 dmg = rawDmg - absorbed;
                 const nextPool = curPool - absorbed;
                 armorJustBroke = nextPool <= 0;
@@ -43713,7 +43892,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // the enemy as gearWear.
             let enemyGearWear;
             if (defender.gearRef) {
-                const w = wearEnemyGear(defender.gearRef, { type: 'hit', partKey, dmg, isCrit: rolled.isCrit, justDisabled, partMaxHp: targetState.maxHp }, t);
+                const w = wearEnemyGear(defender.gearRef, { type: 'hit', partKey, dmg, absorbed: absorbedDmg, isCrit: rolled.isCrit, justDisabled, partMaxHp: targetState.maxHp }, t);
                 enemyGearWear = w.gearWear;
                 w.log.forEach(l => log.push(l));
             }
@@ -43733,7 +43912,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     log.push({ text: defender.name + ' — ' + t(moraleBreak === 'surrender' ? 'combatLogEnemySurrenderText' : 'combatLogEnemyFleeText'), kind: 'defended' });
                 }
             }
-            return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied, isCrit: rolled.isCrit, morale, moraleBreak, armorPoolKey: poolKey, armorPoolNext, enemyGearWear };
+            return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied, isCrit: rolled.isCrit, morale, moraleBreak, armorPoolKey: poolKey, armorPoolNext, enemyGearWear, absorbed: absorbedDmg };
         }
         // Player-side defender (hero or ally): automatic dodge/block/parry —
         // same full/partial/fail math and riposte-on-full-parry the manual
@@ -43759,7 +43938,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return { parts: defender.parts, riposteDamage: 0, log, defeated: false, resultKind: 'resilience', dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null, guaranteedBlockConsumed: true };
         }
         const availability = defender.defenseAvailability;
-        const defenseOrder = getAutoDefenseOrder(availability);
+        const defenseOrder = getAutoDefenseOrder(availability).filter(k => !(isRanged && k === 'parry'));
         // Either one of dodge / block / parry succeeds (checked in that order,
         // the first success ends the sequence) or the hit simply lands as a
         // normal hit — no separate "defense failed" state. A guaranteed
@@ -43798,10 +43977,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const poolKey = armorPoolKeyForPart(partKey);
         const curPool = Math.max(0, (defender.armorPools && defender.armorPools.cur && defender.armorPools.cur[poolKey]) || 0);
         const armored = curPool > 0 && !attacker.armorPiercing;
-        let dmg, armorPoolKey = null, armorPoolNext = null, armorJustBroke = false;
+        let dmg, armorPoolKey = null, armorPoolNext = null, armorJustBroke = false, absorbedDmg = 0;
         const rawDmg = Math.max(1, Math.round(softenedDmg));
         if (armored) {
             const absorbed = Math.min(curPool, rawDmg);
+            absorbedDmg = absorbed;
             dmg = rawDmg - absorbed;
             armorPoolKey = poolKey;
             const nextPool = curPool - absorbed;
@@ -43851,10 +44031,20 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             attackerGearWear = w.gearWear;
             w.log.forEach(l => log.push(l));
         }
-        return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied, isCrit: rolled.isCrit, morale, moraleBreak: null, armorPoolKey, armorPoolNext, attackerGearWear };
+        return { parts, riposteDamage: 0, log, defeated, resultKind: defeated ? 'vital' : 'hit', dmg, partKey, partLabel, justDisabled, stunApplied, isCrit: rolled.isCrit, morale, moraleBreak: null, armorPoolKey, armorPoolNext, attackerGearWear, absorbed: absorbedDmg };
     }
     // Builds the attacker/defender descriptor resolveOneAttack expects for
     // whichever of the three combatant kinds is acting/being hit right now.
+    // An archer/crossbowman locked in melee (see getActiveLockPartner) can't
+    // draw at point-blank range — they can only throw a fist (firearms are
+    // exempt, see isBowWeaponName). Swaps the
+    // actor's weapon for bare hands; the caller also skips weapon wear and
+    // passes isRanged=false so no ranged rules (hit mult, line block, parry
+    // immunity) apply to the punch. A future weapon-swap-from-inventory
+    // system can replace this by equipping a melee weapon instead.
+    function asUnarmedActor(actor) {
+        return { ...actor, weaponDamage: UNARMED_DAMAGE, weaponLabel: t('combatUnarmedLabel'), armorPiercing: false };
+    }
     function makeHeroActor(mods, wear) {
         const weaponInfo = getPlayerWeaponInfo(wear);
         return { name: heroName || t('combatYouLabel'), parts: null, agility: gameState.stats.agility, power: gameState.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: !!weaponInfo.armorPiercing, mods, isEnemy: false };
@@ -43868,17 +44058,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         return { name: heroName || t('combatYouLabel'), parts, isEnemy: false, agility: gameState.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getPlayerDefenseForPart(k, wear), weaponDamage: getPlayerWeaponInfo(wear).damage, armorPiercing: !!getPlayerWeaponInfo(wear).armorPiercing, mods, guaranteedBlock: !!guaranteedBlock, armorPools: { cur: armorCur || { body: 0, head: 0 } } };
     }
     function makeAllyActor(ally, mods, wear) {
-        const key = ally.name.trim().toLowerCase();
-        const weaponInfo = getWeaponInfoForLoadout(partyEquipment[key], overlayGearWear(partyInventories[key] || [], wear, itemRarities), t('combatUnarmedLabel'));
+        const load = getAllyLoadout(ally);
+        const weaponInfo = getWeaponInfoForLoadout(load.equipment, overlayGearWear(load.inventory, wear, load.itemRarities), t('combatUnarmedLabel'), load.itemRarities);
         return { name: ally.name, parts: null, agility: ally.stats.agility, power: ally.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: !!weaponInfo.armorPiercing, mods, isEnemy: false };
     }
     function makeAllyDefender(ally, mods, wear) {
-        const key = ally.name.trim().toLowerCase();
-        const eq = partyEquipment[key] || EMPTY_EQUIPMENT;
-        const inv = overlayGearWear(partyInventories[key] || [], wear, itemRarities);
-        const availability = computeDefenseAvailability(eq, inv, itemRarities);
-        const weaponInfo = getWeaponInfoForLoadout(eq, inv, t('combatUnarmedLabel'));
-        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k), weaponDamage: weaponInfo.damage, armorPiercing: !!weaponInfo.armorPiercing, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart, armorPools: { cur: (ally.armorPools && ally.armorPools.cur) || { body: 0, head: 0 } } };
+        const load = getAllyLoadout(ally);
+        const eq = load.equipment;
+        const inv = overlayGearWear(load.inventory, wear, load.itemRarities);
+        const availability = computeDefenseAvailability(eq, inv, load.itemRarities);
+        const weaponInfo = getWeaponInfoForLoadout(eq, inv, t('combatUnarmedLabel'), load.itemRarities);
+        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k, load.itemRarities), weaponDamage: weaponInfo.damage, armorPiercing: !!weaponInfo.armorPiercing, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart, armorPools: { cur: (ally.armorPools && ally.armorPools.cur) || { body: 0, head: 0 } } };
     }
     // powerMult (optional): a one-off multiplier for a single buffed swing —
     // see runAutoTurn's boss-tier "power surge" turn — layered on top of, not
@@ -43930,7 +44120,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return makeHeroActor(computeHeroMods(gameState, state.abilityState, heroPartsHealthRatio(state.heroParts)), state.gearWear);
         if (who.type === 'ally') {
             const ally = state.allies.find(a => a.id === who.id);
-            return makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), (state.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+            return makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(state, ally));
         }
         return makeEnemyActor(state.enemies.find(e => e.id === who.id));
     }
@@ -43939,7 +44129,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return makeHeroDefender(state.heroParts, computeHeroMods(gameState, state.abilityState), state.gearWear, state.abilityState && state.abilityState.resilienceActive, state.heroArmorCur);
         if (who.type === 'ally') {
             const ally = state.allies.find(a => a.id === who.id);
-            return makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name), (state.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+            return makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(state, ally));
         }
         return makeEnemyDefender(state.enemies.find(e => e.id === who.id), state.enemies);
     }
@@ -44035,7 +44225,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 let gearWear = state.gearWear || {};
                 if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
                     const hitPart = state.heroParts[outcome.partKey];
-                    const w = heroHitWear(gearWear, outcome.partKey, outcome.dmg, outcome.isCrit, outcome.justDisabled, hitPart ? hitPart.maxHp : 0);
+                    const w = heroHitWear(gearWear, outcome.partKey, outcome.dmg, outcome.isCrit, outcome.justDisabled, hitPart ? hitPart.maxHp : 0, outcome.absorbed);
                     gearWear = w.gearWear;
                     log = [...log, ...w.log];
                 }
@@ -44067,7 +44257,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const allyBefore = state.allies.find(a => a.id === mover.id);
                 let allyGearWear = state.allyGearWear || {};
                 if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
-                    const w = applyAllyWear(state, allyBefore, { type: 'hit', partKey: outcome.partKey, dmg: outcome.dmg, isCrit: outcome.isCrit, justDisabled: outcome.justDisabled });
+                    const w = applyAllyWear(state, allyBefore, { type: 'hit', partKey: outcome.partKey, dmg: outcome.dmg, absorbed: outcome.absorbed, isCrit: outcome.isCrit, justDisabled: outcome.justDisabled });
                     allyGearWear = w.allyGearWear;
                     log = [...log, ...w.log];
                 }
@@ -44152,11 +44342,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const ally = combat.allies.find(a => a.id === current.id);
         if (!ally)
             return BASE_MOVEMENT_RANGE;
-        const key = ally.name.trim().toLowerCase();
-        const allyEquipment = partyEquipment[key] || EMPTY_EQUIPMENT;
-        const allyInventory = partyInventories[key] || [];
+        const load = getAllyLoadout(ally);
+        const allyEquipment = load.equipment;
+        const allyInventory = load.inventory;
         const totalWeight = computeTotalWeight(allyInventory);
-        const capacity = computeCarryCapacity(ally.stats.strength, allyEquipment, itemRarities);
+        const capacity = computeCarryCapacity(ally.stats.strength, allyEquipment, load.itemRarities);
         return computeMovementRange({ isOverweight: totalWeight > capacity, heavyArmor: isHeavyArmorEquipped(allyEquipment, allyInventory) });
     }
     // Moving instead of attacking (see CombatModal's move-mode toggle and
@@ -44328,7 +44518,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             defenderKey = 'enemy:' + blocker.id;
         }
         else if (blocker.type === 'ally') {
-            defender = makeAllyDefender(blocker.ally, computeAllyMods(gameState.npcs, blocker.ally.name), allyGearWear[blocker.ally.name.trim().toLowerCase()]);
+            defender = makeAllyDefender(blocker.ally, computeAllyMods(gameState.npcs, blocker.ally.name), allyWearOf({ allyGearWear }, blocker.ally));
             defenderKey = 'ally:' + blocker.id;
         }
         else {
@@ -44336,7 +44526,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             defender = makeHeroDefender(heroParts, heroMods, gearWear, prev.abilityState && prev.abilityState.resilienceActive, prev.heroArmorCur);
             defenderKey = 'hero:hero';
         }
-        const outcome = resolveOneAttack(actor, defender, t, mult, false);
+        const outcome = resolveOneAttack(actor, defender, t, mult, false, true); // a friendly-fire shot is always ranged
         log = [...log, ...outcome.log];
         const landed = outcome.resultKind === 'hit' || outcome.resultKind === 'vital';
         let result = null, killedBy = null;
@@ -44358,7 +44548,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         else if (blocker.type === 'ally') {
             const ally = blocker.ally;
             if (landed) {
-                const w = applyAllyWear(prev, ally, { type: 'hit', partKey: outcome.partKey, dmg: outcome.dmg, isCrit: outcome.isCrit, justDisabled: outcome.justDisabled });
+                const w = applyAllyWear(prev, ally, { type: 'hit', partKey: outcome.partKey, dmg: outcome.dmg, absorbed: outcome.absorbed, isCrit: outcome.isCrit, justDisabled: outcome.justDisabled });
                 allyGearWear = w.allyGearWear;
                 log = [...log, ...w.log];
             }
@@ -44379,7 +44569,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 abilityState = { ...prev.abilityState, resilienceActive: false };
             if (landed) {
                 const hitPart = heroParts[outcome.partKey];
-                const w = heroHitWear(gearWear, outcome.partKey, outcome.dmg, outcome.isCrit, outcome.justDisabled, hitPart ? hitPart.maxHp : 0);
+                const w = heroHitWear(gearWear, outcome.partKey, outcome.dmg, outcome.isCrit, outcome.justDisabled, hitPart ? hitPart.maxHp : 0, outcome.absorbed);
                 gearWear = w.gearWear;
                 log = [...log, ...w.log];
             }
@@ -44431,9 +44621,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const ally = prev.allies.find(a => a.id === current.id);
                 if (!ally || !ally.playerControlled || ally.routing || isAllyOut(ally))
                     return prev;
-                const allyKey = ally.name.trim().toLowerCase();
-                const allyWeaponType = getLoadoutWeaponType(partyEquipment[allyKey] || EMPTY_EQUIPMENT, partyInventories[allyKey] || []);
-                const allyIsRanged = allyWeaponType === 'ranged';
+                const allyLoad = getAllyLoadout(ally);
+                const allyWeaponType = getLoadoutWeaponType(allyLoad.equipment, allyLoad.inventory);
+                // Locked in melee: a bow/crossbow can't be drawn — the companion
+                // punches instead. Firearms still fire point-blank.
+                const allyLockedShooter = allyWeaponType === 'ranged' && isBowLoadout(allyLoad.equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
+                const allyIsRanged = allyWeaponType === 'ranged' && !allyLockedShooter;
                 if (!allyIsRanged && chebyshevDistance(ally.pos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                     return prev;
                 {
@@ -44456,14 +44649,16 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const allyRangedMult = allyIsRanged ? computeRangedHitMultiplier(ally.pos, enemy.pos, prev.coverCells) : 1;
                 let log = lineBlockLog ? [...prev.log, lineBlockLog] : prev.log;
-                const attacker = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+                const attacker = allyLockedShooter
+                    ? asUnarmedActor(makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally)))
+                    : makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally));
                 if (friendlyBlocker)
                     return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, friendlyBlocker, log);
                 const forceCrit = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + enemy.id, ally.pos, enemy.pos);
-                const outcome = resolveOneAttack(attacker, makeEnemyDefender(enemy, prev.enemies), t, allyRangedMult, forceCrit);
+                const outcome = resolveOneAttack(attacker, makeEnemyDefender(enemy, prev.enemies), t, allyRangedMult, forceCrit, allyIsRanged);
                 log = [...log, ...outcome.log];
                 let allyGearWear = prev.allyGearWear || {};
-                if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
+                if (!allyLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
                     const w = applyAllyWear(prev, ally, { type: 'strike' });
                     allyGearWear = w.allyGearWear;
                     log = [...log, ...w.log];
@@ -44481,7 +44676,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const defenderKey = 'enemy:' + enemyId;
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: allyIsRanged, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 const locks = deriveLocksAfterAction(prev, 'ally:' + ally.id, defenderKey);
                 if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
@@ -44490,7 +44685,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (current.type !== 'hero')
                 return prev;
             const heroWeaponType = getLoadoutWeaponType(equipment, gameState.inventory);
-            const heroIsRanged = heroWeaponType === 'ranged';
+            // Locked in melee: a bow/crossbow can't be drawn — the hero punches
+            // instead. Firearms (rifle, автомат...) still fire point-blank.
+            const heroLockedShooter = heroWeaponType === 'ranged' && isBowLoadout(equipment) && !!getActiveLockPartner(prev, 'hero:hero');
+            const heroIsRanged = heroWeaponType === 'ranged' && !heroLockedShooter;
             if (!heroIsRanged && chebyshevDistance(prev.heroPos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                 return prev;
             {
@@ -44535,12 +44733,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     }
                 }
             }
-            const attacker = makeHeroActor(mods, prev.gearWear);
+            const attacker = heroLockedShooter ? asUnarmedActor(makeHeroActor(mods, prev.gearWear)) : makeHeroActor(mods, prev.gearWear);
             if (friendlyBlocker)
                 return applyFriendlyFireShot(prev, { type: 'hero', id: 'hero', pos: prev.heroPos, actor: attacker }, friendlyBlocker, log, heroParts);
             const defender = makeEnemyDefender(enemy, prev.enemies);
             const forceCrit = isBackstabOnLocked(prev, 'hero:hero', 'enemy:' + enemy.id, prev.heroPos, enemy.pos);
-            const outcome = resolveOneAttack(attacker, defender, t, heroRangedMult, forceCrit);
+            const outcome = resolveOneAttack(attacker, defender, t, heroRangedMult, forceCrit, heroIsRanged);
             // `mods.damageMultiplier` above (unconditionally, as long as it's
             // unspent this fight) so the hit-line damage above already reflects
             // it — this just tags the log and marks it spent, and only for a
@@ -44553,7 +44751,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // A landed strike wears the weapon(s) in hand — more against a tough
             // enemy, less against a weak one. Misses wear nothing.
             let gearWear = prev.gearWear || {};
-            if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
+            if (!heroLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
                 const invNow = overlayGearWear(gameState.inventory, gearWear, itemRarities);
                 const w = applyHeroWearOps(gearWear, buildHeroStrikeWearOps({ equipment, inventory: invNow, itemRarities }));
                 gearWear = w.gearWear;
@@ -44572,7 +44770,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             const defenderKey = 'enemy:' + enemyId;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: heroIsRanged, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
             const locks = deriveLocksAfterAction(prev, 'hero:hero', defenderKey);
             if (enemies.every(isEnemyOut)) {
                 return { ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'victory' };
@@ -45014,7 +45212,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         log = [...log, { text: ally.name + ': ' + partLabel + ' ' + t('combatPartDisabledSuffix'), kind: 'disabled' }];
                     }
                     // An unopposed punish hit still wears the companion's armor/cloak/jewelry.
-                    const punishWear = applyAllyWear(prev, ally, { type: 'hit', partKey, dmg, isCrit: rolled.isCrit, justDisabled });
+                    const punishWear = applyAllyWear(prev, ally, { type: 'hit', partKey, dmg, absorbed, isCrit: rolled.isCrit, justDisabled });
                     log = [...log, ...punishWear.log];
                     return advanceTurn({ ...prev, allies: punishedAllies, log, allyGearWear: punishWear.allyGearWear });
                 }
@@ -45069,13 +45267,16 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     || pickLivingTarget(prev.enemies, isEnemyOut);
                 if (!target)
                     return { ...prev, log, result: 'victory' };
-                const attacker = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+                // Locked in melee with a bow/crossbow in hand: punch instead of shooting.
+                const aiAllyLockedShooter = isBowLoadout(getAllyLoadout(ally).equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
+                const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally));
+                const attacker = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
                 const forceCrit4 = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + target.id, ally.pos, target.pos);
-                const outcome = resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t, undefined, forceCrit4);
+                const outcome = resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t, undefined, forceCrit4, false); // AI allies only ever swing at melee-reachable targets
                 log = [...log, ...outcome.log];
                 // A landed strike wears the companion's weapon(s), same as the hero's.
                 let allyGearWear = prev.allyGearWear || {};
-                if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
+                if (!aiAllyLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
                     const w = applyAllyWear(prev, ally, { type: 'strike' });
                     allyGearWear = w.allyGearWear;
                     log = [...log, ...w.log];
@@ -45093,7 +45294,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const defenderKey = 'enemy:' + target.id;
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ...(aiAllyLockedShooter ? { ranged: false } : {}), attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 const locks = deriveLocksAfterAction(prev, 'ally:' + ally.id, defenderKey);
                 if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
@@ -45376,10 +45577,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const vulnerableFriends = prev.enemies.filter(e => !isEnemyOut(e) && e.id !== enemy.id && (e.role === 'ranged' || e.role === 'caster') && e.pos);
             const initialTargetChoice = pickBestTarget(targets, tg => {
                 const hpFraction = tg.kind === 'hero' ? heroPartsHealthRatio(prev.heroParts) : hpFractionOfParts(tg.ally.parts);
-                const allyKeyForTg = tg.kind === 'ally' ? tg.ally.name.trim().toLowerCase() : null;
                 const squishy = tg.kind === 'hero'
                     ? getLoadoutWeaponType(equipment, gameState.inventory) === 'ranged'
-                    : getLoadoutWeaponType(partyEquipment[allyKeyForTg] || EMPTY_EQUIPMENT, partyInventories[allyKeyForTg] || []) === 'ranged';
+                    : (() => { const l = getAllyLoadout(tg.ally); return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged'; })();
                 const protectBonus = vulnerableFriends.some(v => chebyshevDistance(tg.pos, v.pos) <= MELEE_ATTACK_MAX_DISTANCE);
                 return scoreCombatTarget({ hpFraction, squishy, protectBonus }, { role: enemy.role, tierRank: ENEMY_TIER_RANKS[enemy.tier] });
             });
@@ -45387,9 +45587,15 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // right on the shooter's line, may take the shot instead (see
             // findLineBlocker) — the redirected target replaces the choice for
             // everything below (hit roll, wear, animation).
+            // Locked in melee: an archer/crossbowman can't draw at point-blank
+            // range — it punches its lock partner instead (no line-of-fire
+            // redirect, no aimed-shot bonus, no ranged rules on the blow). A
+            // firearm user keeps shooting.
+            const enemyIsShooter = enemy.role === 'ranged' || getEnemyWeaponType(enemy) === 'ranged';
+            const enemyPunching = enemyIsShooter && isEnemyBowUser(enemy) && !!getActiveLockPartner(prev, 'enemy:' + enemy.id);
             let targetChoice = initialTargetChoice;
             let friendlyBlocker = null;
-            if (enemy.role === 'ranged' && enemy.pos) {
+            if (enemy.role === 'ranged' && enemy.pos && !enemyPunching) {
                 const origIsHero = initialTargetChoice.kind === 'hero';
                 const blocker = rollLineBlockRedirect(prev, { type: 'enemy', id: enemy.id }, enemy.pos, origIsHero ? { type: 'hero', id: 'hero' } : { type: 'ally', id: initialTargetChoice.ally.id }, initialTargetChoice.pos);
                 if (blocker) {
@@ -45405,22 +45611,28 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // "power surge" swing instead (see COMBAT_TUNING.bossPowerSurge*) —
             // both fold into the same power multiplier passed to makeEnemyActor,
             // which also layers in the standing enrage bonus if it's enraged.
-            const roleDmgMult = (enemy.role === 'ranged' && enemy.engaged) ? ENEMY_ROLES.ranged.engagedDamageMult : 1;
+            const roleDmgMult = (enemy.role === 'ranged' && (enemy.engaged || enemyPunching)) ? ENEMY_ROLES.ranged.engagedDamageMult : 1;
             let powerSurgeMult = 1;
             if (isBossTier && Math.random() * 100 < COMBAT_TUNING.bossPowerSurgeChance) {
                 powerSurgeMult = COMBAT_TUNING.bossPowerSurgeMult;
                 log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogBossPowerSurgeText'), kind: 'effect' }];
             }
+            if (enemyPunching)
+                steadyAimMult = 1;
             if (steadyAimMult > 1)
                 log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogAimedShotText'), kind: 'defended' }];
-            const attacker = makeEnemyActor(enemy, roleDmgMult * powerSurgeMult);
+            const attacker = enemyPunching
+                ? { ...makeEnemyActor(enemy, roleDmgMult * powerSurgeMult), weaponLabel: t('combatUnarmedLabel'), armorPiercing: false }
+                : makeEnemyActor(enemy, roleDmgMult * powerSurgeMult);
+            // A ranged-role enemy, or anyone actually wielding a bow/gun, is firing — its shot can't be parried. A locked archer only punches.
+            const enemyShotIsRanged = enemyIsShooter && !enemyPunching;
             if (friendlyBlocker)
                 return applyFriendlyFireShot(prev, { type: 'enemy', id: enemy.id, pos: enemy.pos, actor: attacker }, friendlyBlocker, log);
             if (targetChoice.kind === 'hero') {
                 const heroMods = computeHeroMods(gameState, prev.abilityState);
                 const defender = makeHeroDefender(prev.heroParts, heroMods, prev.gearWear, prev.abilityState && prev.abilityState.resilienceActive, prev.heroArmorCur);
                 const forceCrit5 = isBackstabOnLocked(prev, 'enemy:' + enemy.id, 'hero:hero', enemy.pos, prev.heroPos);
-                const outcome = resolveOneAttack(attacker, defender, t, (enemy.role === 'ranged' ? computeRangedHitMultiplier(enemy.pos, prev.heroPos, prev.coverCells) * steadyAimMult : 1), forceCrit5);
+                const outcome = resolveOneAttack(attacker, defender, t, (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, prev.heroPos, prev.coverCells) * steadyAimMult : 1), forceCrit5, enemyShotIsRanged);
                 const heroArmorCur = outcome.armorPoolNext || prev.heroArmorCur;
                 // check): once it's actually eaten the one hit it was activated
                 // for, clear resilienceActive so the very next incoming hit goes
@@ -45433,7 +45645,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 let gearWear = prev.gearWear || {};
                 if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
                     const hitPart = prev.heroParts[outcome.partKey];
-                    const w = heroHitWear(gearWear, outcome.partKey, outcome.dmg, outcome.isCrit, outcome.justDisabled, hitPart ? hitPart.maxHp : 0);
+                    const w = heroHitWear(gearWear, outcome.partKey, outcome.dmg, outcome.isCrit, outcome.justDisabled, hitPart ? hitPart.maxHp : 0, outcome.absorbed);
                     gearWear = w.gearWear;
                     log = [...log, ...w.log];
                 }
@@ -45466,7 +45678,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogBleedInflictedText'), kind: 'effect' }];
                 }
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: enemyShotIsRanged, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 const locks = deriveLocksAfterAction(prev, 'enemy:' + enemy.id, 'hero:hero');
                 if (outcome.defeated)
                     return { ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'death', killedBy: enemy.enemyName };
@@ -45475,13 +45687,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 return advanceTurn({ ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks });
             }
             const ally = targetChoice.ally;
-            const defender = makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name), (prev.allyGearWear || {})[ally.name.trim().toLowerCase()]);
+            const defender = makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally));
             const forceCrit6 = isBackstabOnLocked(prev, 'enemy:' + enemy.id, 'ally:' + ally.id, enemy.pos, ally.pos);
-            const outcome = resolveOneAttack(attacker, defender, t, (enemy.role === 'ranged' ? computeRangedHitMultiplier(enemy.pos, ally.pos, prev.coverCells) * steadyAimMult : 1), forceCrit6);
+            const outcome = resolveOneAttack(attacker, defender, t, (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, ally.pos, prev.coverCells) * steadyAimMult : 1), forceCrit6, enemyShotIsRanged);
             // cloak/jewelry, a shield block wears the shield; misses/dodges/parries nothing.
             let allyGearWear = prev.allyGearWear || {};
             if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
-                const w = applyAllyWear(prev, ally, { type: 'hit', partKey: outcome.partKey, dmg: outcome.dmg, isCrit: outcome.isCrit, justDisabled: outcome.justDisabled });
+                const w = applyAllyWear(prev, ally, { type: 'hit', partKey: outcome.partKey, dmg: outcome.dmg, absorbed: outcome.absorbed, isCrit: outcome.isCrit, justDisabled: outcome.justDisabled });
                 allyGearWear = w.allyGearWear;
                 log = [...log, ...w.log];
             }
@@ -45510,7 +45722,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             const defenderKey = 'ally:' + ally.id;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: enemyShotIsRanged, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
             const locks = deriveLocksAfterAction(prev, 'enemy:' + enemy.id, defenderKey);
             if (enemies.every(isEnemyOut))
                 return { ...prev, allies, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
@@ -46604,7 +46816,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // could then "resolve" in prose). The engine's own auto-continue after a
         // fight passes a base whose source narrator is already combatResolved.
         if (isCombatPendingInMessages(base)) {
-            setError(t('combatPendingInputBlocked'));
             return;
         }
         const precedingNarrator = base.length > 0 && base[base.length - 1].role === 'narrator'
@@ -46934,7 +47145,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         }
         // Checked before the input is cleared so the typed text isn't lost.
         if (isCombatPendingInMessages(messages)) {
-            setError(t('combatPendingInputBlocked'));
             return;
         }
         const unresolved = [...getUnresolvedItemOffers(), ...getUnresolvedQuestOffers(), ...getUnresolvedTravelOffer()];
@@ -47629,7 +47839,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                                 React.createElement("button", { onClick: openExportModal, className: "btn btn-ghost", type: "button" }, t('exportHeaderButton')),
                                 React.createElement("button", { onClick: () => setRestartConfirmOpen(true), className: "btn btn-primary", type: "button" }, t('restartButton'))))) : (React.createElement("div", { className: "input-row" },
                             React.createElement("input", { value: input, onChange: e => setInput(e.target.value), onKeyDown: e => { if (e.key === 'Enter' && !loading)
-                                    handleSend(); }, placeholder: combatBlocksInput ? t('combatPendingInputBlocked') : t('actionPlaceholder'), disabled: loading || combatBlocksInput, className: "text-field action-input" }),
+                                    handleSend(); }, placeholder: t('actionPlaceholder'), disabled: loading || combatBlocksInput, className: "text-field action-input" }),
                             React.createElement("button", { onClick: openDirectorModal, disabled: loading, className: "btn btn-ghost director-btn", type: "button", "aria-label": t('directorBtnAria') }, "\uD83D\uDCDD"),
                             React.createElement("button", { onClick: handleSend, disabled: loading || combatBlocksInput || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
@@ -47645,9 +47855,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: viewedState, equipment: viewedEquipment, itemRarities: viewedItemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: isLatestTurn ? openEquipPicker : undefined, onOpenItemDetail: openItemDetailFromEquipment, onEquip: isLatestTurn ? equipItemInSlot : undefined, onUnequip: isLatestTurn ? unequipSlot : undefined, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
-        combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroWeaponType: getLoadoutWeaponType(equipment, gameState.inventory), allyWeaponTypes: Object.fromEntries((combat.allies || []).map(a => {
+        combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroWeaponType: getLoadoutWeaponType(equipment, gameState.inventory), heroBow: isBowLoadout(equipment), allyBows: Object.fromEntries((combat.allies || []).map(a => {
                 const k = a.name.trim().toLowerCase();
-                return [k, getLoadoutWeaponType(partyEquipment[k], partyInventories[k] || [])];
+                return [k, isBowLoadout(getAllyLoadout(a).equipment)];
+            })), allyWeaponTypes: Object.fromEntries((combat.allies || []).map(a => {
+                const k = a.name.trim().toLowerCase();
+                const l = getAllyLoadout(a);
+                return [k, getLoadoutWeaponType(l.equipment, l.inventory)];
             })), introActive: combatIntroActive, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
         talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, onLearn: isLatestTurn ? learnTalent : undefined, onClose: () => setTalentTreeModalOpen(false), t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
