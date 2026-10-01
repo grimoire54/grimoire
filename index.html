@@ -21344,46 +21344,35 @@ function rollStartingItemRarity() {
 // tiers far less winnable than lower ones even in an otherwise "fair"
 // same-tier match. These ranges instead hold to roughly 15-33% of the
 // matched weapon tier's damage throughout, weak through legendary.
-// RETUNED: enemy armor now sits on the same scale as hero gear
-// (ARMOR_DEFENSE_BY_RARITY 50..300): every armored enemy has at least 50,
-// and the top tiers may exceed 300 (legendary up to 500). The older note
-// above describes the previous 1..20 scale.
+// Enemy armor is no longer a stat of the tier at all: it comes from the gear
+// the enemy wears (see rollEnemyArmorGear / rollEnemyInventory), on exactly
+// the same scale and formulas as the hero's own armor. The older note above
+// describes a previous, tier-based armor stat that no longer exists.
 const ENEMY_TIERS = {
-    weak: { hp: [10, 34], power: [3, 6], precision: [3, 6], initiative: [3, 6], armor: [50, 100] },
-    average: { hp: [35, 69], power: [7, 13], precision: [7, 13], initiative: [7, 13], armor: [75, 160] },
-    strong: { hp: [70, 149], power: [14, 24], precision: [14, 24], initiative: [14, 24], armor: [110, 230] },
-    exceptional: { hp: [150, 399], power: [25, 54], precision: [25, 54], initiative: [25, 54], armor: [170, 350] },
-    legendary: { hp: [400, 1000], power: [55, 100], precision: [55, 100], initiative: [55, 100], armor: [250, 500] }
+    weak: { hp: [10, 34], power: [7, 10], precision: [7, 10], initiative: [7, 10] },
+    average: { hp: [35, 69], power: [10, 14], precision: [10, 14], initiative: [10, 14] },
+    strong: { hp: [70, 149], power: [14, 19], precision: [14, 19], initiative: [14, 19] },
+    exceptional: { hp: [150, 399], power: [19, 26], precision: [19, 26], initiative: [19, 26] },
+    legendary: { hp: [400, 1000], power: [26, 36], precision: [26, 36], initiative: [26, 36] }
 };
+// power/precision/initiative are on the HERO'S OWN stat scale (ordinary
+// person ~10, see EMPTY_STATE and the stats calibration in the state prompt;
+// 0.02 weapon damage per point of power, 1.2% hit chance per point of
+// precision). They used to run up to 100, which multiplied a legendary
+// enemy's weapon x2.8 and gave it a >100% hit chance — something no hero's
+// stats ever reach. Weak foes sit just under the hero's baseline, a
+// legendary one is a clearly exceptional (but humanly plausible) fighter.
 // ---- ENEMY ARMOR LOADOUT — random gear count/quality, by rank -----------
-// An enemy never carries a real per-slot inventory the way the hero/allies
-// do (see ARMOR_POOL_SLOTS/partyEquipment) — but unlike the version of this
-// system that shipped earlier, gear is no longer purely cosmetic either.
-// Previously ENEMY_TIERS.armor was rolled on its own and the procedural
-// loadout below only decided how that fixed number was SPLIT between the
-// helmet and body portrait bars — two enemies at the same tier and the same
-// rolled total could show a totally different "outfit" (one ratty piece vs
-// a full set) for identical defense. Now the loadout comes first: each of
-// the 4 physical armor slots (helmet/armor/gloves/boots — see
-// ARMOR_SLOT_PROTECTION) is its own independent roll, so there's no more
-// artificial cap at 1-3 body pieces — a bare enemy and a complete four-piece
-// set are both reachable at any rank — each worn piece's quality is rolled
-// off ENEMY_ARMOR_LOADOUT_RARITIES same as before, and the pieces' REAL
-// defense values (via the exact getArmorDefenseForSlot the hero/allies' own
-// gear reads off) are summed to see how this enemy actually turned out
-// dressed. That raw sum is then rescaled to fill ENEMY_TIERS.armor's own
-// [min,max] band for this tier (see rollEnemyArmorPools) rather than used
-// directly, so the weapon-tier-vs-ENEMY_TIERS.armor win-rate simulation
-// documented above ARMOR_DEFENSE_BY_RARITY stays valid — a mythic four-piece
-// set is 260 raw, which would otherwise dwarf even legendary's old ceiling
-// of 20. The practical effect: a bare-handed enemy sits at this tier's
-// tuned armor floor, a best-in-tier full set sits at its tuned ceiling, and
-// everything in between scales smoothly with exactly what's equipped — gear
-// now genuinely determines the stat, not just how it's drawn. Whatever
-// total that lands on, the ENEMY still only ever mitigates that one number
-// per hit (see resolveOneAttack's `defender.isEnemy` branch, which reads the
-// flat `armor` field) — only the portrait bars visualize the head/body
-// split, never separate math.
+// A humanoid enemy (and an ally that isn't a party member) wears a real
+// loadout: each of the 4 physical armor slots (helmet/armor/gloves/boots —
+// see ARMOR_SLOT_PROTECTION) is its own independent roll (rollEnemyArmorGear),
+// the pieces become a real inventory (rollEnemyInventory), and its armor
+// pools / total are computed FROM that inventory with the hero's own
+// functions (computeHeroArmorPoolMaxes / computeTotalArmorDefense). The tier
+// only decides how likely each slot is and how good the pieces tend to be —
+// there is no per-tier armor stat to rescale into. Only the portrait bars
+// split the pool into head/body; combat math reads the same pools as for
+// the hero.
 const ENEMY_ARMOR_LOADOUT_RARITIES = ['junk', 'common', 'uncommon', 'rare', 'unique', 'mythic'];
 // Per tier: independent presence odds for each physical armor slot (the 3
 // body slots — armor/gloves/boots — share one figure; helmet gets its own,
@@ -21398,14 +21387,14 @@ const ENEMY_ARMOR_LOADOUT_BY_TIER = {
     weak: { bodyChance: 0.25, helmetChance: 0.15, rarityCenter: 0 },
     average: { bodyChance: 0.40, helmetChance: 0.30, rarityCenter: 1 },
     strong: { bodyChance: 0.55, helmetChance: 0.50, rarityCenter: 2 },
-    exceptional: { bodyChance: 0.75, helmetChance: 0.70, rarityCenter: 4 },
+    exceptional: { bodyChance: 0.75, helmetChance: 0.70, rarityCenter: 3 },
     legendary: { bodyChance: 0.90, helmetChance: 0.85, rarityCenter: 5 }
 };
 function rollEnemyArmorRarity(center) {
     const idx = Math.max(0, Math.min(ENEMY_ARMOR_LOADOUT_RARITIES.length - 1, Math.round(center + (Math.random() * 3 - 1.5))));
     return ENEMY_ARMOR_LOADOUT_RARITIES[idx];
 }
-// The raw ceiling rollEnemyArmorPools rescales against: a full four-slot
+// The ceiling used for the old-save fallback dodge estimate: a full four-slot
 // set at roughly the best quality this tier's rarityCenter plausibly rolls
 // (center+1, clamped — see rollEnemyArmorRarity's spread). Reads
 // ARMOR_DEFENSE_BY_RARITY directly (defined further down the file, same as
@@ -21415,40 +21404,32 @@ function enemyArmorLoadoutCeiling(center) {
     const topRarity = ENEMY_ARMOR_LOADOUT_RARITIES[Math.min(ENEMY_ARMOR_LOADOUT_RARITIES.length - 1, center + 1)];
     return 4 * (ARMOR_DEFENSE_BY_RARITY[topRarity] || ARMOR_DEFENSE_BY_RARITY.common);
 }
-// Rolls this enemy's actual loadout, then both derives its total armor FROM
-// that loadout and splits it across the helmet/body portrait pools — see
-// the note above. Returns {head:{max,cur}, body:{max,cur}, total} in the
-// exact same head/body shape CombatPortrait/resolveOneAttack already read
-// off the hero's own armorPools, head+body always summing back to `total`.
-function rollEnemyArmorPools(tierKey) {
+// Rolls which armor pieces (and of what rarity) a humanoid of this tier wears.
+// This is the ONLY thing the tier decides about armor: the pieces themselves
+// are turned into a real inventory by rollEnemyInventory, and the armor
+// pools / total are then computed from that inventory with the very same
+// functions the hero uses (computeHeroArmorPoolMaxes / computeTotalArmorDefense)
+// — nothing is rescaled or looked up per tier any more.
+function rollEnemyArmorGear(tierKey) {
     const cfg = ENEMY_ARMOR_LOADOUT_BY_TIER[tierKey] || ENEMY_ARMOR_LOADOUT_BY_TIER.average;
-    const tier = ENEMY_TIERS[tierKey] || ENEMY_TIERS.average;
-    const bodySlotKeys = ['armor', 'gloves', 'boots'];
-    let bodyWeight = 0;
-    // The pieces themselves are kept (gear) so the enemy's real inventory can
-    // be built from exactly what was rolled here — see rollEnemyInventory.
     const gear = [];
-    bodySlotKeys.forEach(slot => {
-        if (Math.random() < cfg.bodyChance) {
-            const rarity = rollEnemyArmorRarity(cfg.rarityCenter);
-            gear.push({ slot, rarity });
-            bodyWeight += getArmorDefenseForSlot(slot, rarity) || 0;
-        }
+    ['armor', 'gloves', 'boots'].forEach(slot => {
+        if (Math.random() < cfg.bodyChance)
+            gear.push({ slot, rarity: rollEnemyArmorRarity(cfg.rarityCenter) });
     });
-    const hasHelmet = Math.random() < cfg.helmetChance;
-    let headWeight = 0;
-    if (hasHelmet) {
-        const helmetRarity = rollEnemyArmorRarity(cfg.rarityCenter);
-        gear.push({ slot: 'helmet', rarity: helmetRarity });
-        headWeight = getArmorDefenseForSlot('helmet', helmetRarity) || 0;
-    }
-    const gearRaw = headWeight + bodyWeight;
-    const ceiling = enemyArmorLoadoutCeiling(cfg.rarityCenter);
-    const fraction = ceiling > 0 ? Math.min(1, gearRaw / ceiling) : 0;
-    const total = Math.round(tier.armor[0] + fraction * (tier.armor[1] - tier.armor[0]));
-    const headMax = gearRaw > 0 ? Math.round(total * headWeight / gearRaw) : 0;
-    const bodyMax = Math.max(0, total - headMax);
-    return { head: { max: headMax, cur: headMax }, body: { max: bodyMax, cur: bodyMax }, total, gear };
+    if (Math.random() < cfg.helmetChance)
+        gear.push({ slot: 'helmet', rarity: rollEnemyArmorRarity(cfg.rarityCenter) });
+    return gear;
+}
+// Armor pools of an enemy computed from the pieces it ACTUALLY wears — the
+// exact same computeHeroArmorPoolMaxes the hero and party members use
+// (rarity + weight class + per-copy statRoll + set bonus). Returns the enemy
+// shape {head:{max,cur}, body:{max,cur}, total}.
+function enemyArmorPoolsFromLoadout(loadout, bonusMult) {
+    const m = typeof bonusMult === 'number' ? bonusMult : 1;
+    const mx = computeHeroArmorPoolMaxes(loadout.equipment, loadout.inventory, loadout.itemRarities);
+    const head = Math.round(mx.head * m), body = Math.round(mx.body * m);
+    return { head: { max: head, cur: head }, body: { max: body, cur: body }, total: head + body };
 }
 // ---- ENEMY KIND — humanoid vs animal / monster / behemoth -----------------
 // Every enemy is tagged with a "kind" alongside its "tier"/"role" (see the
@@ -21483,14 +21464,11 @@ function rollEnemyStatsForTier(tierKey, kind) {
     const tier = ENEMY_TIERS[tierKey] || ENEMY_TIERS.average;
     const rollRange = ([min, max]) => Math.round(min + Math.random() * (max - min));
     // A non-'humanoid' kind never carries armor (see ENEMY_KINDS above) — skip
-    // the whole loadout roll rather than dressing a wolf in a helmet nobody
-    // will ever see. A caller that doesn't pass a kind at all (allies — see
-    // makeAllyCombatant) keeps rolling armor exactly as it always has.
-    const rolledPools = (kind && kind !== ENEMY_KIND_DEFAULT)
-        ? { head: { max: 0, cur: 0 }, body: { max: 0, cur: 0 }, total: 0, gear: [] }
-        : rollEnemyArmorPools(tierKey);
-    const { gear: armorGear, ...armorPools } = rolledPools;
-    return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armor: armorPools.total, armorPools, armorGear };
+    // the gear roll rather than dressing a wolf in a helmet nobody will ever
+    // see. A caller that doesn't pass a kind at all (allies — see
+    // makeAllyCombatant) is a humanoid and gets a gear roll like one.
+    const armorGear = (kind && kind !== ENEMY_KIND_DEFAULT) ? [] : rollEnemyArmorGear(tierKey);
+    return { totalHp: rollRange(tier.hp), power: rollRange(tier.power), precision: rollRange(tier.precision), initiative: rollRange(tier.initiative), armorGear };
 }
 // Every enemy the model generates (see the COMBAT event schema) is tagged
 // with a "role" alongside its "tier" — this is what actually makes that tag
@@ -24342,8 +24320,6 @@ const COMBAT_TUNING = {
     // the dmg >= 1 floor already applied after variance/crit.
     damageMultiplierMin: 0.3,
     damageMultiplierMax: 4,
-    enemyDamageBase: 5, // enemies carry no inventory/rarity, so their damage scales off "power" alone —
-    enemyDamagePowerScale: 1.0, // calibrated so an ordinary enemy (power ~10) hits about as hard as a common one-handed weapon
     hpScale: 2, // multiplies narrative health (1-1000, ordinary ~50) into a combat HP pool sized to match weapon damage — see the calibration note above WEAPON_DAMAGE_BY_RARITY
     // Block's own base % now comes from the equipped shield/two-handed
     // weapon's rarity (see BLOCK_CHANCE_BY_RARITY/getBlockChanceForItem)
@@ -24381,7 +24357,7 @@ const COMBAT_TUNING = {
     // and the roll itself is weighted toward the middle (two averaged rolls)
     // rather than a flat uniform spread, so wild low/high outliers are rarer
     // and a crit reads as a distinct spike rather than blending into ordinary
-    // variance. See computeWeaponDamage/computeEnemyDamage.
+    // variance. See computeWeaponDamage.
     damageVarianceBase: 0.3, // variance fraction at "ordinary" (baseline) precision
     damageVarianceMinFraction: 0.5, // variance never shrinks below this fraction of the base, however precise the attacker
     damageVariancePrecisionScale: 0.01, // variance fraction reduced per point of attacker precision above baseline
@@ -24587,8 +24563,11 @@ const WEAPON_DAMAGE_BY_RARITY = {
 // flag (or anything other than literal true) means false: full raw damage
 // still gets through to anything unarmored or already-broken, it just never
 // bypasses armor that's actually intact.
-// RETUNED: base defense now runs from 50 (junk) to 300 (mythic) in smoothly
-// widening steps (+30/+40/+50/+60/+70). Armor durability == defense, so armor
+// RETUNED (again): base defense now runs from 50 (junk) to 150 (mythic) in
+// smoothly widening steps (+12/+16/+20/+24/+28). Mythic 150 is the medium
+// base; a heavy mythic piece (x1.35) lands at ~203, and a lucky statRoll
+// (+-15%) pushes it to ~234 at most — i.e. "about 200, a bit more if you
+// roll well". Previously 50..300 (+30/+40/+50/+60/+70). Armor durability == defense, so armor
 // pools grow with it; SET_BONUS_DEFENSE_BY_TIER below is scaled to match.
 // (The older note below describes the previous 2..65 scale.)
 // Worn armor's flat damage reduction per hit, by rarity tier — roughly
@@ -24601,11 +24580,11 @@ const WEAPON_DAMAGE_BY_RARITY = {
 // fix. A hit always deals at least 1 regardless of armor.
 const ARMOR_DEFENSE_BY_RARITY = {
     junk: 50,
-    common: 80,
-    uncommon: 120,
-    rare: 170,
-    unique: 230,
-    mythic: 300
+    common: 62,
+    uncommon: 78,
+    rare: 98,
+    unique: 122,
+    mythic: 150
 };
 // Which body part(s) each armor slot protects. Only slots that are
 // physically protective gear are listed — amulet/rings are accessories,
@@ -25570,12 +25549,12 @@ function computeEnemyDefenseAvailability(enemy) {
 // weapon text and armor pools instead.
 function computeEnemyDefenseAvailabilityFromTier(enemy) {
     const tierKey = ENEMY_TIERS[enemy.tier] ? enemy.tier : 'average';
-    const tier = ENEMY_TIERS[tierKey];
     const cfg = ENEMY_ARMOR_LOADOUT_BY_TIER[tierKey] || ENEMY_ARMOR_LOADOUT_BY_TIER.average;
     const rarity = ENEMY_ARMOR_LOADOUT_RARITIES[cfg.rarityCenter] || 'common';
     const isHumanoid = !enemy.kind || enemy.kind === ENEMY_KIND_DEFAULT;
     const armorTotal = (enemy.armorPools && enemy.armorPools.total) || 0;
-    const armorFraction = tier.armor[1] > 0 ? Math.min(1, armorTotal / tier.armor[1]) : 0;
+    const armorCeiling = enemyArmorLoadoutCeiling(cfg.rarityCenter);
+    const armorFraction = armorCeiling > 0 ? Math.min(1, armorTotal / armorCeiling) : 0;
     const dodgeTop = Object.values(DODGE_SLOT_MYTHIC_BASE).reduce((s, v) => s + v, 0);
     const dodgeFull = Math.min(DODGE_CHANCE_MAX, Math.round(dodgeTop * (DODGE_RARITY_STEP[rarity] || 2) / 6));
     const canDodge = armorFraction < 0.6;
@@ -25701,8 +25680,8 @@ const SET_ELIGIBLE_SLOTS = ['helmet', 'armor', 'gloves', 'boots'];
 // of ARMOR_DEFENSE_BY_RARITY for the 4-piece tier — a complete matched set
 // effectively doubles that piece's own defense.
 const SET_BONUS_DEFENSE_BY_TIER = {
-    2: { junk: 0, common: 40, uncommon: 60, rare: 85, unique: 115, mythic: 150 },
-    4: { junk: 0, common: 80, uncommon: 120, rare: 170, unique: 230, mythic: 300 }
+    2: { junk: 0, common: 31, uncommon: 39, rare: 49, unique: 61, mythic: 75 },
+    4: { junk: 0, common: 62, uncommon: 78, rare: 98, unique: 122, mythic: 150 }
 };
 function extractSetStems(name) {
     if (!name)
@@ -26782,7 +26761,7 @@ function normalizeEnemyBodyParts(raw) {
 // lowercase name -> rarity), so every defense helper written for the player
 // side (computeDefenseAvailability -> block/parry/dodge, heavy armor locking
 // out dodge) works on it unchanged. Built ONCE at spawn from what was already
-// rolled: the armor pieces from rollEnemyArmorPools, and the weapon/shield
+// rolled: the armor pieces from rollEnemyArmorGear, and the weapon/shield
 // from weaponDescription. Non-humanoid kinds get an empty loadout.
 const ENEMY_HEAVY_ARMOR_CHANCE_BY_TIER = { weak: 0.05, average: 0.15, strong: 0.3, exceptional: 0.5, legendary: 0.6 };
 const ENEMY_GEAR_NAMES = {
@@ -26880,18 +26859,17 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
     // fight (see resolveOneAttack) is the one final number, not something
     // that gets rescaled (and silently reinflated) build after build.
     const bonusMult = role === 'tank' ? (1 + ENEMY_ROLES.tank.armorBonusPct / 100) : 1;
-    const armorPools = bonusMult === 1 ? rolled.armorPools : {
-        head: { max: Math.round(rolled.armorPools.head.max * bonusMult), cur: Math.round(rolled.armorPools.head.cur * bonusMult) },
-        body: { max: Math.round(rolled.armorPools.body.max * bonusMult), cur: Math.round(rolled.armorPools.body.cur * bonusMult) },
-        total: Math.round(rolled.armorPools.total * bonusMult)
-    };
+    // Gear first, armor second: the pools are derived from the pieces the enemy
+    // really wears (same formula as the hero), not from ENEMY_TIERS.armor.
+    const ownLoadout = rollEnemyInventory(tier, kind, rolled.armorGear, weaponDescription, enemyName);
+    const armorPools = enemyArmorPoolsFromLoadout(ownLoadout, bonusMult);
     return {
         id, enemyName,
         enemyDescription: typeof spec.enemyDescription === 'string' ? spec.enemyDescription.trim() : '',
         weaponDescription, tier, role, kind, damageResist, fearless, armorPiercing,
         totalHp: rolled.totalHp, power: rolled.power, precision: rolled.precision,
         initiative: rolled.initiative, armor: armorPools.total, armorPools,
-        ...rollEnemyInventory(tier, kind, rolled.armorGear, weaponDescription, enemyName),
+        ...ownLoadout,
         bodyParts: normalizeEnemyBodyParts(spec.bodyParts)
     };
 }
@@ -27501,7 +27479,7 @@ function computeHitChance(part, attackerPrecision, mods) {
 // Flat per-hit chance for a landed attack (hero, ally, or enemy alike — the
 // roll itself is symmetric, only the resulting numbers differ by who's
 // swinging) to come down as a critical strike — see COMBAT_TUNING.critChance/
-// critMultiplier and computeWeaponDamage/computeEnemyDamage below, which are
+// critMultiplier and computeWeaponDamage below, which is
 // what actually apply the multiplier.
 function rollCritical(bonus) {
     return Math.random() * 100 < COMBAT_TUNING.critChance + (bonus || 0);
@@ -27547,17 +27525,20 @@ function computeWeaponDamage(weaponDamage, attackerPower, mods, attackerPrecisio
     const isCrit = forceCrit || rollCritical(mods ? mods.critChanceDelta : 0);
     return { dmg: Math.max(1, Math.round(isCrit ? raw * COMBAT_TUNING.critMultiplier : raw)), isCrit };
 }
-// An enemy's damage: enemies carry no inventory/rarity, so their hits scale
-// directly off their generated "power" stat instead, calibrated so an
-// ordinary opponent (power ~10) hits about as hard as a common one-handed
-// weapon (see WEAPON_DAMAGE_BY_RARITY). Same { dmg, isCrit } shape as
-// computeWeaponDamage, for the same reason.
-function computeEnemyDamage(enemyPower, enemyPrecision, forceCrit) {
-    const base = COMBAT_TUNING.enemyDamageBase + enemyPower * COMBAT_TUNING.enemyDamagePowerScale;
-    const variance = base * damageVarianceFraction(enemyPrecision);
-    const raw = base + rollVarianceFactor() * variance;
-    const isCrit = forceCrit || rollCritical();
-    return { dmg: Math.max(1, Math.round(isCrit ? raw * COMBAT_TUNING.critMultiplier : raw)), isCrit };
+// What an enemy swings with. A humanoid with a real loadout (the usual case)
+// uses the weapon it actually wields — the very same getWeaponInfoForLoadout
+// the hero and allies go through — so this is only the fallback for a
+// creature that carries no gear (animal / monster / behemoth, or an enemy
+// restored from a save that predates enemy inventories): its natural weapon
+// (claws, fangs, a tail) is rated like a weapon of the rarity its tier
+// typically wields (ENEMY_ARMOR_LOADOUT_BY_TIER.rarityCenter), a behemoth's
+// doubled the way a two-hander's is. Either way the damage then goes through
+// computeWeaponDamage with the creature's power, exactly like a hero's.
+function naturalWeaponDamage(enemy) {
+    const cfg = ENEMY_ARMOR_LOADOUT_BY_TIER[enemy && enemy.tier] || ENEMY_ARMOR_LOADOUT_BY_TIER.average;
+    const rarity = ENEMY_ARMOR_LOADOUT_RARITIES[cfg.rarityCenter] || 'common';
+    const base = WEAPON_DAMAGE_BY_RARITY[rarity] || WEAPON_DAMAGE_BY_RARITY.common;
+    return enemy && enemy.kind === 'behemoth' ? base * 2 : base;
 }
 // blockChanceBase is the equipped shield/two-handed weapon's own rarity-
 // scaled block rating (see getBlockChanceForItem/computeDefenseAvailability)
@@ -44990,14 +44971,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
             if (!npc || !(npc.health > 0))
                 return null;
-            const armor = computeTotalArmorDefense(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
             // Same per-fight head/body armor pools as the hero (see
             // computeHeroArmorPoolMaxes) — opens every fight at full, drains as it
             // soaks up hits (see resolveOneAttack), same full-block-until-broken
             // rule. max is fixed for the fight (portrait bar denominator); cur is
             // what actually drains.
-            const allyArmorMax = computeHeroArmorPoolMaxes(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
-            const armorPools = { max: allyArmorMax, cur: allyArmorMax };
+            const { armor, armorPools } = allyArmorFromLoadout(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
             // Party members track morale the same way enemies do (see
             // COMBAT_TUNING's morale* block) — the hero never does (no
             // makeHeroDefender.morale field), only companions. A companion whose
@@ -45085,44 +45064,53 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             g.inventory = g.inventory.map(it => (it.slot === 'weapon' && !it.shield) ? { ...it, armorPiercing: true } : it);
         return g;
     }
+    // The one place an ally's armor numbers come from — party member, tracked
+    // NPC or anonymous reinforcement alike: the total and the head/body pools
+    // are computed from the pieces in the given loadout (equipment + inventory
+    // + rarities), exactly like the hero's. Pools open every fight full.
+    function allyArmorFromLoadout(equipmentObj, inventoryList, rarities) {
+        const max = computeHeroArmorPoolMaxes(equipmentObj, inventoryList, rarities);
+        return { armor: computeTotalArmorDefense(equipmentObj || EMPTY_EQUIPMENT, inventoryList || [], rarities), armorPools: { max, cur: { ...max } } };
+    }
     function makeAllyCombatant(raw, id) {
-        if (raw && typeof raw.npcName === 'string' && raw.npcName.trim()) {
-            const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === raw.npcName.trim().toLowerCase());
-            if (npc && npc.health > 0 && npc.stats) {
-                const key = npc.name.trim().toLowerCase();
-                const armor = computeTotalArmorDefense(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
-                const allyArmorMax = computeHeroArmorPoolMaxes(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
-                const armorPools = { max: allyArmorMax, cur: allyArmorMax };
-                return { id, name: npc.name, stats: npc.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts: buildCombatantParts(npc.health, npc.maxHealth), armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false };
-            }
-            const rolled = rollEnemyStatsForTier('average');
-            const name = npc ? npc.name : raw.npcName.trim();
-            return {
-                id, name,
-                stats: { strength: rolled.power, agility: rolled.precision, intelligence: 0, initiative: rolled.initiative },
-                originalHealth: rolled.totalHp, originalMaxHealth: rolled.totalHp,
-                parts: buildCombatantParts(rolled.totalHp, rolled.totalHp),
-                // makeAllyDefender expects ally.armorPools.cur as a flat {head,body}
-                // map (same shape buildAllyCombatants/the hero use) — rollEnemyStatsForTier
-                // hands back the nested {max,cur} shape enemies use instead, so flatten it here.
-                armor: rolled.armor, armorPools: { max: { head: rolled.armorPools.head.max, body: rolled.armorPools.body.max }, cur: { head: rolled.armorPools.head.cur, body: rolled.armorPools.body.cur } }, morale: COMBAT_TUNING.moraleStart, playerControlled: false,
-                ownGear: rollAllyOwnGear('average', rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing)
-            };
+        const isNamedNpc = !!(raw && typeof raw.npcName === 'string' && raw.npcName.trim());
+        const npcRecord = isNamedNpc ? (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === raw.npcName.trim().toLowerCase()) : null;
+        // Tracked NPC that already has real stats/health: those numbers are kept.
+        if (npcRecord && npcRecord.health > 0 && npcRecord.stats) {
+            const npc = npcRecord;
+            const key = npc.name.trim().toLowerCase();
+            // Gear: their party loadout if they have one, otherwise a rolled
+            // loadout of their own (ownGear — see getAllyLoadout), the same way an
+            // enemy or an anonymous reinforcement gets it. Never bare-handed just
+            // because nobody handed them anything.
+            const hasPartyGear = !!(partyEquipment[key] || partyInventories[key]);
+            const ownGear = hasPartyGear ? undefined : rollAllyOwnGear('average', rollEnemyArmorGear('average'), npc.name, raw.weaponDescription, raw.armorPiercing);
+            const load = ownGear || { equipment: partyEquipment[key], inventory: partyInventories[key], itemRarities };
+            const { armor, armorPools } = allyArmorFromLoadout(load.equipment, load.inventory, load.itemRarities);
+            return { id, name: npc.name, stats: npc.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts: buildCombatantParts(npc.health, npc.maxHealth), armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false, ...(ownGear ? { ownGear } : {}) };
         }
-        const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : t('combatReinforcementAllyFallbackName');
-        const tier = ENEMY_TIERS[raw.tier] ? raw.tier : 'average';
+        // Everyone else is rolled exactly like an enemy of that tier: stats from
+        // the tier, gear from rollEnemyInventory, armor from that gear. A named
+        // NPC without tracked stats keeps their real name (average tier).
+        const name = isNamedNpc
+            ? (npcRecord ? npcRecord.name : raw.npcName.trim())
+            : (typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : t('combatReinforcementAllyFallbackName'));
+        const tier = !isNamedNpc && ENEMY_TIERS[raw.tier] ? raw.tier : 'average';
         const rolled = rollEnemyStatsForTier(tier);
+        const ownGear = rollAllyOwnGear(tier, rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing);
+        const { armor, armorPools } = allyArmorFromLoadout(ownGear.equipment, ownGear.inventory, ownGear.itemRarities);
         return {
             id, name,
             stats: { strength: rolled.power, agility: rolled.precision, intelligence: 0, initiative: rolled.initiative },
             originalHealth: rolled.totalHp, originalMaxHealth: rolled.totalHp,
             parts: buildCombatantParts(rolled.totalHp, rolled.totalHp),
-            // Same flattening as the npcName branch above — see its comment.
-            armor: rolled.armor, armorPools: { max: { head: rolled.armorPools.head.max, body: rolled.armorPools.body.max }, cur: { head: rolled.armorPools.head.cur, body: rolled.armorPools.body.cur } }, morale: COMBAT_TUNING.moraleStart, playerControlled: false,
-            ownGear: rollAllyOwnGear(tier, rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing),
-            weaponDescription: typeof raw.weaponDescription === 'string' ? raw.weaponDescription.trim() : '',
-            armorPiercing: raw.armorPiercing === true,
-            anonymousReinforcement: true
+            armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false,
+            ownGear,
+            ...(isNamedNpc ? {} : {
+                weaponDescription: typeof raw.weaponDescription === 'string' ? raw.weaponDescription.trim() : '',
+                armorPiercing: raw.armorPiercing === true,
+                anonymousReinforcement: true
+            })
         };
     }
     // Runs once, the moment a fight actually starts (see startCombat/
@@ -45852,7 +45840,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const hitChance = clampPercent(computeHitChance(part, attacker.agility, attacker.mods) * (typeof rangedHitMult === 'number' ? rangedHitMult : 1));
         // A guaranteed backstab (see isBackstabOnLocked) skips the hit roll
         // outright, same reasoning as forceCrit in computeWeaponDamage/
-        // computeEnemyDamage below — "guaranteed" means guaranteed, not just a
+        // computeWeaponDamage below — "guaranteed" means guaranteed, not just a
         // very favorable roll.
         const hit = forceCrit || (Math.random() * 100 < hitChance);
         if (!hit) {
@@ -45862,7 +45850,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // Enemies get no defense roll against an ordinary hit (dodge/block/parry
         // there is a player-side mechanic) — only against a parry's riposte, see
         // applyRiposteDamage/computeEnemyDefenseAvailability. Their rolled gear (see
-        // ENEMY_TIERS/rollEnemyArmorPools) still guards the part(s) it covers
+        // rollEnemyArmorGear/rollEnemyInventory) still guards the part(s) it covers
         // the exact same way — a full block on that part, worn down hit by
         // hit, for as long as the relevant pool (head or body) still has any
         // charge left, and no reduction at all once it's gone or against an
@@ -45983,7 +45971,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             return { parts: defender.parts, riposteDamage, riposteArmorPiercing: !!defender.armorPiercing, log, defeated: false, resultKind, dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null };
         }
-        const rolled = computeEnemyDamage(attacker.power, attacker.agility, forceCrit);
+        const rolled = computeWeaponDamage(attacker.weaponDamage, attacker.power, attacker.mods, attacker.agility, forceCrit);
         const softenedDmg = rolled.dmg;
         // ---- Armor pools (see computeHeroArmorPoolMaxes' comment) — every
         // defender now carries one (hero, ally, and — above — enemy alike): the
@@ -46095,15 +46083,26 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     function makeEnemyActor(enemy, powerMult) {
         // Boss-tier enrage (see COMBAT_TUNING.enrageHpThreshold/runAutoTurn) is a
         // standing buff for the rest of the fight once triggered; powerMult is a
-        // separate, single-turn buff from a "power surge" action. Both can stack.
+        // separate, single-turn buff from a "power surge" (or a penalty from a
+        // ranged enemy firing while engaged). Both can stack, and both go through
+        // mods.damageMultiplier — the same channel a hero's adrenaline/exhaustion
+        // uses — instead of inflating the strength stat itself.
         const enrageMult = enemy.enraged ? COMBAT_TUNING.enragePowerMult : 1;
         const precisionMult = enemy.enraged ? COMBAT_TUNING.enragePrecisionMult : 1;
-        const totalPowerMult = enrageMult * (typeof powerMult === 'number' ? powerMult : 1);
-        return { name: enemy.enemyName, parts: null, agility: Math.round(enemy.precision * precisionMult), power: Math.round(enemy.power * totalPowerMult), weaponDamage: null, weaponLabel: enemy.weaponDescription, armorPiercing: enemy.armorPiercing === true, mods: aggregateEffectModifiers([]), isEnemy: false, gearRef: enemy };
+        const totalDamageMult = enrageMult * (typeof powerMult === 'number' ? powerMult : 1);
+        // A humanoid with a real loadout swings what it wields (same helper as
+        // hero/allies); a creature without gear uses its natural weapon.
+        let weapon = null;
+        if (enemy.equipment && enemy.inventory && (!enemy.kind || enemy.kind === ENEMY_KIND_DEFAULT)) {
+            const rar = enemy.itemRarities || {};
+            weapon = getWeaponInfoForLoadout(enemy.equipment, overlayGearWear(enemy.inventory, enemy.gearWear, rar), enemy.weaponDescription || t('combatUnarmedLabel'), rar);
+        }
+        const mods = { ...aggregateEffectModifiers([]), damageMultiplier: clampDamageMultiplier(totalDamageMult) };
+        return { name: enemy.enemyName, parts: null, agility: Math.round(enemy.precision * precisionMult), power: enemy.power, weaponDamage: weapon ? weapon.damage : naturalWeaponDamage(enemy), weaponLabel: weapon ? weapon.label : enemy.weaponDescription, armorPiercing: enemy.armorPiercing === true || !!(weapon && weapon.armorPiercing), mods, isEnemy: false, gearRef: enemy };
     }
     function makeEnemyDefender(enemy, enemies) {
         // Every physical armor piece an enemy rolled on spawn (see
-        // rollEnemyArmorPools/rollEnemyFromSpec, which already bakes a tank's
+        // enemyArmorPoolsFromLoadout/rollEnemyFromSpec, which already bakes a tank's
         // armor bonus permanently into these numbers) comes as a head/body pool
         // exactly like the hero's own. It just went unused for the actual hit
         // math before (only its flat `.total` was read) — now it drives the
@@ -46528,11 +46527,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const shooterKey = shooter.type === 'hero' ? 'hero:hero' : shooter.type + ':' + shooter.id;
         let defender, defenderKey;
         if (blocker.type === 'enemy') {
-            if (shooter.type === 'enemy') {
-                // makeEnemyActor carries no weaponDamage (its hits normally go through
-                // computeEnemyDamage) — give it an equivalent one for the enemy-defender math.
-                actor = { ...actor, weaponDamage: COMBAT_TUNING.enemyDamageBase + actor.power * COMBAT_TUNING.enemyDamagePowerScale, power: COMBAT_TUNING.powerBaseline };
-            }
             defender = makeEnemyDefender(blocker.enemy, prev.enemies);
             defenderKey = 'enemy:' + blocker.id;
         }
@@ -47204,7 +47198,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     const part = BODY_PARTS.find(p => p.key === partKey);
                     const partLabel = t(part.labelKey);
                     const targetState = ally.parts[partKey];
-                    const rolled = computeEnemyDamage(punisher.power, punisher.precision);
+                    const punisherActor = makeEnemyActor(punisher);
+                    const rolled = computeWeaponDamage(punisherActor.weaponDamage, punisherActor.power, punisherActor.mods, punisherActor.agility);
                     // Same full-block-until-broken armor as an ordinary landed hit
                     // (see resolveOneAttack) — an unopposed punish hit still has to
                     // get past whichever pool guards the part it happened to land on.
@@ -47641,7 +47636,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (steadyAimMult > 1)
                 log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogAimedShotText'), kind: 'defended' }];
             const attacker = enemyPunching
-                ? { ...makeEnemyActor(enemy, roleDmgMult * powerSurgeMult), weaponLabel: t('combatUnarmedLabel'), armorPiercing: false }
+                ? asUnarmedActor(makeEnemyActor(enemy, roleDmgMult * powerSurgeMult))
                 : makeEnemyActor(enemy, roleDmgMult * powerSurgeMult);
             // A ranged-role enemy, or anyone actually wielding a bow/gun, is firing — its shot can't be parried. A locked archer only punches.
             const enemyShotIsRanged = enemyIsShooter && !enemyPunching;
