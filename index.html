@@ -13,6 +13,12 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0c0a09; }
   #root { min-height: 100vh; }
+  /* Same bouncing dots as the in-game "thinking" indicator (grim-dot-bounce). */
+  .boot-dots span { display: inline-block; animation: grim-dot-bounce 1.2s infinite ease-in-out; color: #fbbf24; font-size: 1.1rem; }
+  .boot-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .boot-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .boot-dots span { animation: none !important; } }
 </style>
 <script>
 // React 19 + ReactDOM + Scheduler, bundled inline so the app has zero
@@ -17249,7 +17255,16 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
     });
   })();
 </script>
-<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em">Гримуар — загрузка…</div></div>
+<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em"><span>Grimoire RPG - <span id="boot-word">loading</span></span><span class="boot-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div></div>
+<script>
+  // Boot note wording follows the system language: Russian UI -> "загрузка", anything else -> "loading".
+  (function () {
+    var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+    var ru = /^ru\b/i.test(String(langs[0] || ''));
+    var w = document.getElementById('boot-word');
+    if (w) w.textContent = ru ? 'загрузка' : 'loading';
+  })();
+</script>
 <script>
   // Minimal localStorage-backed stand-in for the window.storage API that
   // Claude.ai artifacts provide. grimoire.jsx was written against that
@@ -17360,6 +17375,46 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
 // object instead of an ES import — everything else below is untouched by
 // the precompile step except JSX syntax itself.
 const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
+// ----------------------------------------------------------------------------
+// Boot screen ("Grimoire RPG - загрузка...") — lives in the JSX on purpose.
+// The placeholder #boot-note sits in index.html's <div id="root">, outside the
+// compiled app, so a freshly built index.html wrapper would otherwise bring
+// back the old plain text. This runs as soon as the app script loads and
+// upgrades the placeholder: "Grimoire RPG - загрузка" for a Russian system
+// language, "Grimoire RPG - loading" for anything else, with the same bouncing
+// dots as the in-game "thinking" indicator. Idempotent (skips a placeholder
+// that already has .boot-dots) and a no-op where there is no #boot-note
+// (e.g. when this file runs as an artifact). React replaces the node on mount.
+(function upgradeBootNote() {
+    try {
+        const note = document.getElementById('boot-note');
+        if (!note || note.querySelector('.boot-dots'))
+            return;
+        if (!document.getElementById('boot-dots-style')) {
+            const st = document.createElement('style');
+            st.id = 'boot-dots-style';
+            st.textContent =
+                '.boot-dots span { display: inline-block; animation: grim-dot-bounce 1.2s infinite ease-in-out; color: #fbbf24; font-size: 1.1rem; }' +
+                    '.boot-dots span:nth-child(2) { animation-delay: 0.15s; }' +
+                    '.boot-dots span:nth-child(3) { animation-delay: 0.3s; }' +
+                    '@keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }' +
+                    '@media (prefers-reduced-motion: reduce) { .boot-dots span { animation: none !important; } }';
+            document.head.appendChild(st);
+        }
+        const langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+        const ru = /^ru\b/i.test(String(langs[0] || ''));
+        note.textContent = '';
+        const label = document.createElement('span');
+        label.textContent = 'Grimoire RPG - ' + (ru ? 'загрузка' : 'loading');
+        const dots = document.createElement('span');
+        dots.className = 'boot-dots';
+        dots.setAttribute('aria-hidden', 'true');
+        dots.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+        note.appendChild(label);
+        note.appendChild(dots);
+    }
+    catch (e) { /* cosmetic only — never block startup */ }
+})();
 // ============================================================================
 // Grimoire RPG — file map
 // ----------------------------------------------------------------------------
@@ -17668,6 +17723,19 @@ const TRANSLATIONS = {
         abilityDesc_intimidation: 'Одним взглядом подрывает боевой дух всех врагов разом.',
         abilityName_secondWind: 'Второе дыхание',
         abilityDesc_secondWind: 'Раз в бой можно немедленно восстановить часть здоровья прямо в разгар боя.',
+        abilityName_gunSmg: 'Автомат: очередь',
+        abilityDesc_gunSmg: 'Очередь из трёх пуль по выбранной цели. Выберите способность, затем тапните по врагу.',
+        abilityName_gunSmgSuppress: 'Автомат: подавление',
+        abilityDesc_gunSmgSuppress: 'Три очереди подряд с короткими паузами — шквал огня по цели.',
+        abilityName_gunPistol: 'Пистолет',
+        abilityDesc_gunPistol: 'Одиночный прицельный выстрел из пистолета.',
+        abilityName_gunDual: 'Два пистолета',
+        abilityDesc_gunDual: 'Залп из двух пистолетов, по одному в каждой руке.',
+        abilityName_gunEnergy: 'Энерговинтовка: очередь',
+        abilityDesc_gunEnergy: 'Очередь из трёх энергетических зарядов по выбранной цели.',
+        abilityName_gunEnergySuppress: 'Энерговинтовка: подавление',
+        abilityDesc_gunEnergySuppress: 'Три очереди энергозарядов подряд с короткими паузами.',
+        abilityFreqUnlimited: 'без ограничений',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Таланты',
         talentsTitle: 'Таланты',
@@ -17951,6 +18019,7 @@ const TRANSLATIONS = {
         // -- Combat: active abilities (see ABILITY_DEFS/onUseAbility) --
         combatAbilityReadyHint: 'готово',
         combatAbilityUsedHint: 'использовано в этом бою',
+        combatAbilityArmedHint: 'выбрана — тапните по цели',
         combatAbilityCooldownHint: 'перезарядка: {n}',
         combatLogBloodlustText: 'Жажда крови усиливает первый удар',
         combatLogResilienceActivateText: 'собирается поглотить следующий удар',
@@ -18438,6 +18507,19 @@ const TRANSLATIONS = {
         abilityDesc_intimidation: "A single glance shakes every enemy's resolve at once.",
         abilityName_secondWind: 'Second Wind',
         abilityDesc_secondWind: 'Once per fight, instantly recover part of your health mid-battle.',
+        abilityName_gunSmg: 'SMG: Burst',
+        abilityDesc_gunSmg: 'A three-round burst at the chosen target. Pick the ability, then tap an enemy.',
+        abilityName_gunSmgSuppress: 'SMG: Suppression',
+        abilityDesc_gunSmgSuppress: 'Three bursts in a row with short pauses — a hail of fire on the target.',
+        abilityName_gunPistol: 'Pistol',
+        abilityDesc_gunPistol: 'A single aimed pistol shot.',
+        abilityName_gunDual: 'Dual Pistols',
+        abilityDesc_gunDual: 'A volley from two pistols, one in each hand.',
+        abilityName_gunEnergy: 'Energy Rifle: Burst',
+        abilityDesc_gunEnergy: 'A three-bolt burst of energy at the chosen target.',
+        abilityName_gunEnergySuppress: 'Energy Rifle: Suppression',
+        abilityDesc_gunEnergySuppress: 'Three energy bursts in a row with short pauses.',
+        abilityFreqUnlimited: 'unlimited',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Talents',
         talentsTitle: 'Talents',
@@ -18714,6 +18796,7 @@ const TRANSLATIONS = {
         // -- Combat: active abilities (see ABILITY_DEFS/onUseAbility) --
         combatAbilityReadyHint: 'ready',
         combatAbilityUsedHint: 'used this fight',
+        combatAbilityArmedHint: 'selected — tap a target',
         combatAbilityCooldownHint: 'cooldown: {n}',
         combatLogBloodlustText: 'Bloodlust empowers the first strike',
         combatLogResilienceActivateText: 'braces to absorb the next blow',
@@ -19234,6 +19317,45 @@ const ABILITY_DEFS = {
         secondWindHealFraction: 0.3,
         promptLabel: 'Second Wind',
         promptHint: 'Can dig deep and recover mid-fight, catching a genuine second wind under pressure rather than steadily wearing down.'
+    },
+    // Weapon abilities (weaponFx ids -> GUN_FX_DEFS). Selected in CombatModal's
+    // ability row, then a tap on an enemy attacks with that weapon's animation.
+    // They don't consume a use, so they're always available.
+    gunSmg: {
+        icon: '🔫', nameKey: 'abilityName_gunSmg', descKey: 'abilityDesc_gunSmg',
+        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'smg',
+        promptLabel: 'Submachine Gun',
+        promptHint: 'Fires disciplined three-round bursts at a target.'
+    },
+    gunSmgSuppress: {
+        icon: '💥', nameKey: 'abilityName_gunSmgSuppress', descKey: 'abilityDesc_gunSmgSuppress',
+        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'smgSuppress',
+        promptLabel: 'SMG Suppression',
+        promptHint: 'Pins targets down with repeated bursts of automatic fire.'
+    },
+    gunPistol: {
+        icon: '🎯', nameKey: 'abilityName_gunPistol', descKey: 'abilityDesc_gunPistol',
+        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'pistol',
+        promptLabel: 'Pistol',
+        promptHint: 'Takes single, aimed pistol shots.'
+    },
+    gunDual: {
+        icon: '✌️', nameKey: 'abilityName_gunDual', descKey: 'abilityDesc_gunDual',
+        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'dualPistols',
+        promptLabel: 'Dual Pistols',
+        promptHint: 'Fires two pistols at once, one in each hand.'
+    },
+    gunEnergy: {
+        icon: '⚡', nameKey: 'abilityName_gunEnergy', descKey: 'abilityDesc_gunEnergy',
+        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'energyRifle',
+        promptLabel: 'Energy Rifle',
+        promptHint: 'Fires three-bolt bursts of energy at a target.'
+    },
+    gunEnergySuppress: {
+        icon: '🌩️', nameKey: 'abilityName_gunEnergySuppress', descKey: 'abilityDesc_gunEnergySuppress',
+        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'energySuppress',
+        promptLabel: 'Energy Rifle Suppression',
+        promptHint: 'Pins targets down with repeated energy bursts.'
     }
 };
 // How many levels a level-up spans, as a plain list of the level numbers
@@ -19391,6 +19513,17 @@ function deriveAbilitiesFromTalents(talents) {
     }
     return out;
 }
+// Weapon abilities (ABILITY_DEFS entries with a weaponFx) aren't talent
+// keystones, so deriveAbilitiesFromTalents never returns them — this keeps any
+// the hero already owns (granted from the dev panel) whenever abilities get
+// re-derived from talents.
+function isWeaponFxAbility(id) { const d = ABILITY_DEFS[id]; return !!(d && d.weaponFx); }
+function mergeWeaponAbilities(derived, prev) {
+    const out = Array.isArray(derived) ? [...derived] : [];
+    (Array.isArray(prev) ? prev : []).forEach(id => { if (isWeaponFxAbility(id) && !out.includes(id))
+        out.push(id); });
+    return out;
+}
 // Folds every learned "stat" talent into a mods object shaped exactly like
 // aggregateEffectModifiers'/applyHeroAbilityMods' own (see computeHeroMods,
 // the only caller) — critChanceDelta/hitChanceDelta/defenseChanceDelta/
@@ -19448,7 +19581,7 @@ function canLearnTalent(talents, points, id) {
 function abilityFrequencyLabel(def, t) {
     if (!def || def.type !== 'active')
         return '';
-    const base = def.frequency === 'perRounds'
+    const base = def.frequency === 'unlimited' ? t('abilityFreqUnlimited') : def.frequency === 'perRounds'
         ? t('abilityFreqPerRounds').replace('{n}', def.cooldownRounds)
         : t('abilityFreqPerFight');
     return def.trigger === 'auto' ? base + ' · ' + t('abilityFreqAuto') : base;
@@ -20690,7 +20823,7 @@ function normalizeGameState(raw) {
         // (possibly just-migrated) resolvedTalents above.
         talents: resolvedTalents,
         talentPoints: resolvedTalentPoints,
-        abilities: deriveAbilitiesFromTalents(resolvedTalents)
+        abilities: mergeWeaponAbilities(deriveAbilitiesFromTalents(resolvedTalents), raw.abilities)
     };
 }
 // A faction's own declared stance toward another known faction — "war"
@@ -21427,7 +21560,8 @@ function rollEnemyArmorGear(tierKey) {
 // shape {head:{max,cur}, body:{max,cur}, total}.
 function enemyArmorPoolsFromLoadout(loadout, bonusMult) {
     const m = typeof bonusMult === 'number' ? bonusMult : 1;
-    const mx = computeHeroArmorPoolMaxes(loadout.equipment, loadout.inventory, loadout.itemRarities);
+    // Enemies get no set bonus (4th arg true) — only the pieces' own defense counts.
+    const mx = computeHeroArmorPoolMaxes(loadout.equipment, loadout.inventory, loadout.itemRarities, true);
     const head = Math.round(mx.head * m), body = Math.round(mx.body * m);
     return { head: { max: head, cur: head }, body: { max: body, cur: body }, total: head + body };
 }
@@ -24538,19 +24672,20 @@ const PARRY_CHANCE_MAX_TWO_HANDED = 30;
 // mistaken for a proper shield).
 const BLOCK_CHANCE_TWO_HANDED_PENALTY = 3;
 const UNARMED_DAMAGE = 5;
-// RETUNED: per-hand damage. Base values run 12 (junk) .. 100 (mythic) in
-// smoothly widening steps (+10/+13/+17/+22/+26). The per-copy roll (+-15%)
-// sits on top, so a one-hander spans 10 (worst junk) .. ~115 (best mythic);
-// a two-hander (or a bow) doubles that (20..~230). Two one-handers
-// dual-wielded sum, so a typical top-tier pair / two-hander gives ~200.
+// RETUNED (flattened): per-hand damage. Base values run 15 (junk) .. 85 (mythic)
+// in smoothly widening steps (+11/+12/+12/+16/+19) — low tiers raised, top
+// tiers lowered vs. the old 12..100. The per-copy roll (+-15%)
+// sits on top, so a one-hander spans 13 (worst junk) .. ~98 (best mythic);
+// a two-hander (or a bow) doubles that (26..~196). Two one-handers
+// dual-wielded sum, so a typical top-tier pair / two-hander gives ~170.
 // Shields deal no damage at all (see getWeaponDamageForSlot / isShieldItem).
 const WEAPON_DAMAGE_BY_RARITY = {
-    junk: 12,
-    common: 22,
-    uncommon: 35,
-    rare: 52,
-    unique: 74,
-    mythic: 100
+    junk: 15,
+    common: 26,
+    uncommon: 38,
+    rare: 50,
+    unique: 66,
+    mythic: 85
 };
 // ---- ARMOR-PIERCING WEAPONS — bypass a covered part's armor entirely ----
 // Combat now treats intact armor as a hard block on the part(s) it covers
@@ -24563,11 +24698,11 @@ const WEAPON_DAMAGE_BY_RARITY = {
 // flag (or anything other than literal true) means false: full raw damage
 // still gets through to anything unarmored or already-broken, it just never
 // bypasses armor that's actually intact.
-// RETUNED (again): base defense now runs from 50 (junk) to 150 (mythic) in
-// smoothly widening steps (+12/+16/+20/+24/+28). Mythic 150 is the medium
-// base; a heavy mythic piece (x1.35) lands at ~203, and a lucky statRoll
-// (+-15%) pushes it to ~234 at most — i.e. "about 200, a bit more if you
-// roll well". Previously 50..300 (+30/+40/+50/+60/+70). Armor durability == defense, so armor
+// RETUNED (again): base defense now runs from 50 (junk) to 100 (mythic) in
+// smoothly widening steps (+6/+8/+10/+12/+14). Mythic 100 is the medium
+// base; a heavy mythic piece (x1.35) lands at ~135, and a lucky statRoll
+// (+-15%) pushes it to ~156 at most — i.e. "about 135, a bit more if you
+// roll well". Previously 50..150 (+12/+16/+20/+24/+28), before that 50..300. Armor durability == defense, so armor
 // pools grow with it; SET_BONUS_DEFENSE_BY_TIER below is scaled to match.
 // (The older note below describes the previous 2..65 scale.)
 // Worn armor's flat damage reduction per hit, by rarity tier — roughly
@@ -24580,11 +24715,11 @@ const WEAPON_DAMAGE_BY_RARITY = {
 // fix. A hit always deals at least 1 regardless of armor.
 const ARMOR_DEFENSE_BY_RARITY = {
     junk: 50,
-    common: 62,
-    uncommon: 78,
-    rare: 98,
-    unique: 122,
-    mythic: 150
+    common: 56,
+    uncommon: 64,
+    rare: 74,
+    unique: 86,
+    mythic: 100
 };
 // Which body part(s) each armor slot protects. Only slots that are
 // physically protective gear are listed — amulet/rings are accessories,
@@ -25675,13 +25810,13 @@ const SET_ELIGIBLE_SLOTS = ['helmet', 'armor', 'gloves', 'boots'];
 // Two fixed tiers, keyed by how many of the (max 4) eligible slots match —
 // 2 or 3 pieces unlock the smaller number, all 4 unlock the larger one
 // INSTEAD of the smaller one (see getSetBonusForSlot: tiers never stack).
-// Each column scales by the matching piece's own rarity, roughly half of
-// ARMOR_DEFENSE_BY_RARITY for the 2-piece tier and roughly the full value
-// of ARMOR_DEFENSE_BY_RARITY for the 4-piece tier — a complete matched set
-// effectively doubles that piece's own defense.
+// Each column scales by the matching piece's own rarity, roughly a quarter of
+// ARMOR_DEFENSE_BY_RARITY for the 2-piece tier and roughly half of
+// ARMOR_DEFENSE_BY_RARITY for the 4-piece tier — a complete matched set
+// adds about 50% to that piece's own defense (halved from the old 100%).
 const SET_BONUS_DEFENSE_BY_TIER = {
-    2: { junk: 0, common: 31, uncommon: 39, rare: 49, unique: 61, mythic: 75 },
-    4: { junk: 0, common: 62, uncommon: 78, rare: 98, unique: 122, mythic: 150 }
+    2: { junk: 0, common: 14, uncommon: 16, rare: 19, unique: 22, mythic: 25 },
+    4: { junk: 0, common: 28, uncommon: 32, rare: 37, unique: 43, mythic: 50 }
 };
 function extractSetStems(name) {
     if (!name)
@@ -25805,10 +25940,11 @@ function computeTotalArmorDefense(equipment, inventory, itemRarities) {
 // does not shrink an already-rolled pool, precisely so the two mechanics
 // never have to be reconciled turn-by-turn.
 const ARMOR_POOL_SLOTS = { head: ['helmet'], body: ['armor', 'gloves', 'boots'] };
-function computeArmorPoolMax(equipmentObj, inventoryList, itemRarities, poolKey) {
+function computeArmorPoolMax(equipmentObj, inventoryList, itemRarities, poolKey, noSetBonus) {
     const eq = equipmentObj || EMPTY_EQUIPMENT;
     const inv = inventoryList || [];
-    const activeSets = computeActiveEquipmentSets(eq, inv, itemRarities);
+    // noSetBonus (enemies only): matched-set bonuses never apply to enemy gear.
+    const activeSets = noSetBonus ? {} : computeActiveEquipmentSets(eq, inv, itemRarities);
     const resolvedWorn = resolveEquippedItems(eq, inv);
     let total = 0;
     for (const slotKey of ARMOR_POOL_SLOTS[poolKey]) {
@@ -25826,8 +25962,8 @@ function computeArmorPoolMax(equipmentObj, inventoryList, itemRarities, poolKey)
 // Rolled once when a fight starts — see startCombat/attemptStealthKill,
 // which store the result as combat.heroArmorMax and seed combat.heroArmorCur
 // with the same numbers (armor opens every fight at full).
-function computeHeroArmorPoolMaxes(equipment, inventory, itemRarities) {
-    return { body: computeArmorPoolMax(equipment, inventory, itemRarities, 'body'), head: computeArmorPoolMax(equipment, inventory, itemRarities, 'head') };
+function computeHeroArmorPoolMaxes(equipment, inventory, itemRarities, noSetBonus) {
+    return { body: computeArmorPoolMax(equipment, inventory, itemRarities, 'body', noSetBonus), head: computeArmorPoolMax(equipment, inventory, itemRarities, 'head', noSetBonus) };
 }
 // Which pool a landed hit's body part draws from — head hits draw the head
 // pool, every other part (torso/arms/legs) draws the shared body pool.
@@ -31772,6 +31908,28 @@ const COMBAT_CARD_ARRIVE_MS = 1000;
 // bars all wait for it (see pendingShots in CombatModal).
 const RANGED_DRAW_MS = 420;
 const ARROW_FLIGHT_MS = 260;
+// Gun-ability visuals (ABILITY_DEFS[id].weaponFx -> key here). A "burst" is
+// perBurst shots `gap` ms apart; `hands` are the muzzle offsets (px, sideways
+// from the shooter's centre) fired `stagger` ms apart; `bursts` > 1 repeats
+// the burst after `pause` ms (suppression). `flare` scales muzzle flash/smoke.
+const GUN_BULLET_FLIGHT_MS = 220;
+const GUN_FX_DEFS = {
+    smg: { energy: false, bursts: 1, perBurst: 3, gap: 90, pause: 0, hands: [0], stagger: 0, flare: 1 },
+    smgSuppress: { energy: false, bursts: 3, perBurst: 3, gap: 90, pause: 450, hands: [0], stagger: 0, flare: 1 },
+    pistol: { energy: false, bursts: 1, perBurst: 1, gap: 0, pause: 0, hands: [0], stagger: 0, flare: 0.55 },
+    dualPistols: { energy: false, bursts: 1, perBurst: 1, gap: 0, pause: 0, hands: [-20, 20], stagger: 55, flare: 0.55 },
+    energyRifle: { energy: true, bursts: 1, perBurst: 3, gap: 90, pause: 0, hands: [0], stagger: 0, flare: 1 },
+    energySuppress: { energy: true, bursts: 3, perBurst: 3, gap: 90, pause: 450, hands: [0], stagger: 0, flare: 1 }
+};
+function gunFxBurstSpan(def) { return (def.perBurst - 1) * def.gap + (def.hands.length - 1) * def.stagger; }
+// Total ms from the first shot to the last bullet landing.
+function gunFxDuration(fxId) {
+    const d = GUN_FX_DEFS[fxId];
+    if (!d)
+        return RANGED_DRAW_MS + ARROW_FLIGHT_MS;
+    const span = gunFxBurstSpan(d);
+    return (d.bursts - 1) * (span + d.pause) + span + GUN_BULLET_FLIGHT_MS;
+}
 // Detached deep copy of a plain-data combat snapshot (parts / armor pools),
 // so a held "before the hit" picture can never change underneath us.
 function cloneCombatSnap(x) {
@@ -35562,11 +35720,11 @@ function DevHeroTab({ api }) {
     function learnAll() {
         patch(s => {
             const talents = Object.fromEntries(Object.keys(TALENT_DEFS).map(id => [id, 1]));
-            return { ...s, talents, abilities: deriveAbilitiesFromTalents(talents) };
+            return { ...s, talents, abilities: mergeWeaponAbilities(deriveAbilitiesFromTalents(talents), s.abilities) };
         });
         api.flash('Все таланты изучены');
     }
-    function resetTalents() { patch(s => ({ ...s, talents: {}, abilities: [] })); api.flash('Таланты сброшены'); }
+    function resetTalents() { patch(s => ({ ...s, talents: {}, abilities: mergeWeaponAbilities([], s.abilities) })); api.flash('Таланты сброшены'); }
     function addEffect() {
         const effect = devBuildEffect(fx, lang);
         patch(s => ({ ...s, effects: dedupePartClientEffects([...s.effects, effect]) }));
@@ -47100,7 +47258,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             ...gameState,
             talents: nextTalents,
             talentPoints: gameState.talentPoints - def.cost,
-            abilities: deriveAbilitiesFromTalents(nextTalents)
+            abilities: mergeWeaponAbilities(deriveAbilitiesFromTalents(nextTalents), gameState.abilities)
         };
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
@@ -51964,7 +52122,6 @@ const APP_STYLES = `
   .icon-btn:hover { color: var(--amber-500); }
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
-
 
 // ---- Mount ----
 // Starts once the third-party scripts have settled (loaded, failed, or timed
