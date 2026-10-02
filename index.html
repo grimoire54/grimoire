@@ -13,12 +13,6 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0c0a09; }
   #root { min-height: 100vh; }
-  /* Same bouncing dots as the in-game "thinking" indicator (grim-dot-bounce). */
-  .boot-dots span { display: inline-block; animation: grim-dot-bounce 1.2s infinite ease-in-out; color: inherit; font-size: 1.1rem; }
-  .boot-dots span:nth-child(2) { animation-delay: 0.15s; }
-  .boot-dots span:nth-child(3) { animation-delay: 0.3s; }
-  @keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .boot-dots span { animation: none !important; } }
 </style>
 <script>
 // React 19 + ReactDOM + Scheduler, bundled inline so the app has zero
@@ -17255,16 +17249,7 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
     });
   })();
 </script>
-<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fbbf24;font:16px Georgia,serif;letter-spacing:.08em"><span>Grimoire RPG - <span id="boot-word">loading</span></span><span class="boot-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div></div>
-<script>
-  // Boot note wording follows the system language: Russian UI -> "загрузка", anything else -> "loading".
-  (function () {
-    var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
-    var ru = /^ru\b/i.test(String(langs[0] || ''));
-    var w = document.getElementById('boot-word');
-    if (w) w.textContent = ru ? 'загрузка' : 'loading';
-  })();
-</script>
+<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em">Гримуар — загрузка…</div></div>
 <script>
   // Minimal localStorage-backed stand-in for the window.storage API that
   // Claude.ai artifacts provide. grimoire.jsx was written against that
@@ -17724,19 +17709,39 @@ const TRANSLATIONS = {
         abilityDesc_intimidation: 'Одним взглядом подрывает боевой дух всех врагов разом.',
         abilityName_secondWind: 'Второе дыхание',
         abilityDesc_secondWind: 'Раз в бой можно немедленно восстановить часть здоровья прямо в разгар боя.',
-        abilityName_gunSmg: 'Автомат: очередь',
+        abilityName_gunSmg: 'Автомат',
         abilityDesc_gunSmg: 'Очередь из трёх пуль по выбранной цели. Выберите способность, затем тапните по врагу.',
-        abilityName_gunSmgSuppress: 'Автомат: подавление',
+        abilityName_gunSmgSuppress: 'Автомат подавление',
         abilityDesc_gunSmgSuppress: 'Подавляющий огонь по цели до вашего следующего хода: если враг двинется, он получит урон, и подавление прервётся. Прерывается, если вы получите урон. Раз в 3 раунда.',
         abilityName_gunPistol: 'Пистолет',
         abilityDesc_gunPistol: 'Одиночный прицельный выстрел из пистолета.',
-        abilityName_gunDual: 'Два пистолета',
+        abilityName_gunDual: 'Пистолет 2р',
         abilityDesc_gunDual: 'Залп из двух пистолетов, по одному в каждой руке.',
-        abilityName_gunEnergy: 'Энерговинтовка: очередь',
+        abilityName_gunEnergy: 'Энерговинтовка',
         abilityDesc_gunEnergy: 'Очередь из трёх энергетических зарядов по выбранной цели.',
-        abilityName_gunEnergySuppress: 'Энерговинтовка: подавление',
+        abilityName_gunEnergySuppress: 'Энерговинтовка подавление',
         abilityDesc_gunEnergySuppress: 'Подавляющий энергоогонь по цели до вашего следующего хода: если враг двинется, он получит урон, и подавление прервётся. Прерывается, если вы получите урон. Раз в 3 раунда.',
         abilityFreqUnlimited: 'без ограничений',
+        abilityName_fireball: 'Фаербол',
+        abilityDesc_fireball: 'Огненный шар летит в выбранную точку и взрывается, поражая несколько клеток вокруг.',
+        abilityName_fireBreath: 'Огненное дыхание',
+        abilityDesc_fireBreath: 'Конус огня от героя в выбранную сторону: пламя идёт от ближних клеток к дальним.',
+        abilityName_fireRing: 'Кольцо огня',
+        abilityDesc_fireRing: 'Волна огня расходится от героя во все стороны, цель выбирать не нужно.',
+        abilityName_meteorShower: 'Метеоритный дождь',
+        abilityDesc_meteorShower: 'На выбранную область с одной стороны падает несколько метеоров.',
+        abilityName_earthTremor: 'Дрожь земли',
+        abilityDesc_earthTremor: 'Удар о землю: ударная волна с пылью расходится во все стороны и отбрасывает врагов.',
+        abilityName_mightyJump: 'Мощный прыжок',
+        abilityDesc_mightyJump: 'Прыжок на другую клетку, при приземлении бьёт дрожь земли и отбрасывает врагов.',
+        afxAimHint: 'Тап ставит метку, повторный тап запускает.',
+        afxCast: 'Применить',
+        afxCancel: 'Отмена',
+        afxLogCast: '{who} применяет «{name}»',
+        afxLogHit: '{name} получает урон ({dmg})',
+        afxLogKnock: '{name} отброшен',
+        afxLogDown: '{name} повержен',
+        afxLogMiss: 'Никого не задело',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Таланты',
         talentsTitle: 'Таланты',
@@ -18524,19 +18529,39 @@ const TRANSLATIONS = {
         abilityDesc_intimidation: "A single glance shakes every enemy's resolve at once.",
         abilityName_secondWind: 'Second Wind',
         abilityDesc_secondWind: 'Once per fight, instantly recover part of your health mid-battle.',
-        abilityName_gunSmg: 'SMG: Burst',
+        abilityName_gunSmg: 'SMG',
         abilityDesc_gunSmg: 'A three-round burst at the chosen target. Pick the ability, then tap an enemy.',
-        abilityName_gunSmgSuppress: 'SMG: Suppression',
+        abilityName_gunSmgSuppress: 'SMG Suppression',
         abilityDesc_gunSmgSuppress: 'Suppressing fire on a target until your next turn: if it moves it takes damage and the suppression breaks. Breaks if you take damage. Once every 3 rounds.',
         abilityName_gunPistol: 'Pistol',
         abilityDesc_gunPistol: 'A single aimed pistol shot.',
-        abilityName_gunDual: 'Dual Pistols',
+        abilityName_gunDual: 'Pistol x2',
         abilityDesc_gunDual: 'A volley from two pistols, one in each hand.',
-        abilityName_gunEnergy: 'Energy Rifle: Burst',
+        abilityName_gunEnergy: 'Energy Rifle',
         abilityDesc_gunEnergy: 'A three-bolt burst of energy at the chosen target.',
-        abilityName_gunEnergySuppress: 'Energy Rifle: Suppression',
+        abilityName_gunEnergySuppress: 'Energy Rifle Suppression',
         abilityDesc_gunEnergySuppress: 'Suppressing energy fire on a target until your next turn: if it moves it takes damage and the suppression breaks. Breaks if you take damage. Once every 3 rounds.',
         abilityFreqUnlimited: 'unlimited',
+        abilityName_fireball: 'Fireball',
+        abilityDesc_fireball: 'A fireball flies to the chosen spot and explodes, hitting several cells around it.',
+        abilityName_fireBreath: 'Fire Breath',
+        abilityDesc_fireBreath: 'A cone of fire from the hero toward the chosen side; the flames travel from the near cells to the far ones.',
+        abilityName_fireRing: 'Ring of Fire',
+        abilityDesc_fireRing: 'A wave of fire spreads from the hero in every direction; no target needed.',
+        abilityName_meteorShower: 'Meteor Shower',
+        abilityDesc_meteorShower: 'Several meteors fall on the chosen area, all from one side.',
+        abilityName_earthTremor: 'Earth Tremor',
+        abilityDesc_earthTremor: 'A ground slam: a shockwave with dust spreads out in every direction and knocks enemies back.',
+        abilityName_mightyJump: 'Mighty Leap',
+        abilityDesc_mightyJump: 'Leap to another spot; the landing sends out an earth tremor that knocks enemies back.',
+        afxAimHint: 'Tap to place the marker, tap again to cast.',
+        afxCast: 'Cast',
+        afxCancel: 'Cancel',
+        afxLogCast: '{who} uses "{name}"',
+        afxLogHit: '{name} takes damage ({dmg})',
+        afxLogKnock: '{name} is knocked back',
+        afxLogDown: '{name} is down',
+        afxLogMiss: 'It hit nobody',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Talents',
         talentsTitle: 'Talents',
@@ -19389,6 +19414,47 @@ const ABILITY_DEFS = {
         type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3, suppress: true, suppressMoveDamageFraction: 0.12, suppressHitFx: 'energyRifle', weaponFx: 'energySuppress',
         promptLabel: 'Energy Rifle Suppression',
         promptHint: 'Pins targets down with repeated energy bursts.'
+    },
+    // Spell abilities (spellFx). Like the weapon abilities these aren't talent
+    // keystones — they're handed out from the DEV panel (see isSpellFxAbility /
+    // mergeWeaponAbilities). `aim` is what the player picks before casting:
+    // 'point' = a cell on the field, 'none' = fires straight away. They use
+    // their own cooldown (spellReadyAt), and don't touch gameState/inventory.
+    fireball: {
+        icon: '🔥', nameKey: 'abilityName_fireball', descKey: 'abilityDesc_fireball',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 2,
+        spellFx: true, aim: 'point', radius: 2, baseDamage: 60,
+        promptLabel: 'Fireball', promptHint: ''
+    },
+    fireBreath: {
+        icon: '🐉', nameKey: 'abilityName_fireBreath', descKey: 'abilityDesc_fireBreath',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3,
+        spellFx: true, aim: 'point', length: 6, angle: 60, baseDamage: 45,
+        promptLabel: 'Fire Breath', promptHint: ''
+    },
+    fireRing: {
+        icon: '⭕', nameKey: 'abilityName_fireRing', descKey: 'abilityDesc_fireRing',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3,
+        spellFx: true, aim: 'none', length: 4, baseDamage: 40,
+        promptLabel: 'Ring of Fire', promptHint: ''
+    },
+    meteorShower: {
+        icon: '☄️', nameKey: 'abilityName_meteorShower', descKey: 'abilityDesc_meteorShower',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 4,
+        spellFx: true, aim: 'point', areaRadius: 3, count: 6, baseDamage: 30,
+        promptLabel: 'Meteor Shower', promptHint: ''
+    },
+    earthTremor: {
+        icon: '🌋', nameKey: 'abilityName_earthTremor', descKey: 'abilityDesc_earthTremor',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3,
+        spellFx: true, aim: 'none', length: 4, baseDamage: 30,
+        promptLabel: 'Earth Tremor', promptHint: ''
+    },
+    mightyJump: {
+        icon: '🦘', nameKey: 'abilityName_mightyJump', descKey: 'abilityDesc_mightyJump',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3,
+        spellFx: true, aim: 'point', range: 8, waveLength: 3, baseDamage: 40,
+        promptLabel: 'Mighty Leap', promptHint: ''
     }
 };
 // How many levels a level-up spans, as a plain list of the level numbers
@@ -19412,7 +19478,7 @@ function computeNewlyGainedLevels(prevLevel, nextLevel) {
 // round counter also starts at 1 — see startCombat) so it reads as usable
 // from the very first round rather than needing a full cooldown up front.
 function createAbilityFightState() {
-    return { bloodlustUsed: false, resilienceUsed: false, resilienceActive: false, secondWindUsed: false, intimidationReadyAtRound: 1, suppressReadyAtRound: 1 };
+    return { bloodlustUsed: false, resilienceUsed: false, resilienceActive: false, secondWindUsed: false, intimidationReadyAtRound: 1, suppressReadyAtRound: 1, spellReadyAt: {} };
 }
 // ----------------------------------------------------------------------------
 // TALENT TREE
@@ -19551,9 +19617,12 @@ function deriveAbilitiesFromTalents(talents) {
 // the hero already owns (granted from the dev panel) whenever abilities get
 // re-derived from talents.
 function isWeaponFxAbility(id) { const d = ABILITY_DEFS[id]; return !!(d && d.weaponFx); }
+// Same story for the spell abilities (ABILITY_DEFS entries with spellFx): dev
+// panel grants, kept across talent re-derivation.
+function isSpellFxAbility(id) { const d = ABILITY_DEFS[id]; return !!(d && d.spellFx); }
 function mergeWeaponAbilities(derived, prev) {
     const out = Array.isArray(derived) ? [...derived] : [];
-    (Array.isArray(prev) ? prev : []).forEach(id => { if (isWeaponFxAbility(id) && !out.includes(id))
+    (Array.isArray(prev) ? prev : []).forEach(id => { if ((isWeaponFxAbility(id) || isSpellFxAbility(id)) && !out.includes(id))
         out.push(id); });
     return out;
 }
@@ -21940,7 +22009,7 @@ const RANGED_WEAPON_TOKEN_PATTERNS = [
     /^лук(а|у|ом|е|и|ов|ам|ами|ах)?$/, /^лучни/, /^арбалет/, /^самострел/,
     /^мушкет/, /^аркебуз/, /^винтовк/, /^дробовик/, /^ружь/, /^ружей/,
     /^обрез(а|у|ом|е|ы|ов)?$/, /^автомат(а|у|ом|е|ы|ов|ам|ами|ах)?$/,
-    /^пулем/, /^калашников/, /^снайпер/,
+    /^пулем/, /^калашников/, /^снайпер/, /^энерговинтовк/, /^энергокарабин/,
     /^(long|short|war|cross|compound|recurve|hunting)?bows?$/, /^crossbow/, /^arquebus/,
     /^musket/, /^rifle/, /^shotgun/, /^carbine/, /^submachine/, /^smg$/,
     /^archer/, /^sniper/, /^machinegun/
@@ -22015,6 +22084,59 @@ function isHandgunWeaponName(name) {
     if (!hasToken(HANDGUN_TOKEN_PATTERNS))
         return false;
     return !hasToken(SUBMACHINE_GUN_TOKEN_PATTERNS);
+}
+// ==============================================================================
+// FIREARM TYPES FOR ENEMIES / COMPANIONS
+// A weapon's free-text name decides which gun animation (GUN_FX_DEFS) and
+// which volley its wielder uses:
+//   energyRifle — энерговинтовка/энергокарабин: burst of 3 energy bolts
+//   smg         — автомат/пулемёт/пистолет-пулемёт: burst of 3 bullets
+//   pistol      — пистолет/револьвер: a single shot
+// The damage rule matches the hero's gun abilities: a burst weapon's normal
+// damage is split across its 3 shots (each shot rolls hit/part/damage on its
+// own); a pistol fires one shot at its normal damage. null = not a firearm.
+// ==============================================================================
+const ENERGY_RIFLE_TOKEN_PATTERNS = [/^энерговинтовк/, /^энергокарабин/, /^plasmarifle/, /^energyrifle/];
+function getGunFxIdFromName(name) {
+    if (typeof name !== 'string' || !name.trim())
+        return null;
+    const tokens = narrativeItemNameTokens(name);
+    if (tokens.length === 0)
+        return null;
+    const hasToken = pats => tokens.some(tok => pats.some(re => re.test(tok)));
+    if (hasToken(ENERGY_RIFLE_TOKEN_PATTERNS))
+        return 'energyRifle';
+    if (hasToken(SUBMACHINE_GUN_TOKEN_PATTERNS) || hasToken([/^автомат(а|у|ом|е|ы|ов|ам|ами|ах)?$/, /^калашников/, /^machinegun/]))
+        return 'smg';
+    if (isHandgunWeaponName(name))
+        return 'pistol';
+    return null;
+}
+// Humanoid enemies only (a beast's claws never match human vocabulary).
+function getEnemyGunFxId(enemy) {
+    if (!enemy || (enemy.kind && enemy.kind !== ENEMY_KIND_DEFAULT))
+        return null;
+    const fromWeapon = getGunFxIdFromName(enemy.weaponDescription);
+    if (fromWeapon)
+        return fromWeapon;
+    return getWeaponTypeFromName(enemy.weaponDescription) === WEAPON_TYPE_DEFAULT ? getGunFxIdFromName(enemy.enemyName) : null;
+}
+// Hero/companion: the first firearm found in the two hand slots.
+function getLoadoutGunFxId(equipmentObj) {
+    const eq = equipmentObj || {};
+    for (const name of [eq.weaponRight, eq.weaponLeft]) {
+        const id = getGunFxIdFromName(name);
+        if (id)
+            return id;
+    }
+    return null;
+}
+// Per-shot weapon damage for one volley of `fxId` whose weapon is rated at
+// `totalDamage`: a burst splits it evenly, a single shot keeps all of it.
+function gunVolleyDamages(fxId, totalDamage) {
+    const def = GUN_FX_DEFS[fxId];
+    const shots = def ? Math.max(1, def.perBurst * def.hands.length) : 1;
+    return Array.from({ length: shots }, () => totalDamage / shots);
 }
 // True for a weapon-slot item that's a handgun (never a shield, never the
 // ranged/two-handed submachine-gun case).
@@ -22153,6 +22275,10 @@ function getEnemyWeaponType(enemy) {
         return WEAPON_TYPE_DEFAULT;
     if (enemy.kind && enemy.kind !== ENEMY_KIND_DEFAULT)
         return WEAPON_TYPE_DEFAULT;
+    // A ranged-role shooter armed with a handgun reads as a shooter (archer
+    // portrait for now) — handguns are otherwise ordinary one-handed weapons.
+    if (enemy.role === 'ranged' && isHandgunWeaponName(enemy.weaponDescription))
+        return 'ranged';
     const fromWeapon = getWeaponTypeFromName(enemy.weaponDescription);
     if (fromWeapon !== WEAPON_TYPE_DEFAULT)
         return fromWeapon;
@@ -27132,7 +27258,8 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
     const rolled = rollEnemyStatsForTier(tier, kind);
     // See the ENEMY_ROLES/COMBAT_TUNING morale-block comments near their own
     // declarations for what "role" and "fearless" actually change mid-fight.
-    const role = ENEMY_ROLES[spec.role] ? spec.role : 'melee';
+    // A firearm wielder with no explicit role shoots from range like an archer.
+    const role = ENEMY_ROLES[spec.role] ? spec.role : (getEnemyGunFxId({ kind, weaponDescription: spec.weaponDescription, enemyName: spec.enemyName }) ? 'ranged' : 'melee');
     const fearless = spec.fearless === true;
     // "armorPiercing" is this enemy's own explicit combat-spec flag (see the
     // schema notes above generateStateAndEvents's enemy shape) — NEVER
@@ -32107,6 +32234,989 @@ function splitForFlanking(list) {
     const half = Math.ceil(list.length / 2);
     return { left: list.slice(0, half), right: list.slice(half) };
 }
+// ============================================================================
+// SPELL ABILITIES (spellFx) — offensive spells, handed out from the DEV panel
+// the same way as the gun abilities (DevHeroTab → «Заклинания и приёмы») and
+// fired from the combat screen.
+// ----------------------------------------------------------------------------
+// Three layers, all in this block:
+//  1. buildAbilityScript — PURE. Turns "who cast what at which cell" into a
+//     complete script: the visual timeline (fx), every hit with its own delay
+//     (damage + optional knockback) and an optional hero move (mightyJump).
+//     The same geometry (afxShapeFor) feeds the targeting preview in
+//     CombatModal, so what you see before confirming is what gets hit.
+//  2. App's castDevAbility (see onUseAbility) — plays the script, then
+//     commits the state change (HP, knockback, hero position, log, turn) once
+//     the animation has had time to land, so bars/cards never move ahead of
+//     the effect.
+//  3. createAbilityFxEngine — the visual layer (canvas particles, soft fire,
+//     smoke, dust, token hops/knockback). Lives inside .combat-grid-world so it
+//     pans/zooms with the camera; every coordinate is world-space pixels.
+// All coordinates inside a script's `fx` are LOCAL pixels/cells (grid origin
+// = GRID_RENDER_MIN_X/Y); everything else (hits[].knock, heroMove) is in the
+// game's own cell coordinates.
+// ============================================================================
+const AFX_CHARGE_MS = 560;
+function afxInGrid(x, y) { return x >= GRID_RENDER_MIN_X && x <= GRID_RENDER_MAX_X && y >= GRID_RENDER_MIN_Y && y <= GRID_RENDER_MAX_Y; }
+function afxClampCell(p) {
+    return { x: Math.max(GRID_RENDER_MIN_X, Math.min(GRID_RENDER_MAX_X, p.x)), y: Math.max(GRID_RENDER_MIN_Y, Math.min(GRID_RENDER_MAX_Y, p.y)) };
+}
+function afxLocalCell(c) { return { x: c.x - GRID_RENDER_MIN_X, y: c.y - GRID_RENDER_MIN_Y, d: c.d || 0, r: c.r || 0, dur: c.dur }; }
+function afxAbilityDamage(id, level) {
+    const def = ABILITY_DEFS[id];
+    return Math.round(((def && def.baseDamage) || 20) * (1 + 0.05 * Math.max(0, (level || 1) - 1)));
+}
+function afxLivingEnemies(combat) {
+    return (combat.enemies || []).filter(e => e.pos && !isBodyDestroyed(e.parts) && !e.fled);
+}
+// Disc of cells centred on a cell (fireball / meteor impact / meteor area).
+function afxBlast(p, r) {
+    const out = [], n = Math.ceil(r);
+    for (let y = p.y - n; y <= p.y + n; y++)
+        for (let x = p.x - n; x <= p.x + n; x++) {
+            if (!afxInGrid(x, y))
+                continue;
+            const d = Math.hypot(x - p.x, y - p.y);
+            if (d <= r + 0.001)
+                out.push({ x, y, d });
+        }
+    return out;
+}
+// Cone from the caster's footprint toward a cell. `d` is the ignition delay in
+// 45ms units, so the flame front travels from the near cells to the far ones.
+function afxCone(origin, target, len, halfRad) {
+    const cx = origin.x + UNIT_SPAN / 2, cy = origin.y + UNIT_SPAN / 2;
+    const vx = target.x + 0.5 - cx, vy = target.y + 0.5 - cy, vl = Math.hypot(vx, vy) || 1;
+    const dx = vx / vl, dy = vy / vl, cs = Math.cos(halfRad), out = [], n = Math.ceil(len + 2);
+    for (let y = Math.floor(cy) - n; y <= Math.ceil(cy) + n; y++)
+        for (let x = Math.floor(cx) - n; x <= Math.ceil(cx) + n; x++) {
+            if (!afxInGrid(x, y) || posContains(origin, x, y))
+                continue;
+            const ex = x + 0.5 - cx, ey = y + 0.5 - cy, d = Math.hypot(ex, ey);
+            if (d > len + 1.2 || (ex * dx + ey * dy) / d < cs - 0.001)
+                continue;
+            out.push({ x, y, r: d, d: Math.max(0, d - 1.2) * 1.5 });
+        }
+    return out;
+}
+// Ring/disc spreading from a footprint; `step` converts distance to delay.
+function afxNova(origin, len, step, dur) {
+    const cx = origin.x + UNIT_SPAN / 2, cy = origin.y + UNIT_SPAN / 2, out = [], n = Math.ceil(len + 2);
+    for (let y = Math.floor(cy) - n; y <= Math.ceil(cy) + n; y++)
+        for (let x = Math.floor(cx) - n; x <= Math.ceil(cx) + n; x++) {
+            if (!afxInGrid(x, y) || posContains(origin, x, y))
+                continue;
+            const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+            if (d > len + 1.2)
+                continue;
+            const c = { x, y, r: d, d: Math.max(0, d - 1.2) * step };
+            if (dur)
+                c.dur = dur;
+            out.push(c);
+        }
+    return out;
+}
+function afxUnitDist(pos, p) { return Math.min(...footprintCells(pos).map(c => Math.hypot(c.x - p.x, c.y - p.y))); }
+function afxNearestCell(pos, map) {
+    let best = null;
+    footprintCells(pos).forEach(c => { const m = map.get(c.x + ',' + c.y); if (m && (!best || m.d < best.d))
+        best = m; });
+    return best;
+}
+// Nearest free footprint to `target` that the hero can reach in one leap.
+function afxPickLanding(combat, target, range) {
+    const hp = combat.heroPos;
+    let best = null, bd = Infinity;
+    for (let y = GRID_RENDER_MIN_Y; y <= GRID_RENDER_MAX_Y - (UNIT_SPAN - 1); y++)
+        for (let x = GRID_RENDER_MIN_X; x <= GRID_RENDER_MAX_X - (UNIT_SPAN - 1); x++) {
+            if (Math.hypot(x - hp.x, y - hp.y) > range)
+                continue;
+            const d = Math.hypot(x - target.x, y - target.y);
+            if (d >= bd)
+                continue;
+            if (isFootprintBlocked({ x, y }, combat, { type: 'hero' }))
+                continue;
+            bd = d;
+            best = { x, y };
+        }
+    return best;
+}
+// What the targeting preview paints for an ability aimed at `target`.
+function afxShapeFor(id, combat, target) {
+    const def = ABILITY_DEFS[id];
+    if (!def || !combat || !combat.heroPos)
+        return { cells: [], footprint: null };
+    const hero = combat.heroPos;
+    if (id === 'fireRing')
+        return { cells: afxNova(hero, def.length, 3.56), footprint: null };
+    if (id === 'earthTremor')
+        return { cells: afxNova(hero, def.length, 2.44), footprint: null };
+    if (!target)
+        return { cells: [], footprint: null };
+    const t = afxClampCell(target);
+    if (id === 'fireball')
+        return { cells: afxBlast(t, def.radius), footprint: null };
+    if (id === 'meteorShower')
+        return { cells: afxBlast(t, def.areaRadius), footprint: null };
+    if (id === 'fireBreath')
+        return { cells: afxCone(hero, t, def.length, def.angle / 2 * Math.PI / 180), footprint: null };
+    if (id === 'mightyJump') {
+        const L = afxPickLanding(combat, t, def.range);
+        return L ? { cells: afxNova(L, def.waveLength, 2.44), footprint: L } : { cells: [], footprint: null };
+    }
+    return { cells: [], footprint: null };
+}
+// Knockback for one enemy, resolved against a "virtual" combat that already
+// holds everyone else's final position (so two knocked units can't overlap).
+function afxResolveKnock(enemy, origin, kb, virtual) {
+    const ex = enemy.pos.x + UNIT_SPAN / 2 - (origin.x + UNIT_SPAN / 2), ey = enemy.pos.y + UNIT_SPAN / 2 - (origin.y + UNIT_SPAN / 2);
+    const el = Math.hypot(ex, ey) || 1, dx = ex / el, dy = ey / el;
+    for (let st = kb; st > 0; st--) {
+        const cand = { x: Math.round(enemy.pos.x + dx * st), y: Math.round(enemy.pos.y + dy * st) };
+        if (cand.x < GRID_RENDER_MIN_X || cand.y < GRID_RENDER_MIN_Y || cand.x > GRID_RENDER_MAX_X - (UNIT_SPAN - 1) || cand.y > GRID_RENDER_MAX_Y - (UNIT_SPAN - 1))
+            continue;
+        if (!isFootprintBlocked(cand, virtual, { type: 'enemy', id: enemy.id }))
+            return cand;
+    }
+    return null;
+}
+// The whole script for one cast. Returns null when the cast is impossible
+// (no target / nowhere to land). `rnd` is injectable so tests can be seeded.
+function buildAbilityScript(id, combat, target, level, rnd) {
+    const def = ABILITY_DEFS[id];
+    if (!def || !combat || !combat.heroPos)
+        return null;
+    rnd = rnd || Math.random;
+    const R = (a, b) => a + rnd() * (b - a);
+    const C = GRID_CELL_PX, CH = AFX_CHARGE_MS;
+    const hero = combat.heroPos, enemies = afxLivingEnemies(combat), dm = afxAbilityDamage(id, level);
+    const px = (cx) => (cx - GRID_RENDER_MIN_X) * C, py = (cy) => (cy - GRID_RENDER_MIN_Y) * C;
+    const centerPx = (pos) => ({ x: px(pos.x) + C * UNIT_SPAN / 2, y: py(pos.y) + C * UNIT_SPAN / 2 });
+    const hc = centerPx(hero);
+    const hits = [];
+    const addHit = (e, delay, dmg, extra) => {
+        const c = centerPx(e.pos);
+        hits.push(Object.assign({ enemyId: e.id, key: 'enemy:' + e.id, delay: Math.round(delay), dmg, x: c.x, y: c.y, hop: false, knock: null }, extra || {}));
+    };
+    // Hits for the cell-map attacks (cone, ring, tremor): damage fades with
+    // distance, delay follows the front.
+    const mapHits = (cells, base, fade, startMs, knockOrigin, virtualBase) => {
+        const map = new Map(cells.map(c => [c.x + ',' + c.y, c]));
+        const len = def.length || def.waveLength || 1;
+        let virtual = virtualBase;
+        enemies.forEach(e => {
+            const b = afxNearestCell(e.pos, map);
+            if (!b)
+                return;
+            const dmgE = Math.max(1, Math.round(base * (1 - fade * Math.min(1, b.r / (len + 1.2)))));
+            let knock = null;
+            if (knockOrigin) {
+                const kb = Math.max(1, Math.min(4, Math.round(4 - 3 * (b.r - 1.2) / len)));
+                const dest = afxResolveKnock(e, knockOrigin, kb, virtual);
+                if (dest) {
+                    knock = dest;
+                    virtual = { ...virtual, enemies: virtual.enemies.map(o => (o.id === e.id ? { ...o, pos: dest } : o)) };
+                }
+            }
+            addHit(e, startMs + b.d * 45, dmgE, { hop: !!knockOrigin, knock });
+        });
+    };
+    const fxHits = () => hits.map(h => ({
+        key: h.key, delay: h.delay, dmg: h.dmg, x: h.x, y: h.y, hop: h.hop,
+        knock: h.knock ? { dx: (h.knock.x - enemies.find(e => e.id === h.enemyId).pos.x) * C, dy: (h.knock.y - enemies.find(e => e.id === h.enemyId).pos.y) * C } : null
+    }));
+    let fx = null, heroMove = null, commitBase = 600;
+    const t = target ? afxClampCell(target) : null;
+    if (id === 'fireball') {
+        if (!t)
+            return null;
+        const ix = px(t.x) + C / 2, iy = py(t.y) + C / 2, dist = Math.hypot(ix - hc.x, iy - hc.y) || 1;
+        const mouth = { x: hc.x + (ix - hc.x) / dist * 46, y: hc.y + (iy - hc.y) / dist * 46 };
+        const flight = 420 + dist * 0.55, impactAt = CH + flight, cells = afxBlast(t, def.radius);
+        enemies.forEach(e => {
+            const d = afxUnitDist(e.pos, t);
+            if (d > def.radius)
+                return;
+            addHit(e, impactAt + d * 45, Math.max(1, Math.round(dm * (1 - 0.55 * d / (def.radius + 0.5)))));
+        });
+        fx = { kind: 'fireball', mouth, target: { x: ix, y: iy }, r: def.radius, cells: cells.map(afxLocalCell), charge: CH, flight, impactAt };
+        commitBase = impactAt + 380;
+    }
+    else if (id === 'fireBreath') {
+        if (!t)
+            return null;
+        const half = def.angle / 2 * Math.PI / 180, cells = afxCone(hero, t, def.length, half);
+        const tx = px(t.x) + C / 2 - hc.x, ty = py(t.y) + C / 2 - hc.y, tl = Math.hypot(tx, ty) || 1, ux = tx / tl, uy = ty / tl;
+        const maxd = Math.max(0, ...cells.map(c => c.d)), T = maxd * 45 + 220;
+        mapHits(cells, dm, 0.35, CH, null, combat);
+        fx = { kind: 'breath', mouth: { x: hc.x + ux * 46, y: hc.y + uy * 46 }, ux, uy, half, len: def.length, cells: cells.map(afxLocalCell), charge: CH, T };
+        commitBase = CH + T + 300;
+    }
+    else if (id === 'fireRing') {
+        const cells = afxNova(hero, def.length, 3.56, 0.55);
+        mapHits(cells, dm, 0.4, CH, null, combat);
+        fx = { kind: 'ring', center: hc, len: def.length, cells: cells.map(afxLocalCell), charge: CH, T: def.length * 160 };
+        commitBase = CH + def.length * 160 + 300;
+    }
+    else if (id === 'meteorShower') {
+        if (!t)
+            return null;
+        const pool = afxBlast(t, def.areaRadius).sort(() => rnd() - 0.5), sx = [-1, -0.6, 0.6, 1][Math.floor(rnd() * 4)];
+        const meteors = [];
+        let lastImpact = 0;
+        for (let i = 0; i < def.count; i++) {
+            const c = pool[i % pool.length], tx = px(c.x) + C / 2, ty = py(c.y) + C / 2;
+            const start = Math.round(i * R(90, 160) + R(0, 80));
+            const a = { x: tx + sx * R(130, 210) + R(-15, 15), y: -70 - R(0, 50) };
+            const dur = 380 + Math.hypot(tx - a.x, ty - a.y) * 0.3, impactAt = CH + start + dur;
+            lastImpact = Math.max(lastImpact, impactAt);
+            meteors.push({ start: CH + start, a, b: { x: tx, y: ty }, dur, cells: afxBlast(c, 1).map(afxLocalCell), r: 1 });
+            enemies.forEach(e => {
+                const d = afxUnitDist(e.pos, c);
+                if (d > 1)
+                    return;
+                addHit(e, impactAt + d * 45, Math.max(1, Math.round(dm * (1 - 0.55 * d / 1.5))));
+            });
+        }
+        fx = { kind: 'meteors', meteors, charge: CH };
+        commitBase = lastImpact + 380;
+    }
+    else if (id === 'earthTremor') {
+        const cells = afxNova(hero, def.length, 2.44);
+        mapHits(cells, dm, 0.4, 230, hero, combat);
+        fx = { kind: 'tremor', center: hc, len: def.length, cells: cells.map(afxLocalCell), stomp: 230, T: def.length * 110 };
+        commitBase = 230 + def.length * 110 + 300;
+    }
+    else if (id === 'mightyJump') {
+        if (!t)
+            return null;
+        const L = afxPickLanding(combat, t, def.range);
+        if (!L)
+            return null;
+        const dist = Math.hypot(L.x - hero.x, L.y - hero.y) * C, crouch = 200, flight = 480 + dist * 0.55, landAt = crouch + flight;
+        const cells = afxNova(L, def.waveLength, 2.44);
+        heroMove = L;
+        mapHits(cells, dm, 0.4, landAt, L, { ...combat, heroPos: L });
+        fx = { kind: 'jump', from: { x: px(hero.x), y: py(hero.y) }, to: { x: px(L.x), y: py(L.y) }, crouch, flight, landAt, center: centerPx(L), len: def.waveLength, cells: cells.map(afxLocalCell), T: def.waveLength * 110 };
+        commitBase = landAt + def.waveLength * 110 + 300;
+    }
+    else
+        return null;
+    const commitMs = Math.round(Math.max(commitBase, ...hits.map(h => h.delay + (h.knock ? 560 : 160))));
+    return { id, fx: { ...fx, hits: fxHits(), commitMs }, hits, heroMove, commitMs };
+}
+// ---- Visual engine ----------------------------------------------------------
+// Sprites, palette lookup and the like are built once, on first use.
+let AFX_ASSETS = null;
+function afxAssets() {
+    if (AFX_ASSETS)
+        return AFX_ASSETS;
+    const mkNoise = n => {
+        const g = [];
+        for (let i = 0; i < n * n; i++)
+            g.push(Math.random());
+        return (x, y) => {
+            x = ((x % n) + n) % n;
+            y = ((y % n) + n) % n;
+            const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+            const a = g[yi * n + xi], b = g[yi * n + (xi + 1) % n], c = g[((yi + 1) % n) * n + xi], d = g[((yi + 1) % n) * n + (xi + 1) % n];
+            return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+        };
+    };
+    // Ragged puffs from layered noise; the edge always fades to transparent.
+    const genPuffs = (cnt, col, amp) => Array.from({ length: cnt }, () => {
+        const S = 96, cv = document.createElement('canvas');
+        cv.width = cv.height = S;
+        const g = cv.getContext('2d'), im = g.createImageData(S, S), n1 = mkNoise(8), n2 = mkNoise(16), n3 = mkNoise(32), ox = Math.random() * 8, oy = Math.random() * 8;
+        for (let y = 0; y < S; y++)
+            for (let x = 0; x < S; x++) {
+                const dx = (x - S / 2) / (S / 2), dy = (y - S / 2) / (S / 2), d = Math.hypot(dx, dy);
+                const f = 0.55 * n1(x / S * 4 + ox, y / S * 4 + oy) + 0.3 * n2(x / S * 8 + ox, y / S * 8 + oy) + 0.15 * n3(x / S * 16 + ox, y / S * 16 + oy);
+                const a = Math.max(0, Math.min(1, (1 - d * 1.05) * 1.6 + (f - 0.5) * amp)) * Math.min(1, Math.max(0, (1 - d) * 4));
+                const sm = a * a * (3 - 2 * a), i = (y * S + x) * 4, c = col(Math.min(1, Math.max(0, f * 1.3 - 0.1)), 1 - sm, y / S);
+                im.data[i] = c[0];
+                im.data[i + 1] = c[1];
+                im.data[i + 2] = c[2];
+                im.data[i + 3] = sm * 255;
+            }
+        g.putImageData(im, 0, 0);
+        return cv;
+    });
+    const SP = document.createElement('canvas');
+    SP.width = SP.height = 64;
+    {
+        const g = SP.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gr.addColorStop(0, 'rgba(255,255,255,1)');
+        gr.addColorStop(0.35, 'rgba(255,255,255,.5)');
+        gr.addColorStop(0.7, 'rgba(255,255,255,.12)');
+        gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 64, 64);
+    }
+    // Flame palette: brightness (0-255) -> colour; semi-transparent on purpose.
+    const LUT = (() => {
+        const st = [[0, 0, 0, 0], [30, 60, 8, 4], [90, 170, 30, 8], [140, 235, 80, 12], [190, 255, 150, 30], [225, 255, 215, 90], [255, 255, 250, 220]], t = new Uint8ClampedArray(1024);
+        for (let v = 0; v < 256; v++) {
+            let j = 1;
+            while (j < st.length - 1 && st[j][0] < v)
+                j++;
+            const a = st[j - 1], b = st[j], f = (v - a[0]) / (b[0] - a[0]);
+            t[v * 4] = a[1] + (b[1] - a[1]) * f;
+            t[v * 4 + 1] = a[2] + (b[2] - a[2]) * f;
+            t[v * 4 + 2] = a[3] + (b[3] - a[3]) * f;
+            t[v * 4 + 3] = v < 24 ? 0 : Math.min(185, (v - 24) / 70 * 185);
+        }
+        return t;
+    })();
+    AFX_ASSETS = {
+        SP, LUT,
+        SMK: genPuffs(6, (t, e) => [70 + t * 60 + e * 30, 64 + t * 54 + e * 26, 60 + t * 50 + e * 22], 1.1),
+        DST: genPuffs(6, (t, e, v) => { const l = Math.min(1.1, Math.max(0.6, 0.82 + 0.3 * (0.5 - v))); return [(150 + t * 72) * l + e * 14, (128 + t * 66) * l + e * 12, (100 + t * 56) * l + e * 8]; }, 0.75)
+    };
+    return AFX_ASSETS;
+}
+function createAbilityFxEngine(host) {
+    const C = GRID_CELL_PX;
+    const W = (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * C, H = (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * C;
+    const world = host.parentElement;
+    const PM = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 0.35 : 1;
+    const A = afxAssets();
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const timers = [], intervals = [], held = [];
+    let disposed = false, raf = 0, last = 0, gt = 0, parts = [], fires = [], lastBox = null;
+    const later = (ms, fn) => { const id = setTimeout(() => { if (!disposed)
+        fn(); }, ms); timers.push(id); return id; };
+    const every = (ms, fn) => { const id = setInterval(() => { if (!disposed)
+        fn(); }, ms); intervals.push(id); return id; };
+    const stopEvery = id => { clearInterval(id); };
+    // Layers (bottom to top): scorch marks, cell glow/dust, soft flame canvas, particle canvas, rings/balls/popups.
+    const mkLayer = (cls) => { const d = document.createElement('div'); d.className = cls; host.appendChild(d); return d; };
+    const scorchL = mkLayer('afx-layer'), cellL = mkLayer('afx-layer afx-blend'), topL = mkLayer('afx-layer');
+    const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.className = 'afx-canvas'; c.style.width = W + 'px'; c.style.height = H + 'px'; return c; };
+    const S = 1;
+    const fcv = mkCanvas(W / 2, H / 2), fcx = fcv.getContext('2d');
+    const xcv = mkCanvas(W * S, H * S), ctx = xcv.getContext('2d');
+    host.insertBefore(fcv, topL);
+    host.insertBefore(xcv, topL);
+    ctx.scale(S, S);
+    const ic = document.createElement('canvas');
+    ic.width = W / 2;
+    ic.height = H / 2;
+    const ictx = ic.getContext('2d', { willReadFrequently: true });
+    function renderFire(bl) {
+        if (!bl.length) {
+            if (lastBox) {
+                fcx.clearRect(lastBox.x, lastBox.y, lastBox.w, lastBox.h);
+                lastBox = null;
+            }
+            return;
+        }
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const p of bl) {
+            const k = p.l / p.m, age = 1 - k, r = (p.gr ? p.s * (0.6 + 0.6 * age) : p.s * (0.35 + 0.65 * k)) * 0.5;
+            x0 = Math.min(x0, p.x * 0.5 - r);
+            y0 = Math.min(y0, p.y * 0.5 - r);
+            x1 = Math.max(x1, p.x * 0.5 + r);
+            y1 = Math.max(y1, p.y * 0.5 + r);
+        }
+        x0 = Math.max(0, Math.floor(x0) - 1);
+        y0 = Math.max(0, Math.floor(y0) - 1);
+        x1 = Math.min(ic.width, Math.ceil(x1) + 1);
+        y1 = Math.min(ic.height, Math.ceil(y1) + 1);
+        const w = x1 - x0, h = y1 - y0;
+        if (lastBox)
+            fcx.clearRect(lastBox.x, lastBox.y, lastBox.w, lastBox.h);
+        if (w <= 0 || h <= 0) {
+            lastBox = null;
+            return;
+        }
+        ictx.globalCompositeOperation = 'source-over';
+        ictx.globalAlpha = 1;
+        ictx.fillStyle = '#000';
+        ictx.fillRect(x0, y0, w, h);
+        ictx.globalCompositeOperation = 'lighter';
+        for (const p of bl) {
+            const k = p.l / p.m, age = 1 - k, r = (p.gr ? p.s * (0.6 + 0.6 * age) : p.s * (0.35 + 0.65 * k)) * 0.5, q = p.a * Math.pow(k, 0.7) * Math.min(1, age * 10 + 0.3);
+            ictx.globalAlpha = Math.min(1, q);
+            ictx.drawImage(A.SP, p.x * 0.5 - r, p.y * 0.5 - r, r * 2, r * 2);
+        }
+        ictx.globalAlpha = 1;
+        const src = ictx.getImageData(x0, y0, w, h).data, out = fcx.createImageData(w, h), d = out.data, LUT = A.LUT;
+        for (let i = 0; i < src.length; i += 4) {
+            const v = src[i] * 4;
+            d[i] = LUT[v];
+            d[i + 1] = LUT[v + 1];
+            d[i + 2] = LUT[v + 2];
+            d[i + 3] = LUT[v + 3];
+        }
+        fcx.putImageData(out, x0, y0);
+        lastBox = { x: x0, y: y0, w, h };
+    }
+    const kick = () => { if (!raf && !disposed) {
+        last = performance.now();
+        raf = requestAnimationFrame(loop);
+    } };
+    // Particle kinds: f/c glowing sparks, s smoke, b soft flame blob, d dust, r debris.
+    function P(o) {
+        parts.push(Object.assign({ vx: 0, vy: 0, f: 2, s: 6, k: 'f', t: 0, b: 0, ph: Math.random() * 6.283, fq: Math.random() * 8, ln: Math.random() * 2 - 1, w: 0, a: 0.3 }, o, { m: o.l }));
+        kick();
+    }
+    function addFire(c, d) { const du = c.dur || 1.5; fires.push({ x: (c.x + 0.5) * C, y: (c.y + 0.5) * C, s: gt + d, e: gt + d + du, d: du }); kick(); }
+    function loop(t) {
+        const dt = Math.min(0.05, (t - last) / 1000);
+        last = t;
+        gt += dt;
+        ctx.clearRect(0, 0, W, H);
+        for (const f of fires) {
+            if (gt < f.s)
+                continue;
+            const e = Math.min(1, (gt - f.s) / Math.min(0.25, f.d * 0.3)) * Math.min(1, (f.e - gt) / Math.min(0.6, f.d * 0.5)), n = dt * 55 * e * (PM < 1 ? 0.5 : 1);
+            let c = Math.floor(n);
+            if (Math.random() < n - c)
+                c++;
+            for (; c > 0; c--)
+                P({ k: 'b', x: f.x + rnd(-0.42, 0.42) * C, y: f.y + rnd(0.05, 0.4) * C, vx: rnd(-6, 6), vy: -rnd(110, 180), f: 0.2, t: 250, w: 260, ph: rnd(0, 6.283), s: rnd(20, 32) * (0.7 + 0.3 * e), a: 0.18 * (0.5 + 0.5 * e), l: rnd(0.6, 1.1) });
+            if (Math.random() < dt * 14 * e * PM)
+                P({ x: f.x + rnd(-0.4, 0.4) * C, y: f.y, vx: rnd(-40, 40), vy: -rnd(80, 190), b: -30, t: 200, s: rnd(1.5, 3.5), l: rnd(0.7, 1.5), f: 0.3 });
+            if (Math.random() < dt * 7 * e * PM)
+                P({ k: 's', x: f.x + rnd(-0.3, 0.3) * C, y: f.y - 12, vx: rnd(-10, 10), vy: -rnd(30, 60), s: rnd(14, 24), l: rnd(1.4, 2.2), f: 0.5 });
+        }
+        fires = fires.filter(f => gt < f.e);
+        parts = parts.filter(p => (p.l -= dt) > 0);
+        const bl = [];
+        for (const p of parts) {
+            const k = p.l / p.m, d = Math.max(0, 1 - p.f * dt);
+            if (p.t) {
+                p.vx += rnd(-1, 1) * p.t * dt;
+                p.vy += rnd(-1, 1) * p.t * dt;
+            }
+            if (p.w)
+                p.vx += Math.sin(gt * 11 + p.ph) * p.w * dt;
+            p.vy -= p.b * dt;
+            if (p.k === 's') {
+                const ag = 1 - k;
+                p.vx += 600 * ag * ag * ag * dt;
+            } // wind takes the smoke at the end of its life
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= d;
+            p.vy *= d;
+            if (p.k === 'b') {
+                bl.push(p);
+                continue;
+            }
+            if (p.k === 'c' || p.k === 'f') {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = `rgba(255,${Math.round(70 + 150 * k)},${Math.round(40 * k)},${(k * 0.9).toFixed(2)})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.s * (0.4 + 0.6 * k), 0, 6.283);
+                ctx.fill();
+                continue;
+            }
+            if (p.k === 'd') {
+                const age = 1 - k, r = p.s * (0.95 + 1.2 * age), a = Math.min(0.85, 0.8 * Math.pow(k, 0.9) * Math.min(1, age * 7 + 0.15));
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = a;
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                if (p.ln > 0.2) {
+                    ctx.scale(1.4, 0.78);
+                    ctx.rotate((p.ph % 1 - 0.5) * 0.5);
+                }
+                else
+                    ctx.rotate(p.ph + age * p.fq * 0.12);
+                ctx.drawImage(A.DST[(p.ph * 10 | 0) % 6], -r, -r, r * 2, r * 2);
+                ctx.restore();
+                ctx.globalAlpha = 1;
+                continue;
+            }
+            if (p.k === 'r') {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = Math.min(1, k * 2);
+                ctx.fillStyle = p.col || 'rgb(135,122,108)';
+                ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+                ctx.globalAlpha = 1;
+                continue;
+            }
+            const age = 1 - k, r = p.s * (1.1 + 1.2 * age), a = 0.55 * Math.pow(k, 0.8) * Math.min(1, age * 6 + 0.1);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = a;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.ph + age * p.fq * 0.1);
+            ctx.drawImage(A.SMK[(p.ph * 10 | 0) % 6], -r, -r, r * 2, r * 2);
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        }
+        renderFire(bl);
+        raf = (parts.length || fires.length) ? requestAnimationFrame(loop) : 0;
+    }
+    // ---- DOM helpers ----
+    function mk(layer, cls, c) {
+        const e = document.createElement('div');
+        e.className = cls;
+        e.style.cssText = `left:${c.x * C}px;top:${c.y * C}px;width:${C}px;height:${C}px;--d:${(c.d || 0).toFixed(2)}`;
+        if (c.dur)
+            e.style.setProperty('--dur', c.dur + 's');
+        if (cls === 'afx-fire')
+            e.innerHTML = '<i></i>';
+        layer.appendChild(e);
+        e.addEventListener('animationend', ev => { if (ev.target === e)
+            e.remove(); });
+    }
+    function ring(cls, x, y, rr) {
+        const e = document.createElement('div');
+        e.className = cls;
+        const s = rr * 2;
+        e.style.cssText = `left:${x - rr}px;top:${y - rr}px;width:${s}px;height:${s}px`;
+        topL.appendChild(e);
+        e.addEventListener('animationend', () => e.remove());
+        return e;
+    }
+    const tokEl = key => world.querySelector('[data-fxkey="' + key + '"]');
+    const vib = pt => { try {
+        if (typeof navigator !== 'undefined' && navigator.vibrate)
+            navigator.vibrate(pt);
+    }
+    catch (e) { /* not supported */ } };
+    const worldAnim = (frames, opts) => { try {
+        return world.animate(frames, opts);
+    }
+    catch (e) {
+        return null;
+    } };
+    function quake() {
+        if (PM < 1)
+            return;
+        worldAnim([{ translate: '0 0' }, { translate: '-7px 4px', offset: 0.12 }, { translate: '6px -5px', offset: 0.26 }, { translate: '-5px -3px', offset: 0.4 }, { translate: '4px 4px', offset: 0.55 }, { translate: '-2px 2px', offset: 0.72 }, { translate: '0 0' }], { duration: 420 });
+    }
+    function rumble(ms, amp) {
+        if (PM < 1)
+            return;
+        const a = worldAnim([{ translate: '0 0' }, { translate: amp + 'px ' + (amp * 0.7) + 'px', offset: 0.25 }, { translate: -amp + 'px ' + (-amp * 0.5) + 'px', offset: 0.75 }, { translate: '0 0' }], { duration: amp > 3 ? 60 : 70, iterations: Infinity });
+        if (a)
+            later(ms, () => a.cancel());
+    }
+    function inhale(x, y, rad, speed, ms, every_ms) {
+        const id = every(every_ms, () => { const a = rnd(0, 6.283); P({ x: x + Math.cos(a) * rad, y: y + Math.sin(a) * rad, vx: -Math.cos(a) * speed, vy: -Math.sin(a) * speed, s: 4, l: 0.3, f: 0 }); });
+        later(ms, () => stopEvery(id));
+    }
+    function charge(el, ms) { if (el) {
+        try {
+            el.animate([{ scale: 1 }, { scale: 1.12 }], { duration: ms, easing: 'ease-in' });
+        }
+        catch (e) { /* ignore */ }
+    } }
+    function popup(h) {
+        const p = document.createElement('div');
+        p.className = 'afx-pop';
+        p.textContent = '−' + h.dmg;
+        p.style.cssText = `left:${h.x}px;top:${h.y - C * 0.8}px`;
+        topL.appendChild(p);
+        p.addEventListener('animationend', () => p.remove());
+    }
+    function applyHit(h) {
+        const el = tokEl(h.key);
+        popup(h);
+        if (!el)
+            return;
+        try {
+            el.animate([{ filter: 'brightness(2.4) sepia(1) saturate(5) hue-rotate(-25deg)' }, { filter: 'none' }], { duration: 420 });
+        }
+        catch (e) { /* ignore */ }
+        if (h.knock && (h.knock.dx || h.knock.dy)) {
+            const dx = h.knock.dx, dy = h.knock.dy;
+            el.style.transition = 'none';
+            const a = el.animate([{ translate: '0 0', rotate: '0deg' }, { translate: (dx * 0.5) + 'px ' + (dy * 0.5 - 24) + 'px', rotate: (Math.random() < 0.5 ? -6 : 6) + 'deg', offset: 0.45 }, { translate: dx + 'px ' + dy + 'px', rotate: '0deg' }], { duration: 520, easing: 'cubic-bezier(.15,.8,.3,1)', fill: 'forwards' });
+            held.push({ anim: a, el });
+            later(520, () => { for (let i = 0, n = Math.round(4 * PM); i < n; i++)
+                P({ k: 'd', x: h.x + dx + rnd(-30, 30), y: h.y + dy + C - rnd(0, 14), vx: rnd(-40, 40), vy: -rnd(15, 40), s: rnd(18, 30), l: rnd(0.8, 1.3), f: 1.2, b: 20 }); });
+        }
+        else if (h.hop) {
+            try {
+                el.animate([{ translate: '0 0', rotate: '0deg' }, { translate: '0 -26px', rotate: (Math.random() < 0.5 ? -5 : 5) + 'deg', offset: 0.38 }, { translate: '0 3px', rotate: '0deg', offset: 0.72 }, { translate: '0 0' }], { duration: 520, easing: 'ease-out' });
+            }
+            catch (e) { /* ignore */ }
+        }
+    }
+    // ---- shared pieces ----
+    function burst(x, y, r) {
+        for (let i = 0, n = Math.round((36 + r * 12) * PM); i < n; i++) {
+            const a = rnd(0, 6.283), sp = 80 + Math.random() * r * C * 2.2;
+            P({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, s: rnd(3, 8), l: rnd(0.5, 1.2), f: 1.6 });
+        }
+        for (let i = 0, n = Math.round((20 + r * 7) * PM); i < n; i++) {
+            const a = rnd(0, 6.283), sp = 60 + Math.random() * r * C * 2.2;
+            P({ k: 'b', gr: 1, x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20, f: 2.4, t: 400, b: 70, s: rnd(28, 46), a: 0.22, l: rnd(0.5, 0.95) });
+        }
+        for (let i = 0, n = Math.round((8 + r * 3) * PM); i < n; i++)
+            P({ k: 'b', x: x + rnd(-0.5, 0.5) * r * C * 0.6, y: y + rnd(-0.2, 0.4) * r * C * 0.4, vx: rnd(-20, 20), vy: -rnd(90, 210), f: 0.6, t: 300, w: 200, b: 40, ph: rnd(0, 6.283), s: rnd(24, 42), a: 0.2, l: rnd(0.7, 1.2) });
+        for (let i = 0, n = Math.round(24 * PM); i < n; i++) {
+            const a = rnd(0, 6.283), sp = rnd(80, r * C * 2.6);
+            P({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, s: rnd(1.5, 3.5), l: rnd(0.7, 1.3), f: 0.8 });
+        }
+        for (let i = 0, n = Math.round(22 * PM); i < n; i++) {
+            const a = rnd(0, 6.283), sp = rnd(20, 20 + r * C * 0.5), o = Math.random() * r * C * 0.4;
+            P({ k: 's', x: x + Math.cos(a) * o, y: y + Math.sin(a) * o, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, s: rnd(16, 28), l: rnd(1.6, 2.5), f: 1 });
+        }
+    }
+    function impact(x, y, r, cells, quiet) {
+        ring('afx-flash', x, y, (r + 1) * C);
+        ring('afx-wave', x, y, (r + 0.5) * C);
+        quake();
+        vib(quiet ? [22, 15, 14] : [40 + r * 15, 30, 30 + r * 10, 25, 20]);
+        cells.forEach(c => { mk(scorchL, 'afx-scorch', c); mk(cellL, 'afx-fire', c); addFire(c, c.d * 0.045); });
+        burst(x, y, r);
+    }
+    function makeBall(n, sizes) {
+        const m = document.createElement('div');
+        m.className = 'afx-ball';
+        m.innerHTML = sizes.map(s => `<i style="width:${s}px;height:${s}px;margin:-${s / 2}px 0 0 -${s / 2}px"></i>`).join('');
+        const sh = document.createElement('div');
+        sh.className = 'afx-shadow';
+        topL.appendChild(sh);
+        topL.appendChild(m);
+        return { m, sh };
+    }
+    // The fireball: three orbiting orbs on an arc, with a shadow on the ground.
+    function fly(a, b, dur, done) {
+        const { m, sh } = makeBall(3, [36, 34, 34]);
+        const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = (b.x - a.x) / dist, ny = (b.y - a.y) / dist, t0 = performance.now();
+        (function step(now) {
+            if (disposed) {
+                m.remove();
+                sh.remove();
+                return;
+            }
+            const t = Math.min(1, (now - t0) / dur), e = Math.pow(t, 1.35), x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e, h = Math.sin(Math.PI * e), ly = y - h * 70;
+            m.style.left = x + 'px';
+            m.style.top = ly + 'px';
+            m.style.transform = `scale(${(1 + 0.6 * h + rnd(-0.05, 0.05)).toFixed(2)}) rotate(${(e * 180) | 0}deg)`;
+            for (let i = 0; i < 3; i++) {
+                const an = now / (110 + i * 30) + i * 2.1;
+                m.children[i].style.transform = `translate(${(Math.cos(an) * 6).toFixed(1)}px,${(Math.sin(an) * 6).toFixed(1)}px)`;
+            }
+            sh.style.left = x + 'px';
+            sh.style.top = y + 'px';
+            sh.style.transform = `scale(${1 - 0.35 * h})`;
+            sh.style.opacity = 1 - 0.4 * h;
+            P({ k: 'c', x, y: ly, vx: rnd(-25, 25), vy: rnd(-25, 25), s: rnd(9, 16), l: 0.32 });
+            for (let q = 0; q < 3; q++) {
+                const bk = rnd(-4, 15), sd = rnd(-24, 24);
+                P({ k: 'c', x: x - nx * bk - ny * sd, y: ly - ny * bk + nx * sd, vx: rnd(-30, 30) - nx * 20, vy: rnd(-30, 30) - ny * 20, s: rnd(3, 7), l: rnd(0.25, 0.5), f: 1 });
+            }
+            if (Math.random() < 0.85 * PM)
+                P({ k: 's', x, y: ly, vx: rnd(-15, 15), vy: rnd(-15, 15), s: rnd(9, 14), l: rnd(1.3, 1.9), f: 1 });
+            if (t < 1)
+                requestAnimationFrame(step);
+            else {
+                m.remove();
+                sh.remove();
+                done();
+            }
+        })(t0);
+    }
+    function meteorFall(a, b, dur, done) {
+        const { m, sh } = makeBall(2, [34, 30]);
+        sh.style.left = b.x + 'px';
+        sh.style.top = b.y + 'px';
+        const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1, bx = (a.x - b.x) / dist, by = (a.y - b.y) / dist, t0 = performance.now();
+        (function step(now) {
+            if (disposed) {
+                m.remove();
+                sh.remove();
+                return;
+            }
+            const t = Math.min(1, (now - t0) / dur), e = t * t, x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e;
+            m.style.left = x + 'px';
+            m.style.top = y + 'px';
+            m.style.transform = `scale(${(0.8 + 0.3 * t).toFixed(2)})`;
+            for (let i = 0; i < 2; i++) {
+                const an = now / (90 + i * 30) + i * 3;
+                m.children[i].style.transform = `translate(${(Math.cos(an) * 4).toFixed(1)}px,${(Math.sin(an) * 4).toFixed(1)}px)`;
+            }
+            sh.style.opacity = (0.15 + 0.45 * t).toFixed(2);
+            sh.style.transform = `scale(${(0.5 + 0.6 * t).toFixed(2)})`;
+            P({ k: 'c', x, y, vx: bx * rnd(20, 80) + rnd(-25, 25), vy: by * rnd(20, 80) + rnd(-25, 25), s: rnd(7, 13), l: 0.32 });
+            P({ k: 'c', x: x + bx * rnd(0, 26) + rnd(-14, 14), y: y + by * rnd(0, 26) + rnd(-14, 14), vx: rnd(-25, 25), vy: rnd(-25, 25), s: rnd(3, 6), l: rnd(0.25, 0.5), f: 1 });
+            P({ k: 'b', x, y, vx: bx * rnd(60, 140) + rnd(-30, 30), vy: by * rnd(60, 140) + rnd(-30, 30), f: 1, t: 300, s: rnd(16, 24), a: 0.2, l: rnd(0.3, 0.5) });
+            if (Math.random() < 0.8 * PM)
+                P({ k: 's', x: x + bx * 12, y: y + by * 12, vx: bx * rnd(20, 50), vy: by * rnd(20, 50), s: rnd(9, 14), l: rnd(1.3, 1.9), f: 1 });
+            if (t < 1)
+                requestAnimationFrame(step);
+            else {
+                m.remove();
+                sh.remove();
+                done();
+            }
+        })(t0);
+    }
+    // Dust wave: each cell lights up as the front reaches it; nearer cells clear first.
+    function quakeWave(center, len, cells, T) {
+        for (let i = 0, n = Math.round(18 * PM); i < n; i++) {
+            const a = rnd(0, 6.283), r0 = rnd(40, 62), cx = Math.cos(a), cy = Math.sin(a);
+            P({ k: 'd', x: center.x + cx * r0, y: center.y + cy * r0, vx: cx * rnd(60, 140), vy: cy * rnd(60, 140) - 10, s: rnd(18, 30), l: rnd(0.6, 1.1), f: 1.6, b: 15 });
+        }
+        rumble(T, 4);
+        vib((() => { const pt = []; for (let n = 0; n <= len; n++) {
+            const on = Math.max(18, 50 - n * 6);
+            pt.push(on, Math.max(10, 110 - on));
+        } return pt; })());
+        cells.forEach(c => {
+            const cc = { ...c }, tt = Math.min(1, Math.max(0, (c.r - 1.2) / len)), fl = 0.4 + 0.9 * tt;
+            cc.dur = +(0.45 + 0.85 * tt).toFixed(2);
+            mk(cellL, 'afx-dust', cc);
+            later(c.d * 45, () => {
+                const x0 = (c.x + 0.5) * C, y0 = (c.y + 0.5) * C, ex = x0 - center.x, ey = y0 - center.y, el = Math.hypot(ex, ey) || 1, dx = ex / el;
+                for (let i = 0, n = Math.round(3 * PM); i < n; i++)
+                    P({ k: 'd', x: x0 + rnd(-20, 20), y: y0 + rnd(-14, 18), vx: dx * rnd(15, 50) + rnd(-10, 10), vy: -rnd(15, 40), s: rnd(13, 22), l: rnd(0.9, 1.6) * fl, f: 1.2, b: 20 });
+                if (Math.random() < 0.45 * PM)
+                    for (let i = 0, n = 1 + (Math.random() * 3 | 0); i < n; i++)
+                        P({ k: 'r', col: ['rgb(96,74,54)', 'rgb(122,98,72)', 'rgb(72,56,44)', 'rgb(108,88,66)'][Math.random() * 4 | 0], x: x0 + rnd(-22, 22), y: y0 + rnd(-12, 18), vx: dx * rnd(10, 70) + rnd(-40, 40), vy: -rnd(60, 180), b: -460, s: rnd(1.5, 3.6), l: rnd(0.5, 0.95), f: 0.15 });
+                if (Math.random() < 0.35 * PM)
+                    P({ k: 'r', x: x0 + rnd(-14, 14), y: y0 + rnd(-8, 14), vx: dx * rnd(30, 90) + rnd(-30, 30), vy: -rnd(90, 170), b: -420, s: rnd(2.5, 4.5), l: rnd(0.5, 0.8), f: 0.2 });
+            });
+        });
+    }
+    function igniteCells(cells, startMs) {
+        cells.forEach(c => { later(startMs, () => { mk(scorchL, 'afx-scorch', c); mk(cellL, 'afx-fire', c); addFire(c, c.d * 0.045); }); });
+    }
+    // ---- the attacks ----
+    const attacks = {
+        fireball(ev, hero) {
+            charge(hero, ev.charge);
+            inhale(ev.mouth.x, ev.mouth.y, 44, 150, ev.charge, 45);
+            later(ev.charge, () => fly(ev.mouth, ev.target, ev.flight, () => impact(ev.target.x, ev.target.y, ev.r, ev.cells, false)));
+        },
+        breath(ev, hero) {
+            charge(hero, ev.charge);
+            inhale(ev.mouth.x, ev.mouth.y, 44, 150, ev.charge, 45);
+            later(ev.charge, () => {
+                const V = C / 0.0675, T = ev.T;
+                ring('afx-flash', ev.mouth.x, ev.mouth.y, C * 1.1);
+                ev.cells.forEach(c => { mk(scorchL, 'afx-scorch', c); mk(cellL, 'afx-fire', c); addFire(c, c.d * 0.045); });
+                rumble(T, 2);
+                vib((() => { const np = Math.max(2, Math.ceil(T / 50)), pt = []; for (let i = 0; i < np; i++)
+                    pt.push(35, 15); return pt; })());
+                const em = every(16, () => {
+                    for (let k = 0; k < 3; k++) {
+                        const a = Math.atan2(ev.uy, ev.ux) + rnd(-ev.half, ev.half) * 0.92, v = V * rnd(0.85, 1.15), o = rnd(-9, 9), L = (ev.len * C + 60) / v;
+                        P({ x: ev.mouth.x - ev.uy * o, y: ev.mouth.y + ev.ux * o, vx: Math.cos(a) * v, vy: Math.sin(a) * v, s: rnd(10, 22), l: L * rnd(0.6, 1), f: 0 });
+                        P({ k: 'b', gr: 1, x: ev.mouth.x - ev.uy * o, y: ev.mouth.y + ev.ux * o, vx: Math.cos(a) * v, vy: Math.sin(a) * v, f: 0, t: 900, w: 200, b: 60, ph: rnd(0, 6.283), s: rnd(22, 38), a: 0.18, l: L * rnd(0.7, 1) });
+                        if (Math.random() < 0.18 * PM)
+                            P({ k: 's', x: ev.mouth.x, y: ev.mouth.y, vx: Math.cos(a) * v * 0.6, vy: Math.sin(a) * v * 0.6, s: 16, l: 0.9, f: 0.4 });
+                    }
+                });
+                later(T, () => stopEvery(em));
+            });
+        },
+        ring(ev, hero) {
+            charge(hero, ev.charge);
+            inhale(ev.center.x, ev.center.y, C + 18, 170, ev.charge, 30);
+            later(ev.charge, () => {
+                ring('afx-flash', ev.center.x, ev.center.y, C * 1.8);
+                quake();
+                vib((() => { const pt = []; for (let n = 0; n <= ev.len; n++) {
+                    const on = Math.max(18, 50 - n * 6);
+                    pt.push(on, Math.max(10, 160 - on));
+                } return pt; })());
+                ev.cells.forEach(c => { mk(scorchL, 'afx-scorch', c); mk(cellL, 'afx-fire', c); addFire(c, c.d * 0.045); });
+            });
+        },
+        meteors(ev, hero) {
+            charge(hero, ev.charge);
+            ev.meteors.forEach(m => later(m.start, () => meteorFall(m.a, m.b, m.dur, () => impact(m.b.x, m.b.y, m.r, m.cells, true))));
+        },
+        tremor(ev, hero) {
+            if (hero) {
+                try {
+                    hero.animate([{ translate: '0 0', scale: 1 }, { translate: '0 -16px', scale: 1.07, offset: 0.35 }, { translate: '0 3px', scale: 0.95, offset: 0.5 }, { translate: '0 0', scale: 1 }], { duration: 550, easing: 'ease-out' });
+                }
+                catch (e) { /* ignore */ }
+            }
+            later(ev.stomp, () => quakeWave(ev.center, ev.len, ev.cells, ev.T));
+        },
+        jump(ev, hero) {
+            const dx = ev.to.x - ev.from.x, dy = ev.to.y - ev.from.y, hmax = 50 + Math.hypot(dx, dy) * 0.25;
+            const sh = document.createElement('div');
+            sh.className = 'afx-shadow afx-shadow-big';
+            topL.appendChild(sh);
+            const sx = ev.from.x + C, sy = ev.from.y + C * 1.8;
+            sh.style.left = sx + 'px';
+            sh.style.top = sy + 'px';
+            sh.style.display = 'none';
+            if (hero) {
+                hero.style.transition = 'none';
+                hero.style.zIndex = 6;
+                try {
+                    hero.animate([{ scale: 1 }, { scale: '1.1 0.86' }], { duration: ev.crouch, easing: 'ease-in' });
+                }
+                catch (e) { /* ignore */ }
+                for (let i = 0, n = Math.round(8 * PM); i < n; i++) {
+                    const a = rnd(0, 6.283);
+                    P({ k: 'd', x: ev.from.x + C + Math.cos(a) * 40, y: ev.from.y + C * 2 - 6 + Math.sin(a) * 8, vx: Math.cos(a) * rnd(40, 110), vy: -rnd(10, 40), s: rnd(14, 22), l: rnd(0.6, 1), f: 1.6, b: 15 });
+                }
+                later(ev.crouch, () => {
+                    sh.style.display = 'block';
+                    const a = hero.animate([{ translate: '0 0', scale: 1 }, { translate: (dx * 0.5) + 'px ' + (dy * 0.5 - hmax) + 'px', scale: 1.18, offset: 0.5 }, { translate: dx + 'px ' + dy + 'px', scale: 1 }], { duration: ev.flight, easing: 'cubic-bezier(.45,.05,.55,.95)', fill: 'forwards' });
+                    held.push({ anim: a, el: hero });
+                    const t0 = performance.now();
+                    (function step(now) {
+                        if (disposed)
+                            return;
+                        const t = Math.min(1, (now - t0) / ev.flight), e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, h = Math.sin(Math.PI * t);
+                        sh.style.left = (sx + dx * e) + 'px';
+                        sh.style.top = (sy + dy * e) + 'px';
+                        sh.style.opacity = (0.55 - 0.3 * h).toFixed(2);
+                        sh.style.transform = `scale(${(1 - 0.3 * h).toFixed(2)})`;
+                        if (t < 1)
+                            requestAnimationFrame(step);
+                        else
+                            sh.remove();
+                    })(t0);
+                });
+                later(ev.landAt, () => {
+                    try {
+                        hero.animate([{ scale: '1.14 0.84' }, { scale: '0.98 1.03', offset: 0.6 }, { scale: 1 }], { duration: 320, easing: 'ease-out' });
+                    }
+                    catch (e) { /* ignore */ }
+                });
+            }
+            later(ev.landAt, () => { ring('afx-flash', ev.center.x, ev.center.y, C * 1.6); quakeWave(ev.center, ev.len, ev.cells, ev.T); });
+        }
+    };
+    // After the game state commits a move/knockback, drop the visual offsets
+    // the engine was holding so the real new position shows without a double
+    // shift (or a slide).
+    function settle() {
+        if (!held.length)
+            return;
+        held.splice(0).forEach(({ anim, el }) => {
+            el.style.transition = 'none';
+            try {
+                anim.cancel();
+            }
+            catch (e) { /* ignore */ }
+            requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; el.style.zIndex = ''; }));
+        });
+    }
+    function play(ev) {
+        if (disposed || !ev || !attacks[ev.kind])
+            return;
+        const hero = tokEl('hero');
+        attacks[ev.kind](ev, hero);
+        (ev.hits || []).forEach(h => later(h.delay, () => applyHit(h)));
+    }
+    function dispose() {
+        disposed = true;
+        timers.forEach(clearTimeout);
+        intervals.forEach(clearInterval);
+        if (raf)
+            cancelAnimationFrame(raf);
+        held.splice(0).forEach(({ anim, el }) => { try {
+            anim.cancel();
+        }
+        catch (e) { /* ignore */ } el.style.transition = ''; el.style.zIndex = ''; });
+        while (host.firstChild)
+            host.removeChild(host.firstChild);
+    }
+    return { play, settle, dispose };
+}
+const AFX_CSS = `
+  .afx-host { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; z-index: 5; overflow: visible; }
+  .afx-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+  .afx-blend { mix-blend-mode: screen; }
+  .afx-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .afx-fire { position: absolute; border-radius: 9px; animation: afx-burn var(--dur, 1.6s) ease-out both; animation-delay: calc(var(--d) * 45ms); }
+  .afx-fire i { position: absolute; inset: 12%; border-radius: 50%; background: radial-gradient(circle, #fff8d6, rgba(253,224,71,.85) 45%, rgba(249,115,22,0) 72%); animation: afx-core .28s steps(2) infinite; }
+  @keyframes afx-core { 50% { transform: scale(.8) rotate(20deg); opacity: .8; } }
+  @keyframes afx-burn { 0% { opacity: 0; transform: scale(.3); background: #fff3b0; } 10% { opacity: 1; transform: scale(1.06); background: #fbbf24; box-shadow: 0 0 22px 6px rgba(251,146,60,.9); } 40% { opacity: .92; transform: scale(1); background: #ea580c; box-shadow: 0 0 16px 3px rgba(234,88,12,.7); } 75% { opacity: .5; background: #991b1b; box-shadow: 0 0 8px rgba(153,27,27,.4); } 100% { opacity: 0; background: #450a0a; box-shadow: none; } }
+  .afx-dust { position: absolute; border-radius: 9px; background: radial-gradient(circle, rgba(200,172,135,.5), rgba(150,125,95,.2) 60%, transparent 82%); animation: afx-dustp var(--dur, .85s) ease-out both; animation-delay: calc(var(--d) * 45ms); }
+  @keyframes afx-dustp { 0% { opacity: 0; transform: scale(.6); } 18% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.25); } }
+  .afx-scorch { position: absolute; border-radius: 9px; background: radial-gradient(circle, rgba(28,12,6,.9), rgba(28,12,6,.35) 70%, transparent); animation: afx-scorch 6s ease-out both; animation-delay: calc(var(--d) * 45ms + 500ms); }
+  @keyframes afx-scorch { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+  .afx-wave { position: absolute; border-radius: 50%; border: 3px solid rgba(254,215,170,.95); box-shadow: 0 0 24px rgba(249,115,22,.8), inset 0 0 30px rgba(249,115,22,.5); animation: afx-wave 1.1s cubic-bezier(.2,.7,.3,1) forwards; }
+  @keyframes afx-wave { from { transform: scale(.05); opacity: 1; filter: blur(0); } 15% { opacity: .85; filter: blur(.5px); } 35% { opacity: .6; filter: blur(1.5px); } 55% { opacity: .38; filter: blur(3px); } 75% { opacity: .18; filter: blur(5px); } 90% { opacity: .06; filter: blur(7px); } to { transform: scale(1); opacity: 0; filter: blur(9px); } }
+  .afx-flash { position: absolute; border-radius: 50%; background: radial-gradient(circle, #fff, rgba(255,244,190,.85) 30%, rgba(251,146,60,0) 70%); animation: afx-flash .32s ease-out forwards; }
+  @keyframes afx-flash { from { transform: scale(.3); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+  .afx-ball { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  .afx-ball i { position: absolute; left: 50%; top: 50%; border-radius: 50%; background: radial-gradient(circle at 42% 42%, #fff 0 14%, #fde047 32%, #f97316 58%, rgba(239,68,68,0) 74%); box-shadow: 0 0 18px 8px rgba(249,115,22,.5); }
+  .afx-shadow { position: absolute; width: 34px; height: 12px; margin: -6px 0 0 -17px; border-radius: 50%; background: rgba(0,0,0,.5); filter: blur(2px); }
+  .afx-shadow-big { width: 80px; height: 22px; margin: -11px 0 0 -40px; }
+  .afx-pop { position: absolute; transform: translate(-50%, 0); font: 700 1.25rem/1 var(--font-mono, monospace); color: #fca5a5; text-shadow: 0 2px 0 #450a0a, 0 0 8px #000; animation: afx-pop .95s ease-out forwards; z-index: 3; }
+  @keyframes afx-pop { from { opacity: 0; transform: translate(-50%, 10px) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); } to { opacity: 0; transform: translate(-50%, -46px); } }
+  .afx-preview-cell { position: absolute; box-sizing: border-box; border: 1px dashed rgba(248,113,113,.7); background: rgba(220,38,38,.18); pointer-events: none; z-index: 1; border-radius: 5px; }
+  .afx-preview-land { position: absolute; box-sizing: border-box; border: 2px solid rgba(251,191,36,.95); background: rgba(251,191,36,.18); pointer-events: none; z-index: 1; border-radius: 8px; box-shadow: 0 0 10px rgba(251,191,36,.6); }
+  .afx-preview-aim { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border: 2px solid #fbbf24; border-radius: 50%; box-shadow: 0 0 10px rgba(251,191,36,.6); pointer-events: none; z-index: 1; }
+  .afx-preview-aim::before, .afx-preview-aim::after { content: ""; position: absolute; background: #fbbf24; }
+  .afx-preview-aim::before { left: 50%; top: -8px; bottom: -8px; width: 2px; margin-left: -1px; }
+  .afx-preview-aim::after { top: 50%; left: -8px; right: -8px; height: 2px; margin-top: -1px; }
+  @media (prefers-reduced-motion: reduce) { .afx-wave { animation-duration: 1.6s; } }
+`;
+// ---- Committing a finished script onto the combat object -------------------
+let AFX_SEQ = 0;
+const afxNextSeq = () => ++AFX_SEQ;
+const afxEnemyOut = e => !!e.fled || isBodyDestroyed(e.parts);
+// Spills the damage over the body parts torso -> head -> the rest, so a big
+// hit can actually finish someone off (applyDotToParts alone only ever
+// empties one part per call).
+function afxDamageParts(parts, dmg) {
+    let cur = parts, left = dmg, dealt = 0;
+    for (let i = 0; i < 12 && left > 0; i++) {
+        const r = applyDotToParts(cur, left);
+        if (!r.hitPart || r.actualDamage <= 0)
+            break;
+        cur = r.parts;
+        dealt += r.actualDamage;
+        left -= r.actualDamage;
+    }
+    return { parts: cur, dealt };
+}
+function afxCommitScript(prev, script, abilityId, t, youLabel) {
+    const def = ABILITY_DEFS[abilityId];
+    const agg = new Map();
+    script.hits.forEach(h => {
+        const a = agg.get(h.enemyId) || { dmg: 0, knock: null };
+        a.dmg += h.dmg;
+        if (h.knock)
+            a.knock = h.knock;
+        agg.set(h.enemyId, a);
+    });
+    const log = [...prev.log, { text: t('afxLogCast').replace('{who}', youLabel).replace('{name}', t(def.nameKey)), kind: 'hit' }];
+    const enemies = prev.enemies.map(e => {
+        const a = agg.get(e.id);
+        if (!a)
+            return e;
+        const wasOut = afxEnemyOut(e), r = afxDamageParts(e.parts, a.dmg);
+        const next = { ...e, parts: r.parts };
+        if (a.knock)
+            next.pos = a.knock;
+        log.push({ text: t('afxLogHit').replace('{name}', e.enemyName).replace('{dmg}', String(a.dmg)), kind: 'hit' });
+        if (a.knock)
+            log.push({ text: t('afxLogKnock').replace('{name}', e.enemyName), kind: 'hit' });
+        if (!wasOut && afxEnemyOut(next))
+            log.push({ text: t('afxLogDown').replace('{name}', e.enemyName), kind: 'vital' });
+        return next;
+    });
+    if (!agg.size)
+        log.push({ text: t('afxLogMiss'), kind: 'hit' });
+    const fightState = prev.abilityState || createAbilityFightState();
+    const abilityState = { ...fightState, spellReadyAt: { ...(fightState.spellReadyAt || {}), [abilityId]: prev.round + def.cooldownRounds } };
+    const next = { ...prev, enemies, log, abilityState, abilityFx: null, abilityFxCommit: (prev.abilityFxCommit || 0) + 1 };
+    if (script.heroMove)
+        next.heroPos = script.heroMove;
+    return { combat: next, allDown: enemies.every(afxEnemyOut) };
+}
+const AFX_UI_CSS = `
+  .afx-aim-catcher { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 7; cursor: crosshair; }
+  .combat-ability-chip-aiming { outline: 2px solid var(--amber-400, #fbbf24); outline-offset: 1px; }
+  .afx-aim-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }
+  .afx-aim-bar-hint { flex: 1 1 12rem; font-size: 0.78rem; color: var(--stone-400, #a8a29e); }
+  .afx-aim-bar-field { flex-wrap: nowrap; gap: 0.35rem; position: absolute; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px)); z-index: 2; margin: 0; padding: 0.4rem 0.5rem; border-radius: 8px; background: rgba(12, 10, 8, 0.88); border: 1px solid var(--stone-700, #44403c); }
+  .afx-aim-bar-field > * { pointer-events: auto; }
+  .afx-aim-bar-field .afx-aim-bar-hint { flex: 1 1 auto; min-width: 0; font-size: 0.7rem; line-height: 1.2; }
+  .afx-aim-bar-field .btn { flex: none; padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+`;
 // Combat-only display helper for CombatModal's ability row below: whether
 // a given active ability (see ABILITY_DEFS) is currently usable, and if
 // not, how many rounds remain (see createAbilityFightState/onUseAbility —
@@ -32117,6 +33227,10 @@ function getAbilityStatus(id, fightState, round) {
     if (!def || def.type !== 'active')
         return { available: false, cooldown: null, usedUp: false };
     const state = fightState || createAbilityFightState();
+    if (def.spellFx) {
+        const remaining = Math.max(0, ((state.spellReadyAt && state.spellReadyAt[id]) || 1) - round);
+        return { available: remaining <= 0, cooldown: remaining > 0 ? remaining : null, usedUp: false };
+    }
     if (def.frequency === 'perFight') {
         const usedField = id === 'bloodlust' ? 'bloodlustUsed' : id === 'resilience' ? 'resilienceUsed' : 'secondWindUsed';
         return { available: !state[usedField], cooldown: null, usedUp: !!state[usedField] };
@@ -32128,7 +33242,7 @@ function getAbilityStatus(id, fightState, round) {
     }
     return { available: true, cooldown: null, usedUp: false };
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, introActive, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {} }) {
+function CombatModal({ combat, heroName, inventory, itemRarities, introActive, fxBusy, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {} }) {
     // The hero portrait's two armor bars — cur/max straight off combat state
     // (see startCombat/attemptStealthKill for where these are rolled, and
     // resolveOneAttack for where cur drains as hits land).
@@ -32272,6 +33386,34 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // vanish) until the next turn begins. Attacking doesn't depend on it
     // either, see enemy targetable above.
     const [planningMove, setPlanningMove] = useState(true);
+    // ---- spell abilities (see the SPELL ABILITIES block above) ----
+    // inputLocked = the pre-battle intro OR a cast whose animation is still playing.
+    // `aim` is set while a targeted spell waits for its target cell.
+    const inputLocked = introActive || !!fxBusy;
+    const [aim, setAim] = useState(null);
+    const aimRef = useRef(null);
+    aimRef.current = aim;
+    const aimArmedRef = useRef(false);
+    const [afxHost, setAfxHost] = useState(null);
+    const afxRef = useRef(null);
+    const afxPlayedRef = useRef(0);
+    useEffect(() => {
+        if (!afxHost)
+            return undefined;
+        const eng = createAbilityFxEngine(afxHost);
+        afxRef.current = eng;
+        return () => { eng.dispose(); afxRef.current = null; };
+    }, [afxHost]);
+    useEffect(() => {
+        const ev = combat.abilityFx;
+        if (!ev || !afxRef.current || afxPlayedRef.current === ev.seq)
+            return;
+        afxPlayedRef.current = ev.seq;
+        if (Date.now() - (ev.at || 0) < 2500)
+            afxRef.current.play(ev);
+    }, [combat.abilityFx, afxHost]);
+    useLayoutEffect(() => { if (combat.abilityFxCommit && afxRef.current)
+        afxRef.current.settle(); }, [combat.abilityFxCommit]);
     const [pathTarget, setPathTarget] = useState(null);
     useEffect(() => { setPlanningMove(true); setPathTarget(null); }, [combat.turnPos, combat.round]);
     const activeMoverPos = isHeroTurn ? combat.heroPos : (isAllyPlayerTurn ? currentAlly.pos : null);
@@ -32400,7 +33542,13 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         setPan({ x: panStateRef.current.startPanX + dx, y: panStateRef.current.startPanY + dy });
     }
     function onGridPointerUp(e) {
+        const wasSingle = activePointersRef.current.size === 1;
         activePointersRef.current.delete(e.pointerId);
+        if (aimArmedRef.current) {
+            aimArmedRef.current = false;
+            if (e.type === 'pointerup' && wasSingle && !panStateRef.current.moved)
+                aimTapAt(e.clientX, e.clientY);
+        }
         if (activePointersRef.current.size < 2)
             pinchRef.current = null;
         if (activePointersRef.current.size === 0)
@@ -32416,6 +33564,50 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // through this guard first.
     function gridClick(fn) { return () => { if (panStateRef.current.moved)
         return; fn(); }; }
+    // Spell chips: targeted spells open the aiming mode, the rest fire at once.
+    function onSpellChip(id) {
+        const def = ABILITY_DEFS[id];
+        setArmedGunId(null);
+        if (def.aim === 'point') {
+            if (aim && aim.id === id) {
+                setAim(null);
+                return;
+            }
+            const foe = (combat.enemies || []).find(e => e.pos && !isBodyDestroyed(e.parts) && !e.fled);
+            setAim({ id, cell: foe ? { x: foe.pos.x, y: foe.pos.y } : { x: combat.heroPos.x, y: combat.heroPos.y - 4 } });
+            return;
+        }
+        setAim(null);
+        onUseAbility(id);
+    }
+    function confirmAim() {
+        if (!aim)
+            return;
+        const a = aim;
+        setAim(null);
+        onUseAbility(a.id, a.cell);
+    }
+    // First tap on a cell moves the marker, a second tap on the same cell casts.
+    // The grid viewport captures the pointer on pointerdown (for panning), which
+    // sends pointerup/click to the viewport instead of whatever was tapped — so
+    // the tap is resolved from onGridPointerUp, armed by the catcher's pointerdown.
+    function aimTapAt(clientX, clientY) {
+        const a = aimRef.current;
+        if (!a || !afxHost || !afxHost.parentElement)
+            return;
+        const r = afxHost.parentElement.getBoundingClientRect();
+        const cols = GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1, rows = GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1;
+        const x = Math.floor((clientX - r.left) / r.width * cols) + GRID_RENDER_MIN_X;
+        const y = Math.floor((clientY - r.top) / r.height * rows) + GRID_RENDER_MIN_Y;
+        if (x < GRID_RENDER_MIN_X || x > GRID_RENDER_MAX_X || y < GRID_RENDER_MIN_Y || y > GRID_RENDER_MAX_Y)
+            return;
+        if (a.cell.x === x && a.cell.y === y) {
+            setAim(null);
+            onUseAbility(a.id, a.cell);
+            return;
+        }
+        setAim({ ...a, cell: { x, y } });
+    }
     // Clicking a cell while planning a move: first tap on a given cell sets/
     // updates the preview path to it; tapping that *same* cell again confirms
     // — moves to whichever cell the preview actually reached (see
@@ -32751,19 +33943,21 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
     }, [logOpen, shownLog.length]);
     // Escape: reached the edge of your own side with the character whose turn it is.
-    const leaveActor = (!introActive && pendingItemIndex === null && !combat.result)
+    const leaveActor = (!inputLocked && pendingItemIndex === null && !combat.result)
         ? (isHeroTurn && combat.heroPos.y <= PLAYER_EDGE_Y
             ? { type: 'hero', id: null }
             : (isAllyPlayerTurn && currentAlly.pos.y <= PLAYER_EDGE_Y ? { type: 'ally', id: currentAlly.id } : null))
         : null;
     const fieldHintText = pendingItemIndex !== null
         ? t('combatUseItemPickTargetHint')
-        : (isPlayerTurn && !introActive
+        : (isPlayerTurn && !inputLocked
             ? (isAllyPlayerTurn ? currentAlly.name + ' — ' + t('combatChooseTargetHint') : t('combatChooseTargetHint'))
             : (currentAlly ? t('combatAllyTurnHint') : t('combatWaitingHint')));
     const gunLayerRef = useRef(null);
     useEffect(() => { if (!isHeroTurn)
         setArmedGunId(null); }, [isHeroTurn]);
+    useEffect(() => { if (aim && (inputLocked || !isHeroTurn || combat.result))
+        setAim(null); }, [aim, inputLocked, isHeroTurn, combat.result]);
     const arrowSeqRef = useRef(0);
     // ---- "Связаны боем" idle spar loop ----
     // Purely cosmetic: reads combat.locks (see deriveLocksAfterAction, near
@@ -32948,7 +34142,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // sparks. Drawn imperatively into gunLayerRef (inside .combat-grid-world, so
     // it pans/zooms with the camera) via the Web Animations API. Purely visual —
     // the real attack is already resolved; onDone fires when the last bullet lands.
-    function fireGunFx(attackerPos, defenderPos, isMiss, fxId, onDone, timers, onImpact) {
+    function fireGunFx(attackerPos, defenderPos, isMiss, fxId, onDone, timers) {
         const def = GUN_FX_DEFS[fxId];
         const layer = gunLayerRef.current;
         if (!def || !layer || !attackerPos || !defenderPos) {
@@ -32956,6 +34150,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             return;
         }
         const half = (UNIT_SPAN * GRID_CELL_PX) / 2;
+        const MUZ = 46; // muzzle: just past the card edge on the line of fire
         const start = { x: unitCenterPx(attackerPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(attackerPos.y, GRID_RENDER_MIN_Y) };
         const end = { x: unitCenterPx(defenderPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(defenderPos.y, GRID_RENDER_MIN_Y) };
         const en = def.energy, E = en ? ' gunfx-en' : '', k = def.flare, SPREAD = 60;
@@ -32966,43 +34161,71 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             d.style.left = x + 'px';
             d.style.top = y + 'px';
             layer.appendChild(d);
-            d.animate(frames, { duration: dur, easing: ease || 'ease-out' }).onfinish = () => d.remove();
+            d.animate(frames, { duration: dur, easing: ease || 'ease-out', fill: 'both' }).onfinish = () => d.remove();
+            setTimeout(() => { if (d.parentNode)
+                d.remove(); }, dur + 400);
         };
-        const streaks = (x, y, n, base, spreadA, minD, maxD) => {
+        // Muzzle blast: soft glow + gas cone + thin rays + hot core, all semi-transparent.
+        const muzzleFlash = (mx, my, ang) => {
+            const deg = ang * 180 / Math.PI;
+            mk('glow', mx, my, [{ opacity: 0, transform: 'scale(.4)' }, { opacity: 0.9, transform: 'scale(' + 0.8 * k + ')', offset: 0.25 }, { opacity: 0, transform: 'scale(' + 1.5 * k + ')' }], 150);
+            const L = (0.85 + Math.random() * 0.4) * k;
+            mk('cone', mx, my, [{ opacity: 0, transform: 'rotate(' + deg + 'deg) scale(.25,.5)' }, { opacity: 0.8, transform: 'rotate(' + deg + 'deg) scale(' + L + ',' + (0.9 * k + 0.1) + ')', offset: 0.3 }, { opacity: 0, transform: 'rotate(' + deg + 'deg) scale(' + L * 1.15 + ',' + (0.6 * k + 0.1) + ')' }], 95);
+            const n = en ? 4 : (k < 1 ? 4 : 6);
             for (let i = 0; i < n; i++) {
-                const a = base + rnd(spreadA), r = minD + Math.random() * (maxD - minD);
-                mk('streak', x, y, [{ opacity: 1, transform: 'rotate(' + a + 'rad) translateX(2px) scaleX(1)' }, { opacity: 0, transform: 'rotate(' + a + 'rad) translateX(' + r + 'px) scaleX(.3)' }], 160 + Math.random() * 180, 'cubic-bezier(.1,.7,.3,1)');
+                const a = ang + rnd(0.5), sc = (18 + Math.random() * 30) * k / 44;
+                mk('ray', mx, my, [{ opacity: 0.85, transform: 'rotate(' + a + 'rad) scaleX(.2)' }, { opacity: 0.6, transform: 'rotate(' + a + 'rad) scaleX(' + sc + ')', offset: 0.4 }, { opacity: 0, transform: 'rotate(' + a + 'rad) scaleX(' + sc * 1.1 + ')' }], 70 + Math.random() * 50);
+            }
+            for (let i = 0; i < 2; i++) {
+                const a = ang + (i ? 1 : -1) * (1.35 + rnd(0.25)), sc = (10 + Math.random() * 10) * k / 44;
+                mk('ray', mx, my, [{ opacity: 0.6, transform: 'rotate(' + a + 'rad) scaleX(.2)' }, { opacity: 0, transform: 'rotate(' + a + 'rad) scaleX(' + sc + ')' }], 60);
+            }
+            mk('core', mx, my, [{ opacity: 0.9, transform: 'scale(.5)' }, { opacity: 0, transform: 'scale(1.3)' }], 55, 'linear');
+            if (en)
+                mk('ring', mx, my, [{ opacity: 0.5, transform: 'scale(.15)' }, { opacity: 0, transform: 'scale(' + 0.7 * k + ')' }], 130);
+        };
+        // Impact: flash + glow + mini-flash, soft dust/smoke puffs, and on a hit a
+        // faint ring, a fading ember and (ballistic) a scorch mark.
+        const impact = (tx, ty, ang, hit) => {
+            const back = ang + Math.PI;
+            mk('core', tx, ty, [{ opacity: 0.95, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(' + (hit ? 2.2 : 1.4) + ')' }], hit ? 110 : 80, 'linear');
+            mk('glow', tx, ty, [{ opacity: 0, transform: 'scale(.4)' }, { opacity: hit ? 0.8 : 0.45, transform: 'scale(.9)', offset: 0.25 }, { opacity: 0, transform: 'scale(' + (hit ? 1.4 : 1) + ')' }], 220);
+            mk('mini', tx + Math.cos(back) * 4, ty + Math.sin(back) * 4, [{ opacity: 0, transform: 'scale(.4)' }, { opacity: hit ? 0.95 : 0.7, transform: 'scale(1)', offset: 0.3 }, { opacity: 0, transform: 'scale(' + (hit ? 1.5 : 1.2) + ')' }], hit ? 90 : 70);
+            const pn = hit ? 3 : 4;
+            for (let i = 0; i < pn; i++) {
+                const pa = back + rnd(1.2), pd = 10 + Math.random() * 26, sc = (hit ? 0.8 : 1.1) + Math.random() * 0.6;
+                mk('puff', tx, ty, [
+                    { opacity: 0, transform: 'translate(0,0) scale(.4)' },
+                    { opacity: hit ? 0.55 : 0.7, transform: 'translate(' + Math.cos(pa) * pd * 0.4 + 'px,' + (Math.sin(pa) * pd * 0.4 - 4) + 'px) scale(' + sc * 0.8 + ')', offset: 0.18 },
+                    { opacity: 0, transform: 'translate(' + Math.cos(pa) * pd + 'px,' + (Math.sin(pa) * pd - 16) + 'px) scale(' + sc * 1.8 + ')' }
+                ], 520 + Math.random() * 420);
+            }
+            if (hit) {
+                mk('ring', tx, ty, [{ opacity: en ? 0.55 : 0.35, transform: 'scale(.2)' }, { opacity: 0, transform: 'scale(' + (en ? 1.3 : 1) + ')' }], en ? 260 : 200);
+                mk('ember', tx, ty, [{ opacity: 0.95, transform: 'scale(.6)' }, { opacity: 0, transform: 'scale(1.15)' }], 340);
+                if (!en)
+                    mk('scorch', tx, ty, [{ opacity: 0 }, { opacity: 0.85, offset: 0.12 }, { opacity: 0 }], 900);
             }
         };
-        const chips = (x, y, n, maxD) => {
-            for (let i = 0; i < n; i++) {
-                const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * maxD;
-                mk('chip', x, y, [{ opacity: 1, transform: 'translate(0,0)' }, { opacity: 0, transform: 'translate(' + Math.cos(a) * r + 'px,' + (Math.sin(a) * r + 10) + 'px)' }], 260 + Math.random() * 200);
-            }
-        };
-        const shoot = (off, bulletIdx) => {
-            // isMiss is either one flag for the whole volley or, for a gun ability
-            // whose bullets were resolved one by one, a per-bullet array.
-            const miss = Array.isArray(isMiss) ? !!isMiss[bulletIdx] : !!isMiss;
+        const shoot = (off) => {
             const dx = end.x - start.x, dy = end.y - start.y, len = Math.hypot(dx, dy) || 1;
             const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
             let tx = end.x + nx * rnd(SPREAD) + ux * rnd(SPREAD * 0.5), ty = end.y + ny * rnd(SPREAD) + uy * rnd(SPREAD * 0.5);
-            if (miss) {
+            if (isMiss) {
                 const a0 = Math.random() * Math.PI * 2, rad = half + 14 + Math.random() * 34 + SPREAD * 0.4;
                 tx = end.x + Math.cos(a0) * rad;
                 ty = end.y + Math.sin(a0) * rad;
             }
-            const sx = start.x + nx * off + nx * rnd(4), sy = start.y + ny * off + ny * rnd(4);
-            const ang = Math.atan2(ty - sy, tx - sx), deg = ang * 180 / Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
+            // muzzle point: on the line of fire past the card edge, shifted to the weapon's hand (off)
+            const mx = start.x + nx * off + ux * MUZ + nx * rnd(3), my = start.y + ny * off + uy * MUZ + ny * rnd(3);
+            const ang = Math.atan2(ty - my, tx - mx), deg = ang * 180 / Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
             const b = document.createElement('div');
             b.className = 'gunfx-b' + E;
-            b.innerHTML = '<div class="gunfx-trail"></div><div class="gunfx-ball"></div>';
+            b.style.opacity = '0';
+            b.innerHTML = '<div class="gunfx-ball"></div>';
             layer.appendChild(b);
             const T = (x, y) => 'translate(' + x + 'px,' + y + 'px) rotate(' + deg + 'deg)';
-            // muzzle flare + flash (+ smoke and a casing for ballistic guns)
-            const mx = sx + cx * 38, my = sy + cy * 38, fl = (0.8 + Math.random() * 0.5) * k;
-            mk('flare', mx, my, [{ opacity: 0.95, transform: 'rotate(' + deg + 'deg) scale(.4,.7)' }, { opacity: 0.9, transform: 'rotate(' + deg + 'deg) scale(' + fl + ',' + (0.8 + Math.random() * 0.3) + ')', offset: 0.35 }, { opacity: 0, transform: 'rotate(' + deg + 'deg) scale(' + fl * 1.05 + ',.5)' }], 60, 'linear');
-            mk('flash', mx, my, [{ opacity: 0.7 * k, transform: 'scale(' + 0.5 * k + ')' }, { opacity: 0, transform: 'scale(' + 1.2 * k + ')' }], 70, 'linear');
+            muzzleFlash(mx, my, ang);
             if (!en) {
                 mk('smoke', mx + cx * 10, my + cy * 10, [{ opacity: 0.4 * k, transform: 'translate(0,0) scale(' + 0.4 * k + ')' }, { opacity: 0, transform: 'translate(' + cx * 60 * k + 'px,' + (cy * 60 * k - 6) + 'px) scale(' + 1.6 * k + ')' }], 420);
                 for (let q = 0; q < (k < 1 ? 1 : 2); q++) {
@@ -33014,41 +34237,22 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                     ], 700 + Math.random() * 500, 'cubic-bezier(.2,.6,.3,1)');
                 }
                 const cs = Math.random() < 0.5 ? 1 : -1;
-                mk('casing', sx + cx * 8, sy + cy * 8, [
+                mk('casing', start.x + nx * off + ux * 16, start.y + ny * off + uy * 16, [
                     { opacity: 1, transform: 'translate(0,0) rotate(0deg)' },
                     { opacity: 1, transform: 'translate(' + nx * cs * 22 + 'px,' + (ny * cs * 22 - 16) + 'px) rotate(260deg)', offset: 0.55 },
                     { opacity: 0, transform: 'translate(' + nx * cs * 30 + 'px,' + (ny * cs * 30 + 8) + 'px) rotate(420deg)' }
                 ], 420);
             }
-            b.animate([{ transform: T(sx, sy) }, { transform: T(tx, ty) }], { duration: GUN_BULLET_FLIGHT_MS, easing: 'linear', fill: 'forwards' }).onfinish = () => {
+            b.animate([{ transform: T(mx, my), opacity: 1 }, { transform: T(tx, ty), opacity: 1 }], { duration: GUN_BULLET_FLIGHT_MS, easing: 'linear', fill: 'both' }).onfinish = () => {
                 b.remove();
-                const hit = !miss && Math.abs(tx - end.x) <= half + 6 && Math.abs(ty - end.y) <= half + 6, back = ang + Math.PI;
-                if (onImpact)
-                    onImpact(bulletIdx, !miss);
-                mk('flash', tx, ty, [{ opacity: 1, transform: 'scale(.5)' }, { opacity: 0, transform: 'scale(' + (hit ? 2.2 : 1.4) + ')' }], hit ? 130 : 90, 'linear');
-                if (hit) {
-                    streaks(tx, ty, 11, back, 1.2, 26, 78);
-                    chips(tx, ty, 9, 36);
-                    mk('ring', tx, ty, [{ opacity: 0.9, transform: 'scale(.2)' }, { opacity: 0, transform: 'scale(1.2)' }], 230);
-                    mk('dust', tx, ty, [{ opacity: 0.8, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(1.5)' }], 380);
-                }
-                else {
-                    streaks(tx, ty, 5, back, 1.3, 14, 40);
-                    mk('dust', tx, ty, [{ opacity: 0.9, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(1.8)' }], 450);
-                    chips(tx, ty, 4, 18);
-                }
+                impact(tx, ty, ang, !isMiss && Math.abs(tx - end.x) <= half + 6 && Math.abs(ty - end.y) <= half + 6);
             };
         };
         const span = gunFxBurstSpan(def);
         for (let bi = 0; bi < def.bursts; bi++)
             for (let i = 0; i < def.perBurst; i++)
                 def.hands.forEach((off, h) => {
-                    const bulletIdx = (bi * def.perBurst + i) * def.hands.length + h;
-                    // Fewer resolved shots than bullets (target already down, one pistol
-                    // only): the extra bullets are simply not fired.
-                    if (Array.isArray(isMiss) && bulletIdx >= isMiss.length)
-                        return;
-                    timers.push(setTimeout(() => shoot(off, bulletIdx), bi * (span + def.pause) + i * def.gap + h * def.stagger));
+                    timers.push(setTimeout(() => shoot(off), bi * (span + def.pause) + i * def.gap + h * def.stagger));
                 });
         timers.push(setTimeout(onDone, gunFxDuration(fxId)));
     }
@@ -33423,7 +34627,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             // An arrow aimed at this enemy that hasn't landed yet: keep drawing its pre-hit state.
                             const heldShot = heldShotFor('enemy:' + enemy.id);
                             const shownParts = heldShot ? heldShot.parts : enemy.parts;
-                            return (React.createElement("div", { key: enemy.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!enemy.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
+                            return (React.createElement("div", { key: enemy.id, "data-fxkey": 'enemy:' + enemy.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!enemy.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
                                         React.createElement(CombatPortrait, { name: enemy.enemyName, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, 
@@ -33433,7 +34637,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                                             // while planningMove (below) is active, so tapping
                                             // your own card to preview a route never locks out
                                             // tapping an enemy to attack instead.
-                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id, armedGunId)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], suppressed: !!enemy.suppressed, lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, 
+                                            targetable: isPlayerTurn && !inputLocked && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id, armedGunId)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], suppressed: !!enemy.suppressed, lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, 
                                             // A ranged enemy that has been drawn into melee (locked
                                             // with an opponent, or engaged — someone has closed on it
                                             // and it now fights at the point-blank penalty, see
@@ -33443,21 +34647,33 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                                             role: enemy.role === 'ranged' && !isBodyDestroyed(shownParts) && (enemy.engaged || getActiveLockPartner(combat, 'enemy:' + enemy.id)) ? 'melee' : enemy.role, tier: enemy.tier, weaponType: portraitTypeFor('enemy:' + enemy.id, getEnemyWeaponType(enemy), isEnemyBowUser(enemy)), t: t })))));
                         }),
                         visibleAllies.map(ally => {
-                            const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !introActive && pendingItemIndex === null;
+                            const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !inputLocked && pendingItemIndex === null;
                             const isThisActive = !combat.result && current && current.type === 'ally' && current.id === ally.id;
                             const canLeaveHere = isThisAllyPlanner && ally.pos.y <= PLAYER_EDGE_Y;
                             // Same hold as for enemies: an arrow still in flight at this ally hasn't hit yet.
                             const heldShot = heldShotFor('ally:' + ally.id);
                             const shownParts = heldShot ? heldShot.parts : ally.parts;
-                            return (React.createElement("div", { key: ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
+                            return (React.createElement("div", { key: ally.id, "data-fxkey": 'ally:' + ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
                                         React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t })))));
                         }),
-                        React.createElement("div", { className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y) } },
+                        React.createElement("div", { "data-fxkey": "hero", className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
-                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t })))))),
+                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t })))),
+                        React.createElement("style", null, AFX_CSS + AFX_UI_CSS),
+                        aim && (() => {
+                            const shape = afxShapeFor(aim.id, combat, aim.cell);
+                            const L = shape.footprint;
+                            const ac = L ? { x: L.x + 1, y: L.y + 1 } : { x: aim.cell.x + 0.5, y: aim.cell.y + 0.5 };
+                            return (React.createElement(React.Fragment, null,
+                                shape.cells.map((c, i) => (React.createElement("div", { key: 'afxp' + i, className: "afx-preview-cell", style: { left: cellOriginPx(c.x, GRID_RENDER_MIN_X), top: cellOriginPx(c.y, GRID_RENDER_MIN_Y), width: GRID_CELL_PX, height: GRID_CELL_PX } }))),
+                                L && React.createElement("div", { className: "afx-preview-land", style: { left: cellOriginPx(L.x, GRID_RENDER_MIN_X), top: cellOriginPx(L.y, GRID_RENDER_MIN_Y), width: GRID_CELL_PX * UNIT_SPAN, height: GRID_CELL_PX * UNIT_SPAN } }),
+                                React.createElement("div", { className: "afx-preview-aim", style: { left: (ac.x - GRID_RENDER_MIN_X) * GRID_CELL_PX, top: (ac.y - GRID_RENDER_MIN_Y) * GRID_CELL_PX } }),
+                                React.createElement("div", { className: "afx-aim-catcher", onPointerDown: () => { aimArmedRef.current = true; } })));
+                        })(),
+                        React.createElement("div", { className: "afx-host", ref: setAfxHost }))),
                 !combat.result && (React.createElement("div", { className: "combat-field-ui" },
                     React.createElement("div", { className: "combat-fieldlog" },
                         React.createElement("button", { type: "button", className: "combat-fieldlog-toggle", "aria-expanded": logOpen, title: t('combatLogToggleLabel'), "aria-label": t('combatLogToggleLabel'), onClick: () => setLogOpen(o => !o) },
@@ -33465,12 +34681,16 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             React.createElement("span", { className: "combat-fieldlog-caret", "aria-hidden": "true" }, logOpen ? '▴' : '▾')),
                         logOpen && (React.createElement("div", { className: "combat-fieldlog-body", ref: logBodyRef }, shownLog.slice(-40).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))))),
                     React.createElement("p", { className: "combat-fieldhint" }, fieldHintText),
-                    isPlayerTurn && !introActive && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel combat-fielditem-panel grim-slide-down" },
+                    isPlayerTurn && !inputLocked && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel combat-fielditem-panel grim-slide-down" },
                         React.createElement("p", { className: "combat-item-panel-title" }, t('combatUseItemPanelTitle')),
                         usableItems.length === 0 ? (React.createElement("p", { className: "combat-item-panel-empty" }, t('combatUseItemPanelEmpty'))) : (usableItems.map(({ item, index }) => (React.createElement("button", { key: index, type: "button", className: "combat-item-panel-row", onClick: () => { setPendingItemIndex(index); setItemPanelOpen(false); }, style: { color: rarityColor(findItemRarity(item.name, itemRarities)) || undefined } }, item.name)))))),
-                    React.createElement("div", { className: "combat-fieldbar" }, pendingItemIndex !== null ? (isPlayerTurn && !introActive && (React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemCancelLabel'), "aria-label": t('combatUseItemCancelLabel'), onClick: () => setPendingItemIndex(null) },
+                    aim && !combat.result && (React.createElement("div", { className: "afx-aim-bar afx-aim-bar-field" },
+                        React.createElement("span", { className: "afx-aim-bar-hint" }, t('afxAimHint')),
+                        React.createElement("button", { type: "button", className: "btn btn-primary", onClick: confirmAim }, t('afxCast')),
+                        React.createElement("button", { type: "button", className: "btn btn-ghost", onClick: () => setAim(null) }, t('afxCancel')))),
+                    React.createElement("div", { className: "combat-fieldbar" }, pendingItemIndex !== null ? (isPlayerTurn && !inputLocked && (React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemCancelLabel'), "aria-label": t('combatUseItemCancelLabel'), onClick: () => setPendingItemIndex(null) },
                         React.createElement("span", { className: "combat-sqbtn-icon" }, "\u2715")))) : (React.createElement(React.Fragment, null,
-                        React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemButtonLabel'), "aria-label": t('combatUseItemButtonLabel'), onClick: () => setItemPanelOpen(o => !o), disabled: !isPlayerTurn || introActive },
+                        React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemButtonLabel'), "aria-label": t('combatUseItemButtonLabel'), onClick: () => setItemPanelOpen(o => !o), disabled: !isPlayerTurn || inputLocked },
                             React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-sqbtn-img" })),
                         showAbilityStrip && (React.createElement("div", { className: "combat-fieldbar-strip-wrap" },
                             stripEdges.left && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2190", onClick: () => scrollStrip(-1) }, "\u2039"),
@@ -33480,15 +34700,17 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                                 const status = getAbilityStatus(id, combat.abilityState, combat.round);
                                 const isManual = def.trigger === 'manual';
                                 const isGun = !!def.weaponFx;
+                                const isSpell = !!def.spellFx;
                                 const isArmed = isGun && armedGunId === id;
+                                const isAiming = isSpell && !!aim && aim.id === id;
                                 const badge = status.usedUp ? '×' : (status.cooldown ? String(status.cooldown) : '');
-                                return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => setArmedGunId(a => a === id ? null : id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-sqbtn combat-ability-sq' + (status.available ? ' combat-sqbtn-ready' : ' combat-sqbtn-cooldown') + (isManual ? '' : ' combat-sqbtn-auto') + (isArmed ? ' combat-sqbtn-armed' : ''), disabled: !isManual || !isHeroTurn || introActive || !status.available, title: t(def.nameKey) + ' — ' + t(def.descKey), "aria-label": t(def.nameKey) },
+                                return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => { setAim(null); setArmedGunId(a => a === id ? null : id); } : isSpell ? () => onSpellChip(id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-sqbtn combat-ability-sq' + (status.available ? ' combat-sqbtn-ready' : ' combat-sqbtn-cooldown') + (isManual ? '' : ' combat-sqbtn-auto') + (isArmed ? ' combat-sqbtn-armed' : '') + (isAiming ? ' combat-sqbtn-armed' : ''), disabled: !isManual || !isHeroTurn || inputLocked || !status.available, title: t(def.nameKey) + ' — ' + t(def.descKey), "aria-label": t(def.nameKey) },
                                     React.createElement("span", { className: "combat-sqbtn-icon" }, def.icon),
                                     badge && React.createElement("span", { className: "combat-sqbtn-badge" }, badge)));
                             })),
                             stripEdges.right && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2192", onClick: () => scrollStrip(1) }, "\u203A"))),
                         React.createElement("div", { className: "combat-fieldbar-fixed" },
-                            React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatSkipTurnButtonLabel'), "aria-label": t('combatSkipTurnButtonLabel'), onClick: onSkipTurn, disabled: !isPlayerTurn || introActive },
+                            React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatSkipTurnButtonLabel'), "aria-label": t('combatSkipTurnButtonLabel'), onClick: onSkipTurn, disabled: !isPlayerTurn || inputLocked },
                                 React.createElement("span", { className: "combat-sqbtn-icon" }, "\u23F3")),
                             leaveActor && (React.createElement("button", { type: "button", className: "combat-sqbtn combat-sqbtn-leave", title: t('combatLeaveButtonLabel'), "aria-label": t('combatLeaveButtonLabel'), onClick: () => onLeave(leaveActor.type, leaveActor.id) },
                                 React.createElement("span", { className: "combat-sqbtn-icon" }, "\uD83D\uDEAA")))))))))),
@@ -36297,6 +37519,15 @@ function DevHeroTab({ api }) {
                 React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, abilities: mergeWeaponAbilities(s.abilities, Object.keys(ABILITY_DEFS).filter(isWeaponFxAbility)) })) }, "\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435"),
                 React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, abilities: s.abilities.filter(a => !isWeaponFxAbility(a)) })) }, "\u0417\u0430\u0431\u0440\u0430\u0442\u044C \u0432\u0441\u0435"),
                 React.createElement("span", { className: "dev-hint" }, "\u0412 \u0431\u043E\u044E: \u0447\u0438\u043F \u0441\u043F\u043E\u0441\u043E\u0431\u043D\u043E\u0441\u0442\u0438 \u2192 \u0442\u0430\u043F \u043F\u043E \u0432\u0440\u0430\u0433\u0443"))),
+        React.createElement(DevSection, { title: "\u0417\u0430\u043A\u043B\u0438\u043D\u0430\u043D\u0438\u044F \u0438 \u043F\u0440\u0438\u0451\u043C\u044B (\u0442\u0435\u0441\u0442 \u0432 \u0431\u043E\u044E)" },
+            React.createElement(DevRow, null, Object.keys(ABILITY_DEFS).filter(isSpellFxAbility).map(id => {
+                const owned = (gs.abilities || []).includes(id);
+                return (React.createElement(DevBtn, { key: id, small: true, onClick: () => patch(s => ({ ...s, abilities: owned ? s.abilities.filter(a => a !== id) : [...s.abilities, id] })) }, (owned ? '✓ ' : '') + ABILITY_DEFS[id].icon + ' ' + (TRANSLATIONS.ru[ABILITY_DEFS[id].nameKey] || id)));
+            })),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, abilities: mergeWeaponAbilities(s.abilities, Object.keys(ABILITY_DEFS).filter(isSpellFxAbility)) })) }, "\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435"),
+                React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, abilities: s.abilities.filter(a => !isSpellFxAbility(a)) })) }, "\u0417\u0430\u0431\u0440\u0430\u0442\u044C \u0432\u0441\u0435"),
+                React.createElement("span", { className: "dev-hint" }, "\u0412 \u0431\u043E\u044E: \u0447\u0438\u043F \u2192 \u0442\u0430\u043F \u043F\u043E \u043F\u043E\u043B\u044E (\u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0439 \u0442\u0430\u043F \u0438\u043B\u0438 \u00AB\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C\u00BB \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u0435\u0442); \u043A\u043E\u043B\u044C\u0446\u043E \u043E\u0433\u043D\u044F \u0438 \u0434\u0440\u043E\u0436\u044C \u0437\u0435\u043C\u043B\u0438 \u0441\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u044E\u0442 \u0441\u0440\u0430\u0437\u0443"))),
         React.createElement(DevSection, { title: 'Эффекты (' + gs.effects.length + ')' },
             React.createElement(DevRow, null,
                 React.createElement(DevField, { label: "\u0422\u0438\u043F" },
@@ -36819,6 +38050,9 @@ function DevCombatTab({ api }) {
     const PRESETS = [
         { label: '3 слабых бандита', rows: [{ name: 'Бандит', tier: 'weak', role: 'melee', weapon: 'Дубина', count: '3' }] },
         { label: 'Отряд: воин + лучник + маг', rows: [{ name: 'Наёмник', tier: 'average', role: 'melee', weapon: 'Меч', count: '1' }, { name: 'Стрелок', tier: 'average', role: 'ranged', weapon: 'Лук', count: '1' }, { name: 'Чародей', tier: 'average', role: 'caster', weapon: 'Посох', count: '1' }] },
+        { label: 'Автомат', rows: [{ name: 'Автоматчик', tier: 'average', role: 'ranged', weapon: 'Автомат', count: '1' }] },
+        { label: 'Пистолет', rows: [{ name: 'Пистолетчик', tier: 'average', role: 'ranged', weapon: 'Пистолет', count: '1' }] },
+        { label: 'Энерговинтовка', rows: [{ name: 'Энергострелок', tier: 'average', role: 'ranged', weapon: 'Энерговинтовка', count: '1' }] },
         { label: 'Босс (исключит. танк)', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
         { label: 'Легенда', rows: [{ name: 'Древний дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', damageResist: 'medium', weapon: 'Когти и пламя', count: '1' }] }
     ];
@@ -36919,6 +38153,7 @@ function DevCombatTab({ api }) {
                 React.createElement(DevRow, null,
                     React.createElement(DevField, { label: "\u041A\u0442\u043E \u043F\u0440\u0438\u0445\u043E\u0434\u0438\u0442" },
                         React.createElement(DevSelect, { value: wave.side, onChange: x => setW('side', x), options: [['enemy', 'Враги'], ['ally', 'Союзники']] })),
+                    React.createElement(DevField, { label: "\u0421\u0442\u0440\u0435\u043B\u043E\u043A" }, [['Автомат', 'Автоматчик'], ['Пистолет', 'Пистолетчик'], ['Энерговинтовка', 'Энергострелок']].map(([w, n]) => React.createElement("button", { key: w, type: "button", className: "dev-chip", onClick: () => setWave(p => ({ ...p, role: 'ranged', weapon: w, name: n })) }, w))),
                     React.createElement(DevField, { label: "\u0423\u0441\u043B\u043E\u0432\u0438\u0435" },
                         React.createElement(DevSelect, { value: wave.type, onChange: x => setW('type', x), options: REINFORCEMENT_TRIGGER_TYPES.map(k => [k, DEV_TRIGGER_LABELS[k] || k]) })),
                     React.createElement(DevField, { label: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435" },
@@ -39228,6 +40463,11 @@ function App() {
     // flee buttons) can act while the intro is still playing. Re-arms itself
     // every time a fresh fight opens (combatModalOpen flips false -> true).
     const [combatIntroActive, setCombatIntroActive] = useState(false);
+    // True while a cast spell's animation is still playing (see castSpell):
+    // holds off every hero input and the auto-turn effect until the result has
+    // been committed to the fight.
+    const [combatFxBusy, setCombatFxBusy] = useState(false);
+    const combatFxBusyRef = useRef(false);
     // -- Death & resurrection --
     // Shown after a real death (HP pool fully emptied in combat). Tracks
     // which narrator message the fatal fight was attached to, so "go back a
@@ -41063,7 +42303,7 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 If no fight is starting: "combat": {"combat": false}.
 If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "armorPiercing": false, "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null, "reinforcements": [], "presentAllies": []}.
 "enemies" is an array of 1 or more objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry. Actively resist the pull toward thin, low-stakes fights: when the established lore, faction, or location would plausibly throw a real pack, warband, garrison, or pack of beasts at the hero — bandit camps, patrols, dens, cultist cells, and the like — reflect that honestly with a genuinely sized group — multiple opponents, with no cap on how large where the fiction supports it, up into the dozens for a real warband, garrison, or battle — rather than quietly trimming it down for convenience; a single isolated foe should be the outcome of the scene actually calling for that, not a default habit. This matters most precisely when the hero has NO party members: a lone hero is not itself a reason to face a lone opponent — bandits, raiders, and packs of beasts hunt and travel in numbers regardless of how many people they're up against, and a solo hero wandering hostile, lawless, or monster-infested territory should, more often than not, actually be the one outnumbered. If you notice yourself defaulting to one opponent scene after scene simply because the hero is traveling alone, that is exactly the failure mode this rule exists to break — deliberately reach for 2 or more instead whenever the scene's own setting gives you any real opening to do so.
-"enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence. "armorPiercing" is a separate true/false field — true ONLY if this specific weapon is built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or a natural weapon like a boring beak or armor-cracking pincer/claw built the same way) — omit or set false for an ordinary weapon or attack (claws, fangs, a sword, an axe, bare fists) even if sharp or heavy or clearly dangerous. This has real mechanical weight in the fight itself (it lets this opponent's hits bypass a defender's armor entirely), so set it true only when the weapon/attack genuinely, specifically is that kind, never as a default.
+"enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence. Firearms have dedicated animations and rules when they fit the setting: "автомат" (an automatic rifle — fires a burst of three shots), "пистолет" (single shot), "энерговинтовка" (an energy rifle — burst of three bolts); an opponent or ally armed that way shoots from range and fights like an archer (use "role": "ranged"). "armorPiercing" is a separate true/false field — true ONLY if this specific weapon is built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or a natural weapon like a boring beak or armor-cracking pincer/claw built the same way) — omit or set false for an ordinary weapon or attack (claws, fangs, a sword, an axe, bare fists) even if sharp or heavy or clearly dangerous. This has real mechanical weight in the fight itself (it lets this opponent's hits bypass a defender's armor entirely), so set it true only when the weapon/attack genuinely, specifically is that kind, never as a default.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
 "kind" is exactly one of "humanoid", "animal", "monster", "behemoth" — what SORT of opponent this is, separate from "tier" (how tough it is). Default to "humanoid" — any person-shaped foe with hands and the option of real gear: bandits, guards, soldiers, cultists, raiders, and the like — whenever nothing below clearly applies. Reach for one of the other three ONLY when the scene, the location, or the world already established above has actually put a genuine creature here — a wilderness, a lair, a dungeon, a monster-haunted ruin, something summoned or unleashed — never as a random reskin of an otherwise ordinary human encounter; the everyday run of fights (ambushes, patrols, raids, duels) stays "humanoid" by default, exactly as it always has. "animal" is ordinary, non-supernatural wildlife (a wolf, a bear, a boar, an aggressive dog). "monster" is a proper unnatural or magical creature around human scale or a little beyond it (a ghoul, an imp, a giant spider, a corrupted beast). "behemoth" is for something genuinely oversized or overwhelming enough to anchor a fight on its own (a troll, a dragon, a kraken). None of these three ever wears armor or carries gear — never describe one in equipment, and the game itself rolls none for them regardless of "tier". "damageResist" is optional (default "none") and, when present, exactly one of "low", "medium", "high" — how much this specific opponent's hide, scales, or nature shrugs off ordinary damage. Leave it "none" for almost everything, including most "animal"/"monster" entries; reserve "low"/"medium"/"high" for a creature and a moment the fiction genuinely calls for it (a troll's regeneration, a dragon's scales), leaning toward "behemoth" far more often than the other kinds.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
@@ -46797,6 +48037,71 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const weaponInfo = getPlayerWeaponInfo(wear);
         return { name: heroName || t('combatYouLabel'), parts: null, agility: gameState.stats.agility, power: gameState.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: !!weaponInfo.armorPiercing, mods, isEnemy: false };
     }
+    // A firearm volley as separate bullets (see gunVolleyDamages): every bullet
+    // is its own resolveOneAttack — own hit roll, body part and damage — against
+    // a defender updated by the bullets before it (nextDefender(defender, o)).
+    // Stops once the target is down. Returns ONE outcome shaped like a single
+    // resolveOneAttack result (summed damage, final parts / armor / morale, any
+    // crit / stun / disable) so wear, morale and bleed code downstream is
+    // untouched, plus `shots` (per-bullet result for the animation / popups).
+    function resolveGunVolley(attacker, damages, firstDefender, nextDefender, rangedHitMult, forceCrit) {
+        let defender = firstDefender;
+        const results = [];
+        const log = [];
+        for (const dmg of damages) {
+            const o = resolveOneAttack({ ...attacker, weaponDamage: dmg }, defender, t, rangedHitMult, forceCrit, true);
+            results.push(o);
+            log.push(...o.log);
+            if (o.defeated)
+                break;
+            defender = nextDefender(defender, o);
+        }
+        const last = results[results.length - 1];
+        const landed = results.filter(o => o.resultKind === 'hit' || o.resultKind === 'vital');
+        const base = landed.length > 0 ? landed[landed.length - 1] : last;
+        const lastWith = (key) => { for (let i = results.length - 1; i >= 0; i--)
+            if (results[i][key])
+                return results[i]; return null; };
+        const armorSrc = lastWith('armorPoolNext');
+        const breakSrc = lastWith('moraleBreak');
+        const gearSrc = lastWith('attackerGearWear');
+        const enemyGearSrc = lastWith('enemyGearWear');
+        return {
+            ...base,
+            parts: last.parts, morale: last.morale,
+            moraleBreak: breakSrc ? breakSrc.moraleBreak : null,
+            armorPoolKey: armorSrc ? armorSrc.armorPoolKey : base.armorPoolKey,
+            armorPoolNext: armorSrc ? armorSrc.armorPoolNext : null,
+            attackerGearWear: gearSrc ? gearSrc.attackerGearWear : undefined,
+            enemyGearWear: enemyGearSrc ? enemyGearSrc.enemyGearWear : undefined,
+            riposteDamage: 0, riposteArmorPiercing: false,
+            log,
+            defeated: results.some(o => o.defeated),
+            resultKind: results.some(o => o.resultKind === 'vital') ? 'vital' : (landed.length > 0 ? 'hit' : last.resultKind),
+            dmg: results.reduce((sum, o) => sum + (o.dmg || 0), 0),
+            absorbed: results.reduce((sum, o) => sum + (o.absorbed || 0), 0),
+            isCrit: results.some(o => o.isCrit),
+            justDisabled: results.some(o => o.justDisabled),
+            stunApplied: results.some(o => o.stunApplied),
+            guaranteedBlockConsumed: results.some(o => o.guaranteedBlockConsumed),
+            shots: results.map(o => ({ resultKind: o.resultKind, dmg: o.dmg || 0, partKey: o.partKey }))
+        };
+    }
+    // Defender chain for a volley against the hero or a companion.
+    function chainPlainDefender(d, o) {
+        return { ...d, parts: o.parts, morale: o.morale, armorPools: { cur: o.armorPoolNext || (d.armorPools && d.armorPools.cur) || { body: 0, head: 0 } }, guaranteedBlock: o.guaranteedBlockConsumed ? false : d.guaranteedBlock };
+    }
+    // Defender chain for a volley against an enemy: folds each bullet's effect
+    // into a running copy of that enemy and rebuilds its defender from it.
+    function makeEnemyVolleyChain(enemy, enemies) {
+        let cur = enemy;
+        let all = enemies;
+        return (d, o) => {
+            cur = { ...cur, parts: o.parts, armorPools: o.armorPoolNext ? { ...cur.armorPools, [o.armorPoolKey]: { ...(cur.armorPools && cur.armorPools[o.armorPoolKey]), cur: o.armorPoolNext[o.armorPoolKey] } } : cur.armorPools, morale: o.morale, ...moraleBreakFlags(o.moraleBreak), gearWear: o.enemyGearWear || cur.gearWear };
+            all = all.map(e => e.id === cur.id ? cur : e);
+            return makeEnemyDefender(cur, all);
+        };
+    }
     function makeHeroDefender(parts, mods, wear, guaranteedBlock, armorCur) {
         const availability = computeDefenseAvailability(equipment, wear ? overlayGearWear(gameState.inventory, wear, itemRarities) : gameState.inventory, itemRarities);
         // armorPools.cur — every defender (hero, ally, enemy) now carries one;
@@ -47127,7 +48432,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // party member's (buildAllyCombatants' playerControlled flag) can ever
     // call this — AI-run reinforcements never move on their own yet.
     function resolveMove(x, y) {
-        if (combatIntroActive)
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         setCombat(prev => {
             if (!prev || prev.result)
@@ -47180,7 +48485,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // sense (nothing in range, nowhere useful to go) and just waiting out the
     // round actually is the best move.
     function resolveSkipTurn() {
-        if (combatIntroActive)
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         setCombat(prev => {
             if (!prev || prev.result)
@@ -47216,7 +48521,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // equivalent via the routing branches in runAutoTurn instead (no
     // player-facing button, since they're AI).
     function resolveLeaveCombat(actorType, actorId) {
-        if (combatIntroActive)
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         setCombat(prev => {
             if (!prev || prev.result)
@@ -47370,7 +48675,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     }
     function resolveAttack(targetEnemyId, gunAbilityId) {
         // Nothing should happen while the pre-battle intro is still playing.
-        if (combatIntroActive)
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         setCombat(prev => {
             if (!prev || prev.result)
@@ -47392,7 +48697,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // Locked in melee: a bow/crossbow can't be drawn — the companion
                 // punches instead. Firearms still fire point-blank.
                 const allyLockedShooter = allyWeaponType === 'ranged' && isBowLoadout(allyLoad.equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
-                const allyIsRanged = allyWeaponType === 'ranged' && !allyLockedShooter;
+                // A companion with a firearm (pistol included) shoots from range.
+                const allyGunFx = getLoadoutGunFxId(allyLoad.equipment);
+                const allyIsRanged = (allyWeaponType === 'ranged' || !!allyGunFx) && !allyLockedShooter;
                 if (!allyIsRanged && chebyshevDistance(ally.pos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                     return prev;
                 {
@@ -47421,7 +48728,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 if (friendlyBlocker)
                     return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, friendlyBlocker, log);
                 const forceCrit = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + enemy.id, ally.pos, enemy.pos);
-                const outcome = resolveOneAttack(attacker, makeEnemyDefender(enemy, prev.enemies), t, allyRangedMult, forceCrit, allyIsRanged);
+                const outcome = (allyGunFx && allyIsRanged)
+                    ? resolveGunVolley(attacker, gunVolleyDamages(allyGunFx, attacker.weaponDamage), makeEnemyDefender(enemy, prev.enemies), makeEnemyVolleyChain(enemy, prev.enemies), allyRangedMult, forceCrit)
+                    : resolveOneAttack(attacker, makeEnemyDefender(enemy, prev.enemies), t, allyRangedMult, forceCrit, allyIsRanged);
                 log = [...log, ...outcome.log];
                 let allyGearWear = prev.allyGearWear || {};
                 if (!allyLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
@@ -47442,7 +48751,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const defenderKey = 'enemy:' + enemyId;
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: allyIsRanged, attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: allyIsRanged, ...((allyGunFx && allyIsRanged) ? { gunFx: allyGunFx, shots: outcome.shots } : {}), attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 const locks = deriveLocksAfterAction(prev, 'ally:' + ally.id, defenderKey);
                 if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
@@ -47815,7 +49124,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // slots — gear stays locked for the whole fight by design.
     function useConsumableInCombat(itemIndex, targetType, targetId) {
         // Nothing should happen while the pre-battle intro is still playing.
-        if (combatIntroActive)
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         const item = gameState.inventory[itemIndex];
         if (!item || item.slot !== 'consumable')
@@ -47913,11 +49222,52 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // gameState/inventory, so there's no saveGame call — every field this
     // touches lives on the ephemeral `combat` object, same as heroParts/log
     // changes everywhere else mid-fight.
-    function onUseAbility(abilityId) {
-        if (combatIntroActive)
+    // The spell abilities (fireball, breath, ring, meteors, tremor, leap).
+    // buildAbilityScript works out the whole outcome up front; the fx plays inside
+    // CombatModal while the hero input stays locked, and once it has landed
+    // afxCommitScript applies the damage/knockback/hero move, starts the
+    // cooldown and passes the turn — so nothing on the board moves ahead of the
+    // animation. Like the other abilities, nothing here touches gameState or
+    // inventory, only the ephemeral `combat` object.
+    function castSpell(abilityId, target) {
+        const base = combat;
+        if (!base || base.result)
+            return;
+        const current = base.order[base.turnPos];
+        if (!current || current.type !== 'hero')
+            return;
+        if (!getAbilityStatus(abilityId, base.abilityState, base.round).available)
+            return;
+        const script = buildAbilityScript(abilityId, base, target, gameState.level);
+        if (!script)
+            return;
+        const seq = afxNextSeq();
+        const youLabel = heroName || t('combatYouLabel');
+        combatFxBusyRef.current = true;
+        setCombatFxBusy(true);
+        setCombat(p => (p ? { ...p, abilityFx: { ...script.fx, seq, at: Date.now() } } : p));
+        setTimeout(() => {
+            setCombat(p => {
+                if (!p || p.result || !p.abilityFx || p.abilityFx.seq !== seq)
+                    return p;
+                const res = afxCommitScript(p, script, abilityId, t, youLabel);
+                if (res.allDown)
+                    return { ...res.combat, result: 'victory' };
+                return advanceTurn(res.combat);
+            });
+            combatFxBusyRef.current = false;
+            setCombatFxBusy(false);
+        }, script.commitMs);
+    }
+    function onUseAbility(abilityId, target) {
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         if (!gameState.abilities.includes(abilityId))
             return;
+        if (ABILITY_DEFS[abilityId] && ABILITY_DEFS[abilityId].spellFx) {
+            castSpell(abilityId, target);
+            return;
+        }
         setCombat(prev => {
             if (!prev || prev.result)
                 return prev;
@@ -48119,11 +49469,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // hero uses, wired to resolveAttack below.
                 if (ally.playerControlled)
                     return prev;
+                // A summoned/AI companion armed with a firearm shoots from where it
+                // stands (no walking up to melee range), at any living enemy.
+                const aiGunFx = getLoadoutGunFxId(getAllyLoadout(ally).equipment);
                 // AI-run reinforcements have no tracked weapon of their own (see
                 // makeAllyCombatant's own comment on why) — treated as melee-only,
                 // so same as a melee/tank enemy, they have to actually close the
                 // distance on the grid before they can swing.
-                if (ally.pos) {
+                if (ally.pos && !aiGunFx) {
                     const livingEnemyPositions = prev.enemies.filter(e => !isEnemyOut(e)).map(e => ({ pos: e.pos }));
                     const nearest = nearestReachableTarget(ally.pos, livingEnemyPositions, prev, { type: 'ally', id: ally.id }, prev.allies.filter(x => !isAllyOut(x)));
                     if (nearest && chebyshevDistance(ally.pos, nearest.pos) > MELEE_ATTACK_MAX_DISTANCE) {
@@ -48149,12 +49502,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // scoreCombatTarget) rather than always the nearest. Falls back to
                 // the old nearest/random chain if, for whatever reason, nothing
                 // scores (e.g. the closer gets bumped out of range some other way).
-                const meleeReachableAll = ally.pos ? prev.enemies.filter(e => !isEnemyOut(e) && e.pos && chebyshevDistance(ally.pos, e.pos) <= MELEE_ATTACK_MAX_DISTANCE) : [];
+                const meleeReachableAll = ally.pos ? prev.enemies.filter(e => !isEnemyOut(e) && e.pos && (aiGunFx || chebyshevDistance(ally.pos, e.pos) <= MELEE_ATTACK_MAX_DISTANCE)) : [];
                 // Locked in melee: may only swing at the lock partner (if still in reach).
                 const allyLockKey = getActiveLockPartner(prev, 'ally:' + ally.id);
                 const allyLockedOnly = allyLockKey ? meleeReachableAll.filter(e => 'enemy:' + e.id === allyLockKey) : [];
                 const meleeReachableEnemies = allyLockedOnly.length > 0 ? allyLockedOnly : meleeReachableAll;
-                const target = pickBestTarget(meleeReachableEnemies, e => scoreCombatTarget({ hpFraction: hpFractionOfParts(e.parts), squishy: e.role === 'ranged' || e.role === 'caster', tankish: e.role === 'tank' }, { role: 'melee' }))
+                let target = pickBestTarget(meleeReachableEnemies, e => scoreCombatTarget({ hpFraction: hpFractionOfParts(e.parts), squishy: e.role === 'ranged' || e.role === 'caster', tankish: e.role === 'tank' }, { role: 'melee' }))
                     || (ally.pos ? nearestTarget(ally.pos, prev.enemies.filter(e => !isEnemyOut(e)).map(e => ({ e, pos: e.pos })))?.e : null)
                     || pickLivingTarget(prev.enemies, isEnemyOut);
                 if (!target)
@@ -48163,8 +49516,22 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const aiAllyLockedShooter = isBowLoadout(getAllyLoadout(ally).equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
                 const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally));
                 const attacker = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
+                // Firearm shot: a friend standing on the line of fire may take it.
+                if (aiGunFx && ally.pos && target.pos) {
+                    const blocker = rollLineBlockRedirect(prev, { type: 'ally', id: ally.id }, ally.pos, { type: 'enemy', id: target.id }, target.pos);
+                    if (blocker) {
+                        log = [...log, lineBlockLogEntry(blocker, target.enemyName)];
+                        if (blocker.type === 'enemy')
+                            target = blocker.enemy;
+                        else
+                            return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, blocker, log);
+                    }
+                }
                 const forceCrit4 = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + target.id, ally.pos, target.pos);
-                const outcome = resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t, undefined, forceCrit4, false); // AI allies only ever swing at melee-reachable targets
+                const aiShotTarget = target;
+                const outcome = aiGunFx
+                    ? resolveGunVolley(attacker, gunVolleyDamages(aiGunFx, attacker.weaponDamage), makeEnemyDefender(aiShotTarget, prev.enemies), makeEnemyVolleyChain(aiShotTarget, prev.enemies), computeRangedHitMultiplier(ally.pos, aiShotTarget.pos, prev.coverCells), forceCrit4)
+                    : resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t, undefined, forceCrit4, false); // non-firearm AI allies only ever swing at melee-reachable targets
                 log = [...log, ...outcome.log];
                 // A landed strike wears the companion's weapon(s), same as the hero's.
                 let allyGearWear = prev.allyGearWear || {};
@@ -48186,7 +49553,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const defenderKey = 'enemy:' + target.id;
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ...(aiAllyLockedShooter ? { ranged: false } : {}), attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ...(aiAllyLockedShooter ? { ranged: false } : {}), ...(aiGunFx ? { ranged: true, gunFx: aiGunFx, shots: outcome.shots } : {}), attackerType: 'ally', attackerId: ally.id, defenderType: 'enemy', defenderId: target.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 const locks = deriveLocksAfterAction(prev, 'ally:' + ally.id, defenderKey);
                 if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
@@ -48550,13 +49917,18 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 : makeEnemyActor(enemy, roleDmgMult * powerSurgeMult);
             // A ranged-role enemy, or anyone actually wielding a bow/gun, is firing — its shot can't be parried. A locked archer only punches.
             const enemyShotIsRanged = enemyIsShooter && !enemyPunching;
+            // Firearm wielders resolve a volley of separate bullets (see resolveGunVolley).
+            const enemyGunFx = enemyShotIsRanged ? getEnemyGunFxId(enemy) : null;
             if (friendlyBlocker)
                 return applyFriendlyFireShot(prev, { type: 'enemy', id: enemy.id, pos: enemy.pos, actor: attacker }, friendlyBlocker, log);
             if (targetChoice.kind === 'hero') {
                 const heroMods = computeHeroMods(gameState, prev.abilityState);
                 const defender = makeHeroDefender(prev.heroParts, heroMods, prev.gearWear, prev.abilityState && prev.abilityState.resilienceActive, prev.heroArmorCur);
                 const forceCrit5 = isBackstabOnLocked(prev, 'enemy:' + enemy.id, 'hero:hero', enemy.pos, prev.heroPos);
-                const outcome = resolveOneAttack(attacker, defender, t, (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, prev.heroPos, prev.coverCells) * steadyAimMult : 1), forceCrit5, enemyShotIsRanged);
+                const enemyVsHeroMult = (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, prev.heroPos, prev.coverCells) * steadyAimMult : 1);
+                const outcome = enemyGunFx
+                    ? resolveGunVolley(attacker, gunVolleyDamages(enemyGunFx, attacker.weaponDamage), defender, chainPlainDefender, enemyVsHeroMult, forceCrit5)
+                    : resolveOneAttack(attacker, defender, t, enemyVsHeroMult, forceCrit5, enemyShotIsRanged);
                 const heroArmorCur = outcome.armorPoolNext || prev.heroArmorCur;
                 // check): once it's actually eaten the one hit it was activated
                 // for, clear resilienceActive so the very next incoming hit goes
@@ -48602,7 +49974,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogBleedInflictedText'), kind: 'effect' }];
                 }
                 const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), 'hero:hero': true } : (prev.stunned || {});
-                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: enemyShotIsRanged, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+                const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: enemyShotIsRanged, ...(enemyGunFx ? { gunFx: enemyGunFx, shots: outcome.shots } : {}), attackerType: 'enemy', attackerId: enemy.id, defenderType: 'hero', defenderId: 'hero', resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
                 const locks = deriveLocksAfterAction(prev, 'enemy:' + enemy.id, 'hero:hero');
                 if (outcome.defeated)
                     return { ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'death', killedBy: enemy.enemyName };
@@ -48613,7 +49985,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const ally = targetChoice.ally;
             const defender = makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally));
             const forceCrit6 = isBackstabOnLocked(prev, 'enemy:' + enemy.id, 'ally:' + ally.id, enemy.pos, ally.pos);
-            const outcome = resolveOneAttack(attacker, defender, t, (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, ally.pos, prev.coverCells) * steadyAimMult : 1), forceCrit6, enemyShotIsRanged);
+            const enemyVsAllyMult = (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, ally.pos, prev.coverCells) * steadyAimMult : 1);
+            const outcome = enemyGunFx
+                ? resolveGunVolley(attacker, gunVolleyDamages(enemyGunFx, attacker.weaponDamage), defender, chainPlainDefender, enemyVsAllyMult, forceCrit6)
+                : resolveOneAttack(attacker, defender, t, enemyVsAllyMult, forceCrit6, enemyShotIsRanged);
             // cloak/jewelry, a shield block wears the shield; misses/dodges/parries nothing.
             let allyGearWear = prev.allyGearWear || {};
             if (outcome.resultKind === 'hit' || outcome.resultKind === 'vital') {
@@ -48646,7 +50021,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             const defenderKey = 'ally:' + ally.id;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: enemyShotIsRanged, attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: enemyShotIsRanged, ...(enemyGunFx ? { gunFx: enemyGunFx, shots: outcome.shots } : {}), attackerType: 'enemy', attackerId: enemy.id, defenderType: 'ally', defenderId: ally.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
             const locks = deriveLocksAfterAction(prev, 'enemy:' + enemy.id, defenderKey);
             if (enemies.every(isEnemyOut))
                 return { ...prev, allies, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
@@ -48752,7 +50127,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     useEffect(() => {
         if (!combat || combat.result || !combatModalOpen)
             return;
-        if (combatIntroActive)
+        if (combatIntroActive || combatFxBusyRef.current)
             return;
         const current = combat.order[combat.turnPos];
         if (!current)
@@ -48766,7 +50141,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return;
         const timer = setTimeout(() => runAutoTurn(), 650);
         return () => clearTimeout(timer);
-    }, [combat, combatModalOpen, combatIntroActive]);
+    }, [combat, combatModalOpen, combatIntroActive, combatFxBusy]);
+    // A fight that ends/closes mid-animation must not leave input locked for the next one.
+    useEffect(() => {
+        if (!combat && (combatFxBusyRef.current || combatFxBusy)) {
+            combatFxBusyRef.current = false;
+            setCombatFxBusy(false);
+        }
+    }, [combat, combatFxBusy]);
     function buildCombatSummaryTag(finalCombat, failedQuests, bondChanges) {
         const defeatedNames = finalCombat.enemies.filter(isEnemyDown).map(e => e.enemyName);
         // Broken enemies (see the morale system: rollMoraleBreak/applyMoraleShockToGroup)
@@ -51204,7 +52586,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const k = a.name.trim().toLowerCase();
                 const l = getAllyLoadout(a);
                 return [k, getLoadoutWeaponType(l.equipment, l.inventory)];
-            })), introActive: combatIntroActive, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
+            })), introActive: combatIntroActive, fxBusy: combatFxBusy, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
         talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, onLearn: isLatestTurn ? learnTalent : undefined, onClose: () => setTalentTreeModalOpen(false), t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: viewedState, itemRarities: viewedItemRarities, equipment: viewedEquipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, party: viewedParty, partyInventories: partyInventories, partyEquipment: partyEquipment, repairKitName: isLatestTurn && repairKitIndex !== null && gameState.inventory[repairKitIndex] && gameState.inventory[repairKitIndex].slot === 'repairKit' ? gameState.inventory[repairKitIndex].name : null, onApplyRepairKit: isLatestTurn ? applyRepairKitToIndex : undefined, onCancelRepairKit: cancelRepairKit, onClose: () => { setInventoryModalOpen(false); setRepairKitIndex(null); }, t: t })),
@@ -52262,29 +53644,36 @@ const APP_STYLES = `
   .combat-ability-chip-armed { outline: 2px solid var(--amber-400); box-shadow: 0 0 10px rgba(251, 191, 36, 0.45); }
   /* Gun-ability effects (fireGunFx) */
   .gunfx-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 60; }
-  .gunfx { position: absolute; pointer-events: none; z-index: 61; }
+  .gunfx { position: absolute; pointer-events: none; z-index: 61; opacity: 0; }
   .gunfx-b { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 60; will-change: transform; }
   .gunfx-ball { position: absolute; left: -6px; top: -2.5px; width: 12px; height: 5px; border-radius: 2px 3px 3px 2px;
     background: linear-gradient(90deg, #e8870f, #ffd36b 55%, #fff6d6); box-shadow: 0 0 7px 2px rgba(255, 160, 60, 0.7); }
-  .gunfx-trail { position: absolute; right: 6px; top: -1px; width: 34px; height: 2px; border-radius: 1px; background: linear-gradient(90deg, transparent, rgba(255, 170, 70, 0.55)); }
   .gunfx-b.gunfx-en .gunfx-ball { background: linear-gradient(90deg, #1aa7ff, #9eeaff 55%, #fff); box-shadow: 0 0 10px 3px rgba(60, 190, 255, 0.8); }
-  .gunfx-b.gunfx-en .gunfx-trail { width: 44px; background: linear-gradient(90deg, transparent, rgba(80, 200, 255, 0.7)); }
-  .gunfx-flare { width: 84px; height: 30px; margin-top: -15px; transform-origin: 0 50%;
-    background: linear-gradient(90deg, #fff 0, #ffe9a8 18%, #ffa63a 55%, rgba(255, 120, 30, 0) 100%);
-    clip-path: polygon(0 42%, 30% 14%, 62% 30%, 100% 46%, 100% 54%, 62% 72%, 30% 88%, 0 58%); filter: blur(1.5px); }
-  .gunfx-flare.gunfx-en { background: linear-gradient(90deg, #fff 0, #c5f2ff 20%, #38bdf8 58%, rgba(30, 120, 255, 0) 100%); }
-  .gunfx-flash { width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: radial-gradient(circle, #fff 0, rgba(255, 220, 140, 0.8) 35%, rgba(255, 150, 40, 0) 70%); }
-  .gunfx-flash.gunfx-en { background: radial-gradient(circle, #fff 0, rgba(140, 225, 255, 0.85) 35%, rgba(40, 150, 255, 0) 70%); }
+  .gunfx-glow { width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; filter: blur(3px);
+    background: radial-gradient(circle, rgba(255, 190, 90, 0.42), rgba(255, 130, 40, 0.18) 45%, rgba(255, 100, 20, 0) 70%); }
+  .gunfx-glow.gunfx-en { background: radial-gradient(circle, rgba(120, 210, 255, 0.45), rgba(60, 150, 255, 0.2) 45%, rgba(40, 120, 255, 0) 70%); }
+  .gunfx-cone { width: 76px; height: 36px; margin-top: -18px; transform-origin: 0 50%; border-radius: 50%; filter: blur(2.5px);
+    background: radial-gradient(ellipse at 14% 50%, rgba(255, 255, 235, 0.8) 0, rgba(255, 205, 100, 0.55) 28%, rgba(255, 130, 40, 0.25) 60%, rgba(255, 90, 20, 0) 100%); }
+  .gunfx-cone.gunfx-en { background: radial-gradient(ellipse at 14% 50%, rgba(235, 250, 255, 0.85) 0, rgba(130, 215, 255, 0.55) 28%, rgba(50, 150, 255, 0.25) 60%, rgba(30, 110, 255, 0) 100%); }
+  .gunfx-ray { width: 44px; height: 2px; margin-top: -1px; transform-origin: 0 50%; filter: blur(0.4px);
+    background: linear-gradient(90deg, rgba(255, 250, 225, 0.95), rgba(255, 190, 90, 0.55) 45%, rgba(255, 140, 40, 0)); }
+  .gunfx-ray.gunfx-en { background: linear-gradient(90deg, rgba(235, 250, 255, 0.95), rgba(120, 210, 255, 0.55) 45%, rgba(50, 150, 255, 0)); }
+  .gunfx-core { width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 245, 0.95), rgba(255, 225, 150, 0.6) 45%, rgba(255, 180, 70, 0) 72%); }
+  .gunfx-core.gunfx-en { background: radial-gradient(circle, rgba(245, 253, 255, 0.95), rgba(160, 225, 255, 0.6) 45%, rgba(60, 170, 255, 0) 72%); }
+  .gunfx-mini { width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 240, 0.95), rgba(255, 215, 130, 0.6) 45%, rgba(255, 150, 40, 0) 75%); }
+  .gunfx-mini.gunfx-en { background: radial-gradient(circle, rgba(245, 253, 255, 0.95), rgba(150, 225, 255, 0.6) 45%, rgba(50, 160, 255, 0) 75%); }
   .gunfx-smoke { width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; filter: blur(5px);
     background: radial-gradient(circle, rgba(205, 200, 195, 0.55), rgba(170, 170, 170, 0.25) 45%, rgba(150, 150, 150, 0) 72%); }
-  .gunfx-streak { width: 28px; height: 2.5px; margin-top: -1.25px; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, #ffd27a 60%, #fff); }
-  .gunfx-streak.gunfx-en { background: linear-gradient(90deg, transparent, #5ed0ff 60%, #fff); }
-  .gunfx-chip { width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #b8a58a; }
-  .gunfx-chip.gunfx-en { background: #7fdcff; box-shadow: 0 0 4px 1px rgba(80, 200, 255, 0.8); }
+  .gunfx-puff { width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; filter: blur(4px);
+    background: radial-gradient(circle, rgba(160, 145, 125, 0.5), rgba(150, 135, 115, 0.22) 50%, rgba(150, 135, 115, 0) 72%); }
+  .gunfx-puff.gunfx-en { background: radial-gradient(circle, rgba(110, 200, 255, 0.4), rgba(70, 160, 255, 0.16) 50%, rgba(70, 160, 255, 0) 72%); }
   .gunfx-casing { width: 9px; height: 3.5px; border-radius: 1px; margin: -1px 0 0 -3px; background: linear-gradient(#f0c75a, #a67c1a); }
-  .gunfx-dust { width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; filter: blur(2px);
-    background: radial-gradient(circle, rgba(170, 155, 135, 0.55), rgba(170, 155, 135, 0) 70%); }
-  .gunfx-dust.gunfx-en { background: radial-gradient(circle, rgba(90, 200, 255, 0.55), rgba(60, 160, 255, 0) 70%); filter: blur(3px); }
+  .gunfx-scorch { width: 30px; height: 22px; margin: -11px 0 0 -15px; border-radius: 50%; background: radial-gradient(ellipse, rgba(10, 6, 4, 0.7), rgba(10, 6, 4, 0) 70%); }
+  .gunfx-ember { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; filter: blur(1px);
+    background: radial-gradient(circle, rgba(255, 240, 190, 0.95), rgba(255, 140, 40, 0.55) 50%, rgba(255, 90, 20, 0) 75%); }
+  .gunfx-ember.gunfx-en { background: radial-gradient(circle, rgba(235, 250, 255, 0.95), rgba(90, 190, 255, 0.6) 50%, rgba(40, 130, 255, 0) 75%); }
   .gunfx-ring { width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; border: 2px solid rgba(255, 225, 170, 0.85); }
   .gunfx-ring.gunfx-en { border-color: rgba(130, 220, 255, 0.9); }
   @media (prefers-reduced-motion: reduce) {
@@ -53124,6 +54513,7 @@ const APP_STYLES = `
   .icon-btn:hover { color: var(--amber-500); }
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
+
 
 // ---- Mount ----
 // Starts once the third-party scripts have settled (loaded, failed, or timed
