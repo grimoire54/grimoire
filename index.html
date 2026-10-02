@@ -13,12 +13,6 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0c0a09; }
   #root { min-height: 100vh; }
-  /* Same bouncing dots as the in-game "thinking" indicator (grim-dot-bounce). */
-  .boot-dots span { display: inline-block; animation: grim-dot-bounce 1.2s infinite ease-in-out; color: #fbbf24; font-size: 1.1rem; }
-  .boot-dots span:nth-child(2) { animation-delay: 0.15s; }
-  .boot-dots span:nth-child(3) { animation-delay: 0.3s; }
-  @keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .boot-dots span { animation: none !important; } }
 </style>
 <script>
 // React 19 + ReactDOM + Scheduler, bundled inline so the app has zero
@@ -17255,16 +17249,7 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
     });
   })();
 </script>
-<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em"><span>Grimoire RPG - <span id="boot-word">loading</span></span><span class="boot-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div></div>
-<script>
-  // Boot note wording follows the system language: Russian UI -> "загрузка", anything else -> "loading".
-  (function () {
-    var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
-    var ru = /^ru\b/i.test(String(langs[0] || ''));
-    var w = document.getElementById('boot-word');
-    if (w) w.textContent = ru ? 'загрузка' : 'loading';
-  })();
-</script>
+<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em">Гримуар — загрузка…</div></div>
 <script>
   // Minimal localStorage-backed stand-in for the window.storage API that
   // Claude.ai artifacts provide. grimoire.jsx was written against that
@@ -17857,6 +17842,7 @@ const TRANSLATIONS = {
         questsButton: 'Журнал заданий',
         // -- Combat --
         combatButtonLabel: 'Бой',
+        retreatButtonLabel: 'Отступление',
         combatThresholdStub: 'Ты бросаешься в схватку — и всё, что будет дальше, решится в бою.',
         combatModalTitle: 'Бой',
         stealthKillPromptLabel: 'Скрытое убийство',
@@ -18170,6 +18156,8 @@ const TRANSLATIONS = {
         equipmentModalTitle: 'Снаряжение',
         equipmentStatsHeading: 'Параметры персонажа',
         equipmentGearHeading: 'Параметры снаряжения',
+        itemDefenseHeadLabel: 'Защита головы',
+        itemDefenseBodyLabel: 'Защита тела',
         equipCloak: 'Плащ',
         equipBackpack: 'Рюкзак',
         equipHelmet: 'Головной убор',
@@ -18235,6 +18223,10 @@ const TRANSLATIONS = {
         regenerateConfirmText: 'Текущий ответ мастера будет заменён новым. Перегенерировать ответ?',
         regenerateConfirmTextWithLoss: 'Это заменит выбранный ответ и удалит ВСЕ ходы, которые были после него — их будет не восстановить. Перегенерировать?',
         regenerateConfirmButton: 'Да, перегенерировать',
+        branchFromHereButton: 'Начать с этого момента',
+        branchConfirmTitle: 'Начать с этого момента?',
+        branchConfirmText: 'Все ходы после этого будут удалены — их будет не восстановить. Сам этот ход останется, а мир, герой, отряд и репутация вернутся к тому, какими они были сразу после него.',
+        branchConfirmButton: 'Да, удалить последующие ходы',
         // -- Inline item offers --
         resolveItemsErrorPrefix: 'Нужно выбрать, что делать с предметом: ',
         itemTakeAria: 'Взять',
@@ -18641,6 +18633,7 @@ const TRANSLATIONS = {
         questsButton: 'Quest journal',
         // -- Combat --
         combatButtonLabel: 'Fight',
+        retreatButtonLabel: 'Retreat',
         combatThresholdStub: 'You throw yourself into the clash — and whatever comes next will be settled in the fight.',
         combatModalTitle: 'Combat',
         stealthKillPromptLabel: 'Stealth kill',
@@ -18943,6 +18936,8 @@ const TRANSLATIONS = {
         equipmentModalTitle: 'Equipment',
         equipmentStatsHeading: 'Character parameters',
         equipmentGearHeading: 'Equipment parameters',
+        itemDefenseHeadLabel: 'Head defense',
+        itemDefenseBodyLabel: 'Body defense',
         equipCloak: 'Cloak',
         equipBackpack: 'Backpack',
         equipHelmet: 'Headwear',
@@ -19008,6 +19003,10 @@ const TRANSLATIONS = {
         regenerateConfirmText: "The game master's current response will be replaced with a new one. Are you sure you want to regenerate it?",
         regenerateConfirmTextWithLoss: "This will replace the selected response and delete EVERY turn that came after it — they can't be recovered. Are you sure you want to regenerate?",
         regenerateConfirmButton: 'Yes, regenerate',
+        branchFromHereButton: 'Start from this point',
+        branchConfirmTitle: 'Start from this point?',
+        branchConfirmText: "Every turn after this one will be deleted — they can't be recovered. This turn itself stays, and the world, hero, party and reputation go back to how they stood right after it.",
+        branchConfirmButton: 'Yes, delete the later turns',
         // -- Inline item offers --
         resolveItemsErrorPrefix: 'Choose what to do with the item: ',
         itemTakeAria: 'Take',
@@ -26372,53 +26371,122 @@ function computeReachableCells(from, range, combat, exclude) {
 function findFullPathToCell(from, to, combat, exclude) {
     if (from.x === to.x && from.y === to.y)
         return [];
-    const key = (p) => p.x + ',' + p.y;
-    const startKey = key(from);
-    const visited = new Set([startKey]);
-    const cameFrom = new Map();
-    const queue = [from];
-    let head = 0;
-    const dirs = [
-        { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
-        { x: -1, y: 0 }, { x: 1, y: 0 },
-        { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 }
-    ];
-    // Bounded exactly like findPathToAdjacent — the playable grid
-    // (GRID_RENDER_MIN/MAX_X/Y) is small enough that this is always far more
-    // headroom than any real path could ever need.
-    const maxNodes = 6000;
     const targetBlocked = isFootprintBlocked(to, combat, exclude);
+    return searchStraightPath(from, to, combat, exclude, targetBlocked ? null : (pos) => pos.x === to.x && pos.y === to.y, true);
+}
+// Shared route search behind both the player's move preview
+// (findFullPathToCell) and the AI movers (findPathToAdjacent): the SHORTEST
+// route in steps (8-directional, a diagonal costs the same as a straight
+// step — see computeReachableCells), and among all equally short routes the
+// one that stays closest to the straight line from `from` to `to`. A plain
+// breadth-first search picks whichever shortest route its fixed direction
+// order happens to reach first, which is what used to draw a needless
+// zigzag around an obstacle (or even across the open board) when a straight
+// walk was just as short. The tie-break is a small per-step penalty for
+// how far the cell sits off that line, kept well under one step's cost
+// (STEP_COST) summed over any possible route, so it can never trade a
+// shorter route for a prettier one.
+// `isGoal(pos)` decides when to stop; with `nearestFallback` and no goal
+// reached, the search routes to the reachable cell closest (Chebyshev) to
+// `to` instead — the "clicked on a wall" case. Returns the ordered
+// positions from (excluding) `from`, or null if nothing is reachable.
+const PATH_STEP_COST = 1000;
+const PATH_MAX_NODES = 6000;
+function searchStraightPath(from, to, combat, exclude, isGoal, nearestFallback) {
+    const dirs = [
+        { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 },
+        { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: 1 }, { x: -1, y: -1 }
+    ];
+    const key = (p) => (p.x + 5000) * 10000 + (p.y + 5000);
+    // Distance of a cell from the straight segment from -> to, in cells.
+    const sx = to.x - from.x, sy = to.y - from.y;
+    const segLen2 = sx * sx + sy * sy;
+    const offLine = (p) => {
+        if (segLen2 === 0)
+            return 0;
+        const t = Math.max(0, Math.min(1, ((p.x - from.x) * sx + (p.y - from.y) * sy) / segLen2));
+        return Math.hypot(p.x - (from.x + t * sx), p.y - (from.y + t * sy));
+    };
+    // Binary min-heap on cost (insertion order breaks exact ties deterministically).
+    const heap = [];
+    let seq = 0;
+    const push = (item) => {
+        item.seq = seq++;
+        heap.push(item);
+        let i = heap.length - 1;
+        while (i > 0) {
+            const par = (i - 1) >> 1;
+            if (heap[par].cost < heap[i].cost || (heap[par].cost === heap[i].cost && heap[par].seq < heap[i].seq))
+                break;
+            [heap[par], heap[i]] = [heap[i], heap[par]];
+            i = par;
+        }
+    };
+    const pop = () => {
+        const top = heap[0];
+        const last = heap.pop();
+        if (heap.length > 0) {
+            heap[0] = last;
+            let i = 0;
+            for (;;) {
+                const l = 2 * i + 1, r = l + 1;
+                let m = i;
+                const less = (x, y) => heap[x].cost < heap[y].cost || (heap[x].cost === heap[y].cost && heap[x].seq < heap[y].seq);
+                if (l < heap.length && less(l, m))
+                    m = l;
+                if (r < heap.length && less(r, m))
+                    m = r;
+                if (m === i)
+                    break;
+                [heap[m], heap[i]] = [heap[i], heap[m]];
+                i = m;
+            }
+        }
+        return top;
+    };
+    const startKey = key(from);
+    const best = new Map([[startKey, 0]]);
+    const cameFrom = new Map();
+    const settled = new Set();
+    push({ pos: from, cost: 0 });
     let goalPos = null;
-    let nearestFallback = null;
-    let nearestFallbackDist = Infinity;
-    while (head < queue.length && visited.size < maxNodes && !goalPos) {
-        const cur = queue[head++];
+    let fallback = null, fallbackDist = Infinity, fallbackCost = Infinity;
+    while (heap.length > 0 && settled.size < PATH_MAX_NODES) {
+        const cur = pop();
+        const ck = key(cur.pos);
+        if (settled.has(ck))
+            continue;
+        settled.add(ck);
+        if (ck !== startKey) {
+            if (isGoal && isGoal(cur.pos)) {
+                goalPos = cur.pos;
+                break;
+            }
+            if (nearestFallback) {
+                const d2 = chebyshevDistance(cur.pos, to);
+                if (d2 < fallbackDist || (d2 === fallbackDist && cur.cost < fallbackCost)) {
+                    fallbackDist = d2;
+                    fallbackCost = cur.cost;
+                    fallback = cur.pos;
+                }
+            }
+        }
         for (const d of dirs) {
-            const next = { x: cur.x + d.x, y: cur.y + d.y };
-            const k = key(next);
-            if (visited.has(k))
+            const next = { x: cur.pos.x + d.x, y: cur.pos.y + d.y };
+            const nk = key(next);
+            if (settled.has(nk))
                 continue;
             if (isFootprintBlocked(next, combat, exclude))
                 continue;
-            visited.add(k);
-            cameFrom.set(k, cur);
-            if (!targetBlocked && next.x === to.x && next.y === to.y) {
-                goalPos = next;
-                break;
-            }
-            // Track whichever unblocked cell visited so far sits closest to `to`,
-            // in case `to` itself turns out to be unreachable (occupied/cover) —
-            // this is what lets a click on or beyond an obstacle still plan a
-            // route right up to its edge instead of doing nothing.
-            const d2 = chebyshevDistance(next, to);
-            if (d2 < nearestFallbackDist) {
-                nearestFallbackDist = d2;
-                nearestFallback = next;
-            }
-            queue.push(next);
+            const cost = cur.cost + PATH_STEP_COST + Math.round(Math.min(offLine(next), 2) * 4);
+            if (best.has(nk) && best.get(nk) <= cost)
+                continue;
+            best.set(nk, cost);
+            cameFrom.set(nk, cur.pos);
+            push({ pos: next, cost });
         }
     }
-    const finalGoal = goalPos || nearestFallback;
+    const finalGoal = goalPos || fallback;
     if (!finalGoal)
         return null;
     const path = [];
@@ -26491,52 +26559,7 @@ function generateCoverLayout(combatantCount, heroX, enemyX) {
 function findPathToAdjacent(from, to, combat, exclude) {
     if (chebyshevDistance(from, to) <= MELEE_ATTACK_MAX_DISTANCE)
         return [];
-    const key = (p) => p.x + ',' + p.y;
-    const startKey = key(from);
-    const visited = new Set([startKey]);
-    const cameFrom = new Map();
-    const queue = [from];
-    let head = 0;
-    const dirs = [
-        { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
-        { x: -1, y: 0 }, { x: 1, y: 0 },
-        { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 }
-    ];
-    // Bounded so a pathological layout can never hang the UI — the playable
-    // grid (GRID_RENDER_MIN/MAX_X/Y) is small enough that this is always far
-    // more headroom than any real path could need.
-    const maxNodes = 6000;
-    let goalPos = null;
-    while (head < queue.length && visited.size < maxNodes && !goalPos) {
-        const cur = queue[head++];
-        for (const d of dirs) {
-            const next = { x: cur.x + d.x, y: cur.y + d.y };
-            const k = key(next);
-            if (visited.has(k))
-                continue;
-            if (isFootprintBlocked(next, combat, exclude))
-                continue;
-            visited.add(k);
-            cameFrom.set(k, cur);
-            if (chebyshevDistance(next, to) <= MELEE_ATTACK_MAX_DISTANCE) {
-                goalPos = next;
-                break;
-            }
-            queue.push(next);
-        }
-    }
-    if (!goalPos)
-        return null;
-    const path = [];
-    let cur = goalPos;
-    while (key(cur) !== startKey) {
-        path.push(cur);
-        const prev = cameFrom.get(key(cur));
-        if (!prev)
-            return null;
-        cur = prev;
-    }
-    return path.reverse();
+    return searchStraightPath(from, to, combat, exclude, (pos) => chebyshevDistance(pos, to) <= MELEE_ATTACK_MAX_DISTANCE, false);
 }
 // How far a chooseMoveStep call actually walks along its path/greedy
 // fallback in one turn — the actor's real movement range (see
@@ -26949,6 +26972,59 @@ function rollEnemyInventory(tierKey, kind, armorGear, weaponDescription, enemyNa
     }
     return { equipment, inventory, itemRarities };
 }
+// ---- PARTY STARTER GEAR ---------------------------------------------------
+// A companion who joins with nothing described on them (no narrative
+// belongings, nothing the hero handed over) is given a rolled starter kit of
+// their own, ONCE — built exactly like an enemy's loadout (same slot odds,
+// same rarity roll, same weight classes, same statRoll), so from then on
+// their armor and weapon damage come out of the very same formulas as
+// everyone else's. Unlike an enemy's, this kit is permanent: it lands in
+// partyInventories/partyEquipment and the global rarity map, so it can be
+// inspected, repaired, taken back and traded like any other item. Because
+// the rarity map is keyed by item NAME, the name itself encodes the rarity
+// (a "Rusty helmet" is always junk) — two companions can never disagree
+// about what a name means — and the adjectives are different per slot within
+// a rarity, so a random kit never forms an accidental matching set (see
+// extractSetStems). Order: junk, common, uncommon, rare, unique, mythic.
+const PARTY_STARTER_GEAR_NAMES = {
+    ru: {
+        helmet: ['Ржавый шлем', 'Простой шлем', 'Стальной шлем', 'Закалённый шлем', 'Рунный шлем', 'Королевский шлем'],
+        armor: ['Дырявая броня', 'Кожаная броня', 'Кольчужная броня', 'Латная броня', 'Мастерская броня', 'Драконья броня'],
+        gloves: ['Рваные перчатки', 'Холщовые перчатки', 'Дублёные перчатки', 'Усиленные перчатки', 'Узорные перчатки', 'Златотканые перчатки'],
+        boots: ['Стоптанные сапоги', 'Грубые сапоги', 'Подбитые сапоги', 'Крепкие сапоги', 'Походные сапоги', 'Зачарованные сапоги'],
+        weapon: ['Тупой меч', 'Солдатский меч', 'Боевой меч', 'Булатный меч', 'Клинок мастера', 'Реликтовый меч'],
+        shield: ['Дощатый щит', 'Обитый щит', 'Окованный щит', 'Башенный щит', 'Гербовый щит', 'Щит хранителя']
+    },
+    en: {
+        helmet: ['Rusty helmet', 'Plain helmet', 'Steel helmet', 'Tempered helmet', 'Runed helmet', 'Royal helmet'],
+        armor: ['Tattered armor', 'Leather armor', 'Chainmail armor', 'Plate armor', 'Masterwork armor', 'Dragonscale armor'],
+        gloves: ['Ragged gloves', 'Canvas gloves', 'Tanned gloves', 'Reinforced gloves', 'Patterned gloves', 'Goldthread gloves'],
+        boots: ['Worn-out boots', 'Coarse boots', 'Hobnailed boots', 'Sturdy boots', 'Trail boots', 'Enchanted boots'],
+        weapon: ['Dull sword', 'Soldier sword', 'Battle sword', 'Damascus sword', 'Master blade', 'Relic sword'],
+        shield: ['Plank shield', 'Studded shield', 'Ironbound shield', 'Tower shield', 'Crested shield', 'Warden shield']
+    }
+};
+const PARTY_STARTER_SHIELD_CHANCE = 0.3;
+function rollPartyStarterGear(lang) {
+    const names = PARTY_STARTER_GEAR_NAMES[lang === 'ru' ? 'ru' : 'en'];
+    const cfg = ENEMY_ARMOR_LOADOUT_BY_TIER.average;
+    const equipment = {};
+    const inventory = [];
+    const itemRarities = {};
+    const add = (slotKey, slot, rarity, extra) => {
+        const name = names[extra && extra.shield ? 'shield' : slot][R_ORDER_INDEX(rarity)];
+        const weightCategory = slot === 'weapon' ? undefined : (slot === 'armor' && Math.random() < ENEMY_HEAVY_ARMOR_CHANCE_BY_TIER.average ? 'heavy' : (Math.random() < 0.3 ? 'light' : 'medium'));
+        inventory.push({ name, slot, twoHanded: false, shield: !!(extra && extra.shield), ...(weightCategory ? { weightCategory } : {}), statRoll: rollItemStatRoll(), questId: null });
+        equipment[slotKey] = name;
+        itemRarities[name.toLowerCase()] = rarity;
+    };
+    rollEnemyArmorGear('average').forEach(g => add(g.slot, g.slot, g.rarity));
+    add('weaponRight', 'weapon', rollEnemyArmorRarity(cfg.rarityCenter));
+    if (Math.random() < PARTY_STARTER_SHIELD_CHANCE)
+        add('weaponLeft', 'weapon', rollEnemyArmorRarity(cfg.rarityCenter), { shield: true });
+    return { equipment, inventory, itemRarities, names: inventory.map(it => it.name) };
+}
+function R_ORDER_INDEX(rarity) { const i = ['junk', 'common', 'uncommon', 'rare', 'unique', 'mythic'].indexOf(rarity); return i < 0 ? 1 : i; }
 // Turns one raw enemy spec — either an entry from a fresh encounter's own
 // "enemies" list (see generateStateAndEvents) or one of a reinforcement
 // wave's "combatants" (see the "reinforcements" schema notes near
@@ -30403,6 +30479,8 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
     // above this component) — note NPCs carry no level field, so unlike the
     // hero's stats panel this one has no Уровень row.
     const totalDefense = computeTotalArmorDefense(equipment, inventory, itemRarities);
+    const headDefense = computeArmorPoolMax(equipment, inventory, itemRarities, 'head');
+    const bodyDefense = computeArmorPoolMax(equipment, inventory, itemRarities, 'body');
     const totalDamage = computeTotalWeaponDamage(equipment, inventory, itemRarities);
     const totalBlockChance = computeDefenseAvailability(equipment, inventory, itemRarities).blockChance || 0;
     const totalInitiativeMod = computeEquipmentInitiativeModifier(equipment, inventory);
@@ -30494,8 +30572,14 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
                                         React.createElement("span", { className: "sheet-stat-label" },
                                             React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
                                             " ",
-                                            t('itemDefenseLabel')),
-                                        React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, totalDefense)),
+                                            t('itemDefenseHeadLabel')),
+                                        React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, headDefense)),
+                                    React.createElement("div", { className: "sheet-stat-row" },
+                                        React.createElement("span", { className: "sheet-stat-label" },
+                                            React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                            " ",
+                                            t('itemDefenseBodyLabel')),
+                                        React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, bodyDefense)),
                                     React.createElement("div", { className: "sheet-stat-row" },
                                         React.createElement("span", { className: "sheet-stat-label" },
                                             React.createElement("img", { src: EQUIP_ICON_WEAPON_LEFT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
@@ -30988,6 +31072,8 @@ function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, isSlot
     // combat's own block-chance gating), so these numbers can never drift
     // from what the rest of the game actually uses them for.
     const totalDefense = computeTotalArmorDefense(equipment, gameState.inventory, itemRarities);
+    const headDefense = computeArmorPoolMax(equipment, gameState.inventory, itemRarities, 'head');
+    const bodyDefense = computeArmorPoolMax(equipment, gameState.inventory, itemRarities, 'body');
     const totalDamage = computeTotalWeaponDamage(equipment, gameState.inventory, itemRarities);
     const totalBlockChance = computeDefenseAvailability(equipment, gameState.inventory, itemRarities).blockChance || 0;
     const totalInitiativeMod = computeEquipmentInitiativeModifier(equipment, gameState.inventory);
@@ -31089,8 +31175,14 @@ function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, isSlot
                                     React.createElement("span", { className: "sheet-stat-label" },
                                         React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
                                         " ",
-                                        t('itemDefenseLabel')),
-                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, totalDefense)),
+                                        t('itemDefenseHeadLabel')),
+                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, headDefense)),
+                                React.createElement("div", { className: "sheet-stat-row" },
+                                    React.createElement("span", { className: "sheet-stat-label" },
+                                        React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                        " ",
+                                        t('itemDefenseBodyLabel')),
+                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, bodyDefense)),
                                 React.createElement("div", { className: "sheet-stat-row" },
                                     React.createElement("span", { className: "sheet-stat-label" },
                                         React.createElement("img", { src: EQUIP_ICON_WEAPON_LEFT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
@@ -32459,6 +32551,12 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // the arrow teleporting/flying erratically). Each entry here gets its
     // own <svg> with its own key, so overlapping shots animate independently.
     const [arrows, setArrows] = useState([]);
+    // Gun abilities (ABILITY_DEFS entries with weaponFx): tapping the chip arms
+    // one, the next tap on an enemy attacks with it (see onAttack below).
+    const [armedGunId, setArmedGunId] = useState(null);
+    const gunLayerRef = useRef(null);
+    useEffect(() => { if (!isHeroTurn)
+        setArmedGunId(null); }, [isHeroTurn]);
     const arrowSeqRef = useRef(0);
     // ---- "Связаны боем" idle spar loop ----
     // Purely cosmetic: reads combat.locks (see deriveLocksAfterAction, near
@@ -32638,6 +32736,105 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         // the element only gets removed once it's already faded out.
         timers.push(setTimeout(() => setArrows(prev => prev.filter(a => a.id !== id)), 480));
     }
+    // Gun-ability animation (GUN_FX_DEFS): bullets/bolts fly from the shooter's
+    // grid cell to the target's, with muzzle flash, smoke, casings and impact
+    // sparks. Drawn imperatively into gunLayerRef (inside .combat-grid-world, so
+    // it pans/zooms with the camera) via the Web Animations API. Purely visual —
+    // the real attack is already resolved; onDone fires when the last bullet lands.
+    function fireGunFx(attackerPos, defenderPos, isMiss, fxId, onDone, timers) {
+        const def = GUN_FX_DEFS[fxId];
+        const layer = gunLayerRef.current;
+        if (!def || !layer || !attackerPos || !defenderPos) {
+            onDone();
+            return;
+        }
+        const half = (UNIT_SPAN * GRID_CELL_PX) / 2;
+        const start = { x: unitCenterPx(attackerPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(attackerPos.y, GRID_RENDER_MIN_Y) };
+        const end = { x: unitCenterPx(defenderPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(defenderPos.y, GRID_RENDER_MIN_Y) };
+        const en = def.energy, E = en ? ' gunfx-en' : '', k = def.flare, SPREAD = 60;
+        const rnd = (a) => (Math.random() * 2 - 1) * a;
+        const mk = (cls, x, y, frames, dur, ease) => {
+            const d = document.createElement('div');
+            d.className = 'gunfx gunfx-' + cls + E;
+            d.style.left = x + 'px';
+            d.style.top = y + 'px';
+            layer.appendChild(d);
+            d.animate(frames, { duration: dur, easing: ease || 'ease-out' }).onfinish = () => d.remove();
+        };
+        const streaks = (x, y, n, base, spreadA, minD, maxD) => {
+            for (let i = 0; i < n; i++) {
+                const a = base + rnd(spreadA), r = minD + Math.random() * (maxD - minD);
+                mk('streak', x, y, [{ opacity: 1, transform: 'rotate(' + a + 'rad) translateX(2px) scaleX(1)' }, { opacity: 0, transform: 'rotate(' + a + 'rad) translateX(' + r + 'px) scaleX(.3)' }], 160 + Math.random() * 180, 'cubic-bezier(.1,.7,.3,1)');
+            }
+        };
+        const chips = (x, y, n, maxD) => {
+            for (let i = 0; i < n; i++) {
+                const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * maxD;
+                mk('chip', x, y, [{ opacity: 1, transform: 'translate(0,0)' }, { opacity: 0, transform: 'translate(' + Math.cos(a) * r + 'px,' + (Math.sin(a) * r + 10) + 'px)' }], 260 + Math.random() * 200);
+            }
+        };
+        const shoot = (off) => {
+            const dx = end.x - start.x, dy = end.y - start.y, len = Math.hypot(dx, dy) || 1;
+            const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+            let tx = end.x + nx * rnd(SPREAD) + ux * rnd(SPREAD * 0.5), ty = end.y + ny * rnd(SPREAD) + uy * rnd(SPREAD * 0.5);
+            if (isMiss) {
+                const a0 = Math.random() * Math.PI * 2, rad = half + 14 + Math.random() * 34 + SPREAD * 0.4;
+                tx = end.x + Math.cos(a0) * rad;
+                ty = end.y + Math.sin(a0) * rad;
+            }
+            const sx = start.x + nx * off + nx * rnd(4), sy = start.y + ny * off + ny * rnd(4);
+            const ang = Math.atan2(ty - sy, tx - sx), deg = ang * 180 / Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
+            const b = document.createElement('div');
+            b.className = 'gunfx-b' + E;
+            b.innerHTML = '<div class="gunfx-trail"></div><div class="gunfx-ball"></div>';
+            layer.appendChild(b);
+            const T = (x, y) => 'translate(' + x + 'px,' + y + 'px) rotate(' + deg + 'deg)';
+            // muzzle flare + flash (+ smoke and a casing for ballistic guns)
+            const mx = sx + cx * 38, my = sy + cy * 38, fl = (0.8 + Math.random() * 0.5) * k;
+            mk('flare', mx, my, [{ opacity: 0.95, transform: 'rotate(' + deg + 'deg) scale(.4,.7)' }, { opacity: 0.9, transform: 'rotate(' + deg + 'deg) scale(' + fl + ',' + (0.8 + Math.random() * 0.3) + ')', offset: 0.35 }, { opacity: 0, transform: 'rotate(' + deg + 'deg) scale(' + fl * 1.05 + ',.5)' }], 60, 'linear');
+            mk('flash', mx, my, [{ opacity: 0.7 * k, transform: 'scale(' + 0.5 * k + ')' }, { opacity: 0, transform: 'scale(' + 1.2 * k + ')' }], 70, 'linear');
+            if (!en) {
+                mk('smoke', mx + cx * 10, my + cy * 10, [{ opacity: 0.4 * k, transform: 'translate(0,0) scale(' + 0.4 * k + ')' }, { opacity: 0, transform: 'translate(' + cx * 60 * k + 'px,' + (cy * 60 * k - 6) + 'px) scale(' + 1.6 * k + ')' }], 420);
+                for (let q = 0; q < (k < 1 ? 1 : 2); q++) {
+                    const sz = (0.5 + Math.random() * 0.6) * k, drift = 10 + Math.random() * 34, lift = 14 + Math.random() * 30, side = rnd(22);
+                    mk('smoke', mx + cx * (4 + q * 5), my + cy * (4 + q * 5), [
+                        { opacity: 0, transform: 'translate(0,0) scale(' + sz * 0.4 + ')' },
+                        { opacity: 0.38, transform: 'translate(' + cx * drift * 0.4 + 'px,' + (cy * drift * 0.4 - lift * 0.2) + 'px) scale(' + sz * 0.9 + ')', offset: 0.12 },
+                        { opacity: 0, transform: 'translate(' + (cx * drift + nx * side) + 'px,' + (cy * drift + ny * side - lift) + 'px) scale(' + sz * 2 + ')' }
+                    ], 700 + Math.random() * 500, 'cubic-bezier(.2,.6,.3,1)');
+                }
+                const cs = Math.random() < 0.5 ? 1 : -1;
+                mk('casing', sx + cx * 8, sy + cy * 8, [
+                    { opacity: 1, transform: 'translate(0,0) rotate(0deg)' },
+                    { opacity: 1, transform: 'translate(' + nx * cs * 22 + 'px,' + (ny * cs * 22 - 16) + 'px) rotate(260deg)', offset: 0.55 },
+                    { opacity: 0, transform: 'translate(' + nx * cs * 30 + 'px,' + (ny * cs * 30 + 8) + 'px) rotate(420deg)' }
+                ], 420);
+            }
+            b.animate([{ transform: T(sx, sy) }, { transform: T(tx, ty) }], { duration: GUN_BULLET_FLIGHT_MS, easing: 'linear', fill: 'forwards' }).onfinish = () => {
+                b.remove();
+                const hit = !isMiss && Math.abs(tx - end.x) <= half + 6 && Math.abs(ty - end.y) <= half + 6, back = ang + Math.PI;
+                mk('flash', tx, ty, [{ opacity: 1, transform: 'scale(.5)' }, { opacity: 0, transform: 'scale(' + (hit ? 2.2 : 1.4) + ')' }], hit ? 130 : 90, 'linear');
+                if (hit) {
+                    streaks(tx, ty, 11, back, 1.2, 26, 78);
+                    chips(tx, ty, 9, 36);
+                    mk('ring', tx, ty, [{ opacity: 0.9, transform: 'scale(.2)' }, { opacity: 0, transform: 'scale(1.2)' }], 230);
+                    mk('dust', tx, ty, [{ opacity: 0.8, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(1.5)' }], 380);
+                }
+                else {
+                    streaks(tx, ty, 5, back, 1.3, 14, 40);
+                    mk('dust', tx, ty, [{ opacity: 0.9, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(1.8)' }], 450);
+                    chips(tx, ty, 4, 18);
+                }
+            };
+        };
+        const span = gunFxBurstSpan(def);
+        for (let bi = 0; bi < def.bursts; bi++)
+            for (let i = 0; i < def.perBurst; i++)
+                def.hands.forEach((off, h) => {
+                    timers.push(setTimeout(() => shoot(off), bi * (span + def.pause) + i * def.gap + h * def.stagger));
+                });
+        timers.push(setTimeout(onDone, gunFxDuration(fxId)));
+    }
     // ---- Pre-battle sword-clash intro ----
     // introActive itself now lives in App() (combatIntroActive) — shared with
     // the auto-turn effect there so nothing can act in the background while
@@ -32699,7 +32896,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
         // Normally the arrival callback below releases the hold at the exact moment
         // the arrow lands; this timer is only a safety net for the case where that
         // callback never runs, so a target can never stay frozen on its old bars.
-        pendingShotTimersRef.current.push(setTimeout(() => releaseShot(seq), RANGED_DRAW_MS + ARROW_FLIGHT_MS + 150));
+        pendingShotTimersRef.current.push(setTimeout(() => releaseShot(seq), (action.gunFx && GUN_FX_DEFS[action.gunFx] ? gunFxDuration(action.gunFx) : RANGED_DRAW_MS + ARROW_FLIGHT_MS) + 150));
     }, [combat]);
     useEffect(() => {
         const action = combat.lastAction;
@@ -32812,7 +33009,21 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 return next;
             });
         };
-        if (isRanged && attackerEl && defenderEl) {
+        if (isRanged && attackerEl && defenderEl && action.gunFx && GUN_FX_DEFS[action.gunFx]) {
+            // Gun ability: no bow draw — bullets start right away, and the target's
+            // bars / hit reaction wait for the last one to land (same hold as arrows).
+            const attackerPos = combatantGridPos(action.attackerType, action.attackerId);
+            const defenderPos = combatantGridPos(action.defenderType, action.defenderId);
+            fireGunFx(attackerPos, defenderPos, isMiss, action.gunFx, () => {
+                releaseShot(seq);
+                if (defenderCls)
+                    setFx(prev => ({ ...prev, [defenderKey]: { cls: defenderCls, seq, spark, vec: null } }));
+                if (popupItems.length > 0)
+                    setPopups(prev => ({ ...prev, [defenderKey]: { seq, items: popupItems } }));
+                timers.push(setTimeout(clearFxAndPopups, 900));
+            }, timers);
+        }
+        else if (isRanged && attackerEl && defenderEl) {
             // Bow draw (with the shake) plays first; the release, the arrow
             // flight and the defender's own reaction are chained off its end so
             // a hit (or a miss landing wide) plays exactly when the arrow
@@ -32893,6 +33104,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')',
                             transformOrigin: '0 0'
                         } },
+                        React.createElement("div", { ref: gunLayerRef, className: "gunfx-layer", "aria-hidden": "true" }),
                         arrows.map(a => (React.createElement("svg", { key: a.id, className: "combat-arrow-projectile", "aria-hidden": "true", viewBox: "0 0 32 10", style: { '--arrow-x1': a.x1, '--arrow-y1': a.y1, '--arrow-x2': a.x2, '--arrow-y2': a.y2, '--arrow-angle': a.angle } },
                             React.createElement("line", { x1: "0", y1: "5", x2: "21", y2: "5", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round" }),
                             React.createElement("path", { d: "M17 0 L32 5 L17 10 Z", fill: "currentColor" })))),
@@ -32927,7 +33139,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             // An arrow aimed at this enemy that hasn't landed yet: keep drawing its pre-hit state.
                             const heldShot = heldShotFor('enemy:' + enemy.id);
                             const shownParts = heldShot ? heldShot.parts : enemy.parts;
-                            return (React.createElement("div", { key: enemy.id, className: "combat-grid-token", style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
+                            return (React.createElement("div", { key: enemy.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!enemy.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(enemy.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(enemy.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
                                         React.createElement(CombatPortrait, { name: enemy.enemyName, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!enemy.fled, isLeaving: isCardOut('enemy', enemy), isArriving: !!arrivedKeys['enemy:' + enemy.id], isActive: isThisActive, 
@@ -32937,7 +33149,14 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                                             // while planningMove (below) is active, so tapping
                                             // your own card to preview a route never locks out
                                             // tapping an enemy to attack instead.
-                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, role: enemy.role, tier: enemy.tier, weaponType: portraitTypeFor('enemy:' + enemy.id, getEnemyWeaponType(enemy), isEnemyBowUser(enemy)), t: t })))));
+                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id, armedGunId)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, 
+                                            // A ranged enemy that has been drawn into melee (locked
+                                            // with an opponent, or engaged — someone has closed on it
+                                            // and it now fights at the point-blank penalty, see
+                                            // ENEMY_ROLES.ranged) wears the melee badge instead of
+                                            // the bow until it breaks away again; engaged is
+                                            // cleared the moment it retreats, so the bow comes back.
+                                            role: enemy.role === 'ranged' && !isBodyDestroyed(shownParts) && (enemy.engaged || getActiveLockPartner(combat, 'enemy:' + enemy.id)) ? 'melee' : enemy.role, tier: enemy.tier, weaponType: portraitTypeFor('enemy:' + enemy.id, getEnemyWeaponType(enemy), isEnemyBowUser(enemy)), t: t })))));
                         }),
                         visibleAllies.map(ally => {
                             const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !introActive && pendingItemIndex === null;
@@ -32946,7 +33165,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             // Same hold as for enemies: an arrow still in flight at this ally hasn't hit yet.
                             const heldShot = heldShotFor('ally:' + ally.id);
                             const shownParts = heldShot ? heldShot.parts : ally.parts;
-                            return (React.createElement("div", { key: ally.id, className: "combat-grid-token", style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
+                            return (React.createElement("div", { key: ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
                                         React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t }),
@@ -32967,12 +33186,14 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 const def = ABILITY_DEFS[id];
                 const status = getAbilityStatus(id, combat.abilityState, combat.round);
                 const isManual = def.trigger === 'manual';
-                const statusText = status.usedUp
+                const isGun = !!def.weaponFx;
+                const isArmed = isGun && armedGunId === id;
+                const statusText = isArmed ? t('combatAbilityArmedHint') : status.usedUp
                     ? t('combatAbilityUsedHint')
                     : status.cooldown
                         ? t('combatAbilityCooldownHint').replace('{n}', status.cooldown)
                         : t('combatAbilityReadyHint');
-                return (React.createElement("button", { key: id, type: "button", onClick: isManual ? () => onUseAbility(id) : undefined, className: 'combat-ability-chip' + (status.available ? ' combat-ability-chip-ready' : ' combat-ability-chip-cooldown') + (isManual ? '' : ' combat-ability-chip-auto'), disabled: !isManual || !isHeroTurn || introActive || !status.available, title: t(def.descKey) },
+                return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => setArmedGunId(a => a === id ? null : id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-ability-chip' + (status.available ? ' combat-ability-chip-ready' : ' combat-ability-chip-cooldown') + (isManual ? '' : ' combat-ability-chip-auto') + (isArmed ? ' combat-ability-chip-armed' : ''), disabled: !isManual || !isHeroTurn || introActive || !status.available, title: t(def.descKey) },
                     React.createElement("span", { className: "combat-ability-chip-icon" }, def.icon),
                     React.createElement("span", { className: "combat-ability-chip-text" },
                         React.createElement("span", { className: "combat-ability-chip-name" }, t(def.nameKey)),
@@ -35270,6 +35491,16 @@ function RegenerateConfirmModal({ withLoss, onConfirm, onCancel, t }) {
                 React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
                 React.createElement("button", { onClick: onConfirm, className: "btn btn-danger", type: "button" }, t('regenerateConfirmButton'))))));
 }
+function BranchConfirmModal({ onConfirm, onCancel, t }) {
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onCancel(); } },
+        React.createElement("div", { className: "modal-card" },
+            React.createElement("h2", { className: "modal-title" }, t('branchConfirmTitle')),
+            React.createElement("p", { className: "hint-text hint-text-block warning-text" }, t('branchConfirmText')),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
+                React.createElement("button", { onClick: onConfirm, className: "btn btn-danger", type: "button" }, t('branchConfirmButton'))))));
+}
 function EditConfirmModal({ withLoss, dontShowAgain, onDontShowAgainChange, onConfirm, onCancel, t }) {
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onCancel(); } },
@@ -35779,6 +36010,15 @@ function DevHeroTab({ api }) {
                 React.createElement(DevBtn, { onClick: () => giveGold(1) }, "\uFF0B"),
                 React.createElement(DevBtn, { onClick: () => giveGold(-1) }, "\uFF0D"),
                 React.createElement(DevBtn, { onClick: setGoldExact }, "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C"))),
+        React.createElement(DevSection, { title: "\u041E\u0433\u043D\u0435\u0441\u0442\u0440\u0435\u043B\u044C\u043D\u044B\u0435 \u0441\u043F\u043E\u0441\u043E\u0431\u043D\u043E\u0441\u0442\u0438 (\u0442\u0435\u0441\u0442 \u0432 \u0431\u043E\u044E)" },
+            React.createElement(DevRow, null, Object.keys(ABILITY_DEFS).filter(isWeaponFxAbility).map(id => {
+                const owned = (gs.abilities || []).includes(id);
+                return (React.createElement(DevBtn, { key: id, small: true, onClick: () => patch(s => ({ ...s, abilities: owned ? s.abilities.filter(a => a !== id) : [...s.abilities, id] })) }, (owned ? '✓ ' : '') + ABILITY_DEFS[id].icon + ' ' + (TRANSLATIONS.ru[ABILITY_DEFS[id].nameKey] || id)));
+            })),
+            React.createElement(DevRow, null,
+                React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, abilities: mergeWeaponAbilities(s.abilities, Object.keys(ABILITY_DEFS).filter(isWeaponFxAbility)) })) }, "\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435"),
+                React.createElement(DevBtn, { onClick: () => patch(s => ({ ...s, abilities: s.abilities.filter(a => !isWeaponFxAbility(a)) })) }, "\u0417\u0430\u0431\u0440\u0430\u0442\u044C \u0432\u0441\u0435"),
+                React.createElement("span", { className: "dev-hint" }, "\u0412 \u0431\u043E\u044E: \u0447\u0438\u043F \u0441\u043F\u043E\u0441\u043E\u0431\u043D\u043E\u0441\u0442\u0438 \u2192 \u0442\u0430\u043F \u043F\u043E \u0432\u0440\u0430\u0433\u0443"))),
         React.createElement(DevSection, { title: 'Эффекты (' + gs.effects.length + ')' },
             React.createElement(DevRow, null,
                 React.createElement(DevField, { label: "\u0422\u0438\u043F" },
@@ -38478,6 +38718,7 @@ function App() {
     // -- Restart / regenerate --
     const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
     const [regenerateTarget, setRegenerateTarget] = useState(null);
+    const [branchTarget, setBranchTarget] = useState(null);
     // -- Turn navigation & generation feedback --
     const [currentTurnIndex, setCurrentTurnIndex] = useState(1);
     const [turnInputValue, setTurnInputValue] = useState('1');
@@ -38614,6 +38855,9 @@ function App() {
     // map.currentId to it once this turn resolves, guaranteeing arrival even
     // if the model's own narration of the journey is vague about it.
     const pendingMapDestinationRef = useRef(null);
+    // Set while a queued map trip was cut short by a route ambush this turn, so
+    // the fight it produces is marked noRetreat (see callGameMaster).
+    const routeAmbushRef = useRef(false);
     // Mirrors pendingMapDestinationRef but as UI state, purely to render the
     // queued-trip chip near the composer and the "already queued" badge on
     // the map itself; cleared once the queued action is actually sent.
@@ -40548,6 +40792,7 @@ If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "sh
 "role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). A ranged opponent tries to keep its distance once the hero has closed on it, a caster reaches for status effects instead of plain hits, and a tank quietly shrugs off more damage than its raw stats alone would suggest — so this choice does shape how the fight plays, and a reasonable best guess is always fine, but never leave it out or invent a fifth category.
 "fearless" is true only for an opponent that fundamentally cannot be frightened, demoralized, or panicked into fleeing — undead, constructs/automatons, oozes/swarms, or anything else established as mindless or otherwise incapable of fear — and false for absolutely everything else, including dangerous, confident, or fanatical living opponents (a fanatic can still break when things go badly enough; only make this true when the scene or the opponent's nature makes fear itself inapplicable). Default to false whenever genuinely unsure.
 "ambush" is a single top-level flag for the whole encounter — true only when the hero is the one attacking, every listed opponent has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself; only ever set it true when "enemies" has exactly one entry, since a stealth strike is a single decisive blow against a single unaware target, not a group action. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, mutual/open hostility of any kind, and any fight with more than one opponent.
+"noRetreat" is an optional top-level flag (default false): true when the hero has no way to simply back off and return to where they came from before the fight — they were ambushed, surrounded, cornered, trapped, or the enemies are already upon them, blocking the way, or the fight is part of a scene the hero cannot walk away from. False (or omitted) when the opponents are still some way off or have not yet engaged, so the hero could plausibly turn around and withdraw without a fight.
 "objective" is optional and describes what actually needs to happen for THIS fight to count as won, beyond the default of simply defeating every listed opponent — include it only when the scene itself gives the fight a distinct goal (reinforcements are close, someone else here needs shielding, there is something to grab and escape with rather than a fight to win outright, or the opposition is so far beyond the hero that surviving at all is the only real goal), and otherwise omit the field entirely (or send null) for an ordinary fight where victory just means beating the enemies. When present, "objective" is an object: "type" is exactly one of "surviveTurns" (the hero only needs to hold on for a stretch — a rescue, reinforcements, a collapsing structure, a fuse burning down), "protect" (someone else already in this fight must not go down, whether or not every enemy ends up beaten), "retreat" (the real goal is grabbing something and getting out, not winning the fight outright), or "survive" (the opposition is too much to beat — getting out alive at all is the whole goal); never send "defeatAll" as a type, that is simply what leaving the field out already means. "label" is a short phrase in ${narrativeLanguage}, written the way it would read on a battle-objective banner (e.g. "Продержаться 4 хода — подкрепление на подходе", "Защитить Мерина", "Grab the chest and get out"), and MUST be included whenever "objective" itself is. "turnsRequired" is a small positive integer (2–6 is typical), ONLY for "surviveTurns" — how many full combat rounds the hero has to last. "protectName" is ONLY for "protect" — the exact name of the specific companion (an actual, currently-present party member, never a bystander who is not part of the fight) who must survive.
 "reinforcements" is an optional array (default empty) of additional combatants who arrive mid-fight rather than at the start — the mechanism for a fight that grows beyond the initial clash. This should stay a minority of fights, not the norm, but don't let it collapse to never: over the course of a campaign it should genuinely fire from time to time, not sit empty for dozens of fights running. Actively look for a reason to use it rather than only reaching for it when the scene has already spelled one out in so many words — a bandit camp, a guard post, a den, or any lair-like location plausibly has more than just whoever's in the opening clash within earshot; a cry of alarm, sounds of fighting, or simply the fight running long enough to draw attention are all legitimate, ordinary triggers, not special narrative setups. Reserve it for moments that make sense given the location and situation: a patrol that will come running, a messenger who slipped away to raise the alarm, a stronghold where guards are everywhere, a desperate last stand where allies might reach the hero in time. There's no cap on how many waves a single fight can have — let a large-scale battle escalate for as long as the scene supports it. Each entry has: "id" (short, lowercase, unique slug), "label" (short name for the arriving group, in ${narrativeLanguage}, e.g. "Стража у ворот", "Меррик и его люди"), "side" (exactly "enemy" or "ally"), "trigger" (exactly one of {"type": "turn", "value": 3} — if the fight reaches round 3; {"type": "enemyDeaths", "value": 2} — once 2 enemies are dead; {"type": "allyDeaths", "value": 1} — once 1 ally has gone down; {"type": "heroHpBelow", "value": 20} — once the hero's HP drops below 20%), and "combatants" (1 or more entries, with no upper cap; for "enemy" each is shaped exactly like an "enemies" entry above — "enemyName"/"weaponDescription"/"armorPiercing"/"tier"/"role"/"kind"/"damageResist"/"fearless"/"bodyParts"; for "ally" each is EITHER {"npcName": "exact name"} binding to an already-tracked companion who MUST already exist in "npcs" above with "presentNow": true, OR an anonymous unit shaped like an enemy entry but without "fearless"/"bodyParts" — {"name": "...", "weaponDescription": "...", "armorPiercing": false, "tier": "...", "role": "..."}). Enemy reinforcement tier should usually be AT OR BELOW the fight's own opening tier — they add pressure, not punish the player for winning; a "legendary" reinforcement to a "weak" fight is almost always wrong. An ally reinforcement MUST already be established in the story before this fight — a tracked companion physically present, or an anonymous group the scene has already foreshadowed (a patrol met earlier, a faction the hero has helped) — never conjure allies from nowhere. If a reinforcement is meant to save the hero, its trigger must fire before HP would actually reach zero — even then the rescue is only narrated, not mechanically guaranteed. There is no cap on the total number of enemies across the whole fight (opening roster plus every wave) — a proper siege, battle, or last stand should field as many opponents as the scene actually calls for.\n\"presentAllies\" is an optional array (default empty) of already-tracked, currently-present companions who are ACTIVELY FIGHTING ALONGSIDE THE HERO from the very first round of THIS fight — distinct from \"reinforcements\", which is for someone arriving mid-fight, and from the hero's own recruited party (who are already added to combat automatically and never need to be listed here). Use it whenever the scene's own prose has a specific named character — someone already in \"npcs\" above with \"presentNow\": true, but not already a recruited party member — throwing a punch, swinging a weapon, or otherwise actively fighting on the hero's side in the very scene that just triggered this combat: a hired guide, a fellow prisoner who grabbed a blade, a local guard who joins in, a quest-giver defending themselves alongside the hero. If the scene's own text has such a character fighting, they MUST appear here — never leave a character the prose just showed swinging a weapon out of combat entirely. Do not invent one who wasn't actually shown fighting, and do not include anyone already covered by the hero's recruited party. Each entry is {"npcName": "exact tracked name"}, with no fixed cap.${itemOffersSection}
 
@@ -40745,6 +40990,7 @@ Rules:
                 const stopName = nodeName(interruption.stopId);
                 pendingMapDestinationRef.current = interruption.stopId;
                 if (interruption.kind === 'ambush') {
+                    routeAmbushRef.current = true;
                     routeNotes.push(`set out for "${targetName}"${routeSoFar}, but was ambushed at "${stopName}" partway there — hostile forces struck before the hero could go any further. Open this scene with that ambush and hand it straight to the COMBAT AND AMBUSH HANDOFF rule, stopping the prose the instant violence begins; the hero never reaches "${targetName}" this time, they get no further than "${stopName}".${modeNote}`);
                 }
                 else {
@@ -41417,7 +41663,12 @@ ${chunkText}`;
             // above, so an unexpected value from the model, or its plain absence
             // on an npc carried over from an older save, reads as "not present"
             // rather than a stale truthy leftover.
-            const base = { ...rest, location, dead, factionLeader, unyielding, enemy, incapacitated, presentNow: n.presentNow === true && locationMatchesHero };
+            // Sticky and engine-owned (the model never sees or sets it): a
+            // companion's one-time starter kit was already handed out — see the
+            // PARTY STARTER GEAR effect in App(). Without it a kit the player took
+            // back would be re-issued for free.
+            const starterGearGiven = !!(prior && prior.starterGearGiven === true);
+            const base = { ...rest, location, dead, factionLeader, unyielding, enemy, incapacitated, presentNow: n.presentNow === true && locationMatchesHero, ...(starterGearGiven ? { starterGearGiven: true } : {}) };
             const key = typeof n.name === 'string' ? n.name.trim().toLowerCase() : '';
             if (!key || !partyKeys.includes(key))
                 return base;
@@ -42592,6 +42843,10 @@ ${chunkText}`;
                 // plain Fight button (see combatPending's render site). Ambush only
                 // ever applies to a solo target — see the schema notes above.
                 ambush: combatRaw.ambush === true && enemies.length === 1,
+                // See the "noRetreat" schema note: the hero can't just back off (the
+                // Retreat button next to Fight is hidden). A route ambush (see
+                // routeAmbushRef) forces it on after this parse.
+                noRetreat: combatRaw.noRetreat === true,
                 // See the "objective" field's schema notes above and
                 // COMBAT_OBJECTIVE_TYPES — null (the far more common case) means an
                 // ordinary fight, won simply by beating every listed enemy.
@@ -43802,7 +44057,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             npcRenames: combined.npcRenames || [],
             kindnessCooldownNpcs: combined.kindnessCooldownNpcs || [],
             turnIndex,
-            combatEncounter: combined.combatEncounter,
+            combatEncounter: (() => {
+                const enc = combined.combatEncounter;
+                const ambushedOnRoad = routeAmbushRef.current;
+                routeAmbushRef.current = false;
+                return enc && ambushedOnRoad ? { ...enc, noRetreat: true } : enc;
+            })(),
             startingPartyMembers: combined.startingPartyMembers || [],
             heroIdentity: combined.heroIdentity || null,
             partyChanges: combined.partyChanges || null,
@@ -46773,7 +47033,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return { ...next, result, ...(killedBy ? { killedBy } : {}) };
         return advanceTurn(next);
     }
-    function resolveAttack(targetEnemyId) {
+    function resolveAttack(targetEnemyId, gunAbilityId) {
         // Nothing should happen while the pre-battle intro is still playing.
         if (combatIntroActive)
             return;
@@ -46856,10 +47116,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (current.type !== 'hero')
                 return prev;
             const heroWeaponType = getLoadoutWeaponType(equipment, gameState.inventory);
+            // A selected gun ability (ABILITY_DEFS weaponFx) turns this swing into a
+            // ranged shot with that ability's animation (see GUN_FX_DEFS).
+            const heroGunFx = (gunAbilityId && gameState.abilities.includes(gunAbilityId) && ABILITY_DEFS[gunAbilityId] && ABILITY_DEFS[gunAbilityId].weaponFx) || null;
             // Locked in melee: a bow/crossbow can't be drawn — the hero punches
             // instead. Firearms (rifle, автомат...) still fire point-blank.
-            const heroLockedShooter = heroWeaponType === 'ranged' && isBowLoadout(equipment) && !!getActiveLockPartner(prev, 'hero:hero');
-            const heroIsRanged = heroWeaponType === 'ranged' && !heroLockedShooter;
+            const heroLockedShooter = !heroGunFx && heroWeaponType === 'ranged' && isBowLoadout(equipment) && !!getActiveLockPartner(prev, 'hero:hero');
+            const heroIsRanged = !!heroGunFx || (heroWeaponType === 'ranged' && !heroLockedShooter);
             if (!heroIsRanged && chebyshevDistance(prev.heroPos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                 return prev;
             {
@@ -46941,7 +47204,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             const defenderKey = 'enemy:' + enemyId;
             const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: heroIsRanged, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
+            const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: heroIsRanged, gunFx: heroGunFx, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
             const locks = deriveLocksAfterAction(prev, 'hero:hero', defenderKey);
             if (enemies.every(isEnemyOut)) {
                 return { ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'victory' };
@@ -48734,6 +48997,77 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             setPartyEquipment(nextEquipment);
         saveGame(messages, gameState, itemRarities, equipment, npcReputations, party, nextInventories, equipmentChanged ? nextEquipment : partyEquipment);
     }, [gameState.npcs, party, narrativeItemSlots]);
+    // ---- PARTY STARTER GEAR ----
+    // Runs after the narrative-belongings effect above has had its say: a party
+    // member with nothing at all on them — no narrative belongings, nothing in
+    // partyInventories/partyEquipment — gets a rolled starter kit once (see
+    // rollPartyStarterGear), written everywhere a handed-over item would be:
+    // the party inventory + equipment, the rarity map, and the character's
+    // own n.inventory so the narrator and GroupModal know what they carry.
+    // Every member is marked starterGearGiven the first time they are seen
+    // here, whether or not they needed a kit, so a kit the player later takes
+    // back (or a member who joined already armed) never triggers a second one.
+    useEffect(() => {
+        if (party.length === 0)
+            return;
+        const pending = party.filter(key => {
+            const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+            return npc && npc.starterGearGiven !== true;
+        });
+        if (pending.length === 0)
+            return;
+        const nextInventories = { ...partyInventories };
+        const nextEquipment = { ...partyEquipment };
+        const nextRarities = { ...itemRarities };
+        const givenNames = {};
+        for (const key of pending) {
+            const npc = gameState.npcs.find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+            const hasGear = (partyInventories[key] || []).length > 0
+                || Object.values(partyEquipment[key] || {}).some(Boolean)
+                || (Array.isArray(npc.inventory) && npc.inventory.length > 0);
+            if (hasGear)
+                continue;
+            const kit = rollPartyStarterGear(uiLang);
+            nextInventories[key] = kit.inventory;
+            nextEquipment[key] = { ...EMPTY_EQUIPMENT, ...kit.equipment };
+            for (const [nm, rar] of Object.entries(kit.itemRarities))
+                if (!nextRarities[nm])
+                    nextRarities[nm] = rar;
+            givenNames[key] = kit.names;
+        }
+        const nextNpcs = gameState.npcs.map(n => {
+            const key = n && typeof n.name === 'string' ? n.name.trim().toLowerCase() : '';
+            if (!pending.includes(key))
+                return n;
+            return { ...n, starterGearGiven: true, ...(givenNames[key] ? { inventory: [...(Array.isArray(n.inventory) ? n.inventory : []), ...givenNames[key]] } : {}) };
+        });
+        const nextState = { ...gameState, npcs: nextNpcs };
+        setGameState(nextState);
+        if (Object.keys(givenNames).length > 0) {
+            setPartyInventories(nextInventories);
+            setPartyEquipment(nextEquipment);
+            setItemRarities(nextRarities);
+            // The kit's names are already fully classified (we just built them), so
+            // seed the narrative classification cache with them instead of letting
+            // the effect above spend a model call to rediscover what slot a
+            // "Steel helmet" goes in.
+            setNarrativeItemSlots(prev => {
+                const next = { ...prev };
+                for (const key of Object.keys(givenNames)) {
+                    for (const it of nextInventories[key]) {
+                        if (!next[it.name])
+                            next[it.name] = { slot: it.slot, twoHanded: false, shield: it.shield === true, armorPiercing: false };
+                    }
+                }
+                window.storage.set(NARRATIVE_ITEM_SLOT_CACHE_KEY, JSON.stringify(next), false).catch(() => { });
+                return next;
+            });
+            saveGame(messages, nextState, nextRarities, equipment, npcReputations, party, nextInventories, nextEquipment);
+        }
+        else {
+            saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment);
+        }
+    }, [gameState.npcs, party]);
     // ---- NPC INVENTORY FROM NARRATIVE BELONGINGS (for trading) ----
     // Same idea as the party-gear effect just above, generalized to every
     // tracked NPC rather than only current party members: n.inventory (see
@@ -49621,6 +49955,112 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // Regenerating turnIndex replaces its response and discards every turn
     // after it (their context depended on the version being replaced) — the
     // confirmation dialog warns about this whenever it isn't the latest turn.
+    // ---- RETREAT FROM A PENDING FIGHT ----
+    // Where the hero came from: the map position at the start of the turn this
+    // fight appeared in (the narrator message's own stateBefore). Null when
+    // there isn't a different, known place to go back to.
+    function getRetreatOrigin(turn) {
+        const before = turn && turn.narrator && turn.narrator.stateBefore;
+        const fromId = before && before.map ? before.map.currentId : null;
+        const nodes = gameState.map ? gameState.map.nodes : [];
+        if (!fromId || fromId === gameState.map.currentId)
+            return null;
+        return nodes.find(n => n.id === fromId) || null;
+    }
+    // Can the hero back out of this fight? No when it's flagged noRetreat (an
+    // ambush on the hero, a route ambush, cornered...), when the hero is the one
+    // striking from stealth (that has its own decline option), when the fight
+    // has a scripted objective, or when there's nowhere known to go back to.
+    function canRetreatFrom(turn) {
+        const enc = turn && turn.narrator && turn.narrator.combatEncounter;
+        if (!enc || enc.ambush || enc.noRetreat || enc.objective)
+            return false;
+        return !!getRetreatOrigin(turn);
+    }
+    // The fight never starts: the hero goes back to where they came from, the
+    // encounter is closed without a battle, and a new turn is generated about
+    // it (same pending-destination + travel-note path a map trip uses, minus
+    // any route risk — a retreat is a plain withdrawal).
+    function retreatFromCombat(narratorIndex) {
+        if (loading)
+            return;
+        const turn = turns.find(tn => tn.narratorIndex === narratorIndex);
+        const origin = turn && canRetreatFrom(turn) ? getRetreatOrigin(turn) : null;
+        if (!origin)
+            return;
+        const unresolved = [...getUnresolvedItemOffers(messages), ...getUnresolvedQuestOffers(messages), ...getUnresolvedTravelOffer(messages)];
+        if (unresolved.length > 0) {
+            setError(t('resolveItemsErrorPrefix') + '«' + unresolved[0].label + '»');
+            return;
+        }
+        const enc = messages[narratorIndex].combatEncounter;
+        const names = enc.enemies.map(e => e.enemyName).join(', ');
+        const summaryTag = `The hero chose not to fight ${names} and withdrew to "${origin.name}", where they came from, before any blow was struck. No fight took place: nobody was hurt, killed or robbed, and the opponents stay where they were. The hero is now back in "${origin.name}".`;
+        const updated = messages.map((m, i) => (i === narratorIndex ? { ...m, combatResolved: true, combatSummaryTag: summaryTag, combatRetreated: true } : m));
+        pendingMapDestinationRef.current = origin.id;
+        const note = `retreated from ${names} without fighting and went back to "${origin.name}", where they came from`;
+        if (!pendingTravelEventRef.current.includes(note))
+            pendingTravelEventRef.current = [...pendingTravelEventRef.current, note];
+        setMessages(updated);
+        saveGame(updated, gameState);
+        sendBatch([{ role: 'player', text: '' }], updated, gameState);
+    }
+    // ---- BRANCH FROM THIS TURN ----
+    // "Start from this point": the player stepped back with ‹ › to turn N and
+    // wants the story to continue from there — every turn after N is deleted
+    // and N itself stays exactly as told. It is the discard half of
+    // regenerateTurn(N + 1) without the new request: the live state goes back to
+    // what the turn viewer already shows for N (the next turn's stateBefore /
+    // equipmentBefore / partyBefore / itemRaritiesBefore — see
+    // getSnapshotAfterTurn), the discarded turns' reputation / faction /
+    // kindness-cooldown impact is undone, renames and party orders from them
+    // are reversed, and the running summary is invalidated past what survives.
+    function branchFromTurn(turnIndex) {
+        setBranchTarget(null);
+        if (loading)
+            return;
+        const turn = turns[turnIndex - 1];
+        const discarded = turns.slice(turnIndex);
+        if (!turn || discarded.length === 0)
+            return;
+        const firstDiscarded = discarded[0];
+        const idRevert = revertHeroIdentityForRegen(firstDiscarded, discarded);
+        const undone = idRevert.patchUndone(undoDiscardedTurnsEffects(discarded));
+        const keptMessages = messages.slice(0, turn.narratorIndex + 1);
+        const snap = firstDiscarded.narrator;
+        const stateAfterTurn = snap.stateBefore || gameState;
+        const equipmentAfter = snap.equipmentBefore !== undefined ? snap.equipmentBefore : equipment;
+        const itemRaritiesAfter = snap.itemRaritiesBefore !== undefined ? snap.itemRaritiesBefore : itemRarities;
+        // partyBefore was stamped before the discarded turns' renames/orders ran,
+        // so it already carries the old names; only an old save without it needs
+        // the reverse-relocated live party.
+        const partyAfter = snap.partyBefore !== undefined ? snap.partyBefore : (idRevert.revBases ? idRevert.revBases.party : party);
+        // The summary may already describe the turns being deleted.
+        invalidateSummaryPastSurviving(keptMessages.length);
+        if (idRevert.restore) {
+            setHeroName(idRevert.restore.name);
+            setHeroConcept(idRevert.restore.concept);
+        }
+        commitRevBases(idRevert.revBases);
+        setMessages(keptMessages);
+        setGameState(stateAfterTurn);
+        setEquipment(equipmentAfter);
+        setItemRarities(itemRaritiesAfter);
+        if (partyAfter !== party)
+            setParty(partyAfter);
+        if (undone.npcReputations !== npcReputations)
+            setNpcReputations(undone.npcReputations);
+        if (undone.factionReputations !== factionReputations)
+            setFactionReputations(undone.factionReputations);
+        if (undone.npcKindnessCooldowns !== npcKindnessCooldowns)
+            setNpcKindnessCooldowns(undone.npcKindnessCooldowns);
+        setError(null);
+        setCurrentTurnIndex(turnIndex);
+        const stock = idRevert.revBases ? idRevert.revBases.stock : { npcInventories, npcCurrencies, shopClock };
+        const gear = idRevert.revBases ? idRevert.revBases.gear : { partyInventories, partyEquipment, partyCurrency };
+        const identity = idRevert.restore ? { worldSetting, heroName: idRevert.restore.name, heroConcept: idRevert.restore.concept } : undefined;
+        saveGame(keptMessages, stateAfterTurn, itemRaritiesAfter, equipmentAfter, undone.npcReputations, partyAfter, gear.partyInventories, gear.partyEquipment, undone.factionReputations, undone.npcKindnessCooldowns, stock.npcInventories, stock.npcCurrencies, gear.partyCurrency, identity, stock.shopClock);
+    }
     // ---- REGENERATE HANDLERS ----
     async function regenerateTurn(turnIndex) {
         setRegenerateTarget(null);
@@ -50216,13 +50656,20 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             isLatestTurn && !anyEditActive && combatPending && !combatModalOpen && (currentTurn.narrator.combatEncounter.ambush ? (React.createElement(StealthKillOffer, { enemyName: currentTurn.narrator.combatEncounter.enemies[0].enemyName, interactive: isLatestTurn, onAttempt: () => attemptStealthKill(currentTurn.narratorIndex), onDecline: () => startCombat(currentTurn.narratorIndex), t: t })) : (React.createElement("div", { className: "suggestions-row" },
                                 React.createElement("button", { onClick: () => startCombat(currentTurn.narratorIndex), className: "suggestion-chip combat-trigger-btn", type: "button" },
                                     "\u2694 ",
-                                    t('combatButtonLabel'))))),
+                                    t('combatButtonLabel')),
+                                canRetreatFrom(currentTurn) && (React.createElement("button", { onClick: () => retreatFromCombat(currentTurn.narratorIndex), className: "suggestion-chip", type: "button", disabled: loading },
+                                    "\u21A9 ",
+                                    t('retreatButtonLabel')))))),
                             isLatestTurn && !anyEditActive && !combatPending && !travelOfferPending && currentTurn.narrator.suggestions && currentTurn.narrator.suggestions.length > 0 && (React.createElement("div", { className: "suggestions-row" },
                                 React.createElement("p", { className: "suggestions-label" }, t('suggestionsLabel')),
                                 currentTurn.narrator.suggestions.map((s, si) => (React.createElement("button", { key: si, onClick: () => useSuggestion(s), className: "suggestion-chip", type: "button" }, s))))),
-                            !anyEditActive && (React.createElement("button", { onClick: () => setRegenerateTarget(currentTurnIndex), className: "regenerate-btn", type: "button" },
-                                "\u21BB ",
-                                t('regenerateButton'))))))))),
+                            !anyEditActive && (React.createElement("div", { className: "turn-action-buttons" },
+                                React.createElement("button", { onClick: () => setRegenerateTarget(currentTurnIndex), className: "regenerate-btn", type: "button" },
+                                    "\u21BB ",
+                                    t('regenerateButton')),
+                                !isLatestTurn && (React.createElement("button", { onClick: () => setBranchTarget(currentTurnIndex), className: "regenerate-btn", type: "button", disabled: loading },
+                                    "\u2387 ",
+                                    t('branchFromHereButton'))))))))))),
                 React.createElement("div", { className: "input-bar" },
                     React.createElement("div", { className: "input-bar-inner" },
                         editingTurnIndex !== null && (React.createElement("div", { className: "editing-banner-chip" },
@@ -50325,6 +50772,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         partyGearTarget && (React.createElement(PartyGearModal, { npcName: partyGearTarget, inventory: partyInventories[partyGearKey] || [], equipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, itemRarities: viewedItemRarities, heldCurrency: partyCurrency[partyGearKey] || 0, npc: (viewedState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === partyGearKey), gameState: viewedState, onEquip: isLatestTurn ? ((slotKey, itemName, itemRef) => equipPartyItemInSlot(partyGearTarget, slotKey, itemName, itemRef)) : undefined, onUnequip: isLatestTurn ? (slotKey => unequipPartySlot(partyGearTarget, slotKey)) : undefined, onGiveItem: isLatestTurn ? (() => setPartyGiveModalOpen(true)) : undefined, onTakeBack: isLatestTurn ? (index => takeItemsFromPartyMember(partyGearTarget, [index])) : undefined, onClose: () => { setPartyGearTarget(null); setPartyGiveModalOpen(false); }, t: t })),
         partyGiveModalOpen && partyGearTarget && (React.createElement(GivePartyItemModal, { npcName: partyGearTarget, gameState: gameState, itemRarities: itemRarities, equipment: equipment, memberEquipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, inventory: partyInventories[partyGearKey] || [], onConfirm: indexes => giveItemsToPartyMember(partyGearTarget, indexes), onTakeBack: indexes => takeItemsFromPartyMember(partyGearTarget, indexes), onCancel: () => setPartyGiveModalOpen(false), t: t })),
         restartConfirmOpen && React.createElement(RestartConfirmModal, { onConfirm: confirmRestart, onCancel: () => setRestartConfirmOpen(false), t: t }),
+        branchTarget !== null && (React.createElement(BranchConfirmModal, { onConfirm: () => branchFromTurn(branchTarget), onCancel: () => setBranchTarget(null), t: t })),
         regenerateTarget !== null && (React.createElement(RegenerateConfirmModal, { withLoss: regenerateTarget !== totalTurns, onConfirm: () => regenerateTurn(regenerateTarget), onCancel: () => setRegenerateTarget(null), t: t })),
         editWarningTarget !== null && (React.createElement(EditConfirmModal, { withLoss: editWarningTarget !== totalTurns, dontShowAgain: editWarningDontShowAgain, onDontShowAgainChange: setEditWarningDontShowAgain, onConfirm: confirmEditWarning, onCancel: cancelEditWarning, t: t })),
         devMode && React.createElement(DevPanel, { api: buildDevApi() })));
@@ -50905,6 +51353,12 @@ const APP_STYLES = `
      animation on the transform property fully overrides an element's own
      inline transform style for as long as it runs, which would otherwise
      wipe out the scale itself the moment the bounce started. */
+  /* A downed/fled combatant's card (a corpse) stays on the board but must
+     never get in the way: it sits UNDER living cards and ignores taps, so a
+     live enemy standing on a corpse (or an ally on one) can still be
+     targeted instead of the tap landing on the dead card on top of it. */
+  .combat-grid-token-down { z-index: 1; pointer-events: none; }
+  .combat-grid-token-down * { pointer-events: none !important; }
   .combat-grid-token-scale { position: relative; transform-origin: center center; }
   /* Sizing/positioning anchor for the spark trail and the leave button
      (percentages inside them resolve against this box) — display:
@@ -51315,6 +51769,34 @@ const APP_STYLES = `
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
     animation: arrow-flight 0.48s linear forwards;
   }
+  .combat-ability-chip-armed { outline: 2px solid var(--amber-400); box-shadow: 0 0 10px rgba(251, 191, 36, 0.45); }
+  /* Gun-ability effects (fireGunFx) */
+  .gunfx-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 60; }
+  .gunfx { position: absolute; pointer-events: none; z-index: 61; }
+  .gunfx-b { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 60; will-change: transform; }
+  .gunfx-ball { position: absolute; left: -6px; top: -2.5px; width: 12px; height: 5px; border-radius: 2px 3px 3px 2px;
+    background: linear-gradient(90deg, #e8870f, #ffd36b 55%, #fff6d6); box-shadow: 0 0 7px 2px rgba(255, 160, 60, 0.7); }
+  .gunfx-trail { position: absolute; right: 6px; top: -1px; width: 34px; height: 2px; border-radius: 1px; background: linear-gradient(90deg, transparent, rgba(255, 170, 70, 0.55)); }
+  .gunfx-b.gunfx-en .gunfx-ball { background: linear-gradient(90deg, #1aa7ff, #9eeaff 55%, #fff); box-shadow: 0 0 10px 3px rgba(60, 190, 255, 0.8); }
+  .gunfx-b.gunfx-en .gunfx-trail { width: 44px; background: linear-gradient(90deg, transparent, rgba(80, 200, 255, 0.7)); }
+  .gunfx-flare { width: 84px; height: 30px; margin-top: -15px; transform-origin: 0 50%;
+    background: linear-gradient(90deg, #fff 0, #ffe9a8 18%, #ffa63a 55%, rgba(255, 120, 30, 0) 100%);
+    clip-path: polygon(0 42%, 30% 14%, 62% 30%, 100% 46%, 100% 54%, 62% 72%, 30% 88%, 0 58%); filter: blur(1.5px); }
+  .gunfx-flare.gunfx-en { background: linear-gradient(90deg, #fff 0, #c5f2ff 20%, #38bdf8 58%, rgba(30, 120, 255, 0) 100%); }
+  .gunfx-flash { width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: radial-gradient(circle, #fff 0, rgba(255, 220, 140, 0.8) 35%, rgba(255, 150, 40, 0) 70%); }
+  .gunfx-flash.gunfx-en { background: radial-gradient(circle, #fff 0, rgba(140, 225, 255, 0.85) 35%, rgba(40, 150, 255, 0) 70%); }
+  .gunfx-smoke { width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; filter: blur(5px);
+    background: radial-gradient(circle, rgba(205, 200, 195, 0.55), rgba(170, 170, 170, 0.25) 45%, rgba(150, 150, 150, 0) 72%); }
+  .gunfx-streak { width: 28px; height: 2.5px; margin-top: -1.25px; transform-origin: 0 50%; background: linear-gradient(90deg, transparent, #ffd27a 60%, #fff); }
+  .gunfx-streak.gunfx-en { background: linear-gradient(90deg, transparent, #5ed0ff 60%, #fff); }
+  .gunfx-chip { width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #b8a58a; }
+  .gunfx-chip.gunfx-en { background: #7fdcff; box-shadow: 0 0 4px 1px rgba(80, 200, 255, 0.8); }
+  .gunfx-casing { width: 9px; height: 3.5px; border-radius: 1px; margin: -1px 0 0 -3px; background: linear-gradient(#f0c75a, #a67c1a); }
+  .gunfx-dust { width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; filter: blur(2px);
+    background: radial-gradient(circle, rgba(170, 155, 135, 0.55), rgba(170, 155, 135, 0) 70%); }
+  .gunfx-dust.gunfx-en { background: radial-gradient(circle, rgba(90, 200, 255, 0.55), rgba(60, 160, 255, 0) 70%); filter: blur(3px); }
+  .gunfx-ring { width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; border: 2px solid rgba(255, 225, 170, 0.85); }
+  .gunfx-ring.gunfx-en { border-color: rgba(130, 220, 255, 0.9); }
   @media (prefers-reduced-motion: reduce) {
     .combat-arrow-projectile { animation: none !important; opacity: 0 !important; }
   }
@@ -51617,6 +52099,7 @@ const APP_STYLES = `
   .suggestion-chip { font-family: var(--font-serif); font-style: italic; font-size: 0.9rem; color: var(--amber-400); background: var(--stone-900); border: 1px solid var(--amber-800); border-radius: 999px; padding: 0.4rem 0.9rem; cursor: pointer; text-align: left; }
   .suggestion-chip:hover { background: var(--stone-800); border-color: var(--amber-600); }
   .regenerate-btn { background: none; border: 1px solid var(--stone-700); color: var(--stone-400); border-radius: 999px; padding: 0.4rem 0.9rem; font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.85rem; }
+  .turn-action-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .regenerate-btn:hover:not(:disabled) { border-color: var(--amber-700); color: var(--amber-500); }
   .regenerate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .player-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--amber-500); text-transform: uppercase; letter-spacing: 0.15em; margin: 0 0 0.25rem; }
@@ -52122,6 +52605,7 @@ const APP_STYLES = `
   .icon-btn:hover { color: var(--amber-500); }
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
+
 
 // ---- Mount ----
 // Starts once the third-party scripts have settled (loaded, failed, or timed
