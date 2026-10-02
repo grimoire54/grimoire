@@ -17711,7 +17711,7 @@ const TRANSLATIONS = {
         abilityName_gunSmg: 'Автомат: очередь',
         abilityDesc_gunSmg: 'Очередь из трёх пуль по выбранной цели. Выберите способность, затем тапните по врагу.',
         abilityName_gunSmgSuppress: 'Автомат: подавление',
-        abilityDesc_gunSmgSuppress: 'Три очереди подряд с короткими паузами — шквал огня по цели.',
+        abilityDesc_gunSmgSuppress: 'Подавляющий огонь по цели до вашего следующего хода: если враг двинется, он получит урон, и подавление прервётся. Прерывается, если вы получите урон. Раз в 3 раунда.',
         abilityName_gunPistol: 'Пистолет',
         abilityDesc_gunPistol: 'Одиночный прицельный выстрел из пистолета.',
         abilityName_gunDual: 'Два пистолета',
@@ -17719,7 +17719,7 @@ const TRANSLATIONS = {
         abilityName_gunEnergy: 'Энерговинтовка: очередь',
         abilityDesc_gunEnergy: 'Очередь из трёх энергетических зарядов по выбранной цели.',
         abilityName_gunEnergySuppress: 'Энерговинтовка: подавление',
-        abilityDesc_gunEnergySuppress: 'Три очереди энергозарядов подряд с короткими паузами.',
+        abilityDesc_gunEnergySuppress: 'Подавляющий энергоогонь по цели до вашего следующего хода: если враг двинется, он получит урон, и подавление прервётся. Прерывается, если вы получите урон. Раз в 3 раунда.',
         abilityFreqUnlimited: 'без ограничений',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Таланты',
@@ -18006,6 +18006,11 @@ const TRANSLATIONS = {
         combatAbilityReadyHint: 'готово',
         combatAbilityUsedHint: 'использовано в этом бою',
         combatAbilityArmedHint: 'выбрана — тапните по цели',
+        combatFxSuppressLabel: 'Подавлен',
+        combatLogSuppressStartText: 'открывает подавляющий огонь по цели:',
+        combatLogSuppressEndText: 'подавление закончилось',
+        combatLogSuppressInterruptedText: 'подавление прервано — стрелок ранен',
+        combatLogSuppressMoveHitText: 'двинулся под огнём, подавление прервано',
         combatAbilityCooldownHint: 'перезарядка: {n}',
         combatLogBloodlustText: 'Жажда крови усиливает первый удар',
         combatLogResilienceActivateText: 'собирается поглотить следующий удар',
@@ -18502,7 +18507,7 @@ const TRANSLATIONS = {
         abilityName_gunSmg: 'SMG: Burst',
         abilityDesc_gunSmg: 'A three-round burst at the chosen target. Pick the ability, then tap an enemy.',
         abilityName_gunSmgSuppress: 'SMG: Suppression',
-        abilityDesc_gunSmgSuppress: 'Three bursts in a row with short pauses — a hail of fire on the target.',
+        abilityDesc_gunSmgSuppress: 'Suppressing fire on a target until your next turn: if it moves it takes damage and the suppression breaks. Breaks if you take damage. Once every 3 rounds.',
         abilityName_gunPistol: 'Pistol',
         abilityDesc_gunPistol: 'A single aimed pistol shot.',
         abilityName_gunDual: 'Dual Pistols',
@@ -18510,7 +18515,7 @@ const TRANSLATIONS = {
         abilityName_gunEnergy: 'Energy Rifle: Burst',
         abilityDesc_gunEnergy: 'A three-bolt burst of energy at the chosen target.',
         abilityName_gunEnergySuppress: 'Energy Rifle: Suppression',
-        abilityDesc_gunEnergySuppress: 'Three energy bursts in a row with short pauses.',
+        abilityDesc_gunEnergySuppress: 'Suppressing energy fire on a target until your next turn: if it moves it takes damage and the suppression breaks. Breaks if you take damage. Once every 3 rounds.',
         abilityFreqUnlimited: 'unlimited',
         // -- Talent tree (see TALENT_DEFS) --
         talentsButton: 'Talents',
@@ -18790,6 +18795,11 @@ const TRANSLATIONS = {
         combatAbilityReadyHint: 'ready',
         combatAbilityUsedHint: 'used this fight',
         combatAbilityArmedHint: 'selected — tap a target',
+        combatFxSuppressLabel: 'Suppressed',
+        combatLogSuppressStartText: 'opens suppressing fire on',
+        combatLogSuppressEndText: 'suppression ended',
+        combatLogSuppressInterruptedText: 'suppression broken — the shooter was hit',
+        combatLogSuppressMoveHitText: 'moved under fire, suppression broken',
         combatAbilityCooldownHint: 'cooldown: {n}',
         combatLogBloodlustText: 'Bloodlust empowers the first strike',
         combatLogResilienceActivateText: 'braces to absorb the next blow',
@@ -19328,7 +19338,7 @@ const ABILITY_DEFS = {
     },
     gunSmgSuppress: {
         icon: '💥', nameKey: 'abilityName_gunSmgSuppress', descKey: 'abilityDesc_gunSmgSuppress',
-        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'smgSuppress',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3, suppress: true, suppressMoveDamageFraction: 0.12, suppressHitFx: 'smg', weaponFx: 'smgSuppress',
         promptLabel: 'SMG Suppression',
         promptHint: 'Pins targets down with repeated bursts of automatic fire.'
     },
@@ -19352,7 +19362,7 @@ const ABILITY_DEFS = {
     },
     gunEnergySuppress: {
         icon: '🌩️', nameKey: 'abilityName_gunEnergySuppress', descKey: 'abilityDesc_gunEnergySuppress',
-        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'energySuppress',
+        type: 'active', trigger: 'manual', frequency: 'perRounds', cooldownRounds: 3, suppress: true, suppressMoveDamageFraction: 0.12, suppressHitFx: 'energyRifle', weaponFx: 'energySuppress',
         promptLabel: 'Energy Rifle Suppression',
         promptHint: 'Pins targets down with repeated energy bursts.'
     }
@@ -19378,7 +19388,7 @@ function computeNewlyGainedLevels(prevLevel, nextLevel) {
 // round counter also starts at 1 — see startCombat) so it reads as usable
 // from the very first round rather than needing a full cooldown up front.
 function createAbilityFightState() {
-    return { bloodlustUsed: false, resilienceUsed: false, resilienceActive: false, secondWindUsed: false, intimidationReadyAtRound: 1 };
+    return { bloodlustUsed: false, resilienceUsed: false, resilienceActive: false, secondWindUsed: false, intimidationReadyAtRound: 1, suppressReadyAtRound: 1 };
 }
 // ----------------------------------------------------------------------------
 // TALENT TREE
@@ -31781,7 +31791,7 @@ function EnemyRankBadge({ tier, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isArriving, isActive, targetable, onClick, healTargetable, onHealClick, selectable, selected, onSelectClick, t, variant, fx, dmgPopup, portraitRef, armor, armorPools, role, tier, protectTarget, weaponType, lockFx, locked }) {
+function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isArriving, isActive, targetable, onClick, healTargetable, onHealClick, selectable, selected, onSelectClick, t, variant, fx, dmgPopup, portraitRef, armor, armorPools, role, tier, protectTarget, weaponType, lockFx, locked, suppressed }) {
     // Per-card random seed so idle sway (see swayCls below) is desynchronised
     // between cards — otherwise every combatant would bob in perfect unison.
     const [idleSeed] = useState(() => Math.random());
@@ -31885,6 +31895,7 @@ function CombatPortrait({ name, parts, isDown, isFled, isLeaving, isArriving, is
                         ? React.createElement("span", { className: "combat-portrait-frame-skull" }, "\uD83C\uDFC3")
                         : React.createElement("img", { className: "combat-portrait-frame-img", src: getCombatPortraitIcon(weaponType), alt: "" })),
                 role && !isDown && !isFled && (React.createElement("span", { className: "combat-role-badge", title: t(COMBAT_ROLE_LABEL_KEYS[role]), "aria-hidden": "true" }, ENEMY_ROLE_ICONS[role])),
+                suppressed && !isDown && !isFled && (React.createElement("span", { className: "combat-suppress-badge", title: t('combatFxSuppressLabel'), "aria-hidden": "true" }, "\uD83C\uDFAF")),
                 protectTarget && !isDown && !isFled && (React.createElement("span", { className: "combat-protect-badge", title: t('combatProtectTargetLabel'), "aria-hidden": "true" }, "\u2764\uFE0F")),
                 tier && !isDown && !isFled && React.createElement(EnemyRankBadge, { tier: tier, t: t }),
                 React.createElement("div", { className: "combat-portrait-overlay" },
@@ -32046,7 +32057,8 @@ function getAbilityStatus(id, fightState, round) {
         return { available: !state[usedField], cooldown: null, usedUp: !!state[usedField] };
     }
     if (def.frequency === 'perRounds') {
-        const remaining = Math.max(0, state.intimidationReadyAtRound - round);
+        const readyAt = def.suppress ? (state.suppressReadyAtRound || 1) : state.intimidationReadyAtRound;
+        const remaining = Math.max(0, readyAt - round);
         return { available: remaining <= 0, cooldown: remaining > 0 ? remaining : null, usedUp: false };
     }
     return { available: true, cooldown: null, usedUp: false };
@@ -32939,6 +32951,8 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             defenderCls = 'combat-fx-stunned';
             basePopup = { text: t('combatFxStunLabel'), tone: 'stun' };
         }
+        if (action.suppress)
+            basePopup = { text: t('combatFxSuppressLabel'), tone: 'stun' };
         // A vital hit ("crit") is felt the same way whether the hero just
         // landed one or just took one — a single light buzz, not tied to
         // which side attackerType/defenderType are. Guarded for browsers/
@@ -33149,7 +33163,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                                             // while planningMove (below) is active, so tapping
                                             // your own card to preview a route never locks out
                                             // tapping an enemy to attack instead.
-                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id, armedGunId)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, 
+                                            targetable: isPlayerTurn && !introActive && pendingItemIndex === null && !isBodyDestroyed(enemy.parts) && !enemy.fled && (!actingLockPartner || actingLockPartner === 'enemy:' + enemy.id), onClick: gridClick(() => onAttack(enemy.id, armedGunId)), variant: i === Math.floor((visibleEnemies.length - 1) / 2) ? 'boss' : undefined, fx: fx['enemy:' + enemy.id], suppressed: !!enemy.suppressed, lockFx: lockFx['enemy:' + enemy.id], locked: !!getActiveLockPartner(combat, 'enemy:' + enemy.id), dmgPopup: popups['enemy:' + enemy.id], portraitRef: setPortraitRef('enemy:' + enemy.id), armor: typeof enemy.armor === 'number' ? enemy.armor : undefined, armorPools: heldShot ? heldShot.armorPools : enemy.armorPools, 
                                             // A ranged enemy that has been drawn into melee (locked
                                             // with an opponent, or engaged — someone has closed on it
                                             // and it now fights at the point-blank penalty, see
@@ -46608,6 +46622,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     //    immediately — the same shape every other fight-ending branch here
     //    already returns — without ever reaching advanceTurn.
     function attemptOpportunityAttacks(prev, mover) {
+        // A suppressed enemy that moves eats a hit first (see applySuppressionMoveDamage).
+        if (mover.type === 'enemy') {
+            const sup = applySuppressionMoveDamage(prev, mover.id);
+            if (sup) {
+                prev = sup.state;
+                if (sup.terminal)
+                    return { state: prev, blocked: true, terminal: sup.terminal };
+                if (sup.defeated)
+                    return { state: prev, blocked: true, terminal: null };
+            }
+        }
         const stunnedMap = prev.stunned || {};
         // Whoever isn't on the mover's own side is a potential hostile — a
         // hero/ally mover is threatened by living enemies, an enemy mover by
@@ -47123,6 +47148,21 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // instead. Firearms (rifle, автомат...) still fire point-blank.
             const heroLockedShooter = !heroGunFx && heroWeaponType === 'ranged' && isBowLoadout(equipment) && !!getActiveLockPartner(prev, 'hero:hero');
             const heroIsRanged = !!heroGunFx || (heroWeaponType === 'ranged' && !heroLockedShooter);
+            // Suppression ability: no damage — it pins the target (enemy.suppressed,
+            // see tickSuppression/applySuppressionMoveDamage), spends the turn and
+            // starts a 3-round cooldown. The shots in the animation all miss.
+            const heroGunDef = heroGunFx ? ABILITY_DEFS[gunAbilityId] : null;
+            if (heroGunDef && heroGunDef.suppress) {
+                const fightState = prev.abilityState || createAbilityFightState();
+                if (prev.round < (fightState.suppressReadyAtRound || 1))
+                    return prev;
+                const heroHp = Object.keys(prev.heroParts).reduce((sum, k) => sum + prev.heroParts[k].hp, 0);
+                const enemiesS = prev.enemies.map(e => e.id === enemyId ? { ...e, suppressed: { heroHp, fx: heroGunDef.suppressHitFx } } : (e.suppressed ? { ...e, suppressed: null } : e));
+                const logS = [...prev.log, { text: (heroName || t('combatYouLabel')) + ' — ' + t('combatLogSuppressStartText') + ' ' + enemy.enemyName, kind: 'effect' }];
+                const lastActionS = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: heroGunFx, suppress: true, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: 'miss', dmg: 0 };
+                const abilityStateS = { ...fightState, suppressReadyAtRound: prev.round + heroGunDef.cooldownRounds };
+                return advanceTurn({ ...prev, enemies: enemiesS, log: logS, lastAction: lastActionS, abilityState: abilityStateS });
+            }
             if (!heroIsRanged && chebyshevDistance(prev.heroPos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                 return prev;
             {
@@ -47306,6 +47346,61 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             log
         };
     }
+    // Suppression (ABILITY_DEFS .suppress): enemy.suppressed = { heroHp, fx }.
+    // Lasts until the hero's next turn, and breaks early if the hero loses HP
+    // since the cast (heroHp is raised if they heal, so only real damage counts).
+    function tickSuppression(state) {
+        if (!state.enemies.some(e => e.suppressed))
+            return state;
+        const nextActor = state.order[state.turnPos];
+        const heroTurn = !!nextActor && nextActor.type === 'hero';
+        const hpNow = Object.keys(state.heroParts).reduce((sum, k) => sum + state.heroParts[k].hp, 0);
+        let log = state.log;
+        const enemies = state.enemies.map(e => {
+            if (!e.suppressed)
+                return e;
+            if (isEnemyOut(e))
+                return { ...e, suppressed: null };
+            if (hpNow < e.suppressed.heroHp) {
+                log = [...log, { text: e.enemyName + ' — ' + t('combatLogSuppressInterruptedText'), kind: 'effect' }];
+                return { ...e, suppressed: null };
+            }
+            if (heroTurn) {
+                log = [...log, { text: e.enemyName + ' — ' + t('combatLogSuppressEndText'), kind: 'effect' }];
+                return { ...e, suppressed: null };
+            }
+            return hpNow > e.suppressed.heroHp ? { ...e, suppressed: { ...e.suppressed, heroHp: hpNow } } : e;
+        });
+        return { ...state, enemies, log };
+    }
+    // A suppressed enemy that tries to move takes a hit (a fraction of its max
+    // HP on a random standing body part) and the suppression ends. Called from
+    // attemptOpportunityAttacks, which every enemy movement branch runs first.
+    // Returns null when the enemy isn't suppressed.
+    function applySuppressionMoveDamage(prev, enemyId) {
+        const e = prev.enemies.find(x => x.id === enemyId);
+        if (!e || !e.suppressed || isEnemyOut(e))
+            return null;
+        const keys = Object.keys(e.parts).filter(k => e.parts[k].hp > 0);
+        if (keys.length === 0)
+            return null;
+        const totalMax = Object.keys(e.parts).reduce((sum, k) => sum + e.parts[k].maxHp, 0);
+        const dmg = Math.max(1, Math.round(totalMax * ABILITY_DEFS.gunSmgSuppress.suppressMoveDamageFraction));
+        const key = keys[Math.floor(Math.random() * keys.length)];
+        const left = Math.max(0, e.parts[key].hp - dmg);
+        const parts = { ...e.parts, [key]: { ...e.parts[key], hp: left, disabled: left <= 0 ? true : e.parts[key].disabled } };
+        const hurt = { ...e, parts, suppressed: null };
+        const defeated = isEnemyOut(hurt);
+        let enemies = prev.enemies.map(x => x.id === enemyId ? hurt : x);
+        let log = [...prev.log, { text: e.enemyName + ' — ' + t('combatLogSuppressMoveHitText') + ': -' + dmg + ' HP', kind: 'effect' }];
+        if (defeated) {
+            const shock = applyMoraleShockToGroup(enemies, enemyId, COMBAT_TUNING.moraleAllyDeathLoss, t);
+            enemies = shock.enemies;
+            log = [...log, ...shock.log];
+        }
+        const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: e.suppressed.fx, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: 'hit', dmg, partKey: key };
+        return { state: { ...prev, enemies, log, lastAction }, defeated, terminal: enemies.every(isEnemyOut) ? { result: 'victory' } : null };
+    }
     // Advances turnPos/round to the next living actor and hands off to the
     // auto-turn effect below if that's an ally or an enemy — the hero's own
     // turn just waits (CombatModal shows the target prompt again).
@@ -47313,7 +47408,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const next = findNextTurn(state.order, state.allies, state.enemies, state.turnPos + 1, state.round);
         if (!next)
             return state;
-        const advanced = { ...state, turnPos: next.pos, round: next.round };
+        const advanced = tickSuppression({ ...state, turnPos: next.pos, round: next.round });
         // A "surviveTurns" objective (see COMBAT_OBJECTIVE_TYPES/combat.objective)
         // wins the fight outright the moment the hero has lasted the required
         // number of full rounds — checked here, the one place a round actually
@@ -51769,6 +51864,7 @@ const APP_STYLES = `
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
     animation: arrow-flight 0.48s linear forwards;
   }
+  .combat-suppress-badge { position: absolute; top: 0.2rem; left: 50%; transform: translateX(-50%); z-index: 3; font-size: 0.85rem; line-height: 1; filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.9)); pointer-events: none; }
   .combat-ability-chip-armed { outline: 2px solid var(--amber-400); box-shadow: 0 0 10px rgba(251, 191, 36, 0.45); }
   /* Gun-ability effects (fireGunFx) */
   .gunfx-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 60; }
