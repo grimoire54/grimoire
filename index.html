@@ -18002,6 +18002,9 @@ const TRANSLATIONS = {
         combatCoverFullLabel: 'Полное укрытие',
         combatCoverPartialLabel: 'Частичное укрытие',
         combatSkipTurnButtonLabel: 'Пропустить ход',
+        combatLogToggleLabel: 'Журнал боя',
+        combatFullscreenLabel: 'На весь экран',
+        combatExitFullscreenLabel: 'Свернуть поле боя',
         combatUseItemButtonLabel: 'Применить предмет',
         combatUseItemPanelTitle: 'Какой расходник использовать?',
         combatUseItemPanelEmpty: 'Нет подходящих предметов',
@@ -18792,6 +18795,9 @@ const TRANSLATIONS = {
         combatCoverFullLabel: 'Full cover',
         combatCoverPartialLabel: 'Partial cover',
         combatSkipTurnButtonLabel: 'Skip turn',
+        combatLogToggleLabel: 'Combat log',
+        combatFullscreenLabel: 'Fullscreen',
+        combatExitFullscreenLabel: 'Exit fullscreen',
         combatUseItemButtonLabel: 'Use item',
         combatUseItemPanelTitle: 'Choose a consumable',
         combatUseItemPanelEmpty: 'No usable items',
@@ -32183,6 +32189,84 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     const pinchRef = useRef(null);
     const viewportRef = useRef(null);
     const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
+    // ---- Fullscreen battlefield ----
+    // isFs makes the arena a fixed full-viewport layer (works everywhere, incl.
+    // iPhone Safari where element fullscreen is unavailable); where the
+    // Fullscreen API exists we additionally request it, so browser chrome goes
+    // away too. The layer is always 100% of the visual viewport, so rotating
+    // the phone simply re-lays it out (ResizeObserver above re-measures).
+    const arenaRef = useRef(null);
+    const [isFs, setIsFs] = useState(false);
+    const nativeFsRef = useRef(false);
+    const [logOpen, setLogOpen] = useState(false);
+    const logBodyRef = useRef(null);
+    const abilityStripRef = useRef(null);
+    const [stripEdges, setStripEdges] = useState({ left: false, right: false });
+    function exitFs() {
+        setIsFs(false);
+        if (nativeFsRef.current) {
+            nativeFsRef.current = false;
+            try {
+                if (document.fullscreenElement) {
+                    const p = document.exitFullscreen();
+                    if (p && p.catch)
+                        p.catch(() => { });
+                }
+            }
+            catch (e) { /* ignore */ }
+        }
+    }
+    function toggleFullscreen() {
+        if (isFs) {
+            exitFs();
+            return;
+        }
+        setIsFs(true);
+        const el = arenaRef.current;
+        try {
+            if (el && el.requestFullscreen) {
+                nativeFsRef.current = true;
+                const p = el.requestFullscreen();
+                if (p && p.catch)
+                    p.catch(() => { nativeFsRef.current = false; });
+            }
+        }
+        catch (e) {
+            nativeFsRef.current = false;
+        }
+    }
+    useEffect(() => {
+        const onFsChange = () => {
+            if (nativeFsRef.current && !document.fullscreenElement) {
+                nativeFsRef.current = false;
+                setIsFs(false);
+            }
+        };
+        document.addEventListener('fullscreenchange', onFsChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onFsChange);
+            if (nativeFsRef.current) {
+                nativeFsRef.current = false;
+                try {
+                    if (document.fullscreenElement)
+                        document.exitFullscreen();
+                }
+                catch (e) { /* ignore */ }
+            }
+        };
+    }, []);
+    useEffect(() => {
+        if (!isFs)
+            return undefined;
+        const onKey = (e) => { if (e.key === 'Escape')
+            exitFs(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [isFs]);
+    // The result card (victory/defeat/loot) lives outside the arena — leave
+    // fullscreen as soon as the fight is decided so it is visible.
+    useEffect(() => { if (combat.result && isFs)
+        exitFs(); }, [combat.result]);
     // On at the start of every turn — clicking your own card does nothing
     // (it's not a toggle). Confirming a route turns it off (path + ghost
     // vanish) until the next turn begins. Attacking doesn't depend on it
@@ -32203,7 +32287,20 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
             setViewportSize({ w: viewportRef.current.clientWidth, h: viewportRef.current.clientHeight }); };
         measure();
         window.addEventListener('resize', measure);
-        return () => window.removeEventListener('resize', measure);
+        window.addEventListener('orientationchange', measure);
+        // The viewport also changes size without any window resize (fullscreen
+        // toggle, the log/bars appearing) — watch the element itself too.
+        let ro = null;
+        if (typeof ResizeObserver !== 'undefined' && viewportRef.current) {
+            ro = new ResizeObserver(measure);
+            ro.observe(viewportRef.current);
+        }
+        return () => {
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('orientationchange', measure);
+            if (ro)
+                ro.disconnect();
+        };
     }, []);
     // The camera only needs to find the fight once — right at the start, so
     // the player isn't looking at some arbitrary corner of the (generously
@@ -32625,6 +32722,45 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
     // Gun abilities (ABILITY_DEFS entries with weaponFx): tapping the chip arms
     // one, the next tap on an enemy attacks with it (see onAttack below).
     const [armedGunId, setArmedGunId] = useState(null);
+    // Ability strip (bottom of the field): only the hero has abilities, so it is
+    // hidden on a player-controlled ally's turn. Scrolls horizontally; arrows
+    // appear only while there is something to scroll to.
+    const showAbilityStrip = !combat.result && pendingItemIndex === null && !isAllyPlayerTurn && ownedActiveAbilities.length > 0;
+    function updateStripEdges() {
+        const el = abilityStripRef.current;
+        const left = !!el && el.scrollLeft > 2;
+        const right = !!el && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+        setStripEdges(p => (p.left === left && p.right === right) ? p : { left, right });
+    }
+    function scrollStrip(dir) {
+        const el = abilityStripRef.current;
+        if (el)
+            el.scrollBy({ left: dir * Math.max(60, el.clientWidth * 0.75), behavior: 'smooth' });
+    }
+    useLayoutEffect(() => {
+        updateStripEdges();
+        const el = abilityStripRef.current;
+        if (!el || typeof ResizeObserver === 'undefined')
+            return undefined;
+        const ro = new ResizeObserver(updateStripEdges);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [showAbilityStrip, ownedActiveAbilities.length, isFs, viewportSize.w]);
+    useEffect(() => {
+        if (logOpen && logBodyRef.current)
+            logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
+    }, [logOpen, shownLog.length]);
+    // Escape: reached the edge of your own side with the character whose turn it is.
+    const leaveActor = (!introActive && pendingItemIndex === null && !combat.result)
+        ? (isHeroTurn && combat.heroPos.y <= PLAYER_EDGE_Y
+            ? { type: 'hero', id: null }
+            : (isAllyPlayerTurn && currentAlly.pos.y <= PLAYER_EDGE_Y ? { type: 'ally', id: currentAlly.id } : null))
+        : null;
+    const fieldHintText = pendingItemIndex !== null
+        ? t('combatUseItemPickTargetHint')
+        : (isPlayerTurn && !introActive
+            ? (isAllyPlayerTurn ? currentAlly.name + ' — ' + t('combatChooseTargetHint') : t('combatChooseTargetHint'))
+            : (currentAlly ? t('combatAllyTurnHint') : t('combatWaitingHint')));
     const gunLayerRef = useRef(null);
     useEffect(() => { if (!isHeroTurn)
         setArmedGunId(null); }, [isHeroTurn]);
@@ -33228,7 +33364,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 ": ",
                 combat.objective.label,
                 objectiveFailed ? ' — ' + t('combatObjectiveFailedTag') : '')),
-            React.createElement("div", { className: "combat-arena-group" },
+            React.createElement("div", { className: 'combat-arena-group' + (isFs ? ' combat-arena-fs' : ''), ref: arenaRef },
                 showReinforcementBanner && (React.createElement("div", { key: combat.lastReinforcementSeq, className: "combat-reinforcement-flash", "aria-hidden": "true" },
                     React.createElement("span", { className: "combat-reinforcement-icon" }, combat.lastReinforcement.side === 'ally' ? '🛡' : '⚔'),
                     React.createElement("span", { className: "combat-reinforcement-label" }, combat.lastReinforcement.label))),
@@ -33243,7 +33379,8 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                 React.createElement("div", { className: 'combat-grid-viewport' + (planningMove ? ' combat-grid-viewport-planning' : ''), ref: viewportRef, onPointerDown: onGridPointerDown, onPointerMove: onGridPointerMove, onPointerUp: onGridPointerUp, onPointerCancel: onGridPointerUp, onWheel: onGridWheel },
                     React.createElement("div", { className: "combat-grid-zoom-controls" },
                         React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(zoom + 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "+"),
-                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(zoom - 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "\u2212")),
+                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(zoom - 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "\u2212"),
+                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", title: isFs ? t('combatExitFullscreenLabel') : t('combatFullscreenLabel'), "aria-label": isFs ? t('combatExitFullscreenLabel') : t('combatFullscreenLabel'), onClick: toggleFullscreen }, isFs ? '✕' : '⛶')),
                     React.createElement("div", { className: "combat-grid-world", style: {
                             width: (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX,
                             height: (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX,
@@ -33315,52 +33452,46 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, a
                             return (React.createElement("div", { key: ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t }),
-                                        canLeaveHere && (React.createElement("button", { type: "button", className: "combat-grid-leave-btn", title: t('combatLeaveButtonLabel'), onClick: gridClick(() => onLeave('ally', ally.id)) }, "\uD83D\uDEAA"))))));
+                                        React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t })))));
                         }),
                         React.createElement("div", { className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
-                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t }),
-                                    isHeroTurn && !introActive && pendingItemIndex === null && combat.heroPos.y <= PLAYER_EDGE_Y && (React.createElement("button", { type: "button", className: "combat-grid-leave-btn", title: t('combatLeaveButtonLabel'), onClick: gridClick(() => onLeave('hero', null)) }, "\uD83D\uDEAA")))))))),
-            React.createElement("div", { className: "combat-log" }, shownLog.slice(-6).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))),
-            !combat.result && (React.createElement("p", { className: "combat-turn-indicator" }, pendingItemIndex !== null
-                ? t('combatUseItemPickTargetHint')
-                : (isPlayerTurn && !introActive
-                    ? (isAllyPlayerTurn ? currentAlly.name + ' — ' + t('combatChooseTargetHint') : t('combatChooseTargetHint'))
-                    : (currentAlly ? t('combatAllyTurnHint') : t('combatWaitingHint'))))),
-            !combat.result && pendingItemIndex === null && ownedActiveAbilities.length > 0 && (React.createElement("div", { className: "combat-ability-row" }, ownedActiveAbilities.map(id => {
-                const def = ABILITY_DEFS[id];
-                const status = getAbilityStatus(id, combat.abilityState, combat.round);
-                const isManual = def.trigger === 'manual';
-                const isGun = !!def.weaponFx;
-                const isArmed = isGun && armedGunId === id;
-                const statusText = isArmed ? t('combatAbilityArmedHint') : status.usedUp
-                    ? t('combatAbilityUsedHint')
-                    : status.cooldown
-                        ? t('combatAbilityCooldownHint').replace('{n}', status.cooldown)
-                        : t('combatAbilityReadyHint');
-                return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => setArmedGunId(a => a === id ? null : id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-ability-chip' + (status.available ? ' combat-ability-chip-ready' : ' combat-ability-chip-cooldown') + (isManual ? '' : ' combat-ability-chip-auto') + (isArmed ? ' combat-ability-chip-armed' : ''), disabled: !isManual || !isHeroTurn || introActive || !status.available, title: t(def.descKey) },
-                    React.createElement("span", { className: "combat-ability-chip-icon" }, def.icon),
-                    React.createElement("span", { className: "combat-ability-chip-text" },
-                        React.createElement("span", { className: "combat-ability-chip-name" }, t(def.nameKey)),
-                        React.createElement("span", { className: "combat-ability-chip-status" }, statusText))));
-            }))),
-            !combat.result && pendingItemIndex === null && (React.createElement("div", { className: "combat-flee-row" },
-                React.createElement("button", { onClick: () => setItemPanelOpen(o => !o), className: "btn btn-ghost combat-item-btn", type: "button", disabled: !isPlayerTurn || introActive },
-                    React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-item-btn-icon" }),
-                    " ",
-                    t('combatUseItemButtonLabel')),
-                React.createElement("button", { onClick: onSkipTurn, className: "btn btn-ghost combat-item-btn", type: "button", disabled: !isPlayerTurn || introActive },
-                    "\u23F3 ",
-                    t('combatSkipTurnButtonLabel')))),
-            isPlayerTurn && !introActive && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel grim-slide-down" },
-                React.createElement("p", { className: "combat-item-panel-title" }, t('combatUseItemPanelTitle')),
-                usableItems.length === 0 ? (React.createElement("p", { className: "combat-item-panel-empty" }, t('combatUseItemPanelEmpty'))) : (usableItems.map(({ item, index }) => (React.createElement("button", { key: index, type: "button", className: "combat-item-panel-row", onClick: () => { setPendingItemIndex(index); setItemPanelOpen(false); }, style: { color: rarityColor(findItemRarity(item.name, itemRarities)) || undefined } }, item.name)))))),
-            isPlayerTurn && !introActive && pendingItemIndex !== null && (React.createElement("div", { className: "combat-flee-row" },
-                React.createElement("button", { onClick: () => setPendingItemIndex(null), className: "btn btn-ghost combat-item-cancel-btn", type: "button" },
-                    "\u2715 ",
-                    t('combatUseItemCancelLabel')))),
+                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t })))))),
+                !combat.result && (React.createElement("div", { className: "combat-field-ui" },
+                    React.createElement("div", { className: "combat-fieldlog" },
+                        React.createElement("button", { type: "button", className: "combat-fieldlog-toggle", "aria-expanded": logOpen, title: t('combatLogToggleLabel'), "aria-label": t('combatLogToggleLabel'), onClick: () => setLogOpen(o => !o) },
+                            React.createElement("span", { "aria-hidden": "true" }, "\uD83D\uDCDC"),
+                            React.createElement("span", { className: "combat-fieldlog-caret", "aria-hidden": "true" }, logOpen ? '▴' : '▾')),
+                        logOpen && (React.createElement("div", { className: "combat-fieldlog-body", ref: logBodyRef }, shownLog.slice(-40).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))))),
+                    React.createElement("p", { className: "combat-fieldhint" }, fieldHintText),
+                    isPlayerTurn && !introActive && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel combat-fielditem-panel grim-slide-down" },
+                        React.createElement("p", { className: "combat-item-panel-title" }, t('combatUseItemPanelTitle')),
+                        usableItems.length === 0 ? (React.createElement("p", { className: "combat-item-panel-empty" }, t('combatUseItemPanelEmpty'))) : (usableItems.map(({ item, index }) => (React.createElement("button", { key: index, type: "button", className: "combat-item-panel-row", onClick: () => { setPendingItemIndex(index); setItemPanelOpen(false); }, style: { color: rarityColor(findItemRarity(item.name, itemRarities)) || undefined } }, item.name)))))),
+                    React.createElement("div", { className: "combat-fieldbar" }, pendingItemIndex !== null ? (isPlayerTurn && !introActive && (React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemCancelLabel'), "aria-label": t('combatUseItemCancelLabel'), onClick: () => setPendingItemIndex(null) },
+                        React.createElement("span", { className: "combat-sqbtn-icon" }, "\u2715")))) : (React.createElement(React.Fragment, null,
+                        React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemButtonLabel'), "aria-label": t('combatUseItemButtonLabel'), onClick: () => setItemPanelOpen(o => !o), disabled: !isPlayerTurn || introActive },
+                            React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-sqbtn-img" })),
+                        showAbilityStrip && (React.createElement("div", { className: "combat-fieldbar-strip-wrap" },
+                            stripEdges.left && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2190", onClick: () => scrollStrip(-1) }, "\u2039"),
+                            React.createElement("div", { className: "combat-fieldbar-strip", ref: abilityStripRef, onScroll: updateStripEdges, onWheel: e => { if (e.deltaY && abilityStripRef.current)
+                                    abilityStripRef.current.scrollLeft += e.deltaY; } }, ownedActiveAbilities.map(id => {
+                                const def = ABILITY_DEFS[id];
+                                const status = getAbilityStatus(id, combat.abilityState, combat.round);
+                                const isManual = def.trigger === 'manual';
+                                const isGun = !!def.weaponFx;
+                                const isArmed = isGun && armedGunId === id;
+                                const badge = status.usedUp ? '×' : (status.cooldown ? String(status.cooldown) : '');
+                                return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => setArmedGunId(a => a === id ? null : id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-sqbtn combat-ability-sq' + (status.available ? ' combat-sqbtn-ready' : ' combat-sqbtn-cooldown') + (isManual ? '' : ' combat-sqbtn-auto') + (isArmed ? ' combat-sqbtn-armed' : ''), disabled: !isManual || !isHeroTurn || introActive || !status.available, title: t(def.nameKey) + ' — ' + t(def.descKey), "aria-label": t(def.nameKey) },
+                                    React.createElement("span", { className: "combat-sqbtn-icon" }, def.icon),
+                                    badge && React.createElement("span", { className: "combat-sqbtn-badge" }, badge)));
+                            })),
+                            stripEdges.right && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2192", onClick: () => scrollStrip(1) }, "\u203A"))),
+                        React.createElement("div", { className: "combat-fieldbar-fixed" },
+                            React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatSkipTurnButtonLabel'), "aria-label": t('combatSkipTurnButtonLabel'), onClick: onSkipTurn, disabled: !isPlayerTurn || introActive },
+                                React.createElement("span", { className: "combat-sqbtn-icon" }, "\u23F3")),
+                            leaveActor && (React.createElement("button", { type: "button", className: "combat-sqbtn combat-sqbtn-leave", title: t('combatLeaveButtonLabel'), "aria-label": t('combatLeaveButtonLabel'), onClick: () => onLeave(leaveActor.type, leaveActor.id) },
+                                React.createElement("span", { className: "combat-sqbtn-icon" }, "\uD83D\uDEAA")))))))))),
             resultCopy && !shotsInFlight && (React.createElement("div", { className: "combat-result" },
                 React.createElement("h3", { className: resultCopy.className }, t(resultCopy.titleKey)),
                 React.createElement("p", { className: "hint-text hint-text-block" }, t(resultCopy.textKey)),
@@ -52408,6 +52539,35 @@ const APP_STYLES = `
   .combat-ability-chip-text { display: flex; flex-direction: column; gap: 0.05rem; }
   .combat-ability-chip-name { font-size: 0.72rem; color: var(--amber-100); }
   .combat-ability-chip-status { font-size: 0.6rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; }
+  /* ---- Fullscreen battlefield + in-field UI ---- */
+  .combat-arena-group.combat-arena-fs { position: fixed; inset: 0; z-index: 300; margin: 0; gap: 0; width: 100vw; height: 100vh; height: 100dvh; background: var(--stone-950); }
+  .combat-arena-fs .combat-grid-viewport { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+  .combat-arena-fs .combat-grid-zoom-controls { top: calc(0.5rem + env(safe-area-inset-top, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); }
+  .combat-field-ui { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+  .combat-field-ui > * { pointer-events: auto; }
+  .combat-fieldlog { position: absolute; top: calc(0.5rem + env(safe-area-inset-top, 0px)); left: calc(0.5rem + env(safe-area-inset-left, 0px)); z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; max-width: calc(100% - 4rem); }
+  .combat-fieldlog-toggle { display: flex; align-items: center; gap: 0.25rem; height: 2.2rem; padding: 0 0.55rem; border-radius: 6px; border: 1px solid var(--stone-700); background: rgba(12, 10, 8, 0.75); color: var(--amber-300); font-size: 1rem; cursor: pointer; }
+  .combat-fieldlog-caret { font-size: 0.7rem; color: var(--stone-400); }
+  .combat-fieldlog-body { width: min(78vw, 22rem); max-height: min(14rem, 45vh); overflow-y: auto; padding: 0.5rem 0.6rem; background: rgba(12, 10, 8, 0.88); border: 1px solid var(--stone-800); border-radius: 6px; display: flex; flex-direction: column; gap: 0.3rem; overscroll-behavior: contain; }
+  .combat-fieldhint { position: absolute; top: calc(0.5rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 1; margin: 0; max-width: calc(100% - 9.5rem); padding: 0.25rem 0.6rem; border-radius: 999px; background: rgba(12, 10, 8, 0.7); text-align: center; font-family: var(--font-mono); font-size: 0.7rem; color: var(--amber-500); pointer-events: none; }
+  .combat-fieldbar { position: absolute; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; justify-content: center; gap: 0.4rem; pointer-events: none; }
+  .combat-fieldbar > * { pointer-events: auto; }
+  .combat-fieldbar-strip-wrap { display: flex; align-items: center; gap: 0.2rem; flex: 0 1 auto; min-width: 0; }
+  .combat-fieldbar-strip { display: flex; gap: 0.4rem; min-width: 0; padding: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x; }
+  .combat-fieldbar-strip::-webkit-scrollbar { display: none; }
+  .combat-fieldbar-arrow { flex: none; width: 1.4rem; height: 2.75rem; padding: 0; border-radius: 6px; border: 1px solid var(--stone-700); background: rgba(12, 10, 8, 0.85); color: var(--amber-300); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+  .combat-fieldbar-fixed { display: flex; gap: 0.4rem; flex: none; }
+  .combat-sqbtn { position: relative; flex: none; width: 2.75rem; height: 2.75rem; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--amber-800); background: rgba(12, 10, 8, 0.85); color: var(--amber-100); cursor: pointer; }
+  .combat-sqbtn:disabled { cursor: default; opacity: 0.45; }
+  .combat-sqbtn-icon { font-size: 1.4rem; line-height: 1; }
+  .combat-sqbtn-img { width: 1.4rem; height: 1.4rem; image-rendering: pixelated; }
+  .combat-sqbtn-ready:not(:disabled) { border-color: var(--amber-600); }
+  .combat-sqbtn-cooldown { border-color: var(--stone-700); }
+  .combat-sqbtn-auto { border-style: dashed; }
+  .combat-sqbtn-armed { border-color: var(--amber-300); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.55); }
+  .combat-sqbtn-leave { border-color: var(--amber-300); }
+  .combat-sqbtn-badge { position: absolute; top: 1px; right: 3px; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; color: var(--amber-300); }
+  .combat-fielditem-panel { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(3.8rem + env(safe-area-inset-bottom, 0px)); width: min(90%, 18rem); margin: 0; z-index: 4; }
   .combat-item-panel { margin-top: 0.6rem; background: var(--stone-900); border: 1px solid var(--amber-700); border-radius: 4px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; max-height: 9rem; overflow-y: auto; }
   .combat-item-panel-title { margin: 0 0 0.2rem; font-size: 0.7rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
   .combat-item-panel-empty { margin: 0; font-size: 0.75rem; color: var(--stone-600); text-align: center; padding: 0.3rem 0; }
