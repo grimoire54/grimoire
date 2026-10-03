@@ -22097,6 +22097,12 @@ function isHandgunWeaponName(name) {
 // own); a pistol fires one shot at its normal damage. null = not a firearm.
 // ==============================================================================
 const ENERGY_RIFLE_TOKEN_PATTERNS = [/^энерговинтовк/, /^энергокарабин/, /^plasmarifle/, /^energyrifle/];
+// A rifle / carbine / sniper rifle (any adjective in front: "штурмовая
+// винтовка", "assault rifle") and the energy adjectives that turn one into an
+// energy rifle ("плазменная винтовка", "laser rifle"). Muskets, shotguns and
+// bows are deliberately NOT here: they keep their ordinary single shot.
+const LONG_GUN_TOKEN_PATTERNS = [/^винтовк/, /^карабин/, /^снайпер/, /^rifle/, /^carbine/, /^sniper/, /^assault/];
+const ENERGY_ADJECTIVE_TOKEN_PATTERNS = [/^энерг/, /^плазм/, /^лазер/, /^energy/, /^plasma/, /^laser/, /^photon/, /^фотон/];
 function getGunFxIdFromName(name) {
     if (typeof name !== 'string' || !name.trim())
         return null;
@@ -22106,7 +22112,13 @@ function getGunFxIdFromName(name) {
     const hasToken = pats => tokens.some(tok => pats.some(re => re.test(tok)));
     if (hasToken(ENERGY_RIFLE_TOKEN_PATTERNS))
         return 'energyRifle';
-    if (hasToken(SUBMACHINE_GUN_TOKEN_PATTERNS) || hasToken([/^автомат(а|у|ом|е|ы|ов|ам|ами|ах)?$/, /^калашников/, /^machinegun/]))
+    if (hasToken(LONG_GUN_TOKEN_PATTERNS) && hasToken(ENERGY_ADJECTIVE_TOKEN_PATTERNS))
+        return 'energyRifle';
+    const lowerName = name.toLowerCase();
+    if (hasToken(SUBMACHINE_GUN_TOKEN_PATTERNS) || hasToken([/^автомат(а|у|ом|е|ы|ов|ам|ами|ах)?$/, /^калашников/, /^machinegun/]) || lowerName.includes('machine gun') || lowerName.includes('tommy gun'))
+        return 'smg';
+    // Rifles fire the same bullet volley as an автомат (and can suppress).
+    if (hasToken(LONG_GUN_TOKEN_PATTERNS))
         return 'smg';
     if (isHandgunWeaponName(name))
         return 'pistol';
@@ -24747,6 +24759,13 @@ const COMBAT_TUNING = {
     // enemy stay put, and to let suppression pin it outright.
     suppressedDamageMult: 0.5, // a suppressed enemy that still attacks (all its attacks, incl. parting blows and ranged shots) deals this fraction of its normal damage
     suppressedHoldChance: 85, // % chance a suppressed enemy refuses to move this turn (moving costs it a hit and ends the suppression); the other 15% it risks a dash
+    npcSuppressChance: 45, // BASE % chance an enemy/companion with an smg / rifle / energy rifle opens suppressing fire instead of a normal volley (when off cooldown); scaled up/down by the situation, see npcSuppressChanceFor
+    npcSuppressNearMult: 0.25, // multiplier when the target is already in melee reach of the shooter (point-blank: just shoot)
+    npcSuppressApproachMult: 1.6, // multiplier when the target is a melee fighter still closing the distance (pinning an advance is the whole point)
+    npcSuppressShooterMult: 1.5, // multiplier when the target is itself a shooter (pins down return fire)
+    npcSuppressMaxChance: 85, // hard cap on the situational chance, %
+    npcSuppressFinishHpFraction: 0.35, // a target at or below this share of its HP is shot instead (finish it)
+    npcSuppressCooldownRounds: 3, // rounds before that same shooter can suppress again
     underFireRounds: 2, // rounds a ranged/caster enemy stays cautious after being shot at from range
     underFireCoverHoldChance: 80, // % chance an under-fire ranged/caster enemy that is already shielded from at least one threat stays where it is instead of relocating
     retreatCoverWeight: 3 // when a ranged enemy does back away from melee, each threat a cell is shielded from counts like this many cells of extra distance
@@ -27583,7 +27602,23 @@ function reconcileEffectsList(rawList, priorList) {
         return { ...e, turnsLeft: turnsLeft > 0 ? turnsLeft : null };
     });
     const clientManaged = prior.filter(e => e.clientManaged);
-    return dedupePartClientEffects([...clientManaged, ...narrativeDriven]);
+    // The model sometimes echoes a client-owned condition back as its own
+    // narrative entry (e.g. a plain "смерть"/"death" effect right after the
+    // hero dies), which then shows up twice in the sheet. Drop any
+    // narrative-driven entry whose label matches a clientManaged one, and
+    // any death-like label while a clientManaged "death" is present.
+    const managedLabels = new Set(clientManaged.map(e => String(e.label || '').trim().toLowerCase()));
+    const hasDeath = clientManaged.some(e => e.kind === 'death');
+    const deathLike = /^[\s\p{Extended_Pictographic}\uFE0F]*(смерть|мертв\w*|мёртв\w*|гибель|death|dead)[\s.!]*$/iu;
+    const filteredNarrative = narrativeDriven.filter(e => {
+        const lbl = String(e.label || '').trim().toLowerCase();
+        if (managedLabels.has(lbl))
+            return false;
+        if (hasDeath && deathLike.test(lbl))
+            return false;
+        return true;
+    });
+    return dedupePartClientEffects([...clientManaged, ...filteredNarrative]);
 }
 // Load-from-save path only (see normalizeGameState) — a save already
 // produced by this system has full EffectInstance shape (id, kind, label,
@@ -34142,7 +34177,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     // sparks. Drawn imperatively into gunLayerRef (inside .combat-grid-world, so
     // it pans/zooms with the camera) via the Web Animations API. Purely visual —
     // the real attack is already resolved; onDone fires when the last bullet lands.
-    function fireGunFx(attackerPos, defenderPos, isMiss, fxId, onDone, timers) {
+    function fireGunFx(attackerPos, defenderPos, isMiss, fxId, onDone, timers, onImpact, attackerEl) {
         const def = GUN_FX_DEFS[fxId];
         const layer = gunLayerRef.current;
         if (!def || !layer || !attackerPos || !defenderPos) {
@@ -34155,6 +34190,24 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
         const end = { x: unitCenterPx(defenderPos.x, GRID_RENDER_MIN_X), y: unitCenterPx(defenderPos.y, GRID_RENDER_MIN_Y) };
         const en = def.energy, E = en ? ' gunfx-en' : '', k = def.flare, SPREAD = 60;
         const rnd = (a) => (Math.random() * 2 - 1) * a;
+        const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const worldEl = layer.parentElement;
+        // Per-shot kick: the shooter's card recoils against the line of fire and the
+        // whole field gives a small shake (same feel as the standalone test bench).
+        const kick = (cx, cy) => {
+            if (reduceMotion)
+                return;
+            const kk = Math.max(k, 0.7);
+            try {
+                if (attackerEl)
+                    attackerEl.animate([{ translate: '0 0' }, { translate: (-cx * 13 * kk) + 'px ' + (-cy * 13 * kk) + 'px', offset: 0.25 }, { translate: '0 0' }], { duration: 150, easing: 'ease-out' });
+                if (worldEl) {
+                    const a = 2.5 * kk, d = () => rnd(a).toFixed(1) + 'px ' + rnd(a).toFixed(1) + 'px';
+                    worldEl.animate([{ translate: '0 0' }, { translate: d(), offset: 0.2 }, { translate: d(), offset: 0.45 }, { translate: d(), offset: 0.7 }, { translate: '0 0' }], { duration: 140, easing: 'ease-out' });
+                }
+            }
+            catch (e) { /* animations unsupported — purely cosmetic */ }
+        };
         const mk = (cls, x, y, frames, dur, ease) => {
             const d = document.createElement('div');
             d.className = 'gunfx gunfx-' + cls + E;
@@ -34207,11 +34260,12 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                     mk('scorch', tx, ty, [{ opacity: 0 }, { opacity: 0.85, offset: 0.12 }, { opacity: 0 }], 900);
             }
         };
-        const shoot = (off) => {
+        const shoot = (off, idx) => {
+            const missThis = Array.isArray(isMiss) ? !!isMiss[idx] : !!isMiss;
             const dx = end.x - start.x, dy = end.y - start.y, len = Math.hypot(dx, dy) || 1;
             const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
             let tx = end.x + nx * rnd(SPREAD) + ux * rnd(SPREAD * 0.5), ty = end.y + ny * rnd(SPREAD) + uy * rnd(SPREAD * 0.5);
-            if (isMiss) {
+            if (missThis) {
                 const a0 = Math.random() * Math.PI * 2, rad = half + 14 + Math.random() * 34 + SPREAD * 0.4;
                 tx = end.x + Math.cos(a0) * rad;
                 ty = end.y + Math.sin(a0) * rad;
@@ -34226,6 +34280,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
             layer.appendChild(b);
             const T = (x, y) => 'translate(' + x + 'px,' + y + 'px) rotate(' + deg + 'deg)';
             muzzleFlash(mx, my, ang);
+            kick(cx, cy);
             if (!en) {
                 mk('smoke', mx + cx * 10, my + cy * 10, [{ opacity: 0.4 * k, transform: 'translate(0,0) scale(' + 0.4 * k + ')' }, { opacity: 0, transform: 'translate(' + cx * 60 * k + 'px,' + (cy * 60 * k - 6) + 'px) scale(' + 1.6 * k + ')' }], 420);
                 for (let q = 0; q < (k < 1 ? 1 : 2); q++) {
@@ -34245,14 +34300,18 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
             }
             b.animate([{ transform: T(mx, my), opacity: 1 }, { transform: T(tx, ty), opacity: 1 }], { duration: GUN_BULLET_FLIGHT_MS, easing: 'linear', fill: 'both' }).onfinish = () => {
                 b.remove();
-                impact(tx, ty, ang, !isMiss && Math.abs(tx - end.x) <= half + 6 && Math.abs(ty - end.y) <= half + 6);
+                impact(tx, ty, ang, !missThis && Math.abs(tx - end.x) <= half + 6 && Math.abs(ty - end.y) <= half + 6);
+                if (onImpact)
+                    onImpact(idx);
             };
         };
         const span = gunFxBurstSpan(def);
+        let shotIdx = 0; // bullets are numbered in firing order (burst, shot, hand)
         for (let bi = 0; bi < def.bursts; bi++)
             for (let i = 0; i < def.perBurst; i++)
                 def.hands.forEach((off, h) => {
-                    timers.push(setTimeout(() => shoot(off), bi * (span + def.pause) + i * def.gap + h * def.stagger));
+                    const idx = shotIdx++;
+                    timers.push(setTimeout(() => shoot(off, idx), bi * (span + def.pause) + i * def.gap + h * def.stagger));
                 });
         timers.push(setTimeout(onDone, gunFxDuration(fxId)));
     }
@@ -34469,7 +34528,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                     setPopups(prev => ({ ...prev, [defenderKey]: { seq, items: popupItems } }));
                 }
                 timers.push(setTimeout(clearFxAndPopups, 900));
-            }, timers, onImpact);
+            }, timers, onImpact, attackerEl);
         }
         else if (isRanged && attackerEl && defenderEl) {
             // Bow draw (with the shake) plays first; the release, the arrow
@@ -34519,31 +34578,50 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     // came — all of which clear enemy.suppressed in the combat state). The
     // cast itself plays one burst (see GUN_FX_DEFS.smgSuppress/energySuppress);
     // the loop picks up right after it. Purely visual: every bullet misses wide.
-    const suppressLoopKey = combat.result ? '' : (combat.enemies || [])
-        .filter(e => e.suppressed && !e.fled && e.pos)
-        .map(e => e.id + ':' + e.suppressed.fx).join('|');
+    // The loop reads the freshest combat state through a ref (the effect itself
+    // only restarts when the set of pinned targets changes), re-schedules itself
+    // no matter what a single burst does (a failed burst can't kill the loop),
+    // and keeps the original rhythm (a short randomized pause between bursts) until
+    // enemy.suppressed is actually cleared.
+    const combatNowRef = useRef(combat);
+    combatNowRef.current = combat;
+    const suppressEntries = [];
+    if (combat.heroSuppressed)
+        suppressEntries.push(['hero:hero', combat.heroSuppressed]);
+    (combat.allies || []).forEach(a => { if (a.suppressed && !a.fled && a.pos)
+        suppressEntries.push(['ally:' + a.id, a.suppressed]); });
+    (combat.enemies || []).forEach(e => { if (e.suppressed && !e.fled && e.pos)
+        suppressEntries.push(['enemy:' + e.id, e.suppressed]); });
+    const suppressLoopKey = combat.result ? '' : suppressEntries.map(([k, sp]) => k + '>' + (sp.srcKey || 'hero:hero') + '>' + sp.fx).join('|');
     useEffect(() => {
         if (!suppressLoopKey)
             return undefined;
         const timers = [];
         let stopped = false;
+        const posOfKey = (cur, key) => {
+            if (key === 'hero:hero')
+                return cur.heroPos;
+            const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+            const c = ((type === 'ally' ? cur.allies : cur.enemies) || []).find(x => x.id === id);
+            return c ? c.pos : null;
+        };
         suppressLoopKey.split('|').forEach(entry => {
-            const sep = entry.lastIndexOf(':');
-            const enemyId = entry.slice(0, sep);
-            const hitFx = entry.slice(sep + 1);
+            const [targetKey, srcKey, hitFx] = entry.split('>');
             const fxId = hitFx === 'energyRifle' ? 'energySuppress' : 'smgSuppress';
             if (!GUN_FX_DEFS[fxId])
                 return;
-            const enemyKey = 'enemy:' + enemyId;
             const burst = () => {
                 if (stopped)
                     return;
-                const a = portraitRefs.current['hero:hero'];
-                const d = portraitRefs.current[enemyKey];
-                const attackerPos = combatantGridPos('hero', 'hero');
-                const defenderPos = combatantGridPos('enemy', enemyId);
-                if (a && d && attackerPos && defenderPos)
-                    fireGunFx(attackerPos, defenderPos, true, fxId, () => { }, timers);
+                try {
+                    const cur = combatNowRef.current;
+                    const a = portraitRefs.current[srcKey];
+                    const d = portraitRefs.current[targetKey];
+                    const sp = posOfKey(cur, srcKey), tp = posOfKey(cur, targetKey);
+                    if (a && d && sp && tp)
+                        fireGunFx(sp, tp, true, fxId, () => { }, timers, null, a);
+                }
+                catch (err) { /* purely cosmetic — keep the loop alive */ }
                 timers.push(setTimeout(burst, gunFxDuration(fxId) + 350 + Math.random() * 450));
             };
             // wait out the cast burst that is already playing for this suppression
@@ -34656,12 +34734,12 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             return (React.createElement("div", { key: ally.id, "data-fxkey": 'ally:' + ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t })))));
+                                        React.createElement(CombatPortrait, { suppressed: !!ally.suppressed, name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), t: t })))));
                         }),
                         React.createElement("div", { "data-fxkey": "hero", className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
-                                    React.createElement(CombatPortrait, { name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t })))),
+                                    React.createElement(CombatPortrait, { suppressed: !!combat.heroSuppressed, name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), t: t })))),
                         React.createElement("style", null, AFX_CSS + AFX_UI_CSS),
                         aim && (() => {
                             const shape = afxShapeFor(aim.id, combat, aim.cell);
@@ -38051,6 +38129,7 @@ function DevCombatTab({ api }) {
         { label: '3 слабых бандита', rows: [{ name: 'Бандит', tier: 'weak', role: 'melee', weapon: 'Дубина', count: '3' }] },
         { label: 'Отряд: воин + лучник + маг', rows: [{ name: 'Наёмник', tier: 'average', role: 'melee', weapon: 'Меч', count: '1' }, { name: 'Стрелок', tier: 'average', role: 'ranged', weapon: 'Лук', count: '1' }, { name: 'Чародей', tier: 'average', role: 'caster', weapon: 'Посох', count: '1' }] },
         { label: 'Автомат', rows: [{ name: 'Автоматчик', tier: 'average', role: 'ranged', weapon: 'Автомат', count: '1' }] },
+        { label: 'Винтовка', rows: [{ name: 'Стрелок', tier: 'average', role: 'ranged', weapon: 'Винтовка', count: '1' }] },
         { label: 'Пистолет', rows: [{ name: 'Пистолетчик', tier: 'average', role: 'ranged', weapon: 'Пистолет', count: '1' }] },
         { label: 'Энерговинтовка', rows: [{ name: 'Энергострелок', tier: 'average', role: 'ranged', weapon: 'Энерговинтовка', count: '1' }] },
         { label: 'Босс (исключит. танк)', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
@@ -38153,7 +38232,7 @@ function DevCombatTab({ api }) {
                 React.createElement(DevRow, null,
                     React.createElement(DevField, { label: "\u041A\u0442\u043E \u043F\u0440\u0438\u0445\u043E\u0434\u0438\u0442" },
                         React.createElement(DevSelect, { value: wave.side, onChange: x => setW('side', x), options: [['enemy', 'Враги'], ['ally', 'Союзники']] })),
-                    React.createElement(DevField, { label: "\u0421\u0442\u0440\u0435\u043B\u043E\u043A" }, [['Автомат', 'Автоматчик'], ['Пистолет', 'Пистолетчик'], ['Энерговинтовка', 'Энергострелок']].map(([w, n]) => React.createElement("button", { key: w, type: "button", className: "dev-chip", onClick: () => setWave(p => ({ ...p, role: 'ranged', weapon: w, name: n })) }, w))),
+                    React.createElement(DevField, { label: "\u0421\u0442\u0440\u0435\u043B\u043E\u043A" }, [['Автомат', 'Автоматчик'], ['Винтовка', 'Стрелок'], ['Пистолет', 'Пистолетчик'], ['Энерговинтовка', 'Энергострелок']].map(([w, n]) => React.createElement("button", { key: w, type: "button", className: "dev-chip", onClick: () => setWave(p => ({ ...p, role: 'ranged', weapon: w, name: n })) }, w))),
                     React.createElement(DevField, { label: "\u0423\u0441\u043B\u043E\u0432\u0438\u0435" },
                         React.createElement(DevSelect, { value: wave.type, onChange: x => setW('type', x), options: REINFORCEMENT_TRIGGER_TYPES.map(k => [k, DEV_TRIGGER_LABELS[k] || k]) })),
                     React.createElement(DevField, { label: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435" },
@@ -41480,12 +41559,13 @@ function App() {
         { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
     ];
-    const GEMINI_GENERATION_CONFIG = { maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 1024 } };
+    // No game-side cap on thinking: the model decides how much to reason, and the full output ceiling stays available.
+    const GEMINI_GENERATION_CONFIG = { maxOutputTokens: 65536 };
     async function callGemini(system, messages, retriesLeft) {
         if (devOfflineActive())
             throw new Error('DEV: offline mode — model calls are disabled');
         if (retriesLeft === undefined)
-            retriesLeft = 4;
+            retriesLeft = 12;
         const response = await geminiFetch(geminiEndpoint(geminiModel, 'generateContent'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
@@ -41551,7 +41631,7 @@ function App() {
     // complete text once it's done.
     async function callGeminiStreaming(system, messages, onChunk, retriesLeft) {
         if (retriesLeft === undefined)
-            retriesLeft = 4;
+            retriesLeft = 12;
         const response = await geminiFetch(geminiEndpoint(geminiModel, 'streamGenerateContent') + '?alt=sse', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
@@ -41583,8 +41663,21 @@ function App() {
         // here ever looked at it, so a scene cut off by MAX_TOKENS used to just
         // end mid-sentence with no warning and no attempt to recover.
         let finishReason = null;
+        // A dropped connection mid-stream used to throw here, discarding the
+        // partial text (or, worse, ending the loop cleanly with no finishReason
+        // at all, which the retry below ignored). Both now count as a truncation
+        // that gets continued from where the text stopped.
+        let streamBroke = false;
         while (true) {
-            const { done, value } = await reader.read();
+            let chunkResult;
+            try {
+                chunkResult = await reader.read();
+            }
+            catch (e) {
+                streamBroke = true;
+                break;
+            }
+            const { done, value } = chunkResult;
             if (done)
                 break;
             buffer += decoder.decode(value, { stream: true });
@@ -41629,7 +41722,14 @@ function App() {
         if (!sawDelta)
             throw new Error('no deltas received');
         usageAccumulatorRef.current.output += outputTokens;
-        if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+        // Treat these as truncated too: the stream broke, ended with no
+        // finishReason, or reported STOP but the text ends on a bare letter
+        // (cut mid-word, e.g. "...дикий, животный стра").
+        if (streamBroke || !finishReason)
+            finishReason = 'INTERRUPTED';
+        else if (finishReason === 'STOP' && /[\p{L}\p{N},]$/u.test(fullText.trimEnd()))
+            finishReason = 'CUT_MID_WORD';
+        if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS' && finishReason !== 'INTERRUPTED' && finishReason !== 'CUT_MID_WORD') {
             console.warn('[Grimoire RPG] Gemini streaming finishReason was "' + finishReason + '" (expected "STOP"), response length ' + fullText.length + ' chars. Model used: ' + geminiModel);
         }
         // Same continuation approach as callGemini above (see its comment) — if
@@ -42264,7 +42364,7 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.${stateContractNote}
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text, or \"(none)\"", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text (REQUIRED, never empty)", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
@@ -42303,7 +42403,7 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 If no fight is starting: "combat": {"combat": false}.
 If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "armorPiercing": false, "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null, "reinforcements": [], "presentAllies": []}.
 "enemies" is an array of 1 or more objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry. Actively resist the pull toward thin, low-stakes fights: when the established lore, faction, or location would plausibly throw a real pack, warband, garrison, or pack of beasts at the hero — bandit camps, patrols, dens, cultist cells, and the like — reflect that honestly with a genuinely sized group — multiple opponents, with no cap on how large where the fiction supports it, up into the dozens for a real warband, garrison, or battle — rather than quietly trimming it down for convenience; a single isolated foe should be the outcome of the scene actually calling for that, not a default habit. This matters most precisely when the hero has NO party members: a lone hero is not itself a reason to face a lone opponent — bandits, raiders, and packs of beasts hunt and travel in numbers regardless of how many people they're up against, and a solo hero wandering hostile, lawless, or monster-infested territory should, more often than not, actually be the one outnumbered. If you notice yourself defaulting to one opponent scene after scene simply because the hero is traveling alone, that is exactly the failure mode this rule exists to break — deliberately reach for 2 or more instead whenever the scene's own setting gives you any real opening to do so.
-"enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence. Firearms have dedicated animations and rules when they fit the setting: "автомат" (an automatic rifle — fires a burst of three shots), "пистолет" (single shot), "энерговинтовка" (an energy rifle — burst of three bolts); an opponent or ally armed that way shoots from range and fights like an archer (use "role": "ranged"). "armorPiercing" is a separate true/false field — true ONLY if this specific weapon is built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or a natural weapon like a boring beak or armor-cracking pincer/claw built the same way) — omit or set false for an ordinary weapon or attack (claws, fangs, a sword, an axe, bare fists) even if sharp or heavy or clearly dangerous. This has real mechanical weight in the fight itself (it lets this opponent's hits bypass a defender's armor entirely), so set it true only when the weapon/attack genuinely, specifically is that kind, never as a default.
+"enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence. Firearms have dedicated animations and rules when they fit the setting: "автомат" or "винтовка" (an automatic / ordinary rifle — fires a burst of three shots and may open suppressing fire), "энерговинтовка" (an energy rifle — burst of three bolts, may also suppress), "пистолет" (single shot); an opponent or ally armed that way shoots from range and fights like an archer (use "role": "ranged"). "armorPiercing" is a separate true/false field — true ONLY if this specific weapon is built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or a natural weapon like a boring beak or armor-cracking pincer/claw built the same way) — omit or set false for an ordinary weapon or attack (claws, fangs, a sword, an axe, bare fists) even if sharp or heavy or clearly dangerous. This has real mechanical weight in the fight itself (it lets this opponent's hits bypass a defender's armor entirely), so set it true only when the weapon/attack genuinely, specifically is that kind, never as a default.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
 "kind" is exactly one of "humanoid", "animal", "monster", "behemoth" — what SORT of opponent this is, separate from "tier" (how tough it is). Default to "humanoid" — any person-shaped foe with hands and the option of real gear: bandits, guards, soldiers, cultists, raiders, and the like — whenever nothing below clearly applies. Reach for one of the other three ONLY when the scene, the location, or the world already established above has actually put a genuine creature here — a wilderness, a lair, a dungeon, a monster-haunted ruin, something summoned or unleashed — never as a random reskin of an otherwise ordinary human encounter; the everyday run of fights (ambushes, patrols, raids, duels) stays "humanoid" by default, exactly as it always has. "animal" is ordinary, non-supernatural wildlife (a wolf, a bear, a boar, an aggressive dog). "monster" is a proper unnatural or magical creature around human scale or a little beyond it (a ghoul, an imp, a giant spider, a corrupted beast). "behemoth" is for something genuinely oversized or overwhelming enough to anchor a fight on its own (a troll, a dragon, a kraken). None of these three ever wears armor or carries gear — never describe one in equipment, and the game itself rolls none for them regardless of "tier". "damageResist" is optional (default "none") and, when present, exactly one of "low", "medium", "high" — how much this specific opponent's hide, scales, or nature shrugs off ordinary damage. Leave it "none" for almost everything, including most "animal"/"monster" entries; reserve "low"/"medium"/"high" for a creature and a moment the fiction genuinely calls for it (a troll's regeneration, a dragon's scales), leaning toward "behemoth" far more often than the other kinds.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
@@ -42318,8 +42418,8 @@ If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "sh
 "captivityResolved" matters only when the CURRENT GAME STATE above shows the hero currently held captive (an "effects" entry with "kind": "captivity"); on every other turn it's irrelevant — omit it or leave it false. Set it true the exact turn THIS scene's own events show that captivity definitively ending — a successful escape, a negotiated release, a paid ransom, a rescue by allies, or any other clean resolution the scene actually depicts. Do not set it true for a hopeful attempt still in progress, an empty promise from a captor, or a scene that simply continues the captivity a while longer. If the resolution costs the hero something concrete — an item surrendered, an injury, a debt or promise now owed — show that happening in the prose and record it the ordinary way elsewhere in this same JSON ("inventory" without the item, a new "effects" entry for the injury, and so on); there is no separate field for the cost itself. The hero's "inventory" was emptied out the moment captivity began (their belongings were taken) and will be restored automatically the turn "captivityResolved" is true — you only need to add back, via the ordinary "inventory" field, anything specific this scene shows the hero recovering or being handed early, before the resolution itself (a knife slipped to them by an ally inside, gear a fleeing captor left behind).
 
 === EVENT: HIDDEN INFORMATION ===
-"secretsText" is hidden, behind-the-scenes information about the scene that just happened, shown to the player in a separate panel the hero never sees — never prose that belongs in the story itself. Extract ONLY: (1) the private thoughts and intentions of characters present, ONLY where they differ from what was said or shown outwardly; (2) surrounding circumstances the hero can't perceive, ONLY if genuinely needed to understand the scene (skip this entirely if the scene's surface is already the whole picture). Nothing else — no world lore, no foreshadowing, no analysis, no restating what the scene already showed. If a character present has nothing hidden, say so in one short line or omit them. If NOTHING in the scene has a hidden layer at all, set "secretsText" to exactly "(none)".
-STYLE for "secretsText" — IMPORTANT: as terse as possible while staying clear — one short line per character, plain facts only, no elaboration, no philosophizing, no metaphor; this is a bare-bones briefing, not prose. Third person throughout, like an outside observer — never address anyone as "you," including the hero (${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName) || 'the hero'}): describe them the same way as any other character (e.g. "${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName) || 'The hero'} was not noticed doing…"). Always written in ${narrativeLanguage}, regardless of this being one field among many in an otherwise unlabeled JSON object.
+"secretsText" is hidden, behind-the-scenes information about the scene that just happened, shown to the player in a separate panel the hero never sees — never prose that belongs in the story itself. Extract ONLY: (1) the private thoughts and intentions of characters present, ONLY where they differ from what was said or shown outwardly; (2) surrounding circumstances the hero can't perceive, ONLY if genuinely needed to understand the scene (skip this entirely if the scene's surface is already the whole picture). Nothing else — no world lore, no foreshadowing, no analysis, no restating what the scene already showed. Cover every character present who plays any part in the scene. "secretsText" is REQUIRED on every scene and must never be empty or "(none)": even in a quiet scene there is always something unseen — what each character present really thinks, feels or wants, what is happening just out of the hero's sight, or what someone is holding back. Always write it.
+STYLE for "secretsText" — a bit more detailed than a bare list: for each character with a hidden layer give 2-3 plain sentences — what they actually think or want, why (their motive or what they know), and what they intend to do next. Plain facts, no philosophizing, no metaphor, not story prose. Third person throughout, like an outside observer — never address anyone as "you," including the hero (${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName) || 'the hero'}): describe them the same way as any other character (e.g. "${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName) || 'The hero'} was not noticed doing…"). Always written in ${narrativeLanguage}, regardless of this being one field among many in an otherwise unlabeled JSON object.
 
 "newPendingSecrets" and "pendingSecretUpdates" track commitments raised by "secretsText" over multiple turns, referencing the list given above under "HIDDEN PLANS/INTENTIONS ALREADY ON RECORD" (if any) — this is what stops a planted intention from quietly vanishing once this turn scrolls out of context. "newPendingSecrets" is for a hidden CONCRETE PLAN OR INTENTION revealed in "secretsText" this turn that hasn't played out yet and needs to be paid off later — a character privately deciding to act against, help, betray, ambush, or intervene for someone, a scheme being set in motion — NOT a passing feeling, opinion, or mood with nothing to act on; most turns should add nothing here at all. Each entry's optional "trigger" is for the case where the hidden information itself made the firing condition explicit and mechanical — e.g. "the hero picks up/takes the item on the floor," "the hero opens that door," "the hero speaks that name aloud" — versus a looser intention like "waiting for a chance to strike" which has no single trigger and should omit the field. "pendingSecretUpdates" marks an existing entry from the list above "fulfilled" the moment its plan actually plays out in a LATER scene (never the same turn it was first raised), or "moot" if something in the story has made it permanently impossible or irrelevant (the schemer died, the target left for good, the hero pre-empted it). Both "text" (and "trigger", if set) must be in ${narrativeLanguage}. Omit either array entirely if it has nothing to add — do not force an empty array's worth of invented content just to fill the field.
 
@@ -43927,6 +44027,18 @@ ${chunkText}`;
             err.code = 'incomplete';
             throw err;
         }
+        // "secretsText" is the LAST field in the schema, so a reply that got cut
+        // off (and was then silently closed up by extractJsonObject's repair)
+        // loses exactly it. The schema always asks for it (never empty), so a missing or
+        // empty string means truncation or a skipped field — retry rather than
+        // quietly dropping the hidden-information panel for this turn.
+        if (typeof parsed.secretsText !== 'string' || !parsed.secretsText.trim() || /^\(none\)$/i.test(parsed.secretsText.trim())) {
+            console.error('[Grimoire RPG] state/events response was missing "secretsText" (likely truncated). Raw response was:', raw);
+            const err = new Error('state/events response missing "secretsText"');
+            err.code = 'incomplete';
+            err.missingSecrets = true;
+            throw err;
+        }
         // --- state (unchanged from the old generateStateAndEvents) ---
         const parsedStats = parsed.stats && typeof parsed.stats === 'object' && !Array.isArray(parsed.stats) ? parsed.stats : null;
         // Whatever the model hands back is stripped of any cost basis (item.paid)
@@ -45164,13 +45276,16 @@ Rules:
     // something a retry can't fix (a persistent block, a broken key), and at
     // that point EMPTY_STATE_AND_EVENTS_FALLBACK's graceful degradation is
     // the right call, not an indefinite spinner.
-    const STATE_AND_EVENTS_MAX_ATTEMPTS = 4;
+    const STATE_AND_EVENTS_MAX_ATTEMPTS = 8;
     // Turns a caught error from one failed attempt into the note the NEXT
     // attempt's [ENGINE NOTE — RETRY] carries (see the retryNote param on
     // generateStateAndEvents) — specific enough about what actually went
     // wrong that a retry has a real shot at not repeating the same mistake,
     // rather than just re-asking the identical question.
     function describeStateAndEventsRetryNote(error) {
+        if (error && error.code === 'incomplete' && error.missingSecrets) {
+            return 'Your last reply for this exact scene was cut off before, or left empty, "secretsText" — the final field, which is REQUIRED and must hold real hidden information (never empty, never "(none)"). Return the complete JSON object again, in full, ending with "secretsText".';
+        }
         if (error && error.code === 'incomplete') {
             return 'Your last reply for this exact scene left "suggestions" empty or missing. That field is REQUIRED and can never be empty — every scene, including one that pauses on an offer or trails off, needs 2-3 short, concrete action suggestions. Return the complete JSON object again, in full, and this time make sure "suggestions" holds 2-3 real entries.';
         }
@@ -45227,6 +45342,30 @@ Rules:
             }
         }
         throw lastError;
+    }
+    // Minimal rescue call — see its use in callGameMaster. Asks ONLY for 2-3
+    // suggestions and the terse hidden-information briefing, so the reply is
+    // tiny and very unlikely to be cut off. Returns null on any failure.
+    async function rescueSuggestionsAndSecrets(narrativeText, currentState) {
+        try {
+            const { narrativeLanguage } = sharedContext(currentState);
+            const system = `You assist a text role-playing game. Given the scene below, reply with ONE small JSON object and nothing else: {"suggestions": ["short action", "short action", "short action"], "secretsText": "..."}. "suggestions": 2-3 short, concrete next actions the hero could take, written in ${narrativeLanguage}. "secretsText": hidden, behind-the-scenes information the hero cannot perceive (private thoughts of characters that differ from what they showed, circumstances out of sight), 2-3 plain sentences per character (what they really think, why, what they intend next), third person, in ${narrativeLanguage}. It must never be empty. No markdown fences.`;
+            const raw = await callGemini(system, [{ role: 'user', content: 'Scene:\n\n' + narrativeText }]);
+            const parsed = extractJsonObject(raw);
+            if (!parsed)
+                return null;
+            const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(x => typeof x === 'string' && x.trim()).slice(0, 3) : [];
+            if (suggestions.length === 0)
+                return null;
+            const secretsRaw = typeof parsed.secretsText === 'string' ? parsed.secretsText.trim() : '';
+            if (!secretsRaw || /^\(none\)$/i.test(secretsRaw))
+                return null;
+            return { suggestions, secretsText: secretsRaw };
+        }
+        catch (e) {
+            console.warn('[Grimoire RPG] rescueSuggestionsAndSecrets failed:', e);
+            return null;
+        }
     }
     // A hidden classification call that runs BEFORE the narrative below, on
     // every ordinary turn (not the opening turn, and not while a combat
@@ -45524,6 +45663,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             console.error('[Grimoire RPG] generateStateAndEvents failed after ' + STATE_AND_EVENTS_MAX_ATTEMPTS + ' attempts, character sheet NOT updated this turn:', e);
             return EMPTY_STATE_AND_EVENTS_FALLBACK(currentState, precedingNarrator, isOpeningTurn);
         });
+        // Last resort for the two things the player sees every turn: if the big
+        // extraction failed completely, ask a tiny, cheap model call for just the
+        // action suggestions and the hidden-information text, instead of showing
+        // canned suggestions and an empty secrets panel.
+        if (combined.suggestions === (FALLBACK_SUGGESTIONS[uiLang] || FALLBACK_SUGGESTIONS.ru) && !combined.secretsText) {
+            const rescued = await rescueSuggestionsAndSecrets(narrative, currentState);
+            if (rescued) {
+                combined.suggestions = rescued.suggestions;
+                combined.secretsText = rescued.secretsText;
+            }
+        }
         // A narration that had to be cut short DID contain a fight — whatever the
         // state model made of the trimmed text, that fight goes to the engine.
         if (integrity.forceCombat && !combined.combatEncounter) {
@@ -47081,14 +47231,38 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return { ...wave, combatants: combatants.slice(0, MAX_REINFORCEMENT_WAVE_COMBATANTS) };
         }).filter(Boolean);
     }
+    // A companion who turns on the hero shows up in the fight as an ENEMY with
+    // their own name. They must not also fight on the hero's side as a party
+    // ally (the same person on both teams), so any party ally whose name matches
+    // an enemy is dropped from the ally list and removed from the party — they
+    // have left it by attacking the hero.
+    function splitOutBetrayers(partyAllies, enemies) {
+        // Names compared case-insensitively, ё=е, punctuation ignored, token-wise:
+        // "вадим" matches "Вадим", "Вадим-выживший", "Вадим (враг)", "Выживший Вадим".
+        const toks = v => String(v || '').toLowerCase().replace(/ё/g, 'е').split(/[^a-z0-9а-я]+/).filter(Boolean);
+        const enemyTokenSets = (enemies || []).map(e => toks(e && (e.enemyName || e.name))).filter(t => t.length > 0);
+        if (enemyTokenSets.length === 0)
+            return partyAllies;
+        const isBetrayer = a => {
+            const at = toks(a.name);
+            if (at.length === 0)
+                return false;
+            return enemyTokenSets.some(et => at.every(x => et.includes(x)) || et.every(x => at.includes(x)));
+        };
+        const betrayerKeys = partyAllies.filter(isBetrayer).map(a => String(a.name).trim().toLowerCase());
+        if (betrayerKeys.length === 0)
+            return partyAllies;
+        setParty(prev => prev.filter(k => !betrayerKeys.includes(k)));
+        return partyAllies.filter(a => !isBetrayer(a));
+    }
     function startCombat(narratorIndex) {
         const narratorMsg = messages[narratorIndex];
         const encounter = narratorMsg && narratorMsg.combatEncounter;
         if (!encounter || !Array.isArray(encounter.enemies) || encounter.enemies.length === 0)
             return;
         const enemies = encounter.enemies.map(makeEnemyCombatant);
-        const partyAllies = buildAllyCombatants();
-        const allies = [...partyAllies, ...buildPresentAllyCombatants(encounter, partyAllies.map(a => a.name))];
+        const partyAllies = splitOutBetrayers(buildAllyCombatants(), enemies);
+        const allies = [...partyAllies, ...buildPresentAllyCombatants(encounter, [...partyAllies.map(a => a.name), ...enemies.map(e => e.enemyName || e.name).filter(Boolean)])];
         const order = buildInitiativeOrder(allies, enemies);
         const layout = layoutInitialPositions(allies, enemies);
         combatClosingRef.current = false;
@@ -47161,8 +47335,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return;
         const enemy = encounter.enemies[0];
         const freshParts = buildCombatantParts(enemy.totalHp, enemy.totalHp, normalizeEnemyBodyParts(enemy.bodyParts));
-        const partyAllies = buildAllyCombatants();
-        const allies = [...partyAllies, ...buildPresentAllyCombatants(encounter, partyAllies.map(a => a.name))];
+        const partyAllies = splitOutBetrayers(buildAllyCombatants(), [enemy]);
+        const allies = [...partyAllies, ...buildPresentAllyCombatants(encounter, [...partyAllies.map(a => a.name), enemy.enemyName || enemy.name].filter(Boolean))];
         const outcome = rollStealthKillOutcome(gameState.stats.agility, computeHeroMods(gameState, null).stealthKillChanceBonus);
         let enemyParts = freshParts;
         let result = null;
@@ -48237,9 +48411,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     //    immediately — the same shape every other fight-ending branch here
     //    already returns — without ever reaching advanceTurn.
     function attemptOpportunityAttacks(prev, mover) {
-        // A suppressed enemy that moves eats a hit first (see applySuppressionMoveDamage).
-        if (mover.type === 'enemy') {
-            const sup = applySuppressionMoveDamage(prev, mover.id);
+        // A suppressed mover (hero, companion or enemy) eats a hit first (see applySuppressionMoveDamage).
+        {
+            const sup = applySuppressionMoveDamage(prev, mover);
             if (sup) {
                 prev = sup.state;
                 if (sup.terminal)
@@ -48776,7 +48950,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 if (prev.round < (fightState.suppressReadyAtRound || 1))
                     return prev;
                 const heroHp = Object.keys(prev.heroParts).reduce((sum, k) => sum + prev.heroParts[k].hp, 0);
-                const enemiesS = prev.enemies.map(e => e.id === enemyId ? { ...e, suppressed: { heroHp, fx: heroGunDef.suppressHitFx } } : (e.suppressed ? { ...e, suppressed: null } : e));
+                const enemiesS = prev.enemies.map(e => e.id === enemyId ? { ...e, suppressed: { srcKey: 'hero:hero', srcHp: heroHp, fx: heroGunDef.suppressHitFx } } : (e.suppressed && e.suppressed.srcKey === 'hero:hero' ? { ...e, suppressed: null } : e));
                 const logS = [...prev.log, { text: (heroName || t('combatYouLabel')) + ' — ' + t('combatLogSuppressStartText') + ' ' + enemy.enemyName, kind: 'effect' }];
                 const lastActionS = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: heroGunFx, suppress: true, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: 'miss', dmg: 0 };
                 const abilityStateS = { ...fightState, suppressReadyAtRound: prev.round + heroGunDef.cooldownRounds };
@@ -49017,60 +49191,210 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             log
         };
     }
-    // Suppression (ABILITY_DEFS .suppress): enemy.suppressed = { heroHp, fx }.
-    // Lasts until the hero's next turn, and breaks early if the hero loses HP
-    // since the cast (heroHp is raised if they heal, so only real damage counts).
+    // ---- Suppression (hero abilities with .suppress, and enemy/companion smg /
+    // energy-rifle wielders) ----
+    // A suppressed combatant carries { srcKey, srcHp, fx }: who pinned it
+    // ('hero:hero' / 'ally:<id>' / 'enemy:<id>'), that shooter's total HP when
+    // it fired, and the gun kind. It's stored on the enemy / ally object
+    // (`suppressed`) or, for the hero, on combat state (`heroSuppressed`).
+    // Lasts until the shooter's next turn, breaks early if the shooter loses HP
+    // since the cast, and a pinned target that moves takes a hit and is freed.
+    function supKeyOf(type, id) { return type === 'hero' ? 'hero:hero' : type + ':' + id; }
+    function supPartsHp(parts) { return Object.keys(parts || {}).reduce((sum, k) => sum + parts[k].hp, 0); }
+    function supGet(state, key) {
+        if (key === 'hero:hero')
+            return state.heroSuppressed || null;
+        const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+        const c = (type === 'ally' ? state.allies : state.enemies).find(x => x.id === id);
+        return (c && c.suppressed) || null;
+    }
+    function supSet(state, key, val) {
+        if (key === 'hero:hero')
+            return { ...state, heroSuppressed: val };
+        const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+        const fld = type === 'ally' ? 'allies' : 'enemies';
+        return { ...state, [fld]: state[fld].map(x => x.id === id ? { ...x, suppressed: val } : x) };
+    }
+    function supInfo(state, key) {
+        if (key === 'hero:hero')
+            return { hp: supPartsHp(state.heroParts), out: isBodyDestroyed(state.heroParts), name: heroName || t('combatYouLabel') };
+        const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+        if (type === 'ally') {
+            const a = state.allies.find(x => x.id === id);
+            return a ? { hp: supPartsHp(a.parts), out: isAllyOut(a), name: a.name } : { hp: 0, out: true, name: '' };
+        }
+        const e = state.enemies.find(x => x.id === id);
+        return e ? { hp: supPartsHp(e.parts), out: isEnemyOut(e) || !!e.fled, name: e.enemyName } : { hp: 0, out: true, name: '' };
+    }
+    function supAllKeys(state) { return ['hero:hero', ...state.allies.map(a => 'ally:' + a.id), ...state.enemies.map(e => 'enemy:' + e.id)]; }
+    function supClearBySource(state, srcKey) {
+        let st = state;
+        supAllKeys(state).forEach(k => { const sp = supGet(st, k); if (sp && sp.srcKey === srcKey)
+            st = supSet(st, k, null); });
+        return st;
+    }
     function tickSuppression(state) {
-        if (!state.enemies.some(e => e.suppressed))
+        const keys = supAllKeys(state);
+        if (!keys.some(k => supGet(state, k)))
             return state;
         const nextActor = state.order[state.turnPos];
-        const heroTurn = !!nextActor && nextActor.type === 'hero';
-        const hpNow = Object.keys(state.heroParts).reduce((sum, k) => sum + state.heroParts[k].hp, 0);
-        let log = state.log;
-        const enemies = state.enemies.map(e => {
-            if (!e.suppressed)
-                return e;
-            if (isEnemyOut(e))
-                return { ...e, suppressed: null };
-            if (hpNow < e.suppressed.heroHp) {
-                log = [...log, { text: e.enemyName + ' — ' + t('combatLogSuppressInterruptedText'), kind: 'effect' }];
-                return { ...e, suppressed: null };
+        const nextKey = nextActor ? supKeyOf(nextActor.type, nextActor.id) : null;
+        let st = state, log = state.log;
+        keys.forEach(key => {
+            const sup = supGet(st, key);
+            if (!sup)
+                return;
+            const tgt = supInfo(st, key), src = supInfo(st, sup.srcKey);
+            if (tgt.out || src.out) {
+                st = supSet(st, key, null);
+                return;
             }
-            if (heroTurn) {
-                log = [...log, { text: e.enemyName + ' — ' + t('combatLogSuppressEndText'), kind: 'effect' }];
-                return { ...e, suppressed: null };
+            if (src.hp < sup.srcHp) {
+                log = [...log, { text: tgt.name + ' — ' + t('combatLogSuppressInterruptedText'), kind: 'effect' }];
+                st = supSet(st, key, null);
+                return;
             }
-            return hpNow > e.suppressed.heroHp ? { ...e, suppressed: { ...e.suppressed, heroHp: hpNow } } : e;
+            if (nextKey === sup.srcKey) {
+                log = [...log, { text: tgt.name + ' — ' + t('combatLogSuppressEndText'), kind: 'effect' }];
+                st = supSet(st, key, null);
+                return;
+            }
+            if (src.hp > sup.srcHp)
+                st = supSet(st, key, { ...sup, srcHp: src.hp });
         });
-        return { ...state, enemies, log };
+        return { ...st, log };
     }
-    // A suppressed enemy that tries to move takes a hit (a fraction of its max
-    // HP on a random standing body part) and the suppression ends. Called from
-    // attemptOpportunityAttacks, which every enemy movement branch runs first.
-    // Returns null when the enemy isn't suppressed.
-    function applySuppressionMoveDamage(prev, enemyId) {
-        const e = prev.enemies.find(x => x.id === enemyId);
-        if (!e || !e.suppressed || isEnemyOut(e))
+    // A suppressed combatant (hero, companion or enemy) that tries to move takes
+    // a hit (a fraction of its max HP on a random standing body part) and the
+    // suppression ends. Called from attemptOpportunityAttacks, which every
+    // movement branch runs first. Returns null when the mover isn't suppressed.
+    function applySuppressionMoveDamage(prev, mover) {
+        const key = supKeyOf(mover.type, mover.id);
+        const sup = supGet(prev, key);
+        if (!sup)
             return null;
-        const keys = Object.keys(e.parts).filter(k => e.parts[k].hp > 0);
+        const me = supInfo(prev, key);
+        if (me.out)
+            return null;
+        const src = supInfo(prev, sup.srcKey);
+        const cur = mover.type === 'hero' ? { parts: prev.heroParts }
+            : (mover.type === 'ally' ? prev.allies : prev.enemies).find(x => x.id === mover.id);
+        if (!cur)
+            return null;
+        const keys = Object.keys(cur.parts).filter(k => cur.parts[k].hp > 0);
         if (keys.length === 0)
             return null;
-        const totalMax = Object.keys(e.parts).reduce((sum, k) => sum + e.parts[k].maxHp, 0);
+        const totalMax = Object.keys(cur.parts).reduce((sum, k) => sum + cur.parts[k].maxHp, 0);
         const dmg = Math.max(1, Math.round(totalMax * ABILITY_DEFS.gunSmgSuppress.suppressMoveDamageFraction));
-        const key = keys[Math.floor(Math.random() * keys.length)];
-        const left = Math.max(0, e.parts[key].hp - dmg);
-        const parts = { ...e.parts, [key]: { ...e.parts[key], hp: left, disabled: left <= 0 ? true : e.parts[key].disabled } };
-        const hurt = { ...e, parts, suppressed: null };
-        const defeated = isEnemyOut(hurt);
-        let enemies = prev.enemies.map(x => x.id === enemyId ? hurt : x);
-        let log = [...prev.log, { text: e.enemyName + ' — ' + t('combatLogSuppressMoveHitText') + ': -' + dmg + ' HP', kind: 'effect' }];
-        if (defeated) {
-            const shock = applyMoraleShockToGroup(enemies, enemyId, COMBAT_TUNING.moraleAllyDeathLoss, t);
-            enemies = shock.enemies;
-            log = [...log, ...shock.log];
+        const partKey = keys[Math.floor(Math.random() * keys.length)];
+        const left = Math.max(0, cur.parts[partKey].hp - dmg);
+        const parts = { ...cur.parts, [partKey]: { ...cur.parts[partKey], hp: left, disabled: left <= 0 ? true : cur.parts[partKey].disabled } };
+        let st = supSet(prev, key, null);
+        let log = [...prev.log, { text: me.name + ' — ' + t('combatLogSuppressMoveHitText') + ': -' + dmg + ' HP', kind: 'effect' }];
+        let defeated = false, terminal = null;
+        if (mover.type === 'hero') {
+            st = { ...st, heroParts: parts };
+            defeated = isBodyDestroyed(parts);
+            if (defeated)
+                terminal = { result: 'death', killedBy: src.name };
         }
-        const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: e.suppressed.fx, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: 'hit', dmg, partKey: key };
-        return { state: { ...prev, enemies, log, lastAction }, defeated, terminal: enemies.every(isEnemyOut) ? { result: 'victory' } : null };
+        else if (mover.type === 'ally') {
+            st = { ...st, allies: st.allies.map(a => a.id === mover.id ? { ...a, parts } : a) };
+            defeated = isAllyOut(st.allies.find(a => a.id === mover.id));
+            if (defeated) {
+                st = { ...st, allies: applyAllyMoraleShock(st.allies, mover.id, COMBAT_TUNING.moraleAllyDeathLoss) };
+                log = [...log, { text: me.name + ' ' + t('combatVitalHitSuffix'), kind: 'vital' }];
+            }
+        }
+        else {
+            st = { ...st, enemies: st.enemies.map(e => e.id === mover.id ? { ...e, parts } : e) };
+            defeated = isEnemyOut(st.enemies.find(e => e.id === mover.id));
+            if (defeated) {
+                const shock = applyMoraleShockToGroup(st.enemies, mover.id, COMBAT_TUNING.moraleAllyDeathLoss, t);
+                st = { ...st, enemies: shock.enemies };
+                log = [...log, ...shock.log];
+                if (st.enemies.every(isEnemyOut))
+                    terminal = { result: 'victory' };
+            }
+        }
+        const i = sup.srcKey.indexOf(':');
+        const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: sup.fx, attackerType: sup.srcKey.slice(0, i), attackerId: sup.srcKey.slice(i + 1), defenderType: mover.type, defenderId: mover.type === 'hero' ? 'hero' : mover.id, resultKind: 'hit', dmg, partKey };
+        return { state: { ...st, log, lastAction }, defeated, terminal };
+    }
+    // An enemy / companion wielding an smg or energy rifle may open suppressing
+    // fire on its target INSTEAD of a normal volley (COMBAT_TUNING.npcSuppress*):
+    // no damage, spends its turn, pins the target, 3-round cooldown per shooter.
+    // Returns the new combat state, or null when it just shoots normally.
+    // Where a combatant stands / whether it shoots / how hurt it is — inputs
+    // for npcSuppressChanceFor.
+    function supPos(state, key) {
+        if (key === 'hero:hero')
+            return state.heroPos;
+        const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+        const c = (type === 'ally' ? state.allies : state.enemies).find(x => x.id === id);
+        return c ? c.pos : null;
+    }
+    function supIsShooter(state, key) {
+        if (key === 'hero:hero')
+            return getLoadoutWeaponType(equipment, gameState.inventory) === 'ranged';
+        const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+        if (type === 'ally') {
+            const a = state.allies.find(x => x.id === id);
+            if (!a)
+                return false;
+            const l = getAllyLoadout(a);
+            return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged';
+        }
+        const e = state.enemies.find(x => x.id === id);
+        return !!e && (e.role === 'ranged' || e.role === 'caster' || getEnemyWeaponType(e) === 'ranged');
+    }
+    function supHpFraction(state, key) {
+        if (key === 'hero:hero')
+            return heroPartsHealthRatio(state.heroParts);
+        const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
+        const c = (type === 'ally' ? state.allies : state.enemies).find(x => x.id === id);
+        return c ? hpFractionOfParts(c.parts) : 1;
+    }
+    // How eager this shooter is to pin THIS target right now (0..100). Replaces
+    // the old flat 35% coin flip, which in practice almost never came up:
+    // suppress when it actually pays — the target is a melee fighter still
+    // walking up, or a shooter whose return fire it would blunt — and not when
+    // the target is point-blank (just shoot it), nearly dead (finish it), or
+    // the shooter is itself pinned.
+    function npcSuppressChanceFor(prev, srcKey, targetKey) {
+        if (supGet(prev, srcKey))
+            return 0;
+        if (supHpFraction(prev, targetKey) <= COMBAT_TUNING.npcSuppressFinishHpFraction)
+            return 0;
+        let chance = COMBAT_TUNING.npcSuppressChance;
+        const a = supPos(prev, srcKey), b = supPos(prev, targetKey);
+        if (a && b) {
+            const dist = chebyshevDistance(a, b);
+            if (dist <= MELEE_ATTACK_MAX_DISTANCE)
+                chance *= COMBAT_TUNING.npcSuppressNearMult;
+            else if (!supIsShooter(prev, targetKey))
+                chance *= COMBAT_TUNING.npcSuppressApproachMult;
+        }
+        if (supIsShooter(prev, targetKey))
+            chance *= COMBAT_TUNING.npcSuppressShooterMult;
+        return Math.min(COMBAT_TUNING.npcSuppressMaxChance, chance);
+    }
+    function tryNpcSuppress(prev, srcKey, gunFx, targetKey, log) {
+        if (gunFx !== 'smg' && gunFx !== 'energyRifle')
+            return null;
+        const cd = prev.npcSuppressCd || {};
+        if (prev.round < (cd[srcKey] || 1))
+            return null;
+        if (supGet(prev, targetKey))
+            return null;
+        if (Math.random() * 100 >= npcSuppressChanceFor(prev, srcKey, targetKey))
+            return null;
+        const src = supInfo(prev, srcKey), tgt = supInfo(prev, targetKey);
+        let st = supClearBySource(prev, srcKey);
+        st = supSet(st, targetKey, { srcKey, srcHp: src.hp, fx: gunFx });
+        const si = srcKey.indexOf(':'), ti = targetKey.indexOf(':');
+        const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: gunFx === 'energyRifle' ? 'energySuppress' : 'smgSuppress', suppress: true, attackerType: srcKey.slice(0, si), attackerId: srcKey.slice(si + 1), defenderType: targetKey.slice(0, ti), defenderId: targetKey.slice(ti + 1), resultKind: 'miss', dmg: 0 };
+        return advanceTurn({ ...st, log: [...log, { text: src.name + ' — ' + t('combatLogSuppressStartText') + ' ' + tgt.name, kind: 'effect' }], lastAction, npcSuppressCd: { ...cd, [srcKey]: prev.round + COMBAT_TUNING.npcSuppressCooldownRounds } });
     }
     // Advances turnPos/round to the next living actor and hands off to the
     // auto-turn effect below if that's an ally or an enemy — the hero's own
@@ -49482,6 +49806,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     if (nearest && chebyshevDistance(ally.pos, nearest.pos) > MELEE_ATTACK_MAX_DISTANCE) {
                         const step = chooseMoveStep(ally.pos, nearest.pos, prev, { type: 'ally', id: ally.id }, computeActorMovementRange({ type: 'ally', id: ally.id }));
                         if (step) {
+                            // Pinned by suppressing fire: stays put instead of moving under it.
+                            if (ally.suppressed && Math.random() * 100 < COMBAT_TUNING.suppressedHoldChance) {
+                                return advanceTurn({ ...prev, log: [...log, { text: ally.name + ' — ' + t('combatLogSuppressedHoldText'), kind: 'effect' }] });
+                            }
                             // Not adjacent to `nearest` (that's exactly why it's moving),
                             // but could still be adjacent to some OTHER living enemy —
                             // attemptOpportunityAttacks itself checks against everyone,
@@ -49515,7 +49843,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // Locked in melee with a bow/crossbow in hand: punch instead of shooting.
                 const aiAllyLockedShooter = isBowLoadout(getAllyLoadout(ally).equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
                 const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name), allyWearOf(prev, ally));
-                const attacker = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
+                const attackerRaw = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
+                const attacker = ally.suppressed ? { ...attackerRaw, weaponDamage: attackerRaw.weaponDamage * COMBAT_TUNING.suppressedDamageMult } : attackerRaw;
                 // Firearm shot: a friend standing on the line of fire may take it.
                 if (aiGunFx && ally.pos && target.pos) {
                     const blocker = rollLineBlockRedirect(prev, { type: 'ally', id: ally.id }, ally.pos, { type: 'enemy', id: target.id }, target.pos);
@@ -49526,6 +49855,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         else
                             return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, blocker, log);
                     }
+                }
+                if (aiGunFx && ally.pos && target.pos && !aiAllyLockedShooter) {
+                    const npcCast = tryNpcSuppress(prev, 'ally:' + ally.id, aiGunFx, 'enemy:' + target.id, log);
+                    if (npcCast)
+                        return npcCast;
                 }
                 const forceCrit4 = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + target.id, ally.pos, target.pos);
                 const aiShotTarget = target;
@@ -49921,6 +50255,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const enemyGunFx = enemyShotIsRanged ? getEnemyGunFxId(enemy) : null;
             if (friendlyBlocker)
                 return applyFriendlyFireShot(prev, { type: 'enemy', id: enemy.id, pos: enemy.pos, actor: attacker }, friendlyBlocker, log);
+            if (enemyGunFx && enemy.pos) {
+                const npcCast = tryNpcSuppress(prev, 'enemy:' + enemy.id, enemyGunFx, targetChoice.kind === 'hero' ? 'hero:hero' : 'ally:' + targetChoice.ally.id, log);
+                if (npcCast)
+                    return npcCast;
+            }
             if (targetChoice.kind === 'hero') {
                 const heroMods = computeHeroMods(gameState, prev.abilityState);
                 const defender = makeHeroDefender(prev.heroParts, heroMods, prev.gearWear, prev.abilityState && prev.abilityState.resilienceActive, prev.heroArmorCur);
