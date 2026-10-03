@@ -13,6 +13,12 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0c0a09; }
   #root { min-height: 100vh; }
+  /* Same bouncing dots as the in-game "thinking" indicator (grim-dot-bounce). */
+  .boot-dots span { display: inline-block; animation: grim-dot-bounce 1.2s infinite ease-in-out; color: inherit; font-size: 1.1rem; }
+  .boot-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .boot-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .boot-dots span { animation: none !important; } }
 </style>
 <script>
 // React 19 + ReactDOM + Scheduler, bundled inline so the app has zero
@@ -17249,7 +17255,16 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
     });
   })();
 </script>
-<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em">Гримуар — загрузка…</div></div>
+<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fbbf24;font:16px Georgia,serif;letter-spacing:.08em"><span>Grimoire RPG - <span id="boot-word">loading</span></span><span class="boot-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div></div>
+<script>
+  // Boot note wording follows the system language: Russian UI -> "загрузка", anything else -> "loading".
+  (function () {
+    var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+    var ru = /^ru\b/i.test(String(langs[0] || ''));
+    var w = document.getElementById('boot-word');
+    if (w) w.textContent = ru ? 'загрузка' : 'loading';
+  })();
+</script>
 <script>
   // Minimal localStorage-backed stand-in for the window.storage API that
   // Claude.ai artifacts provide. grimoire.jsx was written against that
@@ -17648,6 +17663,8 @@ const TRANSLATIONS = {
         mapTravelConfirmAria: 'Подтвердить перемещение',
         mapRecenterAria: 'Вернуться к герою',
         mapFitAllAria: 'Показать всю карту',
+        mapFullscreenLabel: 'Карта на весь экран',
+        mapExitFullscreenLabel: 'Свернуть карту',
         mapLayerUpAria: 'Уровень выше',
         mapLayerDownAria: 'Уровень ниже',
         mapLayerLabel: 'Уровень карты',
@@ -18301,34 +18318,6 @@ const TRANSLATIONS = {
         mapLegendNeutralTerritory: 'Территория нейтральной фракции',
         mapLegendDanger: 'Возможна опасность',
         mapDangerLabel: 'Возможна опасность',
-        mapRiskQuiet: 'Дорога тихая',
-        mapRiskTense: 'Путь тревожный',
-        mapRiskDeadly: 'Опасный путь',
-        mapRiskReason_danger: 'угроза на пути',
-        mapRiskReason_hostile: 'враждебные земли',
-        mapRiskReason_battle: 'недавно шёл бой',
-        mapRiskReason_night: 'ночной переход',
-        mapRiskReason_siege: 'осаждённое место',
-        mapArrivalNightfall: '🌙 в пути стемнеет',
-        mapArrivalDawn: '☀️ в пути рассветёт',
-        mapServiceTrade: 'Торговец',
-        mapServiceSmith: 'Кузнец',
-        mapServiceInn: 'Трактир',
-        mapServiceHeal: 'Лекарь',
-        mapFilterLabel: 'Фильтр карты',
-        mapFilterQuest: 'Задания',
-        mapFilterPins: 'Метки и заметки',
-        mapFilterTerritory: 'Территории фракций',
-        mapPinLabel: 'Поставить метку',
-        mapPinNone: 'Снять метку',
-        mapNotePlaceholder: 'Заметка…',
-        mapNoteAria: 'Заметка к месту',
-        mapStatusBesieged: 'Осада',
-        mapStatusBurned: 'Сожжено',
-        mapStatusCaptured: 'Захвачено',
-        mapDangerClearedLabel: 'Угроза устранена',
-        mapLegendCleared: 'Угроза устранена',
-        mapLegendStatus: 'Осада / пожар',
         // -- World reactivity: day/night, faction territory drift --
         dayPhaseDayLabel: 'День',
         dayPhaseNightLabel: 'Ночь',
@@ -18557,6 +18546,8 @@ const TRANSLATIONS = {
         mapTravelConfirmAria: 'Confirm the trip',
         mapRecenterAria: 'Recenter on hero',
         mapFitAllAria: 'Show the whole map',
+        mapFullscreenLabel: 'Fullscreen map',
+        mapExitFullscreenLabel: 'Exit fullscreen',
         mapLayerUpAria: 'Level up',
         mapLayerDownAria: 'Level down',
         mapSearchPlaceholder: 'Find a place…',
@@ -19199,34 +19190,6 @@ const TRANSLATIONS = {
         mapLegendNeutralTerritory: 'Territory of a neutral faction',
         mapLegendDanger: 'Possible danger',
         mapDangerLabel: 'Possible danger',
-        mapRiskQuiet: 'Quiet road',
-        mapRiskTense: 'Uneasy road',
-        mapRiskDeadly: 'Dangerous road',
-        mapRiskReason_danger: 'threat along the way',
-        mapRiskReason_hostile: 'hostile lands',
-        mapRiskReason_battle: 'recent fighting',
-        mapRiskReason_night: 'night travel',
-        mapRiskReason_siege: 'place under siege',
-        mapArrivalNightfall: '🌙 night falls on the way',
-        mapArrivalDawn: '☀️ dawn breaks on the way',
-        mapServiceTrade: 'Trader',
-        mapServiceSmith: 'Smith',
-        mapServiceInn: 'Inn',
-        mapServiceHeal: 'Healer',
-        mapFilterLabel: 'Map filter',
-        mapFilterQuest: 'Quests',
-        mapFilterPins: 'Pins and notes',
-        mapFilterTerritory: 'Faction territories',
-        mapPinLabel: 'Set a pin',
-        mapPinNone: 'Remove pin',
-        mapNotePlaceholder: 'Note…',
-        mapNoteAria: 'Note for this place',
-        mapStatusBesieged: 'Under siege',
-        mapStatusBurned: 'Burned',
-        mapStatusCaptured: 'Captured',
-        mapDangerClearedLabel: 'Threat cleared',
-        mapLegendCleared: 'Threat cleared',
-        mapLegendStatus: 'Siege / fire',
         // -- World reactivity: day/night, faction territory drift --
         dayPhaseDayLabel: 'Day',
         dayPhaseNightLabel: 'Night',
@@ -20332,11 +20295,6 @@ function normalizePendingSecrets(raw) {
     return raw.map(normalizePendingSecret).filter(Boolean);
 }
 const MAP_NODE_KINDS = ['settlement', 'wilderness', 'dungeon', 'landmark'];
-// Player-placed map pins (see MapNodeMeta) and world-driven node statuses
-// (see pickWorldSiegeChange / the world tick in callGameMaster).
-const MAP_PIN_OPTIONS = ['📌', '⭐', '❗', '⛺', '🏠', '↩️'];
-const MAP_NOTE_MAX = 300;
-const MAP_NODE_STATUSES = ['besieged', 'burned'];
 // Old per-grid-unit pacing — no longer what actually drives the travel
 // dot's speed (see MAP_ROUTE_DOT_PIXELS_PER_SECOND, defined further down
 // next to MAP_CELL once that constant exists), kept only as the one-frame
@@ -20544,14 +20502,7 @@ function normalizeMapNode(raw) {
         // off-screen arrow in MapModal, which clears the flag the moment the
         // node is actually clicked. Never set for an ordinary near/adjacent
         // node or for wherever the hero currently stands.
-        arrowPending: raw.arrowPending === true,
-        // Player's own marker and note for this place (never sent to the model).
-        pin: MAP_PIN_OPTIONS.includes(raw.pin) ? raw.pin : null,
-        note: typeof raw.note === 'string' ? raw.note.slice(0, MAP_NOTE_MAX) : '',
-        // 'besieged' | 'burned' | null — set by the background world tick.
-        status: MAP_NODE_STATUSES.includes(raw.status) ? raw.status : null,
-        // True once a danger flag on this place was resolved (true -> false).
-        dangerCleared: raw.dangerCleared === true
+        arrowPending: raw.arrowPending === true
     };
 }
 function normalizeMapState(raw) {
@@ -20803,13 +20754,8 @@ function reconcileMap(rawLocation, currentState) {
                 existing.stageId = stageId;
             if (typeof faction === 'string' && faction.trim())
                 existing.faction = faction.trim();
-            if (typeof danger === 'boolean') {
-                if (existing.danger && !danger)
-                    existing.dangerCleared = true;
-                if (danger)
-                    existing.dangerCleared = false;
+            if (typeof danger === 'boolean')
                 existing.danger = danger;
-            }
             return existing;
         }
         const id = slugifyMapId(name, existingIds);
@@ -21153,60 +21099,15 @@ const ROUTE_ENCOUNTER_MAX_CHANCE = 65;
 // threat is sitting there (see normalizeMapNode's own comment on "danger").
 const ROUTE_AMBUSH_SHARE_DEFAULT = 0.5;
 const ROUTE_AMBUSH_SHARE_DANGEROUS = 0.8;
-// Time on the road. Distance is the only clock the route has, so a grid
-// unit is worth ROUTE_HOURS_PER_UNIT hours; the start of the trip is assumed
-// to sit mid-phase (ROUTE_PHASE_REMAINING_HOURS left of the current day or
-// night), which makes a long trek flip day into night and back in a
-// predictable way for both the risk roll and the narrator's note.
-const ROUTE_NIGHT_BONUS = 8;
-const ROUTE_SIEGE_BONUS = 12;
-const ROUTE_HOURS_PER_UNIT = 4;
-const ROUTE_PHASE_REMAINING_HOURS = 6;
-function routePhaseAtHours(startPhase, hours) {
-    const start = startPhase === 'night' ? 'night' : 'day';
-    const opposite = start === 'night' ? 'day' : 'night';
-    const elapsed = hours - ROUTE_PHASE_REMAINING_HOURS;
-    if (elapsed < 0)
-        return start;
-    return Math.floor(elapsed / 12) % 2 === 0 ? opposite : start;
-}
-function routeHoursAtIndex(path, byId, index) {
-    let units = 0;
-    for (let i = 1; i <= index && i < path.length; i += 1) {
-        const a = byId.get(path[i - 1]);
-        const b = byId.get(path[i]);
-        if (a && b)
-            units += mapNodeDistance(a, b);
-    }
-    return units * ROUTE_HOURS_PER_UNIT;
-}
-function routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds, isNight) {
+function routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds) {
     let chance = legDistance * ROUTE_ENCOUNTER_BASE_CHANCE_PER_UNIT;
-    const reasons = [];
-    if (node.danger) {
+    if (node.danger)
         chance += ROUTE_ENCOUNTER_DANGER_BONUS;
-        reasons.push('danger');
-    }
-    if (node.faction && isFactionHostile(findFactionReputation(node.faction, factionReputations || {}))) {
+    if (node.faction && isFactionHostile(findFactionReputation(node.faction, factionReputations || {})))
         chance += ROUTE_ENCOUNTER_HOSTILE_BONUS;
-        reasons.push('hostile');
-    }
-    if (recentBattleNodeIds && recentBattleNodeIds.has(node.id)) {
+    if (recentBattleNodeIds && recentBattleNodeIds.has(node.id))
         chance += ROUTE_ENCOUNTER_BATTLE_BONUS;
-        reasons.push('battle');
-    }
-    if (node.status === 'besieged') {
-        chance += ROUTE_SIEGE_BONUS;
-        reasons.push('siege');
-    }
-    if (isNight) {
-        chance += ROUTE_NIGHT_BONUS;
-        reasons.push('night');
-    }
-    return { chance: Math.min(ROUTE_ENCOUNTER_MAX_CHANCE, chance), reasons };
-}
-function routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds, isNight) {
-    return routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds, isNight).chance;
+    return Math.min(ROUTE_ENCOUNTER_MAX_CHANCE, chance);
 }
 // Walks every INTERIOR node of the route in order (never the final
 // destination itself — arriving somewhere dangerous is just the ordinary
@@ -21216,9 +21117,8 @@ function routeLegRiskChance(node, legDistance, factionReputations, recentBattleN
 // right there, 'encounter' for something happening with no combat (a
 // delay, a detour, a chance meeting) — where stopIndex is that node's own
 // position in `path`, letting the caller slice the route down to exactly
-// how far the hero actually got this turn. startPhase ('day' | 'night')
-// makes legs travelled after dark riskier.
-function resolveRouteInterruption(path, mapState, factionReputations, recentBattleNodeIds, startPhase) {
+// how far the hero actually got this turn.
+function resolveRouteInterruption(path, mapState, factionReputations, recentBattleNodeIds) {
     const byId = new Map(mapState.nodes.map(n => [n.id, n]));
     for (let i = 1; i < path.length - 1; i += 1) {
         const node = byId.get(path[i]);
@@ -21226,38 +21126,13 @@ function resolveRouteInterruption(path, mapState, factionReputations, recentBatt
         if (!node || !prevNode)
             continue;
         const legDistance = mapNodeDistance(prevNode, node);
-        const isNight = routePhaseAtHours(startPhase, routeHoursAtIndex(path, byId, i)) === 'night';
-        const chance = routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds, isNight);
+        const chance = routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds);
         if (Math.random() * 100 >= chance)
             continue;
         const ambushShare = node.danger ? ROUTE_AMBUSH_SHARE_DANGEROUS : ROUTE_AMBUSH_SHARE_DEFAULT;
         return { stopId: node.id, stopIndex: i, kind: Math.random() < ambushShare ? 'ambush' : 'encounter' };
     }
     return null;
-}
-// Deterministic read of the same numbers resolveRouteInterruption rolls
-// against, for the map's scouting hint: overall chance that something
-// happens on the way, a coarse level, the reasons behind it, and what time
-// of day the hero would arrive in. Pure — never rolls anything.
-function assessRouteRisk(path, mapState, factionReputations, recentBattleNodeIds, startPhase) {
-    const byId = new Map(mapState.nodes.map(n => [n.id, n]));
-    let passChance = 1;
-    const reasons = [];
-    for (let i = 1; i < path.length - 1; i += 1) {
-        const node = byId.get(path[i]);
-        const prevNode = byId.get(path[i - 1]);
-        if (!node || !prevNode)
-            continue;
-        const isNight = routePhaseAtHours(startPhase, routeHoursAtIndex(path, byId, i)) === 'night';
-        const leg = routeLegRisk(node, mapNodeDistance(prevNode, node), factionReputations, recentBattleNodeIds, isNight);
-        passChance *= 1 - leg.chance / 100;
-        leg.reasons.forEach(r => { if (!reasons.includes(r))
-            reasons.push(r); });
-    }
-    const chance = Math.round((1 - passChance) * 100);
-    const level = chance < 12 ? 'quiet' : chance < 30 ? 'tense' : 'deadly';
-    const hours = routeHoursAtIndex(path, byId, path.length - 1);
-    return { chance, level, reasons, hours, arrivalPhase: routePhaseAtHours(startPhase, hours) };
 }
 // Turns a route's total real distance into a plain English phrase for the
 // narrator's own prompt context (see the TRAVEL DECISION block in
@@ -21889,39 +21764,8 @@ function pickWorldTickEvent(factions, mapNodes, currentLocationId) {
         n.faction.trim().toLowerCase() === defender.trim().toLowerCase());
     if (candidates.length === 0)
         return null;
-    // A place already under siege is the likeliest to fall next.
-    const besiegedCandidates = candidates.filter(n => n.status === 'besieged');
-    const pool = (besiegedCandidates.length > 0 && Math.random() < 0.7) ? besiegedCandidates : candidates;
-    const target = pool[Math.floor(Math.random() * pool.length)];
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
     return { id: `we-${Date.now()}-${target.id}`, locationId: target.id, locationName: target.name, fromFaction: defender, toFaction: attacker };
-}
-// Sieges: on a turn where no territory flip happened, a place held by a
-// faction at war may come under siege (or an existing siege may lift).
-// Never touches the hero's current location. Pure — callGameMaster applies
-// the returned { nodeId, status } to the map once.
-const WORLD_SIEGE_CHANCE = 0.18;
-const WORLD_BURN_CHANCE = 0.25;
-function pickWorldSiegeChange(factions, mapNodes, currentLocationId) {
-    const nodes = Array.isArray(mapNodes) ? mapNodes : [];
-    const warFactions = new Set();
-    for (const f of (Array.isArray(factions) ? factions : [])) {
-        for (const r of (f.relations || [])) {
-            if (r.stance !== 'war')
-                continue;
-            warFactions.add(f.name.trim().toLowerCase());
-            warFactions.add(r.faction.trim().toLowerCase());
-        }
-    }
-    if (warFactions.size === 0 || Math.random() >= WORLD_SIEGE_CHANCE)
-        return null;
-    const besieged = nodes.filter(n => n && n.id !== currentLocationId && n.status === 'besieged');
-    if (besieged.length > 0 && Math.random() < 0.3) {
-        return { nodeId: besieged[Math.floor(Math.random() * besieged.length)].id, status: null };
-    }
-    const candidates = nodes.filter(n => n && n.id !== currentLocationId && !n.status && typeof n.faction === 'string' && warFactions.has(n.faction.trim().toLowerCase()));
-    if (candidates.length === 0)
-        return null;
-    return { nodeId: candidates[Math.floor(Math.random() * candidates.length)].id, status: 'besieged' };
 }
 // ==============================================================================
 // STORAGE KEYS & SESSION CONSTANTS
@@ -24939,13 +24783,10 @@ function attachSfxDistance(audio, closeness, opts) {
         return null;
     }
 }
-// Click sound of every button in the game. One capture-phase listener on the
-// document, so it covers all current and future buttons (and ones inside
-// modals) without touching each onClick. A missing file / blocked autoplay is
-// silently ignored, like the other sounds.
-const BUTTON_SOUND_URL = SOUNDS_BASE + 'button.mp3';
 // Turning a page of the story (the ‹ › turn navigation, or jumping to a turn
-// number) plays this instead of the plain button click.
+// number) plays this sound. Ordinary buttons are silent. One capture-phase
+// listener on the document handles the nav buttons. A missing file / blocked
+// autoplay is silently ignored, like the other sounds.
 const PAGE_SOUND_URL = SOUNDS_BASE + 'page.mp3';
 const PAGE_SOUND_BUTTON_SELECTOR = '.turn-nav-btn';
 function playPageSound() {
@@ -24957,27 +24798,14 @@ function playPageSound() {
     }
     catch (e) { /* no sound is fine */ }
 }
-const BUTTON_SOUND_SELECTOR = 'button, [role="button"], input[type="button"], input[type="submit"], summary';
-function playButtonSound() {
-    try {
-        const audio = createSfxAudio(BUTTON_SOUND_URL);
-        const p = audio.play();
-        if (p && typeof p.catch === 'function')
-            p.catch(() => { });
-    }
-    catch (e) { /* no sound is fine */ }
-}
 if (typeof document !== 'undefined' && typeof window !== 'undefined' && !window.__grimoireButtonSound) {
     window.__grimoireButtonSound = true; // install once (hot reload safe)
     document.addEventListener('click', (e) => {
         try {
-            const el = e.target && e.target.closest ? e.target.closest(BUTTON_SOUND_SELECTOR) : null;
+            const el = e.target && e.target.closest ? e.target.closest(PAGE_SOUND_BUTTON_SELECTOR) : null;
             if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true')
                 return;
-            if (el.matches(PAGE_SOUND_BUTTON_SELECTOR))
-                playPageSound();
-            else
-                playButtonSound();
+            playPageSound();
         }
         catch (err) { /* ignore */ }
     }, true);
@@ -33653,10 +33481,6 @@ function fxSprites() {
         amber: mk([[0, 'rgba(255,238,205,.92)'], [.4, 'rgba(255,175,95,.4)'], [1, 'rgba(130,55,12,0)']]),
         white: mk([[0, 'rgba(255,255,255,.95)'], [.5, 'rgba(225,232,240,.3)'], [1, 'rgba(150,160,175,0)']]),
         slate: mk([[0, 'rgba(222,230,240,.92)'], [.4, 'rgba(130,150,175,.4)'], [1, 'rgba(50,62,85,0)']]),
-        // Телепорт: голубо-бирюзовая палитра (в тесте: #40E0D0 и мятно-голубой), ядро светлое, но не белое.
-        teal: mk([[0, 'rgba(150,255,235,.92)'], [.4, 'rgba(40,205,195,.45)'], [1, 'rgba(10,120,135,0)']]),
-        tealCore: mk([[0, 'rgba(215,255,248,.95)'], [.5, 'rgba(90,240,222,.32)'], [1, 'rgba(20,160,165,0)']]),
-        tealMist: mk([[0, 'rgba(110,235,225,.38)'], [1, 'rgba(25,150,160,0)']]),
         red: mk([[0, 'rgba(255,215,195,.95)'], [.35, 'rgba(255,70,45,.5)'], [1, 'rgba(120,10,5,0)']]),
         fire: [[255, 236, 170, .8], [255, 205, 100, .8], [255, 170, 50, .9], [240, 110, 25, .8], [190, 55, 15, .65], [100, 25, 10, .4]]
             .map(c => mk([[0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + c[3] + ')'], [.55, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + c[3] * .55 + ')'], [1, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)']]))
@@ -33714,13 +33538,13 @@ function fxKit() {
                 if (p.k === 'spark') {
                     ctx.globalCompositeOperation = 'lighter';
                     ctx.lineCap = 'round';
-                    ctx.strokeStyle = p.cool === 'teal' ? 'rgba(40,225,208,' + f * .8 + ')' : p.cool ? 'rgba(150,170,200,' + f * .75 + ')' : 'rgba(255,130,40,' + f * .7 + ')';
+                    ctx.strokeStyle = p.cool ? 'rgba(150,170,200,' + f * .75 + ')' : 'rgba(255,130,40,' + f * .7 + ')';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
                     ctx.lineTo(p.x - p.vx * .055, p.y - p.vy * .055);
                     ctx.stroke();
-                    ctx.strokeStyle = p.cool === 'teal' ? 'rgba(185,255,244,' + f + ')' : p.cool ? 'rgba(225,233,243,' + f + ')' : 'rgba(255,240,190,' + f + ')';
+                    ctx.strokeStyle = p.cool ? 'rgba(225,233,243,' + f + ')' : 'rgba(255,240,190,' + f + ')';
                     ctx.lineWidth = 1.3;
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
@@ -34147,7 +33971,7 @@ function flareFxRun(layer, start, end) {
     });
 }
 // ---- Teleport --------------------------------------------------------------
-// Turquoise motes spiral smoothly into the vanishing hero (a ghost of the
+// Grey-blue motes spiral smoothly into the vanishing hero (a ghost of the
 // portrait shivers and brightens), a burst, then the same swirl gathers at the
 // destination and the real card materialises. from/to are world centres.
 function teleportFxRun(layer, from, to, extra) {
@@ -34173,27 +33997,27 @@ function teleportFxRun(layer, from, to, extra) {
         rings.push({ x, y, t: 0, d: .7, R: 110 });
         for (let i = 0; i < 22; i++) {
             const an = fxRnd(0, 6.283), v = fxRnd(100, 420);
-            K.spark(x, y, Math.cos(an) * v, Math.sin(an) * v, fxRnd(.3, .8), 'teal');
+            K.spark(x, y, Math.cos(an) * v, Math.sin(an) * v, fxRnd(.3, .8), true);
         }
         for (let i = 0; i < 5; i++) {
             const an = fxRnd(0, 6.283), v = fxRnd(30, 110);
-            K.blob(x, y, Math.cos(an) * v, Math.sin(an) * v, fxRnd(.4, .8), fxRnd(16, 28), 'teal');
+            K.blob(x, y, Math.cos(an) * v, Math.sin(an) * v, fxRnd(.4, .8), fxRnd(16, 28), 'slate');
         }
         for (let i = 0; i < 8; i++) {
             const an = fxRnd(0, 6.283), v = fxRnd(10, 50);
-            K.blob(x + fxRnd(-20, 20), y + fxRnd(-20, 20), Math.cos(an) * v, Math.sin(an) * v - 10, fxRnd(1, 1.8), fxRnd(4, 7), 'teal');
+            K.blob(x + fxRnd(-20, 20), y + fxRnd(-20, 20), Math.cos(an) * v, Math.sin(an) * v - 10, fxRnd(1, 1.8), fxRnd(4, 7), 'slate');
         }
         for (let i = 0; i < 8; i++)
-            K.blob(x + fxRnd(-20, 20), y + fxRnd(-20, 20), fxRnd(-20, 20), -fxRnd(5, 30), fxRnd(1.5, 2.6), fxRnd(22, 38), 'tealMist');
+            K.smoke(x + fxRnd(-20, 20), y + fxRnd(-20, 20), fxRnd(-20, 20), -fxRnd(5, 30), fxRnd(1.5, 2.6), fxRnd(20, 36), 1.5, fxRnd(8, 24));
     };
     const moteIn = (x, y) => {
         if (Math.random() < .9) {
             const an = fxRnd(0, 6.283), R0 = fxRnd(55, 100);
-            K.blob(x + Math.cos(an) * R0, y + Math.sin(an) * R0, -Math.cos(an) * R0 / .35 * 1.6, -Math.sin(an) * R0 / .35 * 1.6, .35, fxRnd(5, 10), 'teal');
+            K.blob(x + Math.cos(an) * R0, y + Math.sin(an) * R0, -Math.cos(an) * R0 / .35 * 1.6, -Math.sin(an) * R0 / .35 * 1.6, .35, fxRnd(5, 10), 'slate');
         }
         if (Math.random() < .4) {
             const an = fxRnd(0, 6.283), R0 = fxRnd(40, 80);
-            K.spark(x + Math.cos(an) * R0, y + Math.sin(an) * R0, -Math.cos(an) * R0 / .15, -Math.sin(an) * R0 / .15, .15, 'teal');
+            K.spark(x + Math.cos(an) * R0, y + Math.sin(an) * R0, -Math.cos(an) * R0 / .15, -Math.sin(an) * R0 / .15, .15, true);
         }
     };
     fxCanvasRun(layer, fxBox([from, to], 190), (ctx, dt, t) => {
@@ -34251,15 +34075,15 @@ function teleportFxRun(layer, from, to, extra) {
         if (t < T1) {
             const g = (t / T1) * (t / T1);
             ctx.globalAlpha = Math.min(1, g);
-            ctx.drawImage(S.teal, from.x - 72, from.y - 72, 144, 144);
-            ctx.drawImage(S.tealCore, from.x - 28, from.y - 28, 56, 56);
+            ctx.drawImage(S.slate, from.x - 72, from.y - 72, 144, 144);
+            ctx.drawImage(S.white, from.x - 28, from.y - 28, 56, 56);
             ctx.globalAlpha = 1;
         }
         if (t >= T2 && t < T2 + .55) {
             const f = (t - T2) / .55, g = (1 - f) * (1 - f);
             ctx.globalAlpha = Math.min(1, g);
-            ctx.drawImage(S.teal, to.x - 72, to.y - 72, 144, 144);
-            ctx.drawImage(S.tealCore, to.x - 28, to.y - 28, 56, 56);
+            ctx.drawImage(S.slate, to.x - 72, to.y - 72, 144, 144);
+            ctx.drawImage(S.white, to.x - 28, to.y - 28, 56, 56);
             ctx.globalAlpha = 1;
         }
         vortex.forEach(q => {
@@ -34274,7 +34098,7 @@ function teleportFxRun(layer, from, to, extra) {
                 const an = o.a0 + o.dir * o.w * (lt + .8 * lt * lt / (2 * du));
                 for (let k = 0; k < 5; k++) {
                     const a0 = an - o.dir * o.len * (1 - k / 5), a1 = an - o.dir * o.len * (1 - (k + 1) / 5);
-                    ctx.strokeStyle = 'rgba(75,235,215,' + al * (k + 1) / 5 * .8 + ')';
+                    ctx.strokeStyle = 'rgba(190,203,220,' + al * (k + 1) / 5 * .8 + ')';
                     ctx.lineWidth = (.8 + (k + 1) / 5 * 1.4) * o.sz;
                     ctx.beginPath();
                     ctx.arc(q.x, q.y, r, a0, a1, o.dir < 0);
@@ -34282,8 +34106,8 @@ function teleportFxRun(layer, from, to, extra) {
                 }
                 const hx = q.x + Math.cos(an) * r, hy = q.y + Math.sin(an) * r;
                 ctx.globalAlpha = al;
-                ctx.drawImage(S.teal, hx - 8 * o.sz, hy - 8 * o.sz, 16 * o.sz, 16 * o.sz);
-                ctx.drawImage(S.tealCore, hx - 3.5 * o.sz, hy - 3.5 * o.sz, 7 * o.sz, 7 * o.sz);
+                ctx.drawImage(S.slate, hx - 8 * o.sz, hy - 8 * o.sz, 16 * o.sz, 16 * o.sz);
+                ctx.drawImage(S.white, hx - 3.5 * o.sz, hy - 3.5 * o.sz, 7 * o.sz, 7 * o.sz);
                 ctx.globalAlpha = 1;
             });
             q.arcs.forEach(o => {
@@ -34294,7 +34118,7 @@ function teleportFxRun(layer, from, to, extra) {
                 if (al <= 0)
                     return;
                 const an = o.a0 + o.dir * o.w * lt;
-                ctx.strokeStyle = 'rgba(64,224,208,' + al * .35 + ')';
+                ctx.strokeStyle = 'rgba(180,194,214,' + al * .3 + ')';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.arc(q.x, q.y, o.R * (1 - e) + 8, an, an + o.len);
@@ -34303,20 +34127,20 @@ function teleportFxRun(layer, from, to, extra) {
         });
         glows.forEach(g => {
             const a = Math.pow(1 - g.t, 2), gr = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.R);
-            gr.addColorStop(0, 'rgba(110,245,225,' + .55 * a + ')');
-            gr.addColorStop(1, 'rgba(20,150,160,0)');
+            gr.addColorStop(0, 'rgba(205,218,235,' + .55 * a + ')');
+            gr.addColorStop(1, 'rgba(70,90,125,0)');
             ctx.fillStyle = gr;
             ctx.fillRect(g.x - g.R, g.y - g.R, g.R * 2, g.R * 2);
             const w = Math.max(0, 1 - g.t / .22);
             if (w > 0) {
                 const g2 = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.R * .4);
-                g2.addColorStop(0, 'rgba(195,255,245,' + w * .5 + ')');
-                g2.addColorStop(1, 'rgba(110,245,225,0)');
+                g2.addColorStop(0, 'rgba(240,244,250,' + w * .5 + ')');
+                g2.addColorStop(1, 'rgba(205,218,235,0)');
                 ctx.fillStyle = g2;
                 ctx.fillRect(g.x - g.R, g.y - g.R, g.R * 2, g.R * 2);
             }
         });
-        rings.forEach(g => { const f = g.t / g.d, R = g.R * fxEaseO(f), al = Math.pow(1 - f, 1.6); ctx.strokeStyle = 'rgba(64,224,208,' + al * .85 + ')'; ctx.lineWidth = 2 * (1 - f) + .6; ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, 6.283); ctx.stroke(); });
+        rings.forEach(g => { const f = g.t / g.d, R = g.R * fxEaseO(f), al = Math.pow(1 - f, 1.6); ctx.strokeStyle = 'rgba(205,217,232,' + al * .8 + ')'; ctx.lineWidth = 2 * (1 - f) + .6; ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, 6.283); ctx.stroke(); });
         ctx.globalCompositeOperation = 'source-over';
         K.draw(ctx, t);
         return t < T2 + .9 || K.P.length > 0 || vortex.length > 0 || rings.length > 0 || glows.length > 0;
@@ -35305,9 +35129,9 @@ function createAbilityFxEngine(host) {
             };
             const rise = (b, big) => P({ k: 's', x: b.x + rnd(-0.35, 0.35) * b.S, y: b.y + rnd(-0.25, 0.25) * b.S - 6, vx: rnd(-10, 10), vy: -rnd(30, 70) * (big ? 1.4 : 1), s: rnd(14, 24) * (b.S / 100) * (big ? 0.95 : 0.8), l: rnd(1.6, 2.6), f: 0.5 });
             const spark = b => { const a = rnd(0, TAU), sp = rnd(110, 410) * (b.S / 130); P({ k: 'f', x: b.x + rnd(-0.3, 0.3) * b.S, y: b.y + rnd(-0.15, 0.15) * b.S, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.5 - rnd(0, 200), b: -520, s: rnd(1.5, 3), l: rnd(0.3, 0.9), f: 0.3 }); };
-            let dark = 0, flash = 0, last2 = t0, kick = 0;
+            let dark = 0, flash = 0, last2 = t0;
             const onFire = b => {
-                kick = Math.max(kick, b.S > 150 ? 18 : 10);
+                quake();
                 flash = 0.55;
                 ring('afx-flash', b.x, b.y, b.S * 0.8);
                 blast(b, 1, Math.round(44 * PM));
@@ -35457,14 +35281,12 @@ function createAbilityFxEngine(host) {
                 }
             };
             function frame(now) {
-                if (disposed) {
-                    world.style.translate = '';
+                if (disposed)
                     return;
-                }
                 const dt = Math.min(0.05, (now - last2) / 1000);
                 last2 = now;
                 const el = now - t0;
-                let active = 0, shake = 0;
+                let active = 0;
                 for (const b of bs) {
                     const s = el - b.fire;
                     if (s >= 0 && !b.fired) {
@@ -35474,7 +35296,6 @@ function createAbilityFxEngine(host) {
                     if (s >= 0 && s < b.dur) {
                         active++;
                         const wp = prof(s, b.dur, b.seed, el);
-                        shake += (b.S > 150 ? 3.5 : 1.6) * wp;
                         b.sacc += dt * 70 * wp * PM;
                         while (b.sacc >= 1) {
                             b.sacc--;
@@ -35500,11 +35321,8 @@ function createAbilityFxEngine(host) {
                             rise(b, true);
                     }
                 }
-                // Same shake model as the test bench: a hard kick on every impact that decays quickly,
-                // plus a steady rumble that follows beam strength — set every frame, not restarted animations.
-                kick *= Math.exp(-dt * 8);
-                const sh = PM < 1 ? 0 : Math.min(14, kick + (active ? 1 + shake * 0.6 : 0));
-                world.style.translate = sh > 0.06 ? `${rnd(-sh, sh).toFixed(1)}px ${rnd(-sh, sh).toFixed(1)}px` : '';
+                if (active)
+                    rumble(80, 2);
                 dark += ((active ? 0.4 : 0) - dark) * Math.min(1, dt * 40);
                 flash *= Math.exp(-dt * 10);
                 o.globalCompositeOperation = 'source-over';
@@ -35523,10 +35341,8 @@ function createAbilityFxEngine(host) {
                 o.globalCompositeOperation = 'source-over';
                 if (el < endAt)
                     requestAnimationFrame(frame);
-                else {
-                    world.style.translate = '';
+                else
                     ocv.remove();
-                }
             }
             requestAnimationFrame(frame);
         },
@@ -38568,47 +38384,7 @@ const MAP_MAX_SCALE = 2.4;
 // The zoom the map opens at and the "back to hero" button returns to,
 // whatever zoom the camera was at before (zoomed far out or right in).
 const MAP_HERO_SCALE = 0.95;
-const MAP_SERVICE_ICONS = { trade: '🛒', smith: '🔨', inn: '🛏', heal: '🩹' };
-const MAP_SERVICE_LABEL_KEYS = { trade: 'mapServiceTrade', smith: 'mapServiceSmith', inn: 'mapServiceInn', heal: 'mapServiceHeal' };
-const MAP_SERVICE_ROLE_PATTERNS = {
-    trade: /торгов|купец|купц|лавочн|продав|торгаш|барыг|скупщик|merchant|trader|shopkeeper|vendor|peddler|dealer|seller|monger|storekeeper|salesman/i,
-    smith: /кузнец|кузн|оружейник|бронник|smith|armou?rer|forge/i,
-    inn: /трактирщик|корчмар|тавернщик|хозя[йи][нк]\S*\s+(?:таверны|трактира|постоялого)|innkeeper|tavern\s*keeper|barkeep|bartender|publican|landlord|landlady/i,
-    heal: /лекар|целител|знахар|травник|медик|врач|healer|physician|doctor|apothecary|herbalist|medic|surgeon/i
-};
-// Which services a tracked character provides, read from their free-text role.
-function npcServiceKinds(npc) {
-    if (!npc || npc.dead === true || npc.enemy === true || typeof npc.role !== 'string' || !npc.role.trim())
-        return [];
-    return Object.keys(MAP_SERVICE_ROLE_PATTERNS).filter(k => MAP_SERVICE_ROLE_PATTERNS[k].test(npc.role));
-}
-const MAP_FILTER_DEFS = [
-    { key: 'trade', icon: '🛒', labelKey: 'mapServiceTrade' },
-    { key: 'smith', icon: '🔨', labelKey: 'mapServiceSmith' },
-    { key: 'inn', icon: '🛏', labelKey: 'mapServiceInn' },
-    { key: 'heal', icon: '🩹', labelKey: 'mapServiceHeal' },
-    { key: 'quest', icon: '📖', labelKey: 'mapFilterQuest' },
-    { key: 'pins', icon: '📌', labelKey: 'mapFilterPins' }
-];
-const MAP_RISK_ICONS = { quiet: '🟢', tense: '🟠', deadly: '🔴' };
-const MAP_RISK_LABEL_KEYS = { quiet: 'mapRiskQuiet', tense: 'mapRiskTense', deadly: 'mapRiskDeadly' };
-// Player's own pin + note for one place, shown at the bottom of its popup.
-// The note is committed on blur so typing never re-saves the whole game.
-function MapNodeMeta({ node, t, onUpdate }) {
-    const [draft, setDraft] = useState(node.note || '');
-    useEffect(() => { setDraft(node.note || ''); }, [node.id, node.note]);
-    if (!onUpdate)
-        return null;
-    const commit = () => {
-        const v = draft.trim().slice(0, MAP_NOTE_MAX);
-        if (v !== (node.note || ''))
-            onUpdate(node.id, { note: v });
-    };
-    return (React.createElement("div", { className: "map-node-meta" },
-        React.createElement("div", { className: "map-pin-row", role: "group", "aria-label": t('mapPinLabel') }, MAP_PIN_OPTIONS.map(p => (React.createElement("button", { key: p, type: "button", className: 'map-pin-btn' + (node.pin === p ? ' map-pin-btn-active' : ''), "aria-pressed": node.pin === p, title: node.pin === p ? t('mapPinNone') : t('mapPinLabel'), onClick: () => onUpdate(node.id, { pin: node.pin === p ? null : p }) }, p)))),
-        React.createElement("textarea", { className: "map-note-input", value: draft, maxLength: MAP_NOTE_MAX, rows: 2, placeholder: t('mapNotePlaceholder'), "aria-label": t('mapNoteAria'), onChange: e => setDraft(e.target.value), onBlur: commit, onKeyDown: e => e.stopPropagation() })));
-}
-function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase, onClose, onRequestTravel, onCancelTravel, onDismissArrow, onUpdateNodeMeta, pendingMapTravel, previousLayoutPositions, t }) {
+function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase, onClose, onRequestTravel, onCancelTravel, onDismissArrow, pendingMapTravel, previousLayoutPositions, t }) {
     // Which nodes get the battle badge below — see WORLD_EVENT_RECENT_COUNT
     // above EMPTY_STATE for why this is "recent among logged events" rather
     // than a turn-count window. A node can appear here whether or not it's
@@ -38640,6 +38416,103 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     const newArrowRefs = useRef(new Map());
     const [openNodeId, setOpenNodeId] = useState(null);
     const [legendOpen, setLegendOpen] = useState(false);
+    // ---- Fullscreen map (same idea as the fullscreen battlefield) ----
+    // isMapFs turns the map card into a fixed full-viewport layer (works
+    // everywhere, incl. iPhone Safari where element fullscreen is missing);
+    // where the Fullscreen API exists we also request it so the browser
+    // chrome goes away too. Rotating the phone just re-lays the layer out.
+    const mapCardRef = useRef(null);
+    const [isMapFs, setIsMapFs] = useState(false);
+    const mapNativeFsRef = useRef(false);
+    const mapPrevSizeRef = useRef(null);
+    function exitMapFs() {
+        setIsMapFs(false);
+        if (mapNativeFsRef.current) {
+            mapNativeFsRef.current = false;
+            try {
+                if (document.fullscreenElement) {
+                    const p = document.exitFullscreen();
+                    if (p && p.catch)
+                        p.catch(() => { });
+                }
+            }
+            catch (e) { /* ignore */ }
+        }
+    }
+    function toggleMapFullscreen() {
+        if (isMapFs) {
+            exitMapFs();
+            return;
+        }
+        setIsMapFs(true);
+        const el = mapCardRef.current;
+        try {
+            if (el && el.requestFullscreen) {
+                mapNativeFsRef.current = true;
+                const p = el.requestFullscreen();
+                if (p && p.catch)
+                    p.catch(() => { mapNativeFsRef.current = false; });
+            }
+        }
+        catch (e) {
+            mapNativeFsRef.current = false;
+        }
+    }
+    useEffect(() => {
+        const onFsChange = () => {
+            if (mapNativeFsRef.current && !document.fullscreenElement) {
+                mapNativeFsRef.current = false;
+                setIsMapFs(false);
+            }
+        };
+        document.addEventListener('fullscreenchange', onFsChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onFsChange);
+            if (mapNativeFsRef.current) {
+                mapNativeFsRef.current = false;
+                try {
+                    if (document.fullscreenElement)
+                        document.exitFullscreen();
+                }
+                catch (e) { /* ignore */ }
+            }
+        };
+    }, []);
+    useEffect(() => {
+        if (!isMapFs)
+            return undefined;
+        // Escape leaves fullscreen first (and doesn't fall through to anything else).
+        const onKey = (e) => { if (e.key === 'Escape') {
+            e.stopPropagation();
+            exitMapFs();
+        } };
+        document.addEventListener('keydown', onKey, true);
+        return () => document.removeEventListener('keydown', onKey, true);
+    }, [isMapFs]);
+    // When the viewport changes size (entering/leaving fullscreen, rotating the
+    // phone) keep whatever was in the middle of the map in the middle, and
+    // refresh the off-screen arrows.
+    useEffect(() => {
+        function syncViewportSize() {
+            const v = viewportRef.current;
+            if (!v)
+                return;
+            const w = v.clientWidth, h = v.clientHeight;
+            const prev = mapPrevSizeRef.current;
+            mapPrevSizeRef.current = { w, h };
+            if (prev && (prev.w !== w || prev.h !== h)) {
+                const s = viewStateRef.current;
+                applyViewRef.current(s.scale, s.panX + (w - prev.w) / 2, s.panY + (h - prev.h) / 2);
+            }
+            try {
+                updateArrowsRef.current();
+            }
+            catch (e) { /* ignore */ }
+        }
+        const raf = requestAnimationFrame(syncViewportSize);
+        window.addEventListener('resize', syncViewportSize);
+        return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', syncViewportSize); };
+    }, [isMapFs]);
     // Measured on-screen length (px) of the current route-highlight path —
     // see the routeHighlightLine block below for why the travel dot's speed
     // is driven off this instead of activeRoute.distance.
@@ -38652,10 +38525,6 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     // null until a search actually misses, so the "not found" message never
     // flashes on an empty box or while the player is still mid-typing a hit.
     const [searchMissed, setSearchMissed] = useState(false);
-    // Layer filters: one highlight filter at a time (dims every node that
-    // doesn't match), plus an independent switch for faction territories.
-    const [mapFilter, setMapFilter] = useState(null);
-    const [showTerritories, setShowTerritories] = useState(true);
     const currentNode = map.nodes.find(n => n.id === map.currentId);
     // Which vertical layer the map is currently showing — independent of pan/
     // zoom (those are imperative DOM, this is real React state since it drives
@@ -39186,12 +39055,6 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     // the confirmed line and the live preview use exactly the same source of
     // truth; only which one wins depends on whether a trip is queued yet.
     const activeRoute = pendingMapTravel ? pendingMapTravel : (openNode && previewRoute ? { path: previewRoute.path, distance: previewRoute.distance } : null);
-    // Scouting read of a route (see assessRouteRisk) — drives the colour of
-    // the highlight line and the risk line under the travel row.
-    const riskOf = r => (r && Array.isArray(r.path) && r.path.length >= 2)
-        ? assessRouteRisk(r.path, map, factionReputations, recentBattleNodeIds, dayPhase === 'night' ? 'night' : 'day')
-        : null;
-    const activeRisk = riskOf(activeRoute);
     // Every node along the route must be on the layer actually being shown —
     // a route can pass through a floor above/below along the way, and
     // drawing a line through nodes that aren't even rendered on this sheet
@@ -39248,7 +39111,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                 React.createElement("stop", { offset: "0%", stopColor: "#7dd3fc", stopOpacity: "0.95" }),
                 React.createElement("stop", { offset: "55%", stopColor: "var(--sky-400)", stopOpacity: "0.5" }),
                 React.createElement("stop", { offset: "100%", stopColor: "var(--sky-400)", stopOpacity: "0" }))),
-        React.createElement("path", { ref: routeHighlightPathRef, d: routePathD, fill: "none", className: 'map-route-highlight-base map-route-risk-' + (activeRisk ? activeRisk.level : 'quiet') }),
+        React.createElement("path", { ref: routeHighlightPathRef, d: routePathD, fill: "none", className: "map-route-highlight-base" }),
         React.createElement("circle", { r: "9", className: "map-route-wave-dot" },
             React.createElement("animateMotion", { dur: `${Math.max(0.9, routeDurationSeconds).toFixed(2)}s`, repeatCount: "indefinite", calcMode: "linear", path: routePathD })))) : null;
     // Distance readout for the row itself always tracks whichever node's
@@ -39257,19 +39120,9 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     // highlight, even while a different node's popup happens to be open) —
     // since the confirm button below always acts on openNode specifically.
     const openNodeRoute = isQueuedOpenNode ? pendingMapTravel : previewRoute;
-    const openNodeRisk = riskOf(openNodeRoute);
-    let riskText = '\u00A0';
-    if (openNodeRisk) {
-        const lvl = openNodeRisk.level;
-        riskText = MAP_RISK_ICONS[lvl] + ' ' + t(MAP_RISK_LABEL_KEYS[lvl]);
-        if (lvl !== 'quiet' && openNodeRisk.reasons.length > 0)
-            riskText += ' · ' + openNodeRisk.reasons.map(r => t('mapRiskReason_' + r)).join(', ');
-        if (openNodeRisk.arrivalPhase !== (dayPhase === 'night' ? 'night' : 'day'))
-            riskText += ' · ' + t(openNodeRisk.arrivalPhase === 'night' ? 'mapArrivalNightfall' : 'mapArrivalDawn');
-    }
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
-        React.createElement("div", { className: "modal-card map-card" },
+        React.createElement("div", { className: 'modal-card map-card' + (isMapFs ? ' map-card-fs' : ''), ref: mapCardRef },
             React.createElement("h2", { className: "modal-title" },
                 t('mapModalTitle'),
                 " ",
@@ -39312,24 +39165,15 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                             t('mapLegendVerticalLink')),
                         React.createElement("span", { className: "map-legend-item" },
                             React.createElement("span", { className: "map-node-battle-badge map-legend-battle-badge", "aria-hidden": "true" }, "\u2694"),
-                            t('mapLegendRecentBattle')),
-                        React.createElement("span", { className: "map-legend-item" },
-                            React.createElement("span", { className: "map-node-cleared-badge map-legend-static-badge", "aria-hidden": "true" }, "\u2713"),
-                            t('mapLegendCleared')),
-                        React.createElement("span", { className: "map-legend-item" },
-                            React.createElement("span", { className: "map-node-status-badge map-legend-static-badge", "aria-hidden": "true" }, "\uD83D\uDD25"),
-                            t('mapLegendStatus'))))),
+                            t('mapLegendRecentBattle'))))),
             React.createElement("form", { className: "map-search-row", onSubmit: handleMapSearch },
                 React.createElement("input", { type: "text", className: "map-search-input", value: searchQuery, onChange: e => { setSearchQuery(e.target.value); setSearchMissed(false); }, placeholder: t('mapSearchPlaceholder'), "aria-label": t('mapSearchAria') }),
                 React.createElement("button", { type: "submit", className: "map-search-btn", "aria-label": t('mapSearchAria'), title: t('mapSearchAria') }, "\uD83D\uDD0D")),
             searchMissed && React.createElement("p", { className: "map-search-empty" }, t('mapSearchNoResults')),
-            React.createElement("div", { className: "map-filter-row", role: "group", "aria-label": t('mapFilterLabel') },
-                MAP_FILTER_DEFS.map(f => (React.createElement("button", { key: f.key, type: "button", className: 'map-filter-chip' + (mapFilter === f.key ? ' map-filter-chip-on' : ''), "aria-pressed": mapFilter === f.key, title: t(f.labelKey), "aria-label": t(f.labelKey), onClick: () => setMapFilter(v => (v === f.key ? null : f.key)) }, f.icon))),
-                React.createElement("button", { type: "button", className: 'map-filter-chip map-filter-chip-sep' + (showTerritories ? ' map-filter-chip-on' : ''), "aria-pressed": showTerritories, title: t('mapFilterTerritory'), "aria-label": t('mapFilterTerritory'), onClick: () => setShowTerritories(v => !v) }, "\uD83C\uDFF4")),
             React.createElement("div", { className: "map-viewport", ref: viewportRef },
                 React.createElement("div", { className: "map-world", ref: worldRef },
                     React.createElement("svg", { className: "map-svg" },
-                        showTerritories ? territoryShapes : null,
+                        territoryShapes,
                         lines,
                         routeHighlightLine),
                     map.nodes.filter(n => n.discovered && onViewLayer(n)).map(n => {
@@ -39372,15 +39216,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                         // who's behind it before the hero has actually been there.
                         const nodeNpcs = Array.isArray(npcs) ? npcs.filter(npc => npc && typeof npc.location === 'string' && (locationNamesMatch(npc.location, n.name) ||
                             (isCurrent && (npc.presentNow === true || npc.location.trim().toLowerCase() === 'with the hero')))) : [];
-                        // Services this place offers, read from the roles of tracked
-                        // characters stationed here (companions travelling with the
-                        // hero don't count as a shop at this location).
-                        const serviceKinds = [...new Set((Array.isArray(npcs) ? npcs : [])
-                                .filter(npc => npc && typeof npc.location === 'string' && locationNamesMatch(npc.location, n.name))
-                                .flatMap(npcServiceKinds))];
-                        const filterMatch = !mapFilter || (mapFilter === 'quest' ? !!quest : mapFilter === 'pins' ? !!(n.pin || n.note) : serviceKinds.includes(mapFilter));
-                        const dimmed = !!mapFilter && !filterMatch;
-                        return (React.createElement("div", { key: n.id, className: 'map-node' + (open ? ' map-node-open' : '') + (dimmed ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
+                        return (React.createElement("div", { key: n.id, className: 'map-node' + (open ? ' map-node-open' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
                                 onDismissArrow(n.id); }, onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setOpenNodeId(open ? null : n.id);
@@ -39397,32 +39233,13 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                                 React.createElement("span", { className: 'map-node-icon' + (isCurrent ? ' map-node-icon-hero' : quest ? ' map-node-icon-quest' : ''), title: n.faction || undefined }, isCurrent ? '' : (MAP_KIND_ICONS[n.kind] || '📍')),
                                 n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!"),
                                 hasVerticalLink && React.createElement("span", { className: "map-node-stairs-badge", title: t('mapVerticalLinkAria'), "aria-hidden": "true" }, "\u21C5"),
-                                !n.danger && n.dangerCleared && React.createElement("span", { className: "map-node-cleared-badge", title: t('mapDangerClearedLabel'), "aria-hidden": "true" }, "\u2713"),
-                                n.status && React.createElement("span", { className: "map-node-status-badge", title: t(n.status === 'besieged' ? 'mapStatusBesieged' : 'mapStatusBurned'), "aria-hidden": "true" }, n.status === 'besieged' ? '🛡' : '🔥'),
-                                n.pin && !isCurrent && React.createElement("span", { className: "map-node-pin-badge", "aria-hidden": "true" }, n.pin),
                                 recentBattleNodeIds.has(n.id) && React.createElement("span", { className: "map-node-battle-badge", title: t('mapLegendRecentBattle'), "aria-hidden": "true" }, "\u2694")),
-                            React.createElement("span", { className: 'map-node-label' + (isCurrent ? ' map-node-label-hero' : '') },
-                                n.name,
-                                serviceKinds.length > 0 && React.createElement("span", { className: "map-node-services", "aria-hidden": "true" }, serviceKinds.map(k => MAP_SERVICE_ICONS[k]).join(''))),
-                            open && (React.createElement("div", { className: "map-node-desc", onClick: e => e.stopPropagation() },
+                            React.createElement("span", { className: 'map-node-label' + (isCurrent ? ' map-node-label-hero' : '') }, n.name),
+                            open && (n.description || n.danger || isMapNodeCleared(n) || progressPct !== null || quest || nodeNpcs.length > 0) && (React.createElement("div", { className: "map-node-desc", onClick: e => e.stopPropagation() },
                                 progressPct !== null && React.createElement("p", { className: "map-node-progress-tag" }, `[${n.name} — ${progressPct}%]`),
                                 n.danger && React.createElement("p", { className: "map-node-danger-text" },
                                     "\u26A0 ",
                                     t('mapDangerLabel')),
-                                !n.danger && n.dangerCleared && React.createElement("p", { className: "map-node-cleared-ok" },
-                                    "\u2713 ",
-                                    t('mapDangerClearedLabel')),
-                                n.status === 'besieged' && React.createElement("p", { className: "map-node-status-text" },
-                                    "\uD83D\uDEE1 ",
-                                    t('mapStatusBesieged')),
-                                n.status === 'burned' && React.createElement("p", { className: "map-node-status-text" },
-                                    "\uD83D\uDD25 ",
-                                    t('mapStatusBurned')),
-                                recentBattleNodeIds.has(n.id) && n.faction && React.createElement("p", { className: "map-node-status-text" },
-                                    "\u2694 ",
-                                    t('mapStatusCaptured'),
-                                    ": ",
-                                    n.faction),
                                 n.description && React.createElement("p", null, n.description),
                                 quest && (React.createElement("div", { className: "map-node-quest-info" },
                                     React.createElement("p", { className: "map-node-quest-title" },
@@ -39437,14 +39254,12 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                                         npc.name,
                                         typeof npc.role === 'string' && npc.role.trim() ? ' - ' + npc.role.trim() : '',
                                         ni < nodeNpcs.length - 1 ? ', ' : ''))))),
-                                serviceKinds.length > 0 && React.createElement("p", { className: "map-node-services-line" }, serviceKinds.map(k => MAP_SERVICE_ICONS[k] + ' ' + t(MAP_SERVICE_LABEL_KEYS[k])).join(' · ')),
-                                isMapNodeCleared(n) && React.createElement("p", { className: "map-node-cleared-tag" }, t('mapNodeClearedLabel')),
-                                React.createElement(MapNodeMeta, { node: n, t: t, onUpdate: onUpdateNodeMeta })))));
+                                isMapNodeCleared(n) && React.createElement("p", { className: "map-node-cleared-tag" }, t('mapNodeClearedLabel'))))));
                     }),
                     map.nodes.filter(n => !n.discovered && onViewLayer(n)).map(n => {
                         const open = openNodeId === n.id;
                         const p = posOf(n);
-                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : '') + (mapFilter ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
+                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
                                 onDismissArrow(n.id); }, onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setOpenNodeId(open ? null : n.id);
@@ -39470,8 +39285,9 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                         newArrowRefs.current.set(n.id, el);
                     else
                         newArrowRefs.current.delete(n.id); }, className: "map-edge-arrow map-edge-arrow-new", "aria-hidden": "true" }))),
+                React.createElement("button", { type: "button", className: "map-recenter-btn map-fs-btn", onClick: toggleMapFullscreen, "aria-label": isMapFs ? t('mapExitFullscreenLabel') : t('mapFullscreenLabel'), title: isMapFs ? t('mapExitFullscreenLabel') : t('mapFullscreenLabel') }, isMapFs ? '✕' : '⛶'),
                 React.createElement("button", { type: "button", className: "map-recenter-btn", onClick: () => centerOnHeroRef.current(), "aria-label": t('mapRecenterAria'), title: t('mapRecenterAria') }, "\uD83C\uDFAF"),
-                React.createElement("button", { type: "button", className: "map-recenter-btn map-fit-btn", onClick: fitMapToView, "aria-label": t('mapFitAllAria'), title: t('mapFitAllAria') }, "\u26F6"),
+                React.createElement("button", { type: "button", className: "map-recenter-btn map-fit-btn", onClick: fitMapToView, "aria-label": t('mapFitAllAria'), title: t('mapFitAllAria') }, "\u2922"),
                 React.createElement("div", { className: "map-layer-switcher" },
                     React.createElement("button", { type: "button", className: "map-layer-btn", onClick: () => setViewLayer(v => Math.min(maxLayer, v + 1)), disabled: viewLayer >= maxLayer, "aria-label": t('mapLayerUpAria'), title: t('mapLayerUpAria') }, "\u25B2"),
                     React.createElement("span", { className: "map-layer-indicator", title: t('mapLayerLabel') }, viewLayer),
@@ -39486,7 +39302,6 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                         React.createElement("div", { className: "item-offer-choice" },
                             React.createElement("button", { onClick: () => { if (!travelRowVisible)
                                     return; isQueuedOpenNode ? onCancelTravel() : onRequestTravel(openNode); }, className: 'item-choice-btn map-travel-toggle-btn' + (isQueuedOpenNode ? ' item-choice-active-take' : ''), "aria-pressed": isQueuedOpenNode, "aria-label": t(isQueuedOpenNode ? 'removeMapTravelAria' : 'mapTravelConfirmAria'), type: "button" }, "\u279C"))),
-                    React.createElement("p", { className: 'map-travel-queued-note map-travel-risk-note map-travel-risk-' + (openNodeRisk ? openNodeRisk.level : 'quiet'), style: { visibility: travelRowVisible ? 'visible' : 'hidden' } }, riskText),
                     React.createElement("p", { className: "map-travel-queued-note", style: { visibility: travelRowVisible ? 'visible' : 'hidden' } },
                         isQueuedOpenNode ? `${t('mapTravelQueuedBadge')} · ` : '',
                         openNodeRoute ? describeRouteDistanceLabel(openNodeRoute.distance, t) : '\u00A0'))),
@@ -44960,14 +44775,9 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         const recentDeedsText = (state.heroDeeds && state.heroDeeds.length > 0)
             ? state.heroDeeds.slice(-3).map(d => `killed ${d.npcName}${d.locationName ? ` near ${d.locationName}` : ''}`).join('; ')
             : '';
-        const siegeNodesForBriefing = (state.map && Array.isArray(state.map.nodes) ? state.map.nodes : []).filter(n => n.status === 'besieged' || n.status === 'burned');
-        const siegeStatusText = siegeNodesForBriefing.length > 0
-            ? ` Standing conditions elsewhere on the map: ${siegeNodesForBriefing.map(n => `${n.name} is ${n.status === 'besieged' ? 'under siege' : 'burned and in ruins'}`).join('; ')} — show it only if the hero goes there or hears news from there; otherwise leave it as background.`
-            : '';
-        const worldRuleActive = !!(warSummaryParts.length > 0 || recentEventText || recentDeedsText || siegeStatusText);
-        const worldRuleNum = worldRuleActive ? ++ruleNum : null;
-        const worldRule = worldRuleActive
-            ? `\n${worldRuleNum}. THE WORLD KEEPS MOVING: events keep happening beyond whatever the hero is doing right now — territory can already change hands off-page, before this scene even starts.${siegeStatusText}${warSummaryParts.length > 0 ? ` Current standing of an ongoing war: ${warSummaryParts.join('; ')}.` : ''}${recentEventText ? ` JUST HAPPENED, THIS TURN, ENTIRELY OFF-PAGE: ${recentEventText} The hero wasn't there and doesn't automatically know about it — only reflect it directly in the scene if the hero is actually arriving at or already in ${worldTickEvent.locationName} right now (show the aftermath: signs of fighting, a changed garrison, a shaken populace), or if a character present would plausibly have heard and mentions it in passing. Otherwise leave it unmentioned this turn; it'll still be there to discover later.` : ''}${recentDeedsText ? ` The hero has recently: ${recentDeedsText}. When it genuinely fits the scene — never forced — a character who's heard of this may reference it: a rumor, a changed reputation, a wary glance, even a nickname the hero has picked up locally. This should be occasional color, not something every scene leans on.` : ''}`
+        const worldRuleNum = (warSummaryParts.length > 0 || recentEventText || recentDeedsText) ? ++ruleNum : null;
+        const worldRule = (warSummaryParts.length > 0 || recentEventText || recentDeedsText)
+            ? `\n${worldRuleNum}. THE WORLD KEEPS MOVING: events keep happening beyond whatever the hero is doing right now — territory can already change hands off-page, before this scene even starts.${warSummaryParts.length > 0 ? ` Current standing of an ongoing war: ${warSummaryParts.join('; ')}.` : ''}${recentEventText ? ` JUST HAPPENED, THIS TURN, ENTIRELY OFF-PAGE: ${recentEventText} The hero wasn't there and doesn't automatically know about it — only reflect it directly in the scene if the hero is actually arriving at or already in ${worldTickEvent.locationName} right now (show the aftermath: signs of fighting, a changed garrison, a shaken populace), or if a character present would plausibly have heard and mentions it in passing. Otherwise leave it unmentioned this turn; it'll still be there to discover later.` : ''}${recentDeedsText ? ` The hero has recently: ${recentDeedsText}. When it genuinely fits the scene — never forced — a character who's heard of this may reference it: a rumor, a changed reputation, a wary glance, even a nickname the hero has picked up locally. This should be occasional color, not something every scene leans on.` : ''}`
             : '';
         const partyRuleNum = partyMemberNames.length > 0 ? ++ruleNum : null;
         const partyRule = partyMemberNames.length > 0
@@ -45439,13 +45249,9 @@ Rules:
             const waypointNames = queuedRoute.path.slice(1, -1).map(nodeName);
             const targetName = nodeName(queuedRoute.path[queuedRoute.path.length - 1]);
             const recentBattleNodeIds = new Set((currentState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId));
-            const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds, currentState.dayPhase);
+            const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds);
             const routeSoFar = waypointNames.length > 0 ? ` (by way of ${waypointNames.join(', ')})` : '';
-            const startPhaseWord = currentState.dayPhase === 'night' ? 'NIGHT' : 'DAYTIME';
-            const travelHours = routeHoursAtIndex(queuedRoute.path, byId, interruption ? interruption.stopIndex : queuedRoute.path.length - 1);
-            const endPhaseWord = routePhaseAtHours(currentState.dayPhase, travelHours) === 'night' ? 'NIGHT' : 'DAYTIME';
-            const timeNote = ` The trip takes roughly ${Math.max(1, Math.round(travelHours))} hours; the hero sets out in the ${startPhaseWord}${endPhaseWord !== startPhaseWord ? ` and it will be ${endPhaseWord} by the time ${interruption ? 'the hero is stopped' : 'they arrive'} — let that show in plain words (dusk falling, travelling after dark, dawn breaking) and make the time of day at the END of the scene unmistakable` : ' and it is still the same time of day at the end of it'}.`;
-            const modeNote = ` Compress this into a single passage of time — ${describeRouteDistance(queuedRoute.distance)} — rather than dwelling on each leg; a line or two noting the days/hours passing is enough.${timeNote}`;
+            const modeNote = ` Compress this into a single passage of time — ${describeRouteDistance(queuedRoute.distance)} — rather than dwelling on each leg; a line or two noting the days/hours passing is enough.`;
             if (!interruption) {
                 pendingMapDestinationRef.current = queuedRoute.path[queuedRoute.path.length - 1];
                 routeNotes.push(`set out for "${targetName}"${routeSoFar} and completed the whole journey without incident, arriving safely.${modeNote}`);
@@ -48476,7 +48282,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // REACTIVITY section (pickWorldTickEvent) above EMPTY_STATE. Skipped
         // entirely on the opening turn: currentState.map has no nodes yet.
         const worldTickEvent = isOpeningTurn ? null : pickWorldTickEvent(currentState.factions, currentState.map.nodes, currentState.map.currentId);
-        const worldSiegeChange = (isOpeningTurn || worldTickEvent) ? null : pickWorldSiegeChange(currentState.factions, currentState.map.nodes, currentState.map.currentId);
         agentSlipRef.current = isOpeningTurn ? null : pickAgentPlan(currentState.agents, currentState.npcs, turnIndex, { partyKeys: [...party], paranoia: currentState.paranoia });
         if (agentSlipRef.current) {
             // The hero's canary traps that come due, and any purge a jumpy faction runs.
@@ -48537,12 +48342,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const finalState = worldTickEvent
             ? {
                 ...combined.state,
-                map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldTickEvent.locationId ? { ...n, faction: worldTickEvent.toFaction, status: Math.random() < WORLD_BURN_CHANCE ? 'burned' : null } : n) },
+                map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldTickEvent.locationId ? { ...n, faction: worldTickEvent.toFaction } : n) },
                 worldEvents: normalizeWorldEvents([...(combined.state.worldEvents || []), worldTickEvent])
             }
-            : worldSiegeChange
-                ? { ...combined.state, map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldSiegeChange.nodeId ? { ...n, status: worldSiegeChange.status } : n) } }
-                : combined.state;
+            : combined.state;
         agentSlipRef.current = null;
         coverPlanRef.current = null;
         operativePlanRef.current = null;
@@ -48830,23 +48633,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const nextState = {
             ...gameState,
             map: { ...gameState.map, nodes: gameState.map.nodes.map(n => (n.id === nodeId ? { ...n, arrowPending: false } : n)) }
-        };
-        setGameState(nextState);
-        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
-    }
-    // Player's own pin / note on a map node — instant client-side edit like
-    // dismissMapArrow, nothing for the model to resolve.
-    function updateMapNodeMeta(nodeId, patch) {
-        if (!gameState.map.nodes.some(n => n.id === nodeId))
-            return;
-        const meta = {};
-        if (patch.pin !== undefined)
-            meta.pin = MAP_PIN_OPTIONS.includes(patch.pin) ? patch.pin : null;
-        if (patch.note !== undefined)
-            meta.note = String(patch.note).slice(0, MAP_NOTE_MAX);
-        const nextState = {
-            ...gameState,
-            map: { ...gameState.map, nodes: gameState.map.nodes.map(n => (n.id === nodeId ? { ...n, ...meta } : n)) }
         };
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
@@ -56111,7 +55897,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, soundVolume: soundVolume, onSetSoundVolume: setSoundVolume, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
         cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
-        mapModalOpen && (React.createElement(MapModal, { map: viewedState.map, npcs: viewedState.npcs, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, onUpdateNodeMeta: isLatestTurn ? updateMapNodeMeta : undefined, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
+        mapModalOpen && (React.createElement(MapModal, { map: viewedState.map, npcs: viewedState.npcs, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: viewedState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         societyModalOpen && (React.createElement(SocietyModal, { gameState: viewedState, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onClose: () => setSocietyModalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
@@ -57814,6 +57600,23 @@ const APP_STYLES = `
      shape — reads as "part of the same camera-control cluster" rather than
      a stray unrelated button. */
   .map-fit-btn { right: 3.05rem; font-size: 0.95rem; }
+  /* Fullscreen toggle: top-left corner of the map (the layer switcher owns top-right). */
+  .map-fs-btn { right: auto; bottom: auto; left: 0.6rem; top: 0.6rem; }
+  /* Fullscreen map: the card becomes a fixed full-viewport layer; only the map
+     (growing to fill it) and the travel row under it stay, the rest hides. */
+  .modal-card.map-card.map-card-fs { position: fixed; inset: 0; z-index: 300; width: 100vw; max-width: none; height: 100vh; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; border-radius: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--stone-950); animation: none; }
+  .map-card-fs > .modal-title,
+  .map-card-fs > .map-legend-toggle,
+  .map-card-fs > .map-legend-collapse,
+  .map-card-fs > .map-search-row,
+  .map-card-fs > .map-search-empty,
+  .map-card-fs > .map-filter-row,
+  .map-card-fs > .map-empty,
+  .map-card-fs > .modal-actions { display: none; }
+  .map-card-fs .map-viewport { flex: 1 1 auto; height: auto; min-height: 0; border: 0; border-radius: 0; }
+  .map-card-fs .map-travel-offer { margin: 0; flex: none; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); padding-left: calc(0.75rem + env(safe-area-inset-left, 0px)); padding-right: calc(0.75rem + env(safe-area-inset-right, 0px)); }
+  .map-card-fs .map-fs-btn { top: calc(0.6rem + env(safe-area-inset-top, 0px)); left: calc(0.6rem + env(safe-area-inset-left, 0px)); }
+  .map-card-fs .map-layer-switcher { top: calc(0.6rem + env(safe-area-inset-top, 0px)); right: calc(0.6rem + env(safe-area-inset-right, 0px)); }
   /* Search row sits between the legend toggle and the map viewport itself
      (see the JSX) — always visible, unlike the legend which stays tucked
      away behind its own toggle, since finding a specific place is a much
@@ -57854,7 +57657,7 @@ const APP_STYLES = `
   .map-node-fog:hover, .map-node-fog:focus-visible { opacity: 1; }
   .map-node-label { font-family: var(--font-mono); font-size: 0.62rem; color: var(--stone-400); white-space: nowrap; background: rgba(28, 25, 23, 0.82); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.05rem 0.3rem; line-height: 1.3; }
   .map-node-label-hero { color: var(--amber-100); font-weight: 500; border-color: var(--amber-800); }
-  .map-node-desc { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; width: 152px; max-height: 12rem; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; font-family: var(--font-serif); font-style: italic; font-size: 0.72rem; line-height: 1.3; color: var(--stone-400); background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.4rem 0.5rem; text-align: left; z-index: 5; }
+  .map-node-desc { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; width: 152px; max-height: 9rem; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; font-family: var(--font-serif); font-style: italic; font-size: 0.72rem; line-height: 1.3; color: var(--stone-400); background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.4rem 0.5rem; text-align: left; z-index: 5; }
   .map-node-desc p { margin: 0 0 0.4rem; }
   .map-node-desc p:last-child { margin-bottom: 0; }
   .map-node-desc::-webkit-scrollbar { width: 4px; }
@@ -57876,31 +57679,6 @@ const APP_STYLES = `
   .map-node-stairs-badge { position: absolute; top: -4px; left: -4px; width: 13px; height: 13px; border-radius: 50%; background: var(--sky-700, #0369a1); color: var(--amber-50); font-family: var(--font-mono); font-size: 8px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 3px rgba(0,0,0,0.7); z-index: 3; }
   .map-legend-stairs-badge { position: static; display: inline-flex; }
   .map-legend-danger-badge { position: static; display: inline-flex; }
-  .map-filter-row { display: flex; gap: 0.3rem; margin: 0 0 0.5rem; flex-wrap: wrap; }
-  .map-filter-chip { min-width: 2rem; height: 1.8rem; padding: 0 0.4rem; background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 4px; font-size: 0.85rem; line-height: 1; cursor: pointer; }
-  .map-filter-chip:hover { border-color: var(--amber-700); }
-  .map-filter-chip-on { background: var(--stone-800); border-color: var(--amber-600); box-shadow: inset 0 0 0 1px var(--amber-700); }
-  .map-filter-chip-sep { margin-left: auto; }
-  .map-node-dimmed:not(.map-node-open) { opacity: 0.22; }
-  .map-node-dimmed:not(.map-node-open):hover { opacity: 0.6; }
-  .map-node-services { margin-left: 0.25rem; font-size: 0.6rem; }
-  .map-node-status-badge { position: absolute; bottom: -4px; left: -4px; width: 13px; height: 13px; border-radius: 50%; background: var(--stone-800); border: 1px solid var(--stone-600); font-size: 8px; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 3px rgba(0,0,0,0.7); z-index: 3; }
-  .map-node-cleared-badge { position: absolute; top: -4px; right: -4px; width: 13px; height: 13px; border-radius: 50%; background: var(--emerald-700, #047857); color: var(--amber-50); font-family: var(--font-mono); font-size: 9px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 3px rgba(0,0,0,0.7); z-index: 3; }
-  .map-legend-static-badge { position: static; display: inline-flex; }
-  .map-node-pin-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); font-size: 12px; line-height: 1; z-index: 3; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8)); pointer-events: none; }
-  .map-node-status-text { color: var(--orange-400, #fb923c); font-style: normal; }
-  .map-node-cleared-ok { color: var(--emerald-400, #34d399); font-style: normal; }
-  .map-node-services-line { font-style: normal; color: var(--amber-400); }
-  .map-node-meta { border-top: 1px dashed var(--stone-700); padding-top: 0.35rem; margin-top: 0.35rem; }
-  .map-pin-row { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-bottom: 0.3rem; }
-  .map-pin-btn { width: 1.5rem; height: 1.5rem; padding: 0; background: var(--stone-800); border: 1px solid var(--stone-700); border-radius: 3px; font-size: 0.8rem; line-height: 1; cursor: pointer; }
-  .map-pin-btn-active { border-color: var(--amber-500); background: var(--stone-700); }
-  .map-note-input { width: 100%; box-sizing: border-box; resize: none; background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 3px; padding: 0.25rem 0.35rem; font-family: var(--font-serif); font-style: normal; font-size: 0.72rem; line-height: 1.3; color: var(--amber-100); }
-  .map-note-input:focus { outline: none; border-color: var(--amber-600); }
-  .map-travel-risk-note.map-travel-risk-tense { color: var(--orange-400, #fb923c); }
-  .map-travel-risk-note.map-travel-risk-deadly { color: var(--red-400); }
-  .map-route-highlight-base.map-route-risk-tense { stroke: #d97706; opacity: 0.55; }
-  .map-route-highlight-base.map-route-risk-deadly { stroke: #dc2626; opacity: 0.65; }
   /* Bottom-right — the one remaining free corner once danger (top-right)
      and stairs (top-left) are accounted for, so a node can show all three
      badges at once without any of them overlapping. */
@@ -58034,7 +57812,6 @@ const APP_STYLES = `
   .icon-btn:hover { color: var(--amber-500); }
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
-
 
 // ---- Mount ----
 // Starts once the third-party scripts have settled (loaded, failed, or timed
