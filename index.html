@@ -17892,6 +17892,7 @@ const TRANSLATIONS = {
         itemTypeWeaponOneHanded: 'Одноручное оружие',
         itemTypeWeaponTwoHanded: 'Двуручное оружие',
         itemTypeWeaponRanged: 'Стрелковое оружие',
+        itemTypeWeaponPistol: 'Пистолет',
         itemTypeShield: 'Щит',
         itemTypeArmor: 'Доспех',
         itemTypeHelmet: 'Головной убор',
@@ -17912,6 +17913,8 @@ const TRANSLATIONS = {
         itemCapacityBonusLabel: 'Бонус к переносимому весу',
         itemDefenseLabel: 'Защита',
         itemDamageLabel: 'Урон',
+        itemPhysAbsorbLabel: 'Поглощение урона',
+        itemArmorPiercingLabel: 'Бронепробитие',
         itemBlockLabel: 'Блок',
         itemEquippedNote: 'Сейчас надето / используется',
         equipSlotEmptyLabel: 'Пусто',
@@ -18775,6 +18778,7 @@ const TRANSLATIONS = {
         itemTypeWeaponOneHanded: 'One-handed weapon',
         itemTypeWeaponTwoHanded: 'Two-handed weapon',
         itemTypeWeaponRanged: 'Ranged weapon',
+        itemTypeWeaponPistol: 'Pistol',
         itemTypeShield: 'Shield',
         itemTypeArmor: 'Armor',
         itemTypeHelmet: 'Headgear',
@@ -18795,6 +18799,8 @@ const TRANSLATIONS = {
         itemCapacityBonusLabel: 'Carry capacity bonus',
         itemDefenseLabel: 'Defense',
         itemDamageLabel: 'Damage',
+        itemPhysAbsorbLabel: 'Damage absorption',
+        itemArmorPiercingLabel: 'Armor penetration',
         itemBlockLabel: 'Block',
         itemEquippedNote: 'Currently equipped / in use',
         equipSlotEmptyLabel: 'Empty',
@@ -22284,6 +22290,19 @@ function autoEquipStartingGear(inventory) {
 // declension ending (сапогах, доспеха…) still matches its stem without
 // also matching an unrelated word that merely contains the same letters
 // mid-word.
+// "Name - role" label for an NPC; the role is dropped when it only repeats the
+// name (e.g. name "младший исполнительный офицер" + the same role).
+function npcNameWithRole(npc) {
+    const name = typeof npc.name === 'string' ? npc.name : '';
+    const role = typeof npc.role === 'string' ? npc.role.trim() : '';
+    if (!role)
+        return name;
+    const n = name.trim().toLowerCase().replace(/\s+/g, ' ');
+    const r = role.toLowerCase().replace(/\s+/g, ' ');
+    if (n === r || n.includes(r) || r.includes(n))
+        return name;
+    return name + ' - ' + role;
+}
 function narrativeItemNameTokens(name) {
     return name.toLowerCase().split(/[^a-zа-яё]+/).filter(Boolean);
 }
@@ -22294,7 +22313,9 @@ const NARRATIVE_ITEM_SLOT_KEYWORDS = [
             'алебард', 'пика', 'трезубец', 'копь', 'катана', 'пращ', 'дротик', 'щит',
             'sword', 'blade', 'dagger', 'knife', 'axe', 'mace', 'flail', 'hammer', 'staff', 'wand', 'crossbow', 'bow',
             'pistol', 'musket', 'rapier', 'saber', 'sabre', 'epee', 'stiletto', 'club', 'cudgel', 'halberd', 'pike',
-            'trident', 'spear', 'lance', 'claymore', 'katana', 'javelin', 'sling', 'shield'
+            'trident', 'spear', 'lance', 'claymore', 'katana', 'javelin', 'sling', 'shield',
+            'револьвер', 'автомат', 'винтовк', 'карабин', 'дробовик', 'ружь', 'ружей', 'пулем', 'обрез', 'энерговинтовк',
+            'revolver', 'rifle', 'shotgun', 'carbine', 'smg', 'handgun', 'railgun', 'machinegun'
         ]],
     ['armor', [
             'доспех', 'кольчуг', 'панцир', 'нагрудник', 'кирас', 'куртк', 'жилет', 'туник',
@@ -22348,6 +22369,9 @@ function inferEquipSlotFromItemName(name) {
     const hasToken = (...prefixes) => prefixes.some(p => tokens.some(tok => tok.startsWith(p)));
     if ((hasToken('ремонтн', 'починочн') && hasToken('набор', 'комплект')) || (hasToken('repair', 'mending') && hasToken('kit', 'toolkit')))
         return 'repairKit';
+    // Compound pistol names ("лазпистолет", "plasmapistol") are weapons too.
+    if (tokens.some(tok => /пистолет|pistol/.test(tok)))
+        return 'weapon';
     for (const [slot, keywords] of NARRATIVE_ITEM_SLOT_KEYWORDS) {
         if (keywords.some(kw => tokens.some(tok => tok.startsWith(kw))))
             return slot;
@@ -22420,7 +22444,9 @@ const RANGED_WEAPON_TOKEN_PATTERNS = [
     /^musket/, /^rifle/, /^shotgun/, /^carbine/, /^submachine/, /^smg$/,
     /^archer/, /^sniper/, /^machinegun/
 ];
-const HANDGUN_TOKEN_PATTERNS = [/^пистолет/, /^револьвер/, /^наган/, /^pistol/, /^revolver/, /^handgun/];
+// Compound words count too ("лазпистолет", "плазмопистолет", "laserpistol"),
+// so the pattern for pistol isn't anchored to the start of the token.
+const HANDGUN_TOKEN_PATTERNS = [/пистолет/, /^револьвер/, /^наган/, /pistol/, /^revolver/, /^handgun/];
 const SUBMACHINE_GUN_TOKEN_PATTERNS = [/^пулем/, /^submachine/, /^smg$/];
 function isRangedWeaponName(name) {
     if (typeof name !== 'string' || !name.trim())
@@ -22741,6 +22767,13 @@ function getLoadoutWeaponType(equipmentObj, inventoryList) {
     }
     if (weapons.some(isRangedWeaponItem))
         return 'ranged';
+    // A pistol next to a melee weapon doesn't change the melee type: the
+    // other weapon does the hand-to-hand fighting (the pistol sits out).
+    if (weapons.length === 2 && weapons.some(isHandgunWeaponItem) && !weapons.every(isHandgunWeaponItem)) {
+        for (let i = weapons.length - 1; i >= 0; i--)
+            if (isHandgunWeaponItem(weapons[i]))
+                weapons.splice(i, 1);
+    }
     if (hasShield)
         return 'shield';
     if (weapons.length === 1 && weapons[0].twoHanded !== true)
@@ -25853,6 +25886,43 @@ function getBlockChanceForItem(item, rarity) {
     const base = applyStatRoll(BLOCK_CHANCE_BY_RARITY[rarity] || BLOCK_CHANCE_BY_RARITY.common, item.statRoll, BLOCK_CHANCE_MAX);
     return isShield ? base : Math.max(2, base - BLOCK_CHANCE_TWO_HANDED_PENALTY);
 }
+// ---- ARMOR PENETRATION (%) — every weapon has a rating, like a shield's block ----
+// The share of a landed hit's damage that ignores armor and goes straight to
+// HP; the remaining share is eaten by the armor pool (and, while the pool has
+// any charge, never spills over into HP). A top two-handed weapon reaches 50%,
+// a one-handed weapon rates half of a two-handed one of the same tier (max 25%).
+// Ranged weapons (bows/guns) are stored two-handed and rate as two-handed;
+// a pistol is one-handed. Shields have no rating. Per-copy roll applies like
+// block does. Only weapons flagged armorPiercing have a rating; the rest show 0%.
+const ARMOR_PIERCE_ONE_HANDED_BY_RARITY = { junk: 8, common: 11, uncommon: 14, rare: 17, unique: 20, mythic: 23 };
+const ARMOR_PIERCE_ONE_HANDED_MAX = 25;
+const ARMOR_PIERCE_TWO_HANDED_MAX = 50;
+function getArmorPierceForItem(item, rarity) {
+    if (!item || item.slot !== 'weapon')
+        return null;
+    if (item.shield === true || (item.shield === undefined && isShieldItemName(item.name)))
+        return null;
+    // Only weapons marked armor-piercing (the item's own explicit flag — a war
+    // pick, warhammer, bodkin arrows...) penetrate; every other weapon rates 0%.
+    if (item.armorPiercing !== true)
+        return 0;
+    const two = item.twoHanded === true;
+    const base = ARMOR_PIERCE_ONE_HANDED_BY_RARITY[rarity] || ARMOR_PIERCE_ONE_HANDED_BY_RARITY.common;
+    const maxV = two ? ARMOR_PIERCE_TWO_HANDED_MAX : ARMOR_PIERCE_ONE_HANDED_MAX;
+    return Math.min(maxV, applyStatRoll(two ? base * 2 : base, item.statRoll, maxV));
+}
+// One landed hit against an armor pool: `pct` of the damage pierces straight to
+// HP, the rest is absorbed by the pool (fully, no spill-over) while it has charge.
+// `absorbPct` (physical defense, see absorbPctFromDefense) first shaves that
+// share off the non-piercing part of the hit — always, even once the pool is empty.
+function splitArmorHit(rawDmg, curPool, pct, absorbPct) {
+    const pierce = pct > 0 ? Math.min(rawDmg, Math.round(rawDmg * pct / 100)) : 0;
+    const rest = rawDmg - pierce;
+    const restAfter = rest > 0 ? Math.round(rest * (1 - (absorbPct || 0) / 100)) : 0;
+    if (!(curPool > 0))
+        return { dmg: Math.max(1, pierce + restAfter), absorbed: 0, armored: false };
+    return { dmg: pierce, absorbed: Math.min(curPool, restAfter), armored: true };
+}
 // ---- DODGE FROM GEAR — light armor (mostly leather) makes you evasive ----
 // Dodge no longer comes from a flat base: each armor piece contributes its
 // own rating, and the sum is DODGE_CHANCE_MAX (60%) at the very best (all
@@ -26270,8 +26340,8 @@ function buildHeroHitWearOps({ equipment, inventory, itemRarities, partKey, seve
     return collectWearOps([...armorSlots, 'cloak', 'amulet', 'ringLeft', 'ringRight'], equipment, inventory, itemRarities, { type: 'hit', severity, absorbed });
 }
 // The hero landed a strike: whatever weapon(s) they swung wear (not shields).
-function buildHeroStrikeWearOps({ equipment, inventory, itemRarities }) {
-    return collectWearOps(['weaponRight', 'weaponLeft'], equipment, inventory, itemRarities, { type: 'strike' });
+function buildHeroStrikeWearOps({ equipment, inventory, itemRarities, handKeys }) {
+    return collectWearOps(handKeys || ['weaponRight', 'weaponLeft'], equipment, inventory, itemRarities, { type: 'strike' });
 }
 // The hero blocked a blow: a shield in hand wears.
 function buildHeroBlockWearOps({ equipment, inventory, itemRarities, enemyTier }) {
@@ -26742,6 +26812,9 @@ function itemTypeLabel(item, t) {
             return t('itemTypeShield');
         if (isRangedWeaponItem(item))
             return t('itemTypeWeaponRanged');
+        // A pistol is its own weapon type (it only plays one-handed).
+        if (isHandgunWeaponItem(item))
+            return t('itemTypeWeaponPistol');
         return t(item.twoHanded ? 'itemTypeWeaponTwoHanded' : 'itemTypeWeaponOneHanded');
     }
     const base = t(ITEM_TYPE_LABEL_KEYS[item.slot] || ITEM_TYPE_LABEL_KEYS.none);
@@ -26891,6 +26964,25 @@ function getSetBonusForSlot(slotKey, activeSets) {
 // getArmorDefenseForSlot/getSetBonusForSlot, the same single sources of
 // truth the per-slot equip badges already use, so this can never drift
 // from what the paper doll itself shows.
+// ---- PHYSICAL DAMAGE ABSORPTION (%) — more defense, more of each hit absorbed ----
+// Total defense maps linearly onto a share of every incoming hit that armor
+// simply soaks up: exactly 50% for the best possible gear WITHOUT a set bonus
+// (four mythic HEAVY pieces with top stat rolls); a set bonus can push it a
+// little higher, but never past ARMOR_ABSORB_MAX_PCT.
+// Armor-piercing weapons skip it for their piercing share (see splitArmorHit).
+const ARMOR_ABSORB_TOP_PCT = 50;
+const ARMOR_ABSORB_MAX_PCT = 55;
+const ARMOR_ABSORB_REFERENCE_DEFENSE = 4 * getArmorDefenseForSlot('armor', 'mythic', 'heavy', 1);
+function absorbPctFromDefense(totalDefense) {
+    if (!(totalDefense > 0))
+        return 0;
+    return Math.min(ARMOR_ABSORB_MAX_PCT, Math.round(ARMOR_ABSORB_TOP_PCT * totalDefense / ARMOR_ABSORB_REFERENCE_DEFENSE * 10) / 10);
+}
+// Enemies carry no set bonus; their head + body armor pool maxima are their defense.
+function enemyPhysAbsorbPct(enemy) {
+    const p = (enemy && enemy.armorPools) || {};
+    return absorbPctFromDefense(((p.head && p.head.max) || 0) + ((p.body && p.body.max) || 0));
+}
 function computeTotalArmorDefense(equipment, inventory, itemRarities) {
     const activeSets = computeActiveEquipmentSets(equipment, inventory, itemRarities);
     const resolvedWorn = resolveEquippedItems(equipment, inventory);
@@ -31060,8 +31152,7 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
                         } },
                         React.createElement("span", { className: "sheet-npc-toggle" }, isNpcExpanded ? '▾' : '▸'),
                         React.createElement("span", { className: 'sheet-npc-name' + (hostile ? ' sheet-npc-hostile' : resentful ? ' sheet-npc-resentful' : '') },
-                            n.name,
-                            typeof n.role === 'string' && n.role.trim() ? ' - ' + n.role.trim() : '',
+                            npcNameWithRole(n),
                             isDead && React.createElement("span", { className: "npc-status-tag" },
                                 " ",
                                 t('npcDeadTag')),
@@ -31164,8 +31255,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
             React.createElement("button", { onClick: () => setOpenNpcKey(open ? null : npcKey), className: "quest-journal-row journal-name-row", type: "button", "aria-expanded": open },
                 React.createElement("span", { className: "quest-journal-title" },
                     React.createElement("span", { className: hostile ? 'sheet-npc-hostile' : resentful ? 'sheet-npc-resentful' : '' },
-                        n.name,
-                        typeof n.role === 'string' && n.role.trim() ? ' - ' + n.role.trim() : '',
+                        npcNameWithRole(n),
                         isDead && React.createElement("span", { className: "npc-status-tag" },
                             " ",
                             t('npcDeadTag')),
@@ -31387,6 +31477,11 @@ function TradeItemPreviewModal({ item, itemRarities, price, priceArrow, actionLa
                     React.createElement("span", { className: "sheet-stat-label" }, t('itemDamageLabel')),
                     React.createElement("span", { className: "sheet-stat-value" }, weaponDamage),
                     React.createElement(StatCmp, { cmp: cmp.damage }))),
+                getArmorPierceForItem(item, rarity || 'common') !== null && (React.createElement("div", { className: "sheet-stat-row" },
+                    React.createElement("span", { className: "sheet-stat-label" }, t('itemArmorPiercingLabel')),
+                    React.createElement("span", { className: "sheet-stat-value" },
+                        getArmorPierceForItem(item, rarity || 'common'),
+                        "%"))),
                 React.createElement("div", { className: "sheet-stat-row" },
                     React.createElement("span", { className: "sheet-stat-label" }, t('itemWeightLabel')),
                     React.createElement("span", { className: "sheet-stat-value" }, weight),
@@ -31993,6 +32088,14 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
                                         React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, bodyDefense)),
                                     React.createElement("div", { className: "sheet-stat-row" },
                                         React.createElement("span", { className: "sheet-stat-label" },
+                                            React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                            " ",
+                                            t('itemPhysAbsorbLabel')),
+                                        React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" },
+                                            absorbPctFromDefense(totalDefense),
+                                            "%")),
+                                    React.createElement("div", { className: "sheet-stat-row" },
+                                        React.createElement("span", { className: "sheet-stat-label" },
                                             React.createElement("img", { src: EQUIP_ICON_WEAPON_LEFT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
                                             " ",
                                             t('itemDamageLabel')),
@@ -32596,6 +32699,14 @@ function EquipmentModal({ gameState, equipment, itemRarities, pickerSlot, isSlot
                                     React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" }, bodyDefense)),
                                 React.createElement("div", { className: "sheet-stat-row" },
                                     React.createElement("span", { className: "sheet-stat-label" },
+                                        React.createElement("img", { src: EQUIP_ICON_WEAPON_RIGHT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
+                                        " ",
+                                        t('itemPhysAbsorbLabel')),
+                                    React.createElement("span", { className: "sheet-stat-value equipment-stat-defense" },
+                                        absorbPctFromDefense(totalDefense),
+                                        "%")),
+                                React.createElement("div", { className: "sheet-stat-row" },
+                                    React.createElement("span", { className: "sheet-stat-label" },
                                         React.createElement("img", { src: EQUIP_ICON_WEAPON_LEFT, alt: "", style: { width: 16, height: 16, verticalAlign: 'middle', marginRight: 4 } }),
                                         " ",
                                         t('itemDamageLabel')),
@@ -32878,6 +32989,11 @@ function ItemDetailModalContent({ itemIndex, emptySlotKey, hideDropButton, gameS
                         React.createElement("span", { className: "sheet-stat-label" }, t('itemDamageLabel')),
                         React.createElement("span", { className: "sheet-stat-value" }, weaponDamage),
                         React.createElement(StatCmp, { cmp: cmp.damage }))),
+                    !isEmptyDisplay && getArmorPierceForItem(displayItem, rarity || 'common') !== null && (React.createElement("div", { className: "sheet-stat-row" },
+                        React.createElement("span", { className: "sheet-stat-label" }, t('itemArmorPiercingLabel')),
+                        React.createElement("span", { className: "sheet-stat-value" },
+                            getArmorPierceForItem(displayItem, rarity || 'common'),
+                            "%"))),
                     React.createElement("div", { className: "sheet-stat-row" },
                         React.createElement("span", { className: "sheet-stat-label" }, t('itemWeightLabel')),
                         React.createElement("span", { className: "sheet-stat-value" }, weight),
@@ -39251,8 +39367,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                                         t('mapLocationCharactersLabel'),
                                         ": "),
                                     nodeNpcs.map((npc, ni) => (React.createElement("span", { key: ni, className: npc.dead === true ? 'npc-status-tag' : undefined },
-                                        npc.name,
-                                        typeof npc.role === 'string' && npc.role.trim() ? ' - ' + npc.role.trim() : '',
+                                        npcNameWithRole(npc),
                                         ni < nodeNpcs.length - 1 ? ', ' : ''))))),
                                 isMapNodeCleared(n) && React.createElement("p", { className: "map-node-cleared-tag" }, t('mapNodeClearedLabel'))))));
                     }),
@@ -50044,9 +50159,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const poolKey = armorPoolKeyForPart(targetKey);
             const curPool = Math.max(0, (enemy.armorPools && enemy.armorPools[poolKey] && enemy.armorPools[poolKey].cur) || 0);
             const rawDmg = Math.max(1, Math.round(rolled.dmg * COMBAT_TUNING.stealthDamageFraction));
-            const armored = curPool > 0 && !weaponInfo.armorPiercing;
-            const absorbed = armored ? Math.min(curPool, rawDmg) : 0;
-            const dmg = rawDmg - absorbed;
+            const { armored, absorbed, dmg } = splitArmorHit(rawDmg, curPool, weaponInfo.armorPiercing || 0, enemyPhysAbsorbPct(enemy));
             // Never lands the kill here — an outright kill is only ever the 'kill'
             // branch above, so this floors at 1 HP even on a big roll.
             const newHp = Math.max(1, targetState.hp - dmg);
@@ -50169,10 +50282,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const eq = equipmentObj || EMPTY_EQUIPMENT;
         const weaponNames = [eq.weaponRight, eq.weaponLeft].filter(Boolean);
         if (weaponNames.length === 0) {
-            return { damage: UNARMED_DAMAGE, label: unarmedLabel, armorPiercing: false };
+            return { damage: UNARMED_DAMAGE, label: unarmedLabel, armorPiercing: 0 };
         }
         let damage = 0;
-        let armorPiercing = false;
+        let pierceWeighted = 0;
         const labels = [];
         const resolvedHands = resolveEquippedItems(eq, inventoryList || []);
         for (const handKey of ['weaponRight', 'weaponLeft']) {
@@ -50186,18 +50299,19 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // A broken weapon/shield swings for nothing (see ITEM DURABILITY).
             if (item && isItemBroken(item, rarity))
                 continue;
-            damage += getWeaponDamageForSlot('weapon', rarity, item && item.twoHanded, item && item.statRoll, item);
+            const handDamage = getWeaponDamageForSlot('weapon', rarity, item && item.twoHanded, item && item.statRoll, item);
+            damage += handDamage;
+            pierceWeighted += handDamage * (getArmorPierceForItem(item, rarity) || 0);
             labels.push(name);
             // Armor-piercing is the item's own explicit flag (see
             // normalizeInventoryItem) — no name-keyword guessing. Dual-wielding
             // one piercing weapon alongside a non-piercing one still counts the
             // swing as armor-piercing overall (see resolveOneAttack).
-            if (item && item.armorPiercing === true)
-                armorPiercing = true;
         }
         if (labels.length === 0)
-            return { damage: UNARMED_DAMAGE, label: unarmedLabel, armorPiercing: false };
-        return { damage, label: labels.join(' + '), armorPiercing };
+            return { damage: UNARMED_DAMAGE, label: unarmedLabel, armorPiercing: 0 };
+        // Dual wield: damage-weighted average of the two weapons' ratings.
+        return { damage, label: labels.join(' + '), armorPiercing: damage > 0 ? Math.round(pierceWeighted / damage) : 0 };
     }
     // Per-shot damage list for a gun ability (ABILITY_DEFS weaponFx). Every
     // shot is its own attack with its own hit roll, body part and damage roll:
@@ -50226,10 +50340,19 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const rarity = findItemRarity(name, rarities) || 'common';
             if (item && isItemBroken(item, rarity))
                 continue;
-            guns.push({ name, item, rarity, armorPiercing: !!(item && item.armorPiercing === true) });
+            guns.push({ name, item, rarity, armorPiercing: getArmorPierceForItem(item, rarity) || 0 });
         }
         if (guns.length === 0)
             return null;
+        // Pistol shots are rated by the pistol itself, never by a one-handed
+        // weapon in the other hand.
+        if (fxId === 'pistol' || fxId === 'dualPistols') {
+            const onlyHandguns = guns.filter(g => isHandgunWeaponName(g.name));
+            if (onlyHandguns.length > 0) {
+                guns.length = 0;
+                guns.push(...onlyHandguns);
+            }
+        }
         const dmgOf = (g, twoHanded) => getWeaponDamageForSlot('weapon', g.rarity, twoHanded, g.item && g.item.statRoll, g.item);
         if (fxId === 'dualPistols') {
             return guns.slice(0, 2).map(g => ({ weaponDamage: dmgOf(g, false), label: g.name, armorPiercing: g.armorPiercing }));
@@ -50243,6 +50366,27 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const shots = Math.max(1, def.perBurst || 1);
         const each = dmgOf(g, true) / shots;
         return Array.from({ length: shots }, () => ({ weaponDamage: each, label: g.name, armorPiercing: g.armorPiercing }));
+    }
+    // The hero's usable (unbroken, non-shield) hand items split into handguns
+    // (shoot at range) and everything else (melee weapons). `handguns` /
+    // `others` hold { handKey, name }.
+    function getHandgunSplit(equipmentObj, inventoryList, rarities = itemRarities) {
+        const eq = equipmentObj || EMPTY_EQUIPMENT;
+        const resolvedHands = resolveEquippedItems(eq, inventoryList || []);
+        const handguns = [], others = [];
+        for (const handKey of ['weaponRight', 'weaponLeft']) {
+            const name = eq[handKey];
+            if (!name)
+                continue;
+            const item = resolvedHands[handKey];
+            if (isShieldItem(item) || isShieldItemName(name))
+                continue;
+            const rarity = findItemRarity(name, rarities) || 'common';
+            if (item && isItemBroken(item, rarity))
+                continue;
+            (isHandgunWeaponName(name) ? handguns : others).push({ handKey, name });
+        }
+        return { handguns, others };
     }
     // Melee swing plan for the hero (non-ranged, non-gun attacks):
     //  - one-handed weapon in ONE hand (or bare fists): a swing costs 1 action,
@@ -50269,6 +50413,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 continue;
             weapons.push({ name, item, rarity });
         }
+        // A pistol never takes part in melee when there's another melee weapon
+        // in hand: the one-handed weapon does the swinging (alone it gets two
+        // separate 1-action strikes, like any lone one-handed weapon).
+        if (weapons.some(w => isHandgunWeaponName(w.name)) && weapons.some(w => !isHandgunWeaponName(w.name))) {
+            for (let i = weapons.length - 1; i >= 0; i--)
+                if (isHandgunWeaponName(weapons[i].name))
+                    weapons.splice(i, 1);
+        }
         if (weapons.length === 0)
             return { swings: null, endsTurn: false };
         if (weapons.length === 1)
@@ -50276,7 +50428,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const swings = weapons.slice(0, 2).map(w => ({
             weaponDamage: getWeaponDamageForSlot('weapon', w.rarity, !!(w.item && w.item.twoHanded), w.item && w.item.statRoll, w.item),
             label: w.name,
-            armorPiercing: !!(w.item && w.item.armorPiercing === true)
+            armorPiercing: getArmorPierceForItem(w.item, w.rarity) || 0
         }));
         return { swings, endsTurn: true };
     }
@@ -50343,6 +50495,25 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const key = ally.name.trim().toLowerCase();
         return { equipment: partyEquipment[key] || EMPTY_EQUIPMENT, inventory: partyInventories[key] || [], itemRarities, wearKey: key };
     }
+    // What a companion actually fights with right now. A firearm other than a
+    // handgun behaves as before. A handgun shoots (damage from the pistol only,
+    // the other hand's weapon left out); if the companion is also locked in
+    // melee and holds a melee weapon, that weapon fights instead and the pistol
+    // sits out. `equipment` is the loadout to rate damage / wear from.
+    function getAllyCombatKit(ally, state) {
+        const load = getAllyLoadout(ally);
+        const eq = load.equipment;
+        const split = getHandgunSplit(eq, load.inventory, load.itemRarities);
+        if (split.handguns.length === 0)
+            return { equipment: eq, gunFx: getLoadoutGunFxId(eq) };
+        const without = list => { const out = { ...eq }; list.forEach(h => { out[h.handKey] = null; }); return out; };
+        if (split.others.length > 0) {
+            if (state && getActiveLockPartner(state, 'ally:' + ally.id))
+                return { equipment: without(split.handguns), gunFx: null };
+            return { equipment: without(split.others), gunFx: getLoadoutGunFxId(eq) };
+        }
+        return { equipment: eq, gunFx: getLoadoutGunFxId(eq) };
+    }
     function allyWearOf(state, ally) { return ((state && state.allyGearWear) || {})[getAllyLoadout(ally).wearKey]; }
     // A companion's gear wears exactly like the hero's, tracked per companion
     // (combat.allyGearWear[key] = { [itemName]: unitsLost }) against their own
@@ -50355,12 +50526,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // getAllyLoadout), and its wear is keyed by its unique combat id — a name could collide between two
     // "Guard" reinforcements. endCombatAndClose skips those keys (nothing
     // persistent to fold them into: a reinforcement isn't in the party).
-    function applyAllyWear(prev, ally, event) {
+    function applyAllyWear(prev, ally, event, eqOverride) {
         const load = getAllyLoadout(ally);
         const key = load.wearKey;
         const allWear = prev.allyGearWear || {};
         const wear = allWear[key] || {};
-        const eq = load.equipment;
+        const eq = eqOverride || load.equipment;
         const base = load.inventory;
         const rarities = load.itemRarities;
         const inv = overlayGearWear(base, wear, rarities);
@@ -50471,10 +50642,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // whichever pool guards the part it happened to land on.
         const poolKey = armorPoolKeyForPart(partKey);
         const curPool = Math.max(0, (enemy.armorPools && enemy.armorPools[poolKey] && enemy.armorPools[poolKey].cur) || 0);
-        const armored = curPool > 0 && !armorPiercing;
         const rawDmg = Math.max(1, Math.round(riposteDamage));
-        const absorbed = armored ? Math.min(curPool, rawDmg) : 0;
-        const dmg = rawDmg - absorbed;
+        const { armored, absorbed, dmg } = splitArmorHit(rawDmg, curPool, armorPiercing || 0, enemyPhysAbsorbPct(enemy));
         const armorPools = armored ? { ...enemy.armorPools, [poolKey]: { ...enemy.armorPools[poolKey], cur: curPool - absorbed } } : enemy.armorPools;
         const newHp = Math.max(0, targetState.hp - dmg);
         const justDisabled = newHp === 0 && !targetState.disabled;
@@ -50734,18 +50903,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const rawDmg = Math.max(1, Math.round(rolled.dmg));
             const poolKey = armorPoolKeyForPart(partKey);
             const curPool = Math.max(0, (defender.armorPools && defender.armorPools.cur && defender.armorPools.cur[poolKey]) || 0);
-            const armored = curPool > 0 && !attacker.armorPiercing;
-            let dmg, armorJustBroke = false, armorPoolNext = null, absorbedDmg = 0;
+            const split = splitArmorHit(rawDmg, curPool, attacker.armorPiercing || 0, defender.physAbsorb || 0);
+            const armored = split.armored;
+            let dmg = split.dmg, armorJustBroke = false, armorPoolNext = null, absorbedDmg = 0;
             if (armored) {
-                const absorbed = Math.min(curPool, rawDmg);
-                absorbedDmg = absorbed;
-                dmg = rawDmg - absorbed;
-                const nextPool = curPool - absorbed;
+                absorbedDmg = split.absorbed;
+                const nextPool = curPool - split.absorbed;
                 armorJustBroke = nextPool <= 0;
                 armorPoolNext = { ...(defender.armorPools.cur || {}), [poolKey]: nextPool };
-            }
-            else {
-                dmg = rawDmg;
             }
             const newHp = Math.max(0, targetState.hp - dmg);
             const justDisabled = newHp === 0 && !targetState.disabled;
@@ -50843,7 +51008,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 riposteDamage = Math.max(1, Math.round(defender.weaponDamage * COMBAT_TUNING.parryRiposteFraction * defender.mods.damageMultiplier));
                 log.push({ text: defender.name + ' — ' + t('combatLogParryRiposteText'), kind: 'hit' });
             }
-            return { parts: defender.parts, riposteDamage, riposteArmorPiercing: !!defender.armorPiercing, log, defeated: false, resultKind, dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null };
+            return { parts: defender.parts, riposteDamage, riposteArmorPiercing: defender.armorPiercing || 0, log, defeated: false, resultKind, dmg: 0, partKey, partLabel, justDisabled: false, stunApplied: false, isCrit: false, morale: defender.morale, moraleBreak: null };
         }
         const rolled = computeWeaponDamage(attacker.weaponDamage, attacker.power, attacker.mods, attacker.agility, forceCrit);
         const softenedDmg = rolled.dmg;
@@ -50857,20 +51022,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // isn't worn down by a hit it never actually stopped.
         const poolKey = armorPoolKeyForPart(partKey);
         const curPool = Math.max(0, (defender.armorPools && defender.armorPools.cur && defender.armorPools.cur[poolKey]) || 0);
-        const armored = curPool > 0 && !attacker.armorPiercing;
-        let dmg, armorPoolKey = null, armorPoolNext = null, armorJustBroke = false, absorbedDmg = 0;
+        let armorPoolKey = null, armorPoolNext = null, armorJustBroke = false, absorbedDmg = 0;
         const rawDmg = Math.max(1, Math.round(softenedDmg));
+        const split = splitArmorHit(rawDmg, curPool, attacker.armorPiercing || 0, defender.physAbsorb || 0);
+        const armored = split.armored;
+        let dmg = split.dmg;
         if (armored) {
-            const absorbed = Math.min(curPool, rawDmg);
-            absorbedDmg = absorbed;
-            dmg = rawDmg - absorbed;
+            absorbedDmg = split.absorbed;
             armorPoolKey = poolKey;
-            const nextPool = curPool - absorbed;
+            const nextPool = curPool - split.absorbed;
             armorJustBroke = nextPool <= 0;
             armorPoolNext = { ...(defender.armorPools.cur || {}), [poolKey]: nextPool };
-        }
-        else {
-            dmg = rawDmg;
         }
         const newHp = Math.max(0, targetState.hp - dmg);
         const justDisabled = newHp === 0 && !targetState.disabled;
@@ -50929,11 +51091,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // immunity) apply to the punch. A future weapon-swap-from-inventory
     // system can replace this by equipping a melee weapon instead.
     function asUnarmedActor(actor) {
-        return { ...actor, weaponDamage: UNARMED_DAMAGE, weaponLabel: t('combatUnarmedLabel'), armorPiercing: false };
+        return { ...actor, weaponDamage: UNARMED_DAMAGE, weaponLabel: t('combatUnarmedLabel'), armorPiercing: 0 };
     }
     function makeHeroActor(mods, wear) {
         const weaponInfo = getPlayerWeaponInfo(wear);
-        return { name: heroName || t('combatYouLabel'), parts: null, agility: gameState.stats.agility, power: gameState.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: !!weaponInfo.armorPiercing, mods, isEnemy: false };
+        return { name: heroName || t('combatYouLabel'), parts: null, agility: gameState.stats.agility, power: gameState.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: weaponInfo.armorPiercing || 0, mods, isEnemy: false };
     }
     // A firearm volley as separate bullets (see gunVolleyDamages): every bullet
     // is its own resolveOneAttack — own hit roll, body part and damage — against
@@ -50972,7 +51134,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             armorPoolNext: armorSrc ? armorSrc.armorPoolNext : null,
             attackerGearWear: gearSrc ? gearSrc.attackerGearWear : undefined,
             enemyGearWear: enemyGearSrc ? enemyGearSrc.enemyGearWear : undefined,
-            riposteDamage: 0, riposteArmorPiercing: false,
+            riposteDamage: 0, riposteArmorPiercing: 0,
             log,
             defeated: results.some(o => o.defeated),
             resultKind: results.some(o => o.resultKind === 'vital') ? 'vital' : (landed.length > 0 ? 'hit' : last.resultKind),
@@ -51006,12 +51168,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // see resolveOneAttack's single shared pool-absorption branch. getDefenseForPart
         // stays around only for the equipment screen's own flat "how armored is
         // this build" stat display (computeTotalArmorDefense), not for combat math.
-        return { name: heroName || t('combatYouLabel'), parts, isEnemy: false, agility: gameState.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getPlayerDefenseForPart(k, wear), weaponDamage: getPlayerWeaponInfo(wear).damage, armorPiercing: !!getPlayerWeaponInfo(wear).armorPiercing, mods, guaranteedBlock: !!guaranteedBlock, armorPools: { cur: armorCur || { body: 0, head: 0 } } };
+        return { name: heroName || t('combatYouLabel'), parts, isEnemy: false, agility: gameState.stats.agility, defenseAvailability: availability, physAbsorb: absorbPctFromDefense(computeTotalArmorDefense(equipment, wear ? overlayGearWear(gameState.inventory, wear, itemRarities) : gameState.inventory, itemRarities)), getDefenseForPart: (k) => getPlayerDefenseForPart(k, wear), weaponDamage: getPlayerWeaponInfo(wear).damage, armorPiercing: getPlayerWeaponInfo(wear).armorPiercing || 0, mods, guaranteedBlock: !!guaranteedBlock, armorPools: { cur: armorCur || { body: 0, head: 0 } } };
     }
-    function makeAllyActor(ally, mods, wear) {
+    function makeAllyActor(ally, mods, wear, eqOverride) {
         const load = getAllyLoadout(ally);
-        const weaponInfo = getWeaponInfoForLoadout(load.equipment, overlayGearWear(load.inventory, wear, load.itemRarities), t('combatUnarmedLabel'), load.itemRarities);
-        return { name: ally.name, parts: null, agility: ally.stats.agility, power: ally.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: !!weaponInfo.armorPiercing, mods, isEnemy: false };
+        const weaponInfo = getWeaponInfoForLoadout(eqOverride || load.equipment, overlayGearWear(load.inventory, wear, load.itemRarities), t('combatUnarmedLabel'), load.itemRarities);
+        return { name: ally.name, parts: null, agility: ally.stats.agility, power: ally.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: weaponInfo.armorPiercing || 0, mods, isEnemy: false };
     }
     function makeAllyDefender(ally, mods, wear) {
         const load = getAllyLoadout(ally);
@@ -51019,7 +51181,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const inv = overlayGearWear(load.inventory, wear, load.itemRarities);
         const availability = computeDefenseAvailability(eq, inv, load.itemRarities);
         const weaponInfo = getWeaponInfoForLoadout(eq, inv, t('combatUnarmedLabel'), load.itemRarities);
-        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k, load.itemRarities), weaponDamage: weaponInfo.damage, armorPiercing: !!weaponInfo.armorPiercing, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart, armorPools: { cur: (ally.armorPools && ally.armorPools.cur) || { body: 0, head: 0 } } };
+        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, physAbsorb: absorbPctFromDefense(computeTotalArmorDefense(eq, inv, load.itemRarities)), getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k, load.itemRarities), weaponDamage: weaponInfo.damage, armorPiercing: weaponInfo.armorPiercing || 0, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart, armorPools: { cur: (ally.armorPools && ally.armorPools.cur) || { body: 0, head: 0 } } };
     }
     // powerMult (optional): a one-off multiplier for a single buffed swing —
     // see runAutoTurn's boss-tier "power surge" turn — layered on top of, not
@@ -51040,10 +51202,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         let weapon = null;
         if (enemy.equipment && enemy.inventory && (!enemy.kind || enemy.kind === ENEMY_KIND_DEFAULT)) {
             const rar = enemy.itemRarities || {};
-            weapon = getWeaponInfoForLoadout(enemy.equipment, overlayGearWear(enemy.inventory, enemy.gearWear, rar), enemy.weaponDescription || t('combatUnarmedLabel'), rar);
+            // An enemy whose combat spec says armorPiercing has its weapons flagged.
+            const enemyInv = overlayGearWear(enemy.inventory, enemy.gearWear, rar);
+            weapon = getWeaponInfoForLoadout(enemy.equipment, enemy.armorPiercing === true ? enemyInv.map(it => (it.slot === 'weapon' && !it.shield) ? { ...it, armorPiercing: true } : it) : enemyInv, enemy.weaponDescription || t('combatUnarmedLabel'), rar);
         }
         const mods = { ...aggregateEffectModifiers([]), damageMultiplier: clampDamageMultiplier(totalDamageMult) };
-        return { name: enemy.enemyName, parts: null, agility: Math.round(enemy.precision * precisionMult), power: enemy.power, weaponDamage: weapon ? weapon.damage : naturalWeaponDamage(enemy), weaponLabel: weapon ? weapon.label : enemy.weaponDescription, armorPiercing: enemy.armorPiercing === true || !!(weapon && weapon.armorPiercing), mods, isEnemy: false, gearRef: enemy };
+        return { name: enemy.enemyName, parts: null, agility: Math.round(enemy.precision * precisionMult), power: enemy.power, weaponDamage: weapon ? weapon.damage : naturalWeaponDamage(enemy), weaponLabel: weapon ? weapon.label : enemy.weaponDescription, armorPiercing: weapon ? (weapon.armorPiercing || 0) : (enemy.armorPiercing === true ? ARMOR_PIERCE_ONE_HANDED_BY_RARITY.common : 0), mods, isEnemy: false, gearRef: enemy };
     }
     function makeEnemyDefender(enemy, enemies) {
         // Every physical armor piece an enemy rolled on spawn (see
@@ -51066,7 +51230,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // past the point of giving up — it never breaks/flees once enraged,
         // regardless of how the group-morale roll would otherwise land.
         const canBreak = enemy.enraged ? false : (enemies || []).some(isEnemyDown);
-        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, fearless: !!enemy.fearless, canBreak, morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart, armorPools, gearRef: enemy };
+        return { name: enemy.enemyName, parts: enemy.parts, isEnemy: true, fearless: !!enemy.fearless, canBreak, morale: typeof enemy.morale === 'number' ? enemy.morale : COMBAT_TUNING.moraleStart, armorPools, physAbsorb: enemyPhysAbsorbPct(enemy), gearRef: enemy };
     }
     // Generic actor/defender construction by {type, id} — used only by
     // attemptOpportunityAttacks just below, which (unlike every other combat
@@ -51614,7 +51778,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // punches instead. Firearms still fire point-blank.
                 const allyLockedShooter = allyWeaponType === 'ranged' && isBowLoadout(allyLoad.equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
                 // A companion with a firearm (pistol included) shoots from range.
-                const allyGunFx = getLoadoutGunFxId(allyLoad.equipment);
+                const allyKit = getAllyCombatKit(ally, prev);
+                const allyGunFx = allyKit.gunFx;
                 const allyIsRanged = (allyWeaponType === 'ranged' || !!allyGunFx) && !allyLockedShooter;
                 if (!allyIsRanged && chebyshevDistance(ally.pos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                     return prev;
@@ -51639,8 +51804,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const allyRangedMult = allyIsRanged ? computeRangedHitMultiplier(ally.pos, enemy.pos, prev.coverCells) : 1;
                 let log = lineBlockLog ? [...prev.log, lineBlockLog] : prev.log;
                 const attacker = allyLockedShooter
-                    ? asUnarmedActor(makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally)))
-                    : makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally));
+                    ? asUnarmedActor(makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), allyKit.equipment))
+                    : makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), allyKit.equipment);
                 if (friendlyBlocker)
                     return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, friendlyBlocker, log);
                 const forceCrit = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + enemy.id, ally.pos, enemy.pos);
@@ -51650,7 +51815,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 log = [...log, ...outcome.log];
                 let allyGearWear = prev.allyGearWear || {};
                 if (!allyLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
-                    const w = applyAllyWear(prev, ally, { type: 'strike' });
+                    const w = applyAllyWear(prev, ally, { type: 'strike' }, allyKit.equipment);
                     allyGearWear = w.allyGearWear;
                     log = [...log, ...w.log];
                 }
@@ -51680,8 +51845,16 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // ranged shot with that ability's animation (see GUN_FX_DEFS).
             // No gun ability picked but a firearm is in hand: still a gun shot (its
             // own bullets / animation) — never the bow-arrow fallback.
+            // A pistol in hand shoots (no ability needed) — unless the hero is locked
+            // in melee while also holding a melee weapon: then that weapon fights and
+            // the pistol sits out (see getMeleeSwingPlan). A lone pistol still fires
+            // point-blank like any firearm.
+            const handSplit = getHandgunSplit(equipment, overlayGearWear(gameState.inventory, prev.gearWear, itemRarities));
+            const pistolShoots = heroWeaponType !== 'ranged' && handSplit.handguns.length > 0
+                && !(getActiveLockPartner(prev, 'hero:hero') && handSplit.others.length > 0);
+            const pistolFx = pistolShoots ? (handSplit.handguns.length >= 2 ? 'dualPistols' : 'pistol') : null;
             const heroGunFx = (gunAbilityId && gameState.abilities.includes(gunAbilityId) && ABILITY_DEFS[gunAbilityId] && ABILITY_DEFS[gunAbilityId].weaponFx)
-                || (heroWeaponType === 'ranged' && !isBowLoadout(equipment) ? getLoadoutGunFxId(equipment) : null) || null;
+                || (heroWeaponType === 'ranged' && !isBowLoadout(equipment) ? getLoadoutGunFxId(equipment) : null) || pistolFx || null;
             // Locked in melee: a bow/crossbow can't be drawn — the hero punches
             // instead. Firearms (rifle, автомат...) still fire point-blank.
             const heroLockedShooter = !heroGunFx && heroWeaponType === 'ranged' && isBowLoadout(equipment) && !!getActiveLockPartner(prev, 'hero:hero');
@@ -51696,7 +51869,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // pistols in both hands, an SMG/rifle/railgun burst, a bow or crossbow
             // is one attack that ends the turn.
             const heroHandNames = [equipment.weaponRight, equipment.weaponLeft].filter(n => n && !isShieldItemName(n));
-            const heroHandgunCount = heroHandNames.filter(n => isHandgunWeaponName(n)).length;
+            const heroHandgunCount = handSplit.handguns.length;
             const heroLoneHandgun = heroHandNames.length === 1 && heroHandgunCount === 1;
             let rangedEndsTurn = false;
             if (heroIsRanged)
@@ -51840,7 +52013,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             let gearWear = prev.gearWear || {};
             if (!heroLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
                 const invNow = overlayGearWear(gameState.inventory, gearWear, itemRarities);
-                const w = applyHeroWearOps(gearWear, buildHeroStrikeWearOps({ equipment, inventory: invNow, itemRarities }));
+                // Only the weapon actually used wears: the pistol(s) when shooting,
+                // the melee weapon(s) when a pistol is also in hand and the hero fights hand to hand.
+                const usedHands = (handSplit.handguns.length > 0 && handSplit.others.length > 0)
+                    ? (gunPlan ? handSplit.handguns : handSplit.others).map(h => h.handKey) : undefined;
+                const w = applyHeroWearOps(gearWear, buildHeroStrikeWearOps({ equipment, inventory: invNow, itemRarities, handKeys: usedHands }));
                 gearWear = w.gearWear;
                 log = [...log, ...w.log];
             }
@@ -52104,16 +52281,24 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const c = (type === 'ally' ? state.allies : state.enemies).find(x => x.id === id);
         return c ? c.pos : null;
     }
+    // Hero counts as a shooter with a ranged weapon or a pistol that is
+    // currently the one being used (not sitting out during melee).
+    function heroIsShooter(state) {
+        if (getLoadoutWeaponType(equipment, gameState.inventory) === 'ranged')
+            return true;
+        const sp = getHandgunSplit(equipment, gameState.inventory);
+        return sp.handguns.length > 0 && !(state && getActiveLockPartner(state, 'hero:hero') && sp.others.length > 0);
+    }
     function supIsShooter(state, key) {
         if (key === 'hero:hero')
-            return getLoadoutWeaponType(equipment, gameState.inventory) === 'ranged';
+            return heroIsShooter(state);
         const i = key.indexOf(':'), type = key.slice(0, i), id = key.slice(i + 1);
         if (type === 'ally') {
             const a = state.allies.find(x => x.id === id);
             if (!a)
                 return false;
             const l = getAllyLoadout(a);
-            return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged';
+            return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged' || !!getAllyCombatKit(a, state).gunFx;
         }
         const e = state.enemies.find(x => x.id === id);
         return !!e && (e.role === 'ranged' || e.role === 'caster' || getEnemyWeaponType(e) === 'ranged');
@@ -52499,7 +52684,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // aiChooseMeleeMove near the grid helpers). `side` is the mover's side
     // ('enemy' | 'ally'); threats are the opposing side, friends its own.
     function buildAiTacticalCtx(state, side, unit, range) {
-        const heroRanged = getLoadoutWeaponType(equipment, gameState.inventory) === 'ranged';
+        const heroRanged = heroIsShooter(state);
         let threats, friends;
         if (side === 'enemy') {
             threats = [];
@@ -52509,7 +52694,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 if (isAllyOut(a) || !a.pos)
                     return;
                 const l = getAllyLoadout(a);
-                const r = getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged';
+                const r = getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged' || !!getAllyCombatKit(a, state).gunFx;
                 threats.push({ pos: a.pos, hpFraction: hpFractionOfParts(a.parts), squishy: r, ranged: r });
             });
             friends = state.enemies.filter(e => !isEnemyOut(e) && e.id !== unit.id && e.pos).map(e => ({ pos: e.pos }));
@@ -52650,9 +52835,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     const poolKey = armorPoolKeyForPart(partKey);
                     const curPool = Math.max(0, (ally.armorPools && ally.armorPools.cur && ally.armorPools.cur[poolKey]) || 0);
                     const rawDmg = Math.max(1, Math.round(rolled.dmg));
-                    const armored = curPool > 0 && !(punisher.armorPiercing === true);
-                    const absorbed = armored ? Math.min(curPool, rawDmg) : 0;
-                    const dmg = rawDmg - absorbed;
+                    const { armored, absorbed, dmg } = splitArmorHit(rawDmg, curPool, punisherActor.armorPiercing || 0, (() => { const pl = getAllyLoadout(ally); return absorbPctFromDefense(computeTotalArmorDefense(pl.equipment, overlayGearWear(pl.inventory, allyWearOf(prev, ally), pl.itemRarities), pl.itemRarities)); })());
                     const armorPoolsAfter = armored ? { ...ally.armorPools, cur: { ...ally.armorPools.cur, [poolKey]: curPool - absorbed } } : ally.armorPools;
                     const newHp = Math.max(0, targetState.hp - dmg);
                     const justDisabled = newHp === 0 && !targetState.disabled;
@@ -52687,7 +52870,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     return prev;
                 // A summoned/AI companion armed with a firearm shoots from where it
                 // stands (no walking up to melee range), at any living enemy.
-                const aiGunFx = getLoadoutGunFxId(getAllyLoadout(ally).equipment);
+                const aiKit = getAllyCombatKit(ally, prev);
+                const aiGunFx = aiKit.gunFx;
                 // Tactical AI: roll this companion's personality the first time it
                 // acts (see AI_TACTIC_DEFS) and keep it for the rest of the fight.
                 let aiAlly = ally;
@@ -52763,7 +52947,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     return { ...prev, log, result: 'victory' };
                 // Locked in melee with a bow/crossbow in hand: punch instead of shooting.
                 const aiAllyLockedShooter = isBowLoadout(getAllyLoadout(ally).equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
-                const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally));
+                const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), aiKit.equipment);
                 const attackerRaw = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
                 const attacker = ally.suppressed ? { ...attackerRaw, weaponDamage: attackerRaw.weaponDamage * COMBAT_TUNING.suppressedDamageMult } : attackerRaw;
                 // Firearm shot: a friend standing on the line of fire may take it.
@@ -52791,7 +52975,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // A landed strike wears the companion's weapon(s), same as the hero's.
                 let allyGearWear = prev.allyGearWear || {};
                 if (!aiAllyLockedShooter && (outcome.resultKind === 'hit' || outcome.resultKind === 'vital')) {
-                    const w = applyAllyWear(prev, ally, { type: 'strike' });
+                    const w = applyAllyWear(prev, ally, { type: 'strike' }, aiKit.equipment);
                     allyGearWear = w.allyGearWear;
                     log = [...log, ...w.log];
                 }
@@ -53129,8 +53313,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const initialTargetChoice = pickBestTarget(targets, tg => {
                 const hpFraction = tg.kind === 'hero' ? heroPartsHealthRatio(prev.heroParts) : hpFractionOfParts(tg.ally.parts);
                 const squishy = tg.kind === 'hero'
-                    ? getLoadoutWeaponType(equipment, gameState.inventory) === 'ranged'
-                    : (() => { const l = getAllyLoadout(tg.ally); return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged'; })();
+                    ? heroIsShooter(prev)
+                    : (() => { const l = getAllyLoadout(tg.ally); return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged' || !!getAllyCombatKit(tg.ally, prev).gunFx; })();
                 const protectBonus = vulnerableFriends.some(v => chebyshevDistance(tg.pos, v.pos) <= MELEE_ATTACK_MAX_DISTANCE);
                 return scoreCombatTarget({ hpFraction, squishy, protectBonus }, { role: enemy.role, tierRank: ENEMY_TIER_RANKS[enemy.tier] });
             });
@@ -55848,7 +56032,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: viewedState, equipment: viewedEquipment, itemRarities: viewedItemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: isLatestTurn ? openEquipPicker : undefined, onOpenItemDetail: openItemDetailFromEquipment, onEquip: isLatestTurn ? equipItemInSlot : undefined, onUnequip: isLatestTurn ? unequipSlot : undefined, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
-        combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroWeaponType: getLoadoutWeaponType(equipment, gameState.inventory), heroBow: isBowLoadout(equipment), heroFirearm: getLoadoutGunFxId(equipment), allyFirearms: Object.fromEntries((combat.allies || []).map(a => [a.name.trim().toLowerCase(), getLoadoutGunFxId(getAllyLoadout(a).equipment)])), allyBows: Object.fromEntries((combat.allies || []).map(a => {
+        combatModalOpen && combat && (React.createElement(CombatModal, { combat: combat, heroName: heroName, inventory: gameState.inventory, itemRarities: itemRarities, heroWeaponType: getLoadoutWeaponType(equipment, gameState.inventory), heroBow: isBowLoadout(equipment), heroFirearm: (() => {
+                const f = getLoadoutGunFxId(equipment);
+                if (!f)
+                    return f;
+                const sp = getHandgunSplit(equipment, gameState.inventory);
+                return (sp.handguns.length > 0 && sp.others.length > 0 && getActiveLockPartner(combat, 'hero:hero')) ? null : f;
+            })(), allyFirearms: Object.fromEntries((combat.allies || []).map(a => [a.name.trim().toLowerCase(), getAllyCombatKit(a, combat).gunFx])), allyBows: Object.fromEntries((combat.allies || []).map(a => {
                 const k = a.name.trim().toLowerCase();
                 return [k, isBowLoadout(getAllyLoadout(a).equipment)];
             })), allyWeaponTypes: Object.fromEntries((combat.allies || []).map(a => {
