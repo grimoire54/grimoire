@@ -13,12 +13,6 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0c0a09; }
   #root { min-height: 100vh; }
-  /* Same bouncing dots as the in-game "thinking" indicator (grim-dot-bounce). */
-  .boot-dots span { display: inline-block; animation: grim-dot-bounce 1.2s infinite ease-in-out; color: inherit; font-size: 1.1rem; }
-  .boot-dots span:nth-child(2) { animation-delay: 0.15s; }
-  .boot-dots span:nth-child(3) { animation-delay: 0.3s; }
-  @keyframes grim-dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .boot-dots span { animation: none !important; } }
 </style>
 <script>
 // React 19 + ReactDOM + Scheduler, bundled inline so the app has zero
@@ -17255,16 +17249,7 @@ window.ReactDOM = Object.assign({}, _domBase, _domClient);
     });
   })();
 </script>
-<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fbbf24;font:16px Georgia,serif;letter-spacing:.08em"><span>Grimoire RPG - <span id="boot-word">loading</span></span><span class="boot-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div></div>
-<script>
-  // Boot note wording follows the system language: Russian UI -> "загрузка", anything else -> "loading".
-  (function () {
-    var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
-    var ru = /^ru\b/i.test(String(langs[0] || ''));
-    var w = document.getElementById('boot-word');
-    if (w) w.textContent = ru ? 'загрузка' : 'loading';
-  })();
-</script>
+<div id="root"><div id="boot-note" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#78716c;font:16px Georgia,serif;letter-spacing:.08em">Гримуар — загрузка…</div></div>
 <script>
   // Minimal localStorage-backed stand-in for the window.storage API that
   // Claude.ai artifacts provide. grimoire.jsx was written against that
@@ -18029,6 +18014,7 @@ const TRANSLATIONS = {
         combatLogHitTag: 'Попадание',
         combatLogMissTag: 'Промах',
         combatLogLineBlockedText: 'оказывается на линии огня — выстрел, нацеленный на {target}, попадает в него',
+        combatLogStrayBulletText: 'шальная пуля, пролетев мимо цели, попадает в: {name}',
         combatLogEnemyAimsVerb: 'целится в',
         // Hero portrait's armor pools (see computeHeroArmorPoolMaxes) — the
         // combined head bar and the combined body bar (torso+руки+ноги).
@@ -18322,6 +18308,82 @@ const TRANSLATIONS = {
         mapLegendDanger: 'Возможна опасность',
         mapDangerLabel: 'Возможна опасность',
         mapRiskQuiet: 'Дорога тихая',
+        heroFactionHeading: 'Ваша фракция',
+        heroFactionNone: 'У вас нет своей фракции. Её можно основать в зачищенном месте, которое никому не принадлежит.',
+        heroFactionFound: 'Основать фракцию',
+        heroFactionFoundTitle: 'Основание фракции',
+        heroFactionFoundConfirm: 'Основать',
+        heroFactionNamePlaceholder: 'Название',
+        heroFactionNotePlaceholder: 'Девиз или описание (необязательно)',
+        heroFactionFocusLabel: 'Уклон',
+        heroFocus_trade: 'Торговый',
+        heroFocus_martial: 'Военный',
+        heroFocus_shadow: 'Тайный',
+        heroFocus_faith: 'Вера',
+        heroFocusHint_trade: 'Доход в полтора раза больше',
+        heroFocusHint_martial: 'Бойцы надёжнее защищают ваши земли',
+        heroFocusHint_shadow: 'В пути меньше засад',
+        heroFocusHint_faith: 'Людей проще позвать: хватит доверия 40',
+        heroFactionFoundHint_has: 'У вас уже есть фракция',
+        heroFactionFoundHint_name: 'Введите название (от 2 знаков)',
+        heroFactionFoundHint_taken: 'Такое название уже есть',
+        heroFactionFoundHint_place: 'Здесь нельзя основать штаб',
+        heroFactionFoundHint_held: 'Это место принадлежит другой фракции',
+        heroFactionFoundHint_danger: 'Сначала нужно устранить угрозу и осаду',
+        heroFactionFoundHint_cost: 'Не хватает денег',
+        heroFactionLevel1: 'Отряд',
+        heroFactionLevel2: 'Орден',
+        heroFactionLevel3: 'Дом',
+        heroFactionPeople: 'Людей',
+        heroFactionInfluence: 'Влияние',
+        heroFactionSeat: 'Штаб',
+        heroFactionTurnsShort: 'ходов',
+        heroFactionYours: 'Это ваша фракция',
+        heroFactionRankLabel: 'Ранг',
+        heroFactionRank_1: 'Соратник',
+        heroFactionRank_2: 'Член',
+        heroFactionRank_3: 'Офицер',
+        heroFactionJoin: 'Вступить',
+        heroFactionLeave: 'Покинуть',
+        heroFactionLeaveConfirm: 'Точно покинуть?',
+        heroFactionJoinHint_reputation: 'Для вступления нужна репутация от 25',
+        heroFactionJoinHint_war: 'Вы служите её врагам',
+        heroFactionJoinHint_limit: 'Можно состоять не более чем в двух фракциях',
+        heroFactionJoinHint_cooldown: 'Вы недавно ушли отсюда — подождите',
+        heroFactionRecruit: 'Позвать во фракцию',
+        heroFactionDismiss: 'Исключить',
+        heroFactionDismissConfirm: 'Точно исключить?',
+        heroFactionMemberTag: 'ваша фракция',
+        heroFactionDeserterTag: 'отвернулся',
+        heroFactionRecruitHint_reputation: 'Нужно доверие от {n}',
+        heroFactionRecruitHint_loyal: 'Предан своей фракции',
+        heroFactionRecruitHint_full: 'В фракции нет свободных мест',
+        heroFactionRecruitHint_unyielding: 'Не пойдёт под чужое знамя',
+        heroFactionPostLabel: 'Должность',
+        heroFactionPostIdle: 'нет места на этой должности',
+        heroFactionPostFull: 'мест нет',
+        heroFactionPost_guard: 'Страж',
+        heroFactionPost_scout: 'Разведчик',
+        heroFactionPost_envoy: 'Посол',
+        heroFactionPost_quartermaster: 'Казначей',
+        heroFactionPost_none: 'Без должности',
+        heroFactionPostHint_guard: 'Защищает ваши земли от захвата и осады',
+        heroFactionPostHint_scout: 'Раз в 4 хода раскрывает ближайшее неизвестное место и предупреждает о засадах. Мест: по уровню фракции',
+        heroFactionPostHint_envoy: 'Заключает союзы и мир. Каждый посол держит два договора. Мест: по уровню фракции',
+        heroFactionPostHint_quartermaster: 'Приносит доход каждые 10 ходов',
+        heroFactionPostHint_none: 'Просто член фракции',
+        heroTreatyAllied: 'Союз заключён',
+        heroTreatyPeace: 'Мир заключён',
+        heroTreatyBreak: 'Расторгнуть',
+        heroTreatyBreakConfirm: 'Точно расторгнуть?',
+        heroTreatyOfferAlliance: 'Предложить союз',
+        heroTreatyOfferPeace: 'Предложить мир',
+        heroTreatyHint_noenvoy: 'Для договоров нужен посол',
+        heroTreatyHint_capacity: 'Ваши послы уже держат все договоры',
+        heroTreatyHint_reputation: 'Не хватает расположения этой фракции',
+        heroTreatyHint_atwar: 'Сначала нужно заключить мир',
+        heroTreatyHint_conflict: 'Они воюют с фракцией, где вы служите',
+        heroTreatyHint_cost: 'Договор стоит {n} золота',
         mapRiskTense: 'Путь тревожный',
         mapRiskDeadly: 'Опасный путь',
         mapRiskReason_danger: 'угроза на пути',
@@ -18940,6 +19002,7 @@ const TRANSLATIONS = {
         combatLogHitTag: 'Hit',
         combatLogMissTag: 'Miss',
         combatLogLineBlockedText: 'is in the line of fire — the shot aimed at {target} hits them instead',
+        combatLogStrayBulletText: 'a stray bullet, missing its target, hits: {name}',
         combatLogEnemyAimsVerb: 'aims at',
         // Hero portrait's armor pools (see computeHeroArmorPoolMaxes) — the
         // combined head bar and the combined body bar (torso+arms+legs).
@@ -19225,6 +19288,82 @@ const TRANSLATIONS = {
         mapLegendDanger: 'Possible danger',
         mapDangerLabel: 'Possible danger',
         mapRiskQuiet: 'Quiet road',
+        heroFactionHeading: 'Your faction',
+        heroFactionNone: 'You have no faction of your own. You can found one at a cleared place that belongs to no one.',
+        heroFactionFound: 'Found a faction',
+        heroFactionFoundTitle: 'Founding a faction',
+        heroFactionFoundConfirm: 'Found',
+        heroFactionNamePlaceholder: 'Name',
+        heroFactionNotePlaceholder: 'Motto or description (optional)',
+        heroFactionFocusLabel: 'Focus',
+        heroFocus_trade: 'Mercantile',
+        heroFocus_martial: 'Martial',
+        heroFocus_shadow: 'Clandestine',
+        heroFocus_faith: 'Devout',
+        heroFocusHint_trade: 'Income is one and a half times higher',
+        heroFocusHint_martial: 'Fighters guard your lands more reliably',
+        heroFocusHint_shadow: 'Fewer ambushes on the road',
+        heroFocusHint_faith: 'Easier to call people: trust of 40 is enough',
+        heroFactionFoundHint_has: 'You already have a faction',
+        heroFactionFoundHint_name: 'Enter a name (at least 2 characters)',
+        heroFactionFoundHint_taken: 'That name is already taken',
+        heroFactionFoundHint_place: 'A seat cannot be founded here',
+        heroFactionFoundHint_held: 'This place belongs to another faction',
+        heroFactionFoundHint_danger: 'Clear the threat and any siege first',
+        heroFactionFoundHint_cost: 'Not enough money',
+        heroFactionLevel1: 'Band',
+        heroFactionLevel2: 'Order',
+        heroFactionLevel3: 'House',
+        heroFactionPeople: 'Members',
+        heroFactionInfluence: 'Influence',
+        heroFactionSeat: 'Seat',
+        heroFactionTurnsShort: 'turns',
+        heroFactionYours: 'This is your faction',
+        heroFactionRankLabel: 'Rank',
+        heroFactionRank_1: 'Associate',
+        heroFactionRank_2: 'Member',
+        heroFactionRank_3: 'Officer',
+        heroFactionJoin: 'Join',
+        heroFactionLeave: 'Leave',
+        heroFactionLeaveConfirm: 'Really leave?',
+        heroFactionJoinHint_reputation: 'Joining needs a standing of 25 or more',
+        heroFactionJoinHint_war: 'You serve its enemies',
+        heroFactionJoinHint_limit: 'You can belong to at most two factions',
+        heroFactionJoinHint_cooldown: 'You left recently — wait a while',
+        heroFactionRecruit: 'Call into the faction',
+        heroFactionDismiss: 'Dismiss',
+        heroFactionDismissConfirm: 'Really dismiss?',
+        heroFactionMemberTag: 'your faction',
+        heroFactionDeserterTag: 'turned away',
+        heroFactionRecruitHint_reputation: 'Needs trust of {n} or more',
+        heroFactionRecruitHint_loyal: 'Loyal to their own faction',
+        heroFactionRecruitHint_full: 'The faction has no free places',
+        heroFactionRecruitHint_unyielding: 'Will not follow another banner',
+        heroFactionPostLabel: 'Post',
+        heroFactionPostIdle: 'no room for this post',
+        heroFactionPostFull: 'no free places',
+        heroFactionPost_guard: 'Guard',
+        heroFactionPost_scout: 'Scout',
+        heroFactionPost_envoy: 'Envoy',
+        heroFactionPost_quartermaster: 'Quartermaster',
+        heroFactionPost_none: 'No post',
+        heroFactionPostHint_guard: 'Defends your lands against conquest and siege',
+        heroFactionPostHint_scout: 'Every 4 turns reveals the nearest unexplored place and warns of ambushes. Places: by faction level',
+        heroFactionPostHint_envoy: 'Signs alliances and peace. Each envoy keeps two treaties. Places: by faction level',
+        heroFactionPostHint_quartermaster: 'Brings in income every 10 turns',
+        heroFactionPostHint_none: 'Just a member of the faction',
+        heroTreatyAllied: 'Alliance in force',
+        heroTreatyPeace: 'Peace in force',
+        heroTreatyBreak: 'Break treaty',
+        heroTreatyBreakConfirm: 'Really break it?',
+        heroTreatyOfferAlliance: 'Propose an alliance',
+        heroTreatyOfferPeace: 'Propose peace',
+        heroTreatyHint_noenvoy: 'Treaties need an envoy',
+        heroTreatyHint_capacity: 'Your envoys already hold all they can',
+        heroTreatyHint_reputation: 'This faction does not like you enough',
+        heroTreatyHint_atwar: 'Make peace first',
+        heroTreatyHint_conflict: 'They are at war with a faction you serve',
+        heroTreatyHint_cost: 'A treaty costs {n} gold',
         mapRiskTense: 'Uneasy road',
         mapRiskDeadly: 'Dangerous road',
         mapRiskReason_danger: 'threat along the way',
@@ -19343,6 +19482,11 @@ const EMPTY_STATE = {
     // never the narrator's to set, and lives on state so regenerating a turn
     // (stateBefore) rolls it back for free.
     companionBonds: {},
+    // The hero's own standing among the factions — see HERO FACTIONS. Client-
+    // owned (the narrator never sets it) and lives on state, so regenerating
+    // a turn (stateBefore) rolls it back for free, like companionBonds. A
+    // literal rather than EMPTY_HERO_FACTIONS: that const is declared far below.
+    heroFactions: { memberships: [], departed: [], own: null },
     // See TALENT TREE below. `talents` maps a learned TALENT_DEFS node id to
     // its current rank (every node's maxRank is 1 today, but the field is
     // rank-shaped for headroom); `talentPoints` is the unspent balance the
@@ -20572,6 +20716,8 @@ function normalizeMapNode(raw) {
         arrowPending: raw.arrowPending === true,
         // Player's own marker and note for this place (never sent to the model).
         pin: MAP_PIN_OPTIONS.includes(raw.pin) ? raw.pin : null,
+        // Set by the hero faction's scouts (see applyHeroFactionScouting): an unexplored place's name, description and owner show on the map.
+        scouted: raw.scouted === true,
         note: typeof raw.note === 'string' ? raw.note.slice(0, MAP_NOTE_MAX) : '',
         // 'besieged' | 'burned' | null — set by the background world tick.
         status: MAP_NODE_STATUSES.includes(raw.status) ? raw.status : null,
@@ -21171,7 +21317,7 @@ function findMapRoute(mapState, fromId, toId, riskCtx) {
         const d = mapNodeDistance(node, other);
         if (!riskCtx || other.id === toId)
             return d;
-        return d + (routeLegRisk(other, d, riskCtx.factionReputations, riskCtx.recentBattleNodeIds, false).chance / 100) * ROUTE_RISK_WEIGHT_UNITS;
+        return d + (routeLegRisk(other, d, riskCtx.factionReputations, riskCtx.recentBattleNodeIds, false, riskCtx.allegiance).chance / 100) * ROUTE_RISK_WEIGHT_UNITS;
     };
     const dist = new Map([[fromId, 0]]);
     const prev = new Map();
@@ -21286,7 +21432,7 @@ function routeHoursAtIndex(path, byId, index) {
     }
     return units * ROUTE_HOURS_PER_UNIT;
 }
-function routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds, isNight) {
+function routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds, isNight, allegiance) {
     let chance = legDistance * ROUTE_ENCOUNTER_BASE_CHANCE_PER_UNIT;
     const reasons = [];
     if (node.danger) {
@@ -21309,10 +21455,25 @@ function routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds
         chance += ROUTE_NIGHT_BONUS;
         reasons.push('night');
     }
-    return { chance: Math.min(ROUTE_ENCOUNTER_MAX_CHANCE, chance), reasons };
+    // The hero's own side: lands of a faction they belong to or lead are safe
+    // to cross; lands of that faction's enemies are not, even while the
+    // hero's own standing there is still neutral.
+    if (allegiance) {
+        const factionKey = hfKey(node.faction);
+        if (factionKey && allegiance.friendly.has(factionKey)) {
+            chance -= FACTION_ROUTE_FRIENDLY_REDUCTION;
+            reasons.push('friendly');
+        }
+        else if (factionKey && allegiance.enemy.has(factionKey) && !reasons.includes('hostile')) {
+            chance += ROUTE_ENCOUNTER_HOSTILE_BONUS;
+            reasons.push('hostile');
+        }
+        chance -= allegiance.globalReduction || 0;
+    }
+    return { chance: Math.max(0, Math.min(ROUTE_ENCOUNTER_MAX_CHANCE, chance)), reasons };
 }
-function routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds, isNight) {
-    return routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds, isNight).chance;
+function routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds, isNight, allegiance) {
+    return routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds, isNight, allegiance).chance;
 }
 // Walks every INTERIOR node of the route in order (never the final
 // destination itself — arriving somewhere dangerous is just the ordinary
@@ -21324,7 +21485,7 @@ function routeLegRiskChance(node, legDistance, factionReputations, recentBattleN
 // position in `path`, letting the caller slice the route down to exactly
 // how far the hero actually got this turn. startPhase ('day' | 'night')
 // makes legs travelled after dark riskier.
-function resolveRouteInterruption(path, mapState, factionReputations, recentBattleNodeIds, startPhase) {
+function resolveRouteInterruption(path, mapState, factionReputations, recentBattleNodeIds, startPhase, allegiance) {
     const byId = new Map(mapState.nodes.map(n => [n.id, n]));
     for (let i = 1; i < path.length - 1; i += 1) {
         const node = byId.get(path[i]);
@@ -21333,7 +21494,7 @@ function resolveRouteInterruption(path, mapState, factionReputations, recentBatt
             continue;
         const legDistance = mapNodeDistance(prevNode, node);
         const isNight = routePhaseAtHours(startPhase, routeHoursAtIndex(path, byId, i)) === 'night';
-        const chance = routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds, isNight);
+        const chance = routeLegRiskChance(node, legDistance, factionReputations, recentBattleNodeIds, isNight, allegiance);
         if (Math.random() * 100 >= chance)
             continue;
         const ambushShare = node.danger ? ROUTE_AMBUSH_SHARE_DANGEROUS : ROUTE_AMBUSH_SHARE_DEFAULT;
@@ -21345,7 +21506,7 @@ function resolveRouteInterruption(path, mapState, factionReputations, recentBatt
 // against, for the map's scouting hint: overall chance that something
 // happens on the way, a coarse level, the reasons behind it, and what time
 // of day the hero would arrive in. Pure — never rolls anything.
-function assessRouteRisk(path, mapState, factionReputations, recentBattleNodeIds, startPhase) {
+function assessRouteRisk(path, mapState, factionReputations, recentBattleNodeIds, startPhase, allegiance) {
     const byId = new Map(mapState.nodes.map(n => [n.id, n]));
     let passChance = 1;
     const reasons = [];
@@ -21355,7 +21516,7 @@ function assessRouteRisk(path, mapState, factionReputations, recentBattleNodeIds
         if (!node || !prevNode)
             continue;
         const isNight = routePhaseAtHours(startPhase, routeHoursAtIndex(path, byId, i)) === 'night';
-        const leg = routeLegRisk(node, mapNodeDistance(prevNode, node), factionReputations, recentBattleNodeIds, isNight);
+        const leg = routeLegRisk(node, mapNodeDistance(prevNode, node), factionReputations, recentBattleNodeIds, isNight, allegiance);
         passChance *= 1 - leg.chance / 100;
         leg.reasons.forEach(r => { if (!reasons.includes(r))
             reasons.push(r); });
@@ -21553,6 +21714,7 @@ function normalizeGameState(raw) {
         // empty rather than dropping the whole save.
         dayPhase: raw.dayPhase === 'night' ? 'night' : 'day',
         worldEvents: normalizeWorldEvents(raw.worldEvents),
+        heroFactions: normalizeHeroFactions(raw.heroFactions),
         heroDeeds: normalizeHeroDeeds(raw.heroDeeds),
         companionBonds: normalizeCompanionBonds(raw.companionBonds),
         // abilities is no longer stored directly — see
@@ -21971,7 +22133,7 @@ function computeFactionTerritoryCounts(factions, mapNodes) {
 // territory to a faction with no stake in the fight, and it never touches
 // the hero's own current location — a flip happening literally under the
 // hero's feet belongs to the scene itself, not to this background system.
-function pickWorldTickEvent(factions, mapNodes, currentLocationId) {
+function pickWorldTickEvent(factions, mapNodes, currentLocationId, heroGuard) {
     const nodes = Array.isArray(mapNodes) ? mapNodes : [];
     const warPairs = [];
     const seenPairs = new Set();
@@ -21999,6 +22161,9 @@ function pickWorldTickEvent(factions, mapNodes, currentLocationId) {
     const besiegedCandidates = candidates.filter(n => n.status === 'besieged');
     const pool = (besiegedCandidates.length > 0 && Math.random() < 0.7) ? besiegedCandidates : candidates;
     const target = pool[Math.floor(Math.random() * pool.length)];
+    // The hero's own fighters can turn a conquest of their lands aside (see heroGuardHolds).
+    if (heroGuardHolds(heroGuard, target))
+        return null;
     return { id: `we-${Date.now()}-${target.id}`, locationId: target.id, locationName: target.name, fromFaction: defender, toFaction: attacker };
 }
 // Statuses of places off-screen. A siege lasts WORLD_SIEGE_MAX_TURNS and then
@@ -22025,7 +22190,7 @@ function pickWorldStatusExpiry(mapNodes, turnIndex, currentLocationId) {
     }
     return null;
 }
-function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex) {
+function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex, heroGuard) {
     const nodes = Array.isArray(mapNodes) ? mapNodes : [];
     const expired = pickWorldStatusExpiry(nodes, turnIndex, currentLocationId);
     if (expired)
@@ -22044,7 +22209,577 @@ function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex) 
     const candidates = nodes.filter(n => n && n.id !== currentLocationId && !n.status && typeof n.faction === 'string' && warFactions.has(n.faction.trim().toLowerCase()));
     if (candidates.length === 0)
         return null;
-    return { nodeId: candidates[Math.floor(Math.random() * candidates.length)].id, status: 'besieged' };
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    if (heroGuardHolds(heroGuard, target))
+        return null;
+    return { nodeId: target.id, status: 'besieged' };
+}
+// ==============================================================================
+// HERO FACTIONS
+// The hero can swear into existing factions, found one of their own, and call
+// characters into it. Design rules:
+//  * Everything here lives on gameState (heroFactions, npc.faction, the
+//    faction's entry in `factions`, the HQ node's `faction`, `currency`), so
+//    regenerating a turn rolls it all back together. NOTHING writes to the
+//    separate reputation stores — consequences are DERIVED each time from
+//    the live numbers, so they can never drift out of sync with them:
+//      - a membership is active only while the faction's standing stays
+//        >= 0 and the faction isn't destroyed; the rank (associate /
+//        member / officer) is read straight off that standing;
+//      - an NPC counts as a loyal member only while their own standing
+//        toward the hero stays >= 0 (a deserter stays tagged, but counts for
+//        nothing until they warm up again or the hero dismisses them);
+//      - level, slots, influence, income and siege cover are all computed
+//        from the current members and held territory.
+//  * Outcomes are deterministic thresholds, not dice — same spirit as
+//    recruiting to the party ("reputation already gates who's eligible").
+//  * The narrator is TOLD these facts (buildHeroAllegianceNote) and never
+//    decides them; the player's own actions are the only thing that changes
+//    them.
+// ==============================================================================
+const HERO_FACTION_FOCUSES = ['trade', 'martial', 'shadow', 'faith'];
+const FACTION_EXPEL_REPUTATION = 0;
+const FACTION_MAX_MEMBERSHIPS = 2;
+const FACTION_REJOIN_COOLDOWN_TURNS = 20;
+const FACTION_FOUND_COST = 100;
+const FACTION_NAME_MAX = 40;
+const FACTION_NOTE_MAX = 140;
+const FACTION_RECRUIT_REPUTATION_FAITH = 40; // a devout faction asks for less trust (PARTY_REPUTATION_THRESHOLD otherwise)
+const FACTION_LEVELS = [{ minInfluence: 0, slots: 3 }, { minInfluence: 6, slots: 6 }, { minInfluence: 14, slots: 10 }];
+const FACTION_INCOME_INTERVAL = 10;
+const FACTION_INCOME_PER_TERRITORY = 4;
+const FACTION_INCOME_PER_TRADER = 3;
+const FACTION_TRADE_INCOME_MULTIPLIER = 1.5;
+const FACTION_ROUTE_FRIENDLY_REDUCTION = 12;
+const FACTION_SHADOW_ROUTE_REDUCTION = 6;
+const FACTION_GUARD_PER_FIGHTER = 0.25;
+const FACTION_GUARD_PER_FIGHTER_MARTIAL = 0.35;
+const FACTION_GUARD_MAX = 0.75;
+const FACTION_GUARD_MAX_MARTIAL = 0.85;
+const FACTION_MARTIAL_ROLE_PATTERN = /стражн|страж|воин|солдат|капитан|рыцар|наёмн|охранник|ратник|гвард|лучник|guard|soldier|warrior|captain|knight|mercenary|sentinel|fighter|archer/i;
+function hfKey(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+function normalizeHeroFactions(raw) {
+    const empty = { memberships: [], departed: [], own: null };
+    if (!raw || typeof raw !== 'object')
+        return empty;
+    const memberships = [];
+    for (const m of (Array.isArray(raw.memberships) ? raw.memberships : [])) {
+        if (!m || typeof m.faction !== 'string' || !m.faction.trim())
+            continue;
+        if (memberships.some(x => hfKey(x.faction) === hfKey(m.faction)))
+            continue;
+        memberships.push({ faction: m.faction.trim(), since: Number.isFinite(m.since) ? Math.trunc(m.since) : 0 });
+    }
+    const departed = (Array.isArray(raw.departed) ? raw.departed : [])
+        .filter(d => d && typeof d.faction === 'string' && d.faction.trim() && Number.isFinite(d.turn))
+        .map(d => ({ faction: d.faction.trim(), turn: Math.trunc(d.turn) }))
+        .slice(-12);
+    const o = raw.own;
+    const own = (o && typeof o === 'object' && typeof o.name === 'string' && o.name.trim())
+        ? {
+            name: o.name.trim().slice(0, FACTION_NAME_MAX),
+            focus: HERO_FACTION_FOCUSES.includes(o.focus) ? o.focus : 'trade',
+            hqId: typeof o.hqId === 'string' && o.hqId ? o.hqId : null,
+            since: Number.isFinite(o.since) ? Math.trunc(o.since) : 0,
+            // Treaties the hero's faction has signed (see HERO FACTION TREATIES).
+            treaties: normalizeHeroTreaties(o.treaties)
+        }
+        : null;
+    return { memberships, departed, own };
+}
+const FACTION_TREATY_STANCES = ['allied', 'peace'];
+function normalizeHeroTreaties(raw) {
+    const out = [];
+    for (const t of (Array.isArray(raw) ? raw : [])) {
+        if (!t || typeof t.faction !== 'string' || !t.faction.trim() || !FACTION_TREATY_STANCES.includes(t.stance))
+            continue;
+        if (out.some(x => hfKey(x.faction) === hfKey(t.faction)))
+            continue;
+        out.push({ faction: t.faction.trim(), stance: t.stance, since: Number.isFinite(t.since) ? Math.trunc(t.since) : 0 });
+    }
+    return out;
+}
+function heroOwnFaction(state) {
+    return state && state.heroFactions && state.heroFactions.own ? state.heroFactions.own : null;
+}
+function factionRankForReputation(reputation) {
+    if (reputation >= FACTION_HERO_REPUTATION_THRESHOLD)
+        return 3;
+    if (reputation >= FACTION_ALLY_REPUTATION_THRESHOLD)
+        return 2;
+    return 1;
+}
+// Memberships that currently count: standing not below FACTION_EXPEL_REPUTATION
+// and the faction still standing. Rank is read off the live standing.
+function activeMemberships(state, factionReputations) {
+    const list = state && state.heroFactions && Array.isArray(state.heroFactions.memberships) ? state.heroFactions.memberships : [];
+    const out = [];
+    for (const m of list) {
+        const reputation = findFactionReputation(m.faction, factionReputations || {});
+        if (reputation < FACTION_EXPEL_REPUTATION)
+            continue;
+        if (isFactionDestroyed(m.faction, state.npcs))
+            continue;
+        out.push({ faction: m.faction, since: m.since, reputation, rank: factionRankForReputation(reputation) });
+    }
+    return out;
+}
+// Which factions are the hero's own side and which are their enemies by
+// association (at war with a faction the hero belongs to or leads).
+function computeHeroAllegiance(state, factionReputations, npcReputations) {
+    const friendly = new Set();
+    const enemy = new Set();
+    const enemyNames = [];
+    if (!state || !state.heroFactions)
+        return { friendly, enemy, enemyNames, globalReduction: 0 };
+    const own = heroOwnFaction(state);
+    const friendlyNames = activeMemberships(state, factionReputations).map(m => m.faction);
+    if (own)
+        friendlyNames.push(own.name);
+    friendlyNames.forEach(n => friendly.add(hfKey(n)));
+    for (const name of friendlyNames) {
+        for (const r of getRelatedFactions(state.factions, name)) {
+            const k = hfKey(r.faction);
+            if (r.stance === 'war' && !friendly.has(k) && !enemy.has(k)) {
+                enemy.add(k);
+                enemyNames.push(r.faction);
+            }
+        }
+    }
+    // Scouts warn of ambushes; allies of the hero's own faction count as friendly
+    // ground (but their enemies don't become the hero's — no cascading feuds).
+    let globalReduction = 0;
+    const stats = own ? heroFactionStats(state, npcReputations || {}) : null;
+    if (stats) {
+        if (own.focus === 'shadow')
+            globalReduction += FACTION_SHADOW_ROUTE_REDUCTION;
+        globalReduction += Math.min(FACTION_SCOUT_REDUCTION_MAX, stats.scouts * FACTION_SCOUT_AMBUSH_REDUCTION);
+        for (const t of heroFactionActiveTreaties(state, npcReputations || {}, factionReputations)) {
+            if (t.stance === 'allied')
+                friendly.add(hfKey(t.faction));
+        }
+    }
+    return { friendly, enemy, enemyNames, globalReduction };
+}
+// 'ok', or why the hero can't swear into this faction right now.
+function factionJoinStatus(factionName, state, factionReputations, turnIndex) {
+    const key = hfKey(factionName);
+    const own = heroOwnFaction(state);
+    if (own && hfKey(own.name) === key)
+        return 'own';
+    if (isFactionDestroyed(factionName, state.npcs))
+        return 'destroyed';
+    const active = activeMemberships(state, factionReputations);
+    if (active.some(m => hfKey(m.faction) === key))
+        return 'member';
+    const left = state.heroFactions.departed.find(d => hfKey(d.faction) === key);
+    if (left && turnIndex - left.turn < FACTION_REJOIN_COOLDOWN_TURNS)
+        return 'cooldown';
+    if (findFactionReputation(factionName, factionReputations || {}) < FACTION_RESPECTED_REPUTATION_THRESHOLD)
+        return 'reputation';
+    const enemiesOfThis = getRelatedFactions(state.factions, factionName).filter(r => r.stance === 'war').map(r => hfKey(r.faction));
+    const mine = active.map(m => hfKey(m.faction));
+    if (own)
+        mine.push(hfKey(own.name));
+    if (mine.some(k => enemiesOfThis.includes(k)))
+        return 'war';
+    if (active.length >= FACTION_MAX_MEMBERSHIPS)
+        return 'limit';
+    return 'ok';
+}
+function joinHeroFaction(hf, factionName, turn) {
+    const key = hfKey(factionName);
+    return {
+        ...hf,
+        memberships: [...hf.memberships.filter(m => hfKey(m.faction) !== key), { faction: factionName.trim(), since: turn }],
+        departed: hf.departed.filter(d => hfKey(d.faction) !== key)
+    };
+}
+function leaveHeroFaction(hf, factionName, turn) {
+    const key = hfKey(factionName);
+    return {
+        ...hf,
+        memberships: hf.memberships.filter(m => hfKey(m.faction) !== key),
+        departed: [...hf.departed.filter(d => hfKey(d.faction) !== key), { faction: factionName.trim(), turn }].slice(-12)
+    };
+}
+// 'ok', or why a faction can't be founded here and now. node is the place the
+// hero stands in; it becomes the headquarters.
+function heroFactionFoundStatus(state, name, node) {
+    if (heroOwnFaction(state))
+        return 'has';
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (trimmed.length < 2)
+        return 'name';
+    if ((state.factions || []).some(f => f && hfKey(f.name) === hfKey(trimmed)))
+        return 'taken';
+    if (!node || node.kind === 'wilderness')
+        return 'place';
+    if (node.faction)
+        return 'held';
+    if (node.danger || node.status)
+        return 'danger';
+    if (state.currency < FACTION_FOUND_COST)
+        return 'cost';
+    return 'ok';
+}
+function foundHeroFaction(state, { name, focus, note }, node, turn) {
+    const cleanName = name.trim().slice(0, FACTION_NAME_MAX);
+    return {
+        ...state,
+        currency: state.currency - FACTION_FOUND_COST,
+        factions: [...state.factions, { name: cleanName, note: (note || '').trim().slice(0, FACTION_NOTE_MAX), relations: [] }],
+        heroFactions: {
+            ...state.heroFactions,
+            own: { name: cleanName, focus: HERO_FACTION_FOCUSES.includes(focus) ? focus : 'trade', hqId: node.id, since: turn, treaties: [] }
+        },
+        map: { ...state.map, nodes: state.map.nodes.map(n => (n.id === node.id ? { ...n, faction: cleanName } : n)) }
+    };
+}
+// Tagged members of the hero's faction who still stand by the hero.
+function heroFactionActiveMembers(state, npcReputations) {
+    const own = heroOwnFaction(state);
+    if (!own)
+        return [];
+    const key = hfKey(own.name);
+    return (state.npcs || []).filter(n => n && n.dead !== true && hfKey(n.faction) === key &&
+        findNpcReputation(n.name, npcReputations || {}) >= FACTION_EXPEL_REPUTATION);
+}
+// ---- Posts: what each member does for the faction ----
+// A member holds one post, picked by the player (npc.factionPost) or — until
+// they pick — read from the character's role. 'none' is an explicit "no post".
+// Scouts and envoys are capped at the faction's level; the cap is applied when
+// the holders are derived, so a lost level or a changed roster can never leave
+// more of them working than the faction can field.
+const FACTION_POSTS = ['guard', 'scout', 'envoy', 'quartermaster'];
+const FACTION_POST_DETECT_ORDER = ['envoy', 'scout', 'quartermaster', 'guard'];
+const FACTION_POST_PATTERNS = {
+    guard: FACTION_MARTIAL_ROLE_PATTERN,
+    scout: /разведч|следопыт|лазутчик|шпион|егерь|дозорн|scout|tracker|ranger|spy|pathfinder|lookout/i,
+    envoy: /посол|дипломат|гонец|глашатай|посланник|переговорщик|envoy|ambassador|diplomat|emissary|herald|negotiator/i,
+    quartermaster: /торгов|купец|купц|лавочн|продав|казначей|кладовщик|квартирмейстер|снабженец|merchant|trader|shopkeeper|vendor|treasurer|quartermaster|steward|provisioner/i
+};
+const FACTION_SCOUT_INTERVAL = 4;
+const FACTION_SCOUT_AMBUSH_REDUCTION = 3;
+const FACTION_SCOUT_REDUCTION_MAX = 9;
+const FACTION_TREATY_COST = 50;
+const FACTION_TREATIES_PER_ENVOY = 2;
+function detectFactionPost(role) {
+    if (typeof role !== 'string' || !role.trim())
+        return null;
+    for (const post of FACTION_POST_DETECT_ORDER)
+        if (FACTION_POST_PATTERNS[post].test(role))
+            return post;
+    return null;
+}
+function heroFactionPostOf(npc) {
+    if (!npc)
+        return null;
+    if (npc.factionPost === 'none')
+        return null;
+    if (FACTION_POSTS.includes(npc.factionPost))
+        return npc.factionPost;
+    return detectFactionPost(npc.role);
+}
+function heroFactionPostHolders(members, level) {
+    const out = { guard: [], scout: [], envoy: [], quartermaster: [] };
+    for (const n of members) {
+        const post = heroFactionPostOf(n);
+        if (!post)
+            continue;
+        if ((post === 'scout' || post === 'envoy') && out[post].length >= level)
+            continue;
+        out[post].push(n);
+    }
+    return out;
+}
+function heroFactionStats(state, npcReputations) {
+    const own = heroOwnFaction(state);
+    if (!own)
+        return null;
+    const members = heroFactionActiveMembers(state, npcReputations);
+    const territories = (state.map && state.map.nodes ? state.map.nodes : []).filter(n => hfKey(n.faction) === hfKey(own.name)).length;
+    const influence = members.length * 2 + territories * 3;
+    let levelIndex = 0;
+    FACTION_LEVELS.forEach((lv, i) => { if (influence >= lv.minInfluence)
+        levelIndex = i; });
+    const holders = heroFactionPostHolders(members, levelIndex + 1);
+    const fighters = holders.guard.length;
+    const traders = holders.quartermaster.length;
+    const martial = own.focus === 'martial';
+    const incomeRaw = territories * FACTION_INCOME_PER_TERRITORY + traders * FACTION_INCOME_PER_TRADER;
+    return {
+        own, members, territories, influence,
+        level: levelIndex + 1,
+        slots: FACTION_LEVELS[levelIndex].slots,
+        holders, fighters, traders,
+        scouts: holders.scout.length,
+        envoys: holders.envoy.length,
+        income: Math.round(incomeRaw * (own.focus === 'trade' ? FACTION_TRADE_INCOME_MULTIPLIER : 1)),
+        guardProtection: Math.min(martial ? FACTION_GUARD_MAX_MARTIAL : FACTION_GUARD_MAX, fighters * (martial ? FACTION_GUARD_PER_FIGHTER_MARTIAL : FACTION_GUARD_PER_FIGHTER))
+    };
+}
+// 'ok', or why this member can't take that post now.
+function heroFactionPostStatus(npc, post, state, npcReputations) {
+    const stats = heroFactionStats(state, npcReputations);
+    if (!stats || !npc)
+        return 'none';
+    if (!stats.members.some(m => hfKey(m.name) === hfKey(npc.name)))
+        return 'notmember';
+    if (post === 'none' || post === 'guard' || post === 'quartermaster')
+        return 'ok';
+    if (post !== 'scout' && post !== 'envoy')
+        return 'invalid';
+    if (stats.holders[post].some(m => hfKey(m.name) === hfKey(npc.name)))
+        return 'ok';
+    return stats.holders[post].length >= stats.level ? 'full' : 'ok';
+}
+// Scouts: every FACTION_SCOUT_INTERVAL turns each active scout learns what lies
+// in the nearest unexplored place — its name, description and owner show on
+// the map (the node's `scouted` flag) — nearest to the hero first.
+function applyHeroFactionScouting(state, turnIndex, npcReputations) {
+    if (!state || !(turnIndex > 0) || turnIndex % FACTION_SCOUT_INTERVAL !== 0)
+        return state;
+    const stats = heroFactionStats(state, npcReputations);
+    if (!stats || stats.scouts === 0)
+        return state;
+    const nodes = state.map.nodes || [];
+    const here = nodes.find(n => n.id === state.map.currentId) || null;
+    const score = n => (here ? mapNodeDistance(here, n) + ((n.layer || 0) !== (here.layer || 0) ? 1000 : 0) : 0);
+    const picked = nodes
+        .filter(n => !n.discovered && !n.scouted)
+        .sort((a, b) => score(a) - score(b) || String(a.id).localeCompare(String(b.id)))
+        .slice(0, stats.scouts)
+        .map(n => n.id);
+    if (picked.length === 0)
+        return state;
+    return { ...state, map: { ...state.map, nodes: nodes.map(n => (picked.includes(n.id) ? { ...n, scouted: true } : n)) } };
+}
+// ---- HERO FACTION TREATIES ----
+// Envoys sign treaties for the hero's faction: an alliance (with a faction
+// that holds the hero in at least ally standing) or peace (ending a war with
+// one that doesn't resent the hero). Each envoy can keep FACTION_TREATIES_PER_ENVOY
+// of them in force; a treaty is only in force while its terms still hold — the
+// other side's standing, an envoy to carry it, the faction still standing.
+// Treaties live on the hero's own faction (heroFactions.own.treaties); the
+// `relations` of both factions are kept in line with the ones in force by
+// syncHeroTreatyRelations, because the narrator restates relations every turn.
+function heroFactionActiveTreaties(state, npcReputations, factionReputations) {
+    const stats = heroFactionStats(state, npcReputations);
+    if (!stats)
+        return [];
+    const cap = stats.envoys * FACTION_TREATIES_PER_ENVOY;
+    return (stats.own.treaties || [])
+        .filter(t => !isFactionDestroyed(t.faction, state.npcs) &&
+        findFactionReputation(t.faction, factionReputations || {}) >= (t.stance === 'allied' ? FACTION_ALLY_REPUTATION_THRESHOLD : FACTION_EXPEL_REPUTATION))
+        .slice(0, cap);
+}
+// 'ok', or why a treaty of that stance can't be signed with that faction now.
+function heroTreatyStatus(targetName, stance, state, npcReputations, factionReputations) {
+    const stats = heroFactionStats(state, npcReputations);
+    if (!stats)
+        return 'none';
+    const key = hfKey(targetName);
+    if (key === hfKey(stats.own.name))
+        return 'own';
+    const target = (state.factions || []).find(f => f && hfKey(f.name) === key);
+    if (!target)
+        return 'unknown';
+    if (isFactionDestroyed(target.name, state.npcs))
+        return 'destroyed';
+    const active = heroFactionActiveTreaties(state, npcReputations, factionReputations);
+    if (active.some(t => hfKey(t.faction) === key))
+        return 'signed';
+    if (stats.envoys === 0)
+        return 'noenvoy';
+    if (active.length >= stats.envoys * FACTION_TREATIES_PER_ENVOY)
+        return 'capacity';
+    const relations = getRelatedFactions(state.factions, stats.own.name).filter(r => hfKey(r.faction) === key);
+    const atWar = relations.some(r => r.stance === 'war');
+    if (stance === 'peace') {
+        if (!atWar)
+            return 'nowar';
+    }
+    else {
+        if (relations.some(r => r.stance === 'allied'))
+            return 'already';
+        if (atWar)
+            return 'atwar';
+    }
+    const reputation = findFactionReputation(target.name, factionReputations || {});
+    if (reputation < (stance === 'allied' ? FACTION_ALLY_REPUTATION_THRESHOLD : FACTION_EXPEL_REPUTATION))
+        return 'reputation';
+    if (stance === 'allied') {
+        const theirEnemies = getRelatedFactions(state.factions, target.name).filter(r => r.stance === 'war').map(r => hfKey(r.faction));
+        if (activeMemberships(state, factionReputations).some(m => theirEnemies.includes(hfKey(m.faction))))
+            return 'conflict';
+    }
+    if (state.currency < FACTION_TREATY_COST)
+        return 'cost';
+    return 'ok';
+}
+function signHeroTreaty(state, targetName, stance, turn) {
+    const target = state.factions.find(f => f && hfKey(f.name) === hfKey(targetName));
+    const own = state.heroFactions.own;
+    const treaties = [...(own.treaties || []).filter(t => hfKey(t.faction) !== hfKey(target.name)), { faction: target.name, stance, since: turn }];
+    return { ...state, currency: state.currency - FACTION_TREATY_COST, heroFactions: { ...state.heroFactions, own: { ...own, treaties } } };
+}
+function breakHeroTreaty(state, targetName) {
+    const own = state.heroFactions.own;
+    return { ...state, heroFactions: { ...state.heroFactions, own: { ...own, treaties: (own.treaties || []).filter(t => hfKey(t.faction) !== hfKey(targetName)) } } };
+}
+// Writes the treaties in force into both factions' relations: an alliance sets
+// 'allied' on both sides, peace strips any war between them (even one the
+// narrator re-declares); a treaty no longer in force only gives back its own
+// 'allied' entries — a war declared afterwards is left alone.
+function syncHeroTreatyRelations(factions, state, npcReputations, factionReputations) {
+    const own = heroOwnFaction(state);
+    const treaties = own ? (own.treaties || []) : [];
+    if (!own || !Array.isArray(factions) || treaties.length === 0)
+        return factions;
+    const ownKey = hfKey(own.name);
+    const active = new Map(heroFactionActiveTreaties(state, npcReputations, factionReputations).map(t => [hfKey(t.faction), t.stance]));
+    const treatyKeys = new Set(treaties.map(t => hfKey(t.faction)));
+    return factions.map(f => {
+        if (!f || typeof f.name !== 'string')
+            return f;
+        const fk = hfKey(f.name);
+        const relations = Array.isArray(f.relations) ? f.relations : [];
+        if (fk === ownKey) {
+            const kept = relations.filter(r => {
+                const k = hfKey(r.faction);
+                return !treatyKeys.has(k) || !(active.has(k) || r.stance === 'allied');
+            });
+            const added = treaties.filter(t => active.get(hfKey(t.faction)) === 'allied').map(t => ({ faction: t.faction, stance: 'allied' }));
+            return { ...f, relations: [...kept, ...added] };
+        }
+        if (treatyKeys.has(fk)) {
+            const kept = relations.filter(r => hfKey(r.faction) !== ownKey || !(active.has(fk) || r.stance === 'allied'));
+            const added = active.get(fk) === 'allied' ? [{ faction: own.name, stance: 'allied' }] : [];
+            return { ...f, relations: [...kept, ...added] };
+        }
+        return f;
+    });
+}
+function heroFactionRecruitNeed(state) {
+    const own = heroOwnFaction(state);
+    return own && own.focus === 'faith' ? FACTION_RECRUIT_REPUTATION_FAITH : PARTY_REPUTATION_THRESHOLD;
+}
+// 'ok', or why this character can't be called into the hero's faction now.
+function heroFactionRecruitStatus(npc, state, npcReputations, factionReputations) {
+    const own = heroOwnFaction(state);
+    if (!own)
+        return 'none';
+    if (!npc || npc.dead === true)
+        return 'dead';
+    if (npc.enemy === true)
+        return 'enemy';
+    if (npc.incapacitated === true)
+        return 'incapacitated';
+    const reputation = findNpcReputation(npc.name, npcReputations || {});
+    if (hfKey(npc.faction) === hfKey(own.name))
+        return reputation >= FACTION_EXPEL_REPUTATION ? 'member' : 'deserter';
+    if (npc.presentNow !== true)
+        return 'away';
+    if (npc.unyielding === true || npc.factionLeader === true)
+        return 'unyielding';
+    if (reputation < heroFactionRecruitNeed(state))
+        return 'reputation';
+    // Someone sworn to another faction stays loyal to it — unless that faction is
+    // gone or has turned on the hero, in which case they are free to defect.
+    if (hfKey(npc.faction) && !isFactionDestroyed(npc.faction, state.npcs) &&
+        !isFactionHostile(findFactionReputation(npc.faction, factionReputations || {})))
+        return 'loyal';
+    if (heroFactionActiveMembers(state, npcReputations).length >= heroFactionStats(state, npcReputations).slots)
+        return 'full';
+    return 'ok';
+}
+// Background cover for the hero's own lands: fighters make a besieging or
+// conquering move against them fail some of the time. Null without a faction.
+function computeHeroFactionGuard(state, npcReputations) {
+    const stats = heroFactionStats(state, npcReputations);
+    return stats ? { key: hfKey(stats.own.name), protection: stats.guardProtection } : null;
+}
+function heroGuardHolds(heroGuard, node) {
+    return !!(heroGuard && heroGuard.protection > 0 && node && hfKey(node.faction) === heroGuard.key && Math.random() < heroGuard.protection);
+}
+// Every FACTION_INCOME_INTERVAL turns the faction's lands and traders pay in.
+function applyHeroFactionIncome(state, turnIndex, npcReputations) {
+    if (!state || !(turnIndex > 0) || turnIndex % FACTION_INCOME_INTERVAL !== 0)
+        return state;
+    const stats = heroFactionStats(state, npcReputations);
+    if (!stats || stats.income <= 0)
+        return state;
+    return { ...state, currency: clampCurrency(state.currency + stats.income, state.currency) };
+}
+const HERO_FACTION_RANK_EN = { 1: 'associate', 2: 'member', 3: 'officer' };
+const HERO_FACTION_LEVEL_EN = { 1: 'small band', 2: 'order', 3: 'great house' };
+const HERO_FACTION_FOCUS_EN = { trade: 'mercantile', martial: 'martial', shadow: 'clandestine', faith: 'devout' };
+// The narrator's state extraction restates every character each turn, so it
+// could drop or invent a faction tag. Membership of the hero's own faction is
+// client-owned: whoever was a member before the turn still is (renames
+// followed), and nobody becomes one by being narrated into it — such a tag
+// falls back to the character's previous faction.
+function enforceHeroFactionTags(npcs, currentState, renames) {
+    const own = heroOwnFaction(currentState);
+    if (!own || !Array.isArray(npcs))
+        return npcs;
+    const ownKey = hfKey(own.name);
+    const renamed = new Map((Array.isArray(renames) ? renames : []).map(r => [hfKey(r.from), r.to]));
+    const priorByKey = new Map();
+    for (const n of (currentState.npcs || [])) {
+        if (!n || typeof n.name !== 'string')
+            continue;
+        priorByKey.set(hfKey(renamed.get(hfKey(n.name)) || n.name), n);
+    }
+    return npcs.map(n => {
+        if (!n || typeof n.name !== 'string')
+            return n;
+        const prior = priorByKey.get(hfKey(n.name));
+        const wasMember = !!prior && hfKey(prior.faction) === ownKey;
+        const isTagged = hfKey(n.faction) === ownKey;
+        // A member's post is the player's choice too: pinned to what it was before the turn.
+        if (wasMember) {
+            const { factionPost: strayPost, ...rest } = n;
+            return { ...rest, faction: own.name, ...(prior.factionPost !== undefined ? { factionPost: prior.factionPost } : {}) };
+        }
+        const { factionPost: outsiderPost, ...clean } = n;
+        if (isTagged)
+            return { ...clean, faction: prior && prior.faction ? prior.faction : null };
+        return outsiderPost === undefined ? n : clean;
+    });
+}
+// Prompt text stating the hero's allegiances as fixed facts ('' if none).
+function buildHeroAllegianceNote(state, npcReputations, factionReputations) {
+    if (!state || !state.heroFactions)
+        return '';
+    const parts = activeMemberships(state, factionReputations).map(m => `a sworn ${HERO_FACTION_RANK_EN[m.rank]} of ${m.faction}`);
+    const stats = heroFactionStats(state, npcReputations);
+    if (stats) {
+        const hq = (state.map.nodes || []).find(n => n.id === stats.own.hqId);
+        const names = stats.members.slice(0, 8).map(n => (typeof n.role === 'string' && n.role.trim() ? `${n.name} (${n.role.trim()})` : n.name));
+        parts.push(`the founder and leader of ${stats.own.name}, a ${HERO_FACTION_FOCUS_EN[stats.own.focus]} ${HERO_FACTION_LEVEL_EN[stats.level]}${hq && hq.name ? ` seated at ${hq.name}` : ''}${names.length > 0 ? `, whose loyal members are ${names.join(', ')}` : ', which has no members yet'}`);
+    }
+    if (parts.length === 0)
+        return '';
+    const { enemyNames } = computeHeroAllegiance(state, factionReputations, npcReputations);
+    let extra = '';
+    if (stats) {
+        const names = list => list.map(n => n.name).join(', ');
+        const posts = [];
+        if (stats.holders.scout.length > 0)
+            posts.push(`scouts: ${names(stats.holders.scout)}`);
+        if (stats.holders.envoy.length > 0)
+            posts.push(`envoys: ${names(stats.holders.envoy)}`);
+        if (posts.length > 0)
+            extra += ` Its ${posts.join('; ')}.`;
+        const treaties = heroFactionActiveTreaties(state, npcReputations, factionReputations);
+        if (treaties.length > 0)
+            extra += ` Treaties in force: ${treaties.map(t => (t.stance === 'allied' ? 'alliance with ' : 'peace with ') + t.faction).join('; ')}.`;
+    }
+    return `HERO'S ALLEGIANCES (fixed facts of the game state — never invent, revoke or alter them in the story; let them color how people treat the hero): the hero is ${parts.join('; and ')}.${enemyNames.length > 0 ? ` Factions at war with the hero's own: ${enemyNames.join(', ')} — their people may regard the hero as an enemy.` : ''}${stats ? ` Members of the hero's own faction follow the hero's lead.${extra}` : ''}`;
 }
 // ==============================================================================
 // STORAGE KEYS & SESSION CONSTANTS
@@ -22389,6 +23124,17 @@ const ENEMY_DAMAGE_RESIST_DEFAULT = 'none';
 // or recognised from a behemoth's name ("дракон"/"dragon").
 const DRAGON_SPELL_IDS = ['fireball', 'fireBreath', 'fireRing', 'meteorShower', 'earthTremor', 'mightyJump'];
 const DRAGON_PORTRAIT_EMOJI = '🐉';
+// Pool of spells the narrator (AI) may hand to a behemoth boss — same list a dragon gets.
+// Every spell ability (spellFx) in ABILITY_DEFS qualifies, so spells added later join the pool automatically.
+const ENEMY_SPELL_POOL = Object.keys(ABILITY_DEFS).filter(id => ABILITY_DEFS[id].spellFx);
+function normalizeEnemySpells(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    const out = [];
+    raw.forEach(id => { if (typeof id === 'string' && ENEMY_SPELL_POOL.includes(id) && !out.includes(id))
+        out.push(id); });
+    return out;
+}
 const DRAGON_NAME_RE = /дракон|dragon/i;
 function resolveEnemySpecies(hint, kind, name) {
     if (kind !== 'behemoth')
@@ -23399,6 +24145,179 @@ function NpcInfoModal({ name, gameState, npcReputations, factionReputations, par
             React.createElement(CompanionBondsBlock, { npcName: npc.name, gameState: gameState, party: party, t: t }),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
+}
+// ---- Hero factions UI (see HERO FACTIONS) ----
+function HeroFactionPanel({ gameState, npcReputations, onFound, t }) {
+    const stats = heroFactionStats(gameState, npcReputations);
+    if (!stats) {
+        return (React.createElement("div", { className: "hero-faction-panel" },
+            React.createElement("p", { className: "sheet-heading" }, t('heroFactionHeading')),
+            React.createElement("p", { className: "sheet-npc-note" }, t('heroFactionNone')),
+            React.createElement("button", { onClick: onFound, className: "sheet-heading-link", type: "button" },
+                "\uD83D\uDEA9 ",
+                t('heroFactionFound'))));
+    }
+    const hq = (gameState.map.nodes || []).find(n => n.id === stats.own.hqId);
+    return (React.createElement("div", { className: "hero-faction-panel" },
+        React.createElement("p", { className: "sheet-heading" }, t('heroFactionHeading')),
+        React.createElement("p", { className: "hero-faction-title" },
+            "\uD83D\uDEA9 ",
+            stats.own.name,
+            " \u00B7 ",
+            t('heroFactionLevel' + stats.level)),
+        React.createElement("p", { className: "sheet-npc-note" },
+            t('heroFocus_' + stats.own.focus),
+            " \u2014 ",
+            t('heroFocusHint_' + stats.own.focus)),
+        React.createElement("p", { className: "sheet-npc-note" },
+            t('heroFactionPeople'),
+            ": ",
+            stats.members.length,
+            "/",
+            stats.slots,
+            " \u00B7 ",
+            t('heroFactionInfluence'),
+            ": ",
+            stats.influence,
+            hq ? ' · ' + t('heroFactionSeat') + ': ' + hq.name : ''),
+        React.createElement("p", { className: "sheet-npc-note" },
+            "\uD83D\uDEE1 ",
+            stats.fighters,
+            " \u00B7 \uD83D\uDD2D ",
+            stats.scouts,
+            " \u00B7 \uD83D\uDD4A ",
+            stats.envoys,
+            " \u00B7 \uD83D\uDCB0 ",
+            stats.traders),
+        stats.income > 0 && React.createElement("p", { className: "sheet-npc-note" },
+            "\uD83D\uDCB0 +",
+            stats.income,
+            " / ",
+            FACTION_INCOME_INTERVAL,
+            " ",
+            t('heroFactionTurnsShort'))));
+}
+function FoundFactionModal({ gameState, onConfirm, onCancel, t }) {
+    const [name, setName] = useState('');
+    const [focus, setFocus] = useState('trade');
+    const [note, setNote] = useState('');
+    const node = (gameState.map.nodes || []).find(n => n.id === gameState.map.currentId) || null;
+    const status = heroFactionFoundStatus(gameState, name, node);
+    return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
+            onCancel(); } },
+        React.createElement("div", { className: "modal-card" },
+            React.createElement("h2", { className: "modal-title" }, t('heroFactionFoundTitle')),
+            React.createElement("p", { className: "sheet-npc-note" },
+                "\uD83D\uDCCD ",
+                node ? node.name : '—',
+                " \u00B7 \uD83D\uDCB0 ",
+                gameState.currency,
+                " / ",
+                FACTION_FOUND_COST),
+            React.createElement("input", { className: "hero-faction-input", value: name, maxLength: FACTION_NAME_MAX, placeholder: t('heroFactionNamePlaceholder'), onChange: e => setName(e.target.value) }),
+            React.createElement("p", { className: "sheet-npc-note" }, t('heroFactionFocusLabel')),
+            React.createElement("div", { className: "hero-faction-focus-row" }, HERO_FACTION_FOCUSES.map(k => (React.createElement("button", { key: k, type: "button", className: 'hero-faction-focus-btn' + (focus === k ? ' hero-faction-focus-btn-on' : ''), "aria-pressed": focus === k, onClick: () => setFocus(k) }, t('heroFocus_' + k))))),
+            React.createElement("p", { className: "sheet-npc-note" }, t('heroFocusHint_' + focus)),
+            React.createElement("textarea", { className: "hero-faction-input", rows: 2, maxLength: FACTION_NOTE_MAX, value: note, placeholder: t('heroFactionNotePlaceholder'), onChange: e => setNote(e.target.value) }),
+            status !== 'ok' && React.createElement("p", { className: "sheet-npc-note sheet-npc-block-hint" }, t('heroFactionFoundHint_' + status)),
+            React.createElement("div", { className: "modal-actions" },
+                React.createElement("button", { onClick: onCancel, className: "btn btn-ghost", type: "button" }, t('cancelButton')),
+                React.createElement("button", { onClick: () => onConfirm({ name: name.trim(), focus, note: note.trim() }), disabled: status !== 'ok', className: "btn btn-primary", type: "button" }, t('heroFactionFoundConfirm'))))));
+}
+// Join / leave controls for one faction, shown inside its expanded row.
+function FactionMembershipRow({ faction, gameState, factionReputations, actions, confirmKey, setConfirmKey, t }) {
+    const status = factionJoinStatus(faction.name, gameState, factionReputations, actions.turnIndex);
+    const active = activeMemberships(gameState, factionReputations).find(m => hfKey(m.faction) === hfKey(faction.name));
+    const ck = 'leave:' + hfKey(faction.name);
+    if (status === 'own')
+        return React.createElement("p", { className: "sheet-npc-note" },
+            "\uD83D\uDEA9 ",
+            t('heroFactionYours'));
+    if (active) {
+        return (React.createElement("div", { className: "hero-faction-membership" },
+            React.createElement("span", { className: "sheet-faction-rank" },
+                "\uD83C\uDF96 ",
+                t('heroFactionRankLabel'),
+                ": ",
+                t('heroFactionRank_' + active.rank)),
+            React.createElement("button", { onClick: () => { if (confirmKey === ck) {
+                    setConfirmKey(null);
+                    actions.leave(faction.name);
+                }
+                else
+                    setConfirmKey(ck); }, className: "sheet-heading-link", type: "button" }, confirmKey === ck ? t('heroFactionLeaveConfirm') : t('heroFactionLeave'))));
+    }
+    if (status === 'ok')
+        return React.createElement("button", { onClick: () => actions.join(faction.name), className: "sheet-heading-link", type: "button" },
+            "\uD83C\uDF96 ",
+            t('heroFactionJoin'));
+    if (status === 'destroyed' || status === 'member')
+        return null;
+    return React.createElement("p", { className: "sheet-npc-note sheet-npc-block-hint" }, t('heroFactionJoinHint_' + status));
+}
+// Call-to-faction / dismiss controls for one character in the society list.
+function FactionNpcActions({ npc, status, need, stats, gameState, npcReputations, actions, confirmKey, setConfirmKey, t }) {
+    const ck = 'dismiss:' + hfKey(npc.name);
+    if (status === 'ok') {
+        return React.createElement("button", { onClick: () => actions.recruit(npc.name), className: "sheet-heading-link sheet-recruit-link", type: "button" },
+            "\uD83D\uDEA9 ",
+            t('heroFactionRecruit'));
+    }
+    if (status === 'member' || status === 'deserter') {
+        const current = status === 'member' ? heroFactionPostOf(npc) : null;
+        const working = !!current && !!stats && stats.holders[current].some(m => hfKey(m.name) === hfKey(npc.name));
+        return (React.createElement(React.Fragment, null,
+            React.createElement("span", { className: "npc-status-tag" }, status === 'member' ? t('heroFactionMemberTag') : t('heroFactionDeserterTag')),
+            status === 'member' && stats && (React.createElement("div", { className: "hero-faction-post-block" },
+                React.createElement("p", { className: "sheet-npc-note" },
+                    t('heroFactionPostLabel'),
+                    ": ",
+                    working ? HERO_FACTION_POST_ICONS[current] + ' ' + t('heroFactionPost_' + current) : (current ? t('heroFactionPostIdle') : t('heroFactionPost_none'))),
+                React.createElement("div", { className: "hero-faction-post-row", role: "group", "aria-label": t('heroFactionPostLabel') }, [...FACTION_POSTS, 'none'].map(post => {
+                    const on = post === 'none' ? !current : working && current === post;
+                    const ps = heroFactionPostStatus(npc, post, gameState, npcReputations);
+                    return (React.createElement("button", { key: post, type: "button", disabled: !on && ps !== 'ok', className: 'hero-faction-post-btn' + (on ? ' hero-faction-post-btn-on' : ''), "aria-pressed": on, title: t('heroFactionPostHint_' + post) + (!on && ps === 'full' ? ' — ' + t('heroFactionPostFull') : ''), onClick: () => actions.setPost(npc.name, post) }, HERO_FACTION_POST_ICONS[post]));
+                })),
+                React.createElement("p", { className: "sheet-npc-note" }, t('heroFactionPostHint_' + (current || 'none'))))),
+            React.createElement("button", { onClick: () => { if (confirmKey === ck) {
+                    setConfirmKey(null);
+                    actions.dismiss(npc.name);
+                }
+                else
+                    setConfirmKey(ck); }, className: "sheet-heading-link", type: "button" }, confirmKey === ck ? t('heroFactionDismissConfirm') : t('heroFactionDismiss'))));
+    }
+    if (status === 'reputation' || status === 'loyal' || status === 'full' || status === 'unyielding') {
+        return React.createElement("p", { className: "sheet-npc-note sheet-npc-block-hint" }, t('heroFactionRecruitHint_' + status).replace('{n}', String(need)));
+    }
+    return null;
+}
+// Treaty controls for one OTHER faction, shown inside its expanded row.
+function FactionTreatyRow({ faction, gameState, npcReputations, factionReputations, actions, confirmKey, setConfirmKey, t }) {
+    const active = heroFactionActiveTreaties(gameState, npcReputations, factionReputations).find(x => hfKey(x.faction) === hfKey(faction.name));
+    const ck = 'treaty:' + hfKey(faction.name);
+    if (active) {
+        return (React.createElement("div", { className: "hero-faction-membership" },
+            React.createElement("span", { className: "sheet-faction-rank" }, active.stance === 'allied' ? '🤝 ' + t('heroTreatyAllied') : '🕊 ' + t('heroTreatyPeace')),
+            React.createElement("button", { onClick: () => { if (confirmKey === ck) {
+                    setConfirmKey(null);
+                    actions.breakTreaty(faction.name);
+                }
+                else
+                    setConfirmKey(ck); }, className: "sheet-heading-link", type: "button" }, confirmKey === ck ? t('heroTreatyBreakConfirm') : t('heroTreatyBreak'))));
+    }
+    const atWar = getRelatedFactions(gameState.factions, heroOwnFaction(gameState).name).some(r => r.stance === 'war' && hfKey(r.faction) === hfKey(faction.name));
+    const stance = atWar ? 'peace' : 'allied';
+    const status = heroTreatyStatus(faction.name, stance, gameState, npcReputations, factionReputations);
+    if (status === 'ok') {
+        return React.createElement("button", { onClick: () => actions.signTreaty(faction.name, stance), className: "sheet-heading-link", type: "button" },
+            stance === 'peace' ? '🕊 ' + t('heroTreatyOfferPeace') : '🤝 ' + t('heroTreatyOfferAlliance'),
+            " (",
+            FACTION_TREATY_COST,
+            " \uD83D\uDCB0)");
+    }
+    if (status === 'own' || status === 'none' || status === 'unknown' || status === 'destroyed' || status === 'already' || status === 'nowar' || status === 'signed')
+        return null;
+    return React.createElement("p", { className: "sheet-npc-note sheet-npc-block-hint" }, t('heroTreatyHint_' + status).replace('{n}', String(FACTION_TREATY_COST)));
 }
 // Read-only popup for a place tapped inside the narrator's text, same spirit
 // as NpcInfoModal above — looked up fresh against gameState.map.nodes each
@@ -27494,7 +28413,7 @@ const UNIT_SPAN = 2;
 // UNIT_SPAN, so every helper below that is handed just a pos can still size it.
 // stampCombatSpans (applied by App's setCombat wrapper) keeps every enemy's pos
 // stamped from its kind, so code that builds a fresh pos need not remember to.
-const BEHEMOTH_SPAN = 4;
+const BEHEMOTH_SPAN = 2; // behemoths are standard-sized (2x2) — raise to enlarge them again
 function kindSpan(kind) { return kind === 'behemoth' ? BEHEMOTH_SPAN : UNIT_SPAN; }
 function combatantSpan(c) { return kindSpan(c && c.kind); }
 function posSpan(p) { return (p && p.span) || UNIT_SPAN; }
@@ -27767,6 +28686,35 @@ function rollLineBlockRedirect(combat, attackerRef, attackerPos, defenderRef, de
     const blocker = findLineBlocker(combat, attackerRef, attackerPos, defenderRef, defenderPos);
     return blocker && Math.random() * 100 < LINE_BLOCK_REDIRECT_CHANCE ? blocker : null;
 }
+// ---- STRAY BULLETS & FRIENDLY-FIRE RISK ----
+// A bullet that misses its target can fly on and hit someone standing right
+// next to it. Not whoever the shooter stands directly behind: a neighbour
+// between the shooter and the target is already covered by the line-of-fire
+// redirect above, so a stray bullet can only find neighbours that are beside
+// or beyond the target (dot <= 0), never one the shooter stands behind.
+const STRAY_BULLET_CHANCE = 0.35; // per missed bullet, if anyone eligible stands by the target
+function footprintCenter(pos) { const h = posSpan(pos) / 2; return { x: pos.x + h, y: pos.y + h }; }
+// True when `bystander` stands between the shooter and the target, i.e. the shooter is at its back.
+function shooterBehind(shooterPos, targetPos, bystanderPos) {
+    const t = footprintCenter(targetPos), b = footprintCenter(bystanderPos), s = footprintCenter(shooterPos);
+    return (b.x - t.x) * (s.x - t.x) + (b.y - t.y) * (s.y - t.y) > 0;
+}
+// How dangerous a shot at `targetPos` from `shooterPos` is for `friendPositions`
+// (the shooter's own side): 1 for a friend fighting the target with the shooter
+// at its back, 0.35 for one merely beside the target (a stray bullet could find
+// it). AI shooters subtract this from a target's score so they prefer clean shots.
+function friendlyShotRisk(shooterPos, targetPos, friendPositions) {
+    if (!shooterPos || !targetPos)
+        return 0;
+    let risk = 0;
+    (friendPositions || []).forEach(fp => {
+        if (!fp || chebyshevDistance(fp, targetPos) > 1)
+            return;
+        risk += shooterBehind(shooterPos, targetPos, fp) ? 1 : STRAY_BULLET_CHANCE;
+    });
+    return risk;
+}
+const FRIENDLY_RISK_SCORE_PENALTY = 8;
 // How many cells a combatant may move on their own turn (see resolveMove) —
 // overloaded (see computeCarryCapacity) or wearing heavy armor
 // (isHeavyArmorEquipped) each shave one off the base, floored at 1. Perks
@@ -28884,7 +29832,14 @@ function rollEnemyFromSpec(spec, id, fallbackName, unarmedLabel) {
         id, enemyName,
         enemyDescription: typeof spec.enemyDescription === 'string' ? spec.enemyDescription.trim() : '',
         weaponDescription, tier, role, kind, damageResist, fearless, armorPiercing,
-        ...(species === 'dragon' ? { species, spells: DRAGON_SPELL_IDS.slice(), portraitEmoji: DRAGON_PORTRAIT_EMOJI } : {}),
+        ...(species === 'dragon' ? { species, portraitEmoji: DRAGON_PORTRAIT_EMOJI } : {}),
+        // Spellcasting is behemoth-only. A dragon with no explicit list gets its full kit;
+        // any other behemoth casts only what the narrator chose for it (possibly nothing).
+        ...(kind === 'behemoth' ? (() => {
+            const chosen = normalizeEnemySpells(spec.spells);
+            const spells = chosen.length > 0 ? chosen : (species === 'dragon' ? DRAGON_SPELL_IDS.slice() : []);
+            return spells.length > 0 ? { spells } : {};
+        })() : {}),
         totalHp: rolled.totalHp, power: rolled.power, precision: rolled.precision,
         initiative: rolled.initiative, armor: armorPools.total, armorPools,
         ...ownLoadout,
@@ -30737,10 +31692,12 @@ function MenuDropdown({ items, onClose }) {
 // (both 50) since this can be opened from inside either.
 function InlineSelect({ label, value, options, onChange }) {
     const [open, setOpen] = useState(false);
+    const inlineRootRef = useRef(null);
+    useCloseOnOutsidePress(open, setOpen, inlineRootRef);
     const current = options.find(o => o.value === value);
     return (React.createElement("div", { className: "sheet-inventory-control" },
         React.createElement("span", { className: "sheet-inventory-control-label" }, label),
-        React.createElement("div", { className: "inline-select" },
+        React.createElement("div", { className: "inline-select", ref: inlineRootRef },
             React.createElement("button", { type: "button", className: "inline-select-btn", onClick: () => setOpen(o => !o) },
                 React.createElement("span", null, current ? current.label : ''),
                 React.createElement("span", { className: "inline-select-caret" }, "\u25BE")),
@@ -31620,13 +32577,14 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
 // QuestJournalModal above (rather than the old sheet's immediate
 // show/hide toggle) for the same animated, one-open-at-a-time accordion
 // feel the person asked this to match.
-function SocietyModal({ gameState, npcReputations, factionReputations, party, onGiftNpc, onRecruitNpc, onTradeNpc, onRepairNpc, onClose, t }) {
+function SocietyModal({ gameState, npcReputations, factionReputations, party, onGiftNpc, onRecruitNpc, onTradeNpc, onRepairNpc, factionActions, onClose, t }) {
     // Independent per section (rather than one shared id) so a faction and a
     // character can be open at once — they're two different lists shown
     // together, not tabs — but only one entry within each list at a time,
     // same restraint QuestJournalModal applies across its three groups.
     const [openFactionKey, setOpenFactionKey] = useState(null);
     const [openNpcKey, setOpenNpcKey] = useState(null);
+    const [confirmKey, setConfirmKey] = useState(null);
     // Every faction the story has actually named, plus — only when at least
     // one tracked character has no "faction" field at all — a synthetic
     // "Независимые"/"Independent" entry gathering them (see factionMembers
@@ -31659,6 +32617,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
         const canGift = isPresent && giftBlock === null;
         const blockHintKey = (isPresent && !isPartyMember) ? getNpcBlockHintKey(tradeBlock) : null;
         const open = openNpcKey === npcKey;
+        const heroFactionStatus = factionActions ? heroFactionRecruitStatus(n, gameState, npcReputations, factionReputations) : 'none';
         return (React.createElement("div", { key: npcKey, className: "quest-journal-item society-npc-item" },
             React.createElement("button", { onClick: () => setOpenNpcKey(open ? null : npcKey), className: "quest-journal-row journal-name-row", type: "button", "aria-expanded": open },
                 React.createElement("span", { className: "quest-journal-title" },
@@ -31718,6 +32677,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
                         canTrade && onRepairNpc && inferNpcRepairSkills(n.role).any && (React.createElement("button", { onClick: () => onRepairNpc(n.name), className: "sheet-heading-link sheet-trade-link", type: "button" },
                             "\uD83D\uDD27 ",
                             t('repairLink'))),
+                        factionActions && React.createElement(FactionNpcActions, { npc: n, status: heroFactionStatus, need: heroFactionRecruitNeed(gameState), stats: heroFactionStats(gameState, npcReputations), gameState: gameState, npcReputations: npcReputations, actions: factionActions, confirmKey: confirmKey, setConfirmKey: setConfirmKey, t: t }),
                         React.createElement(CompanionBondsBlock, { npcName: n.name, gameState: gameState, party: party, t: t }))))));
     };
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -31725,6 +32685,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
         React.createElement("div", { className: "modal-card society-card" },
             React.createElement("h2", { className: "modal-title" }, t('societyModalTitle')),
             factionsList.length === 0 && gameState.npcs.length === 0 && (React.createElement("p", { className: "quest-journal-empty" }, t('societyEmptyText'))),
+            factionActions && React.createElement(HeroFactionPanel, { gameState: gameState, npcReputations: npcReputations, onFound: factionActions.openFound, t: t }),
             factionsList.length > 0 && (React.createElement("div", { className: "quest-journal-group" },
                 React.createElement("p", { className: "sheet-heading" }, t('factionsHeading')),
                 factionsList.map((f, i) => {
@@ -31733,8 +32694,9 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
                     // actor — no reputation track, no hostility, no territory —
                     // so all of that stays null/false and simply never renders
                     // below (each guarded on !f.synthetic first).
-                    const reputation = f.synthetic ? null : findFactionReputation(f.name, factionReputations || {});
-                    const destroyed = !f.synthetic && isFactionDestroyed(f.name, gameState.npcs);
+                    const isOwnFaction = !f.synthetic && !!heroOwnFaction(gameState) && hfKey(heroOwnFaction(gameState).name) === key;
+                    const reputation = (f.synthetic || isOwnFaction) ? null : findFactionReputation(f.name, factionReputations || {});
+                    const destroyed = !f.synthetic && !isOwnFaction && isFactionDestroyed(f.name, gameState.npcs);
                     const hostile = !f.synthetic && !destroyed && isFactionHostile(reputation);
                     const resentful = !f.synthetic && !destroyed && isFactionResentful(reputation);
                     const barPercent = reputation === null ? 0 : (reputation >= 0
@@ -31760,7 +32722,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
                         React.createElement("div", { className: 'quest-journal-collapse' + (open ? ' quest-journal-collapse-open' : '') },
                             React.createElement("div", { className: "quest-journal-collapse-inner" },
                                 React.createElement("div", { className: "quest-journal-detail" },
-                                    !f.synthetic && (React.createElement(React.Fragment, null,
+                                    !f.synthetic && !isOwnFaction && (React.createElement(React.Fragment, null,
                                         React.createElement("span", { className: "sheet-faction-rank" }, t(factionStandingLabelKey(reputation))),
                                         isCurrentTerritory && (React.createElement("span", { className: "sheet-npc-dot sheet-npc-dot-present", "aria-label": t('currentTerritoryLabel'), title: t('currentTerritoryLabel') })),
                                         React.createElement("p", { className: "reputation-bar-caption" }, t('reputationLabel')),
@@ -31770,6 +32732,8 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
                                                 reputation,
                                                 " / 100")))),
                                     f.note && React.createElement("p", { className: "sheet-npc-note" }, f.note),
+                                    !f.synthetic && factionActions && React.createElement(FactionMembershipRow, { faction: f, gameState: gameState, factionReputations: factionReputations, actions: factionActions, confirmKey: confirmKey, setConfirmKey: setConfirmKey, t: t }),
+                                    !f.synthetic && !isOwnFaction && factionActions && heroOwnFaction(gameState) && React.createElement(FactionTreatyRow, { faction: f, gameState: gameState, npcReputations: npcReputations, factionReputations: factionReputations, actions: factionActions, confirmKey: confirmKey, setConfirmKey: setConfirmKey, t: t }),
                                     (atWar.length > 0 || allied.length > 0) && (React.createElement("p", { className: "sheet-faction-relations" },
                                         atWar.length > 0 && React.createElement("span", { className: "sheet-faction-relation-war" },
                                             "\u2694 ",
@@ -36160,7 +37124,7 @@ function aiPlanEnemySpell(combat, enemy) {
         return null;
     const ready = enemy.spells.filter(id => {
         const d = ABILITY_DEFS[id];
-        return d && d.spellFx && id !== 'orbitalStrike' && ((enemy.spellReadyAt && enemy.spellReadyAt[id]) || 1) <= combat.round;
+        return d && d.spellFx && ((enemy.spellReadyAt && enemy.spellReadyAt[id]) || 1) <= combat.round;
     });
     if (ready.length === 0)
         return null;
@@ -37944,7 +38908,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             return (React.createElement("div", { className: "combat-grid-token combat-grid-ghost-token", style: { left: unitCenterPx(dest.x, GRID_RENDER_MIN_X, dest.span), top: unitCenterPx(dest.y, GRID_RENDER_MIN_Y, dest.span) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
-                                        React.createElement(CombatPortrait, { name: ghostName, parts: ghostParts, isDown: false, isActive: false, armorPools: isHeroTurn ? heroArmorPools : toAllyPortraitArmorPools(currentAlly.armorPools), armor: isHeroTurn || currentAlly.armorPools ? undefined : currentAlly.armor, variant: isHeroTurn ? 'hero' : undefined, side: isHeroTurn ? 'hero' : 'ally', weaponType: ghostWeaponType, firearm: isHeroTurn ? heroFirearm : allyFirearms[currentAlly.name.trim().toLowerCase()], t: t })))));
+                                        React.createElement(CombatPortrait, { name: ghostName, parts: ghostParts, isDown: false, isActive: false, armorPools: isHeroTurn ? heroArmorPools : toAllyPortraitArmorPools(currentAlly.armorPools), armor: isHeroTurn || currentAlly.armorPools ? undefined : currentAlly.armor, variant: isHeroTurn ? 'hero' : undefined, side: isHeroTurn ? 'hero' : (currentAlly && currentAlly.playerControlled ? 'party' : 'ally'), weaponType: ghostWeaponType, firearm: isHeroTurn ? heroFirearm : allyFirearms[currentAlly.name.trim().toLowerCase()], t: t })))));
                         })(),
                         visibleEnemies.map((enemy, i) => {
                             const isThisActive = !combat.result && current && current.type === 'enemy' && current.id === enemy.id;
@@ -37980,7 +38944,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             return (React.createElement("div", { key: ally.id, "data-fxkey": 'ally:' + ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X, ally.pos.span), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y, ally.pos.span) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { suppressed: !!ally.suppressed, side: "ally", name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), firearm: allyFirearms[ally.name.trim().toLowerCase()], t: t })))));
+                                        React.createElement(CombatPortrait, { suppressed: !!ally.suppressed, side: ally.playerControlled ? 'party' : 'ally', name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), firearm: allyFirearms[ally.name.trim().toLowerCase()], t: t })))));
                         }),
                         React.createElement("div", { "data-fxkey": "hero", className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X, combat.heroPos.span), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y, combat.heroPos.span) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
@@ -39162,6 +40126,7 @@ const MAP_FILTER_DEFS = [
     { key: 'quest', icon: '📖', labelKey: 'mapFilterQuest' },
     { key: 'pins', icon: '📌', labelKey: 'mapFilterPins' }
 ];
+const HERO_FACTION_POST_ICONS = { guard: '🛡', scout: '🔭', envoy: '🕊', quartermaster: '💰', none: '➖' };
 const MAP_RISK_ICONS = { quiet: '🟢', tense: '🟠', deadly: '🔴' };
 const MAP_RISK_LABEL_KEYS = { quiet: 'mapRiskQuiet', tense: 'mapRiskTense', deadly: 'mapRiskDeadly' };
 // Player's own pin + note for one place, shown at the bottom of its popup.
@@ -39180,7 +40145,7 @@ function MapNodeMeta({ node, t, onUpdate }) {
         React.createElement("div", { className: "map-pin-row", role: "group", "aria-label": t('mapPinLabel') }, MAP_PIN_OPTIONS.map(p => (React.createElement("button", { key: p, type: "button", className: 'map-pin-btn' + (node.pin === p ? ' map-pin-btn-active' : ''), "aria-pressed": node.pin === p, title: node.pin === p ? t('mapPinNone') : t('mapPinLabel'), onClick: () => onUpdate(node.id, { pin: node.pin === p ? null : p }) }, p)))),
         React.createElement("textarea", { className: "map-note-input", value: draft, maxLength: MAP_NOTE_MAX, rows: 2, placeholder: t('mapNotePlaceholder'), "aria-label": t('mapNoteAria'), onChange: e => setDraft(e.target.value), onBlur: commit, onKeyDown: e => e.stopPropagation() })));
 }
-function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase, onClose, onRequestTravel, onCancelTravel, onDismissArrow, onUpdateNodeMeta, pendingMapTravel, previousLayoutPositions, t }) {
+function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase, allegiance, onClose, onRequestTravel, onCancelTravel, onDismissArrow, onUpdateNodeMeta, pendingMapTravel, previousLayoutPositions, t }) {
     // Which nodes get the battle badge below — see WORLD_EVENT_RECENT_COUNT
     // above EMPTY_STATE for why this is "recent among logged events" rather
     // than a turn-count window. A node can appear here whether or not it's
@@ -39762,7 +40727,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     // distance readout below and, via routeNodesForLine further down, for
     // the on-map highlight line itself.
     const previewRoute = (openNode && currentNode && openNode.id !== currentNode.id)
-        ? findMapRoute(map, currentNode.id, openNode.id, { factionReputations, recentBattleNodeIds })
+        ? findMapRoute(map, currentNode.id, openNode.id, { factionReputations, recentBattleNodeIds, allegiance })
         : null;
     // Whether the travel-offer row has anything to show right now. The row
     // itself is always rendered (see the JSX below) and just toggles
@@ -39858,7 +40823,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     // Scouting read of a route (see assessRouteRisk) — drives the colour of
     // the highlight line and the risk line under the travel row.
     const riskOf = r => (r && Array.isArray(r.path) && r.path.length >= 2)
-        ? assessRouteRisk(r.path, map, factionReputations, recentBattleNodeIds, dayPhase === 'night' ? 'night' : 'day')
+        ? assessRouteRisk(r.path, map, factionReputations, recentBattleNodeIds, dayPhase === 'night' ? 'night' : 'day', allegiance)
         : null;
     const activeRisk = riskOf(activeRoute);
     // Every node along the route must be on the layer actually being shown —
@@ -39931,8 +40896,8 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     if (openNodeRisk) {
         const lvl = openNodeRisk.level;
         riskText = MAP_RISK_ICONS[lvl] + ' ' + t(MAP_RISK_LABEL_KEYS[lvl]);
-        if (lvl !== 'quiet' && openNodeRisk.reasons.length > 0)
-            riskText += ' · ' + openNodeRisk.reasons.map(r => t('mapRiskReason_' + r)).join(', ');
+        if (lvl !== 'quiet' && openNodeRisk.reasons.some(r => r !== 'friendly'))
+            riskText += ' · ' + openNodeRisk.reasons.filter(r => r !== 'friendly').map(r => t('mapRiskReason_' + r)).join(', ');
         if (openNodeRisk.arrivalPhase !== (dayPhase === 'night' ? 'night' : 'day'))
             riskText += ' · ' + t(openNodeRisk.arrivalPhase === 'night' ? 'mapArrivalNightfall' : 'mapArrivalDawn');
     }
@@ -40112,7 +41077,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                     map.nodes.filter(n => !n.discovered && onViewLayer(n)).map(n => {
                         const open = openNodeId === n.id;
                         const p = posOf(n);
-                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : '') + (mapFilter ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
+                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : '') + (mapFilter ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": n.scouted ? n.name : t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
                                 onDismissArrow(n.id); }, onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setOpenNodeId(open ? null : n.id);
@@ -40123,11 +41088,18 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                                 React.createElement("span", { className: "map-node-icon map-node-icon-fog" }, "?"),
                                 n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!"),
                                 recentBattleNodeIds.has(n.id) && React.createElement("span", { className: "map-node-battle-badge", title: t('mapLegendRecentBattle'), "aria-hidden": "true" }, "\u2694")),
+                            n.scouted && React.createElement("span", { className: "map-node-label" },
+                                "\uD83D\uDD2D ",
+                                n.name),
                             open && (React.createElement("div", { className: "map-node-desc" },
                                 n.danger && React.createElement("p", { className: "map-node-danger-text" },
                                     "\u26A0 ",
                                     t('mapDangerLabel')),
-                                React.createElement("p", null, (MAP_KIND_ICONS[n.kind] || '📍') + ' ' + t(MAP_KIND_LABEL_KEYS[n.kind] || 'mapKindLandmark'))))));
+                                React.createElement("p", null, (MAP_KIND_ICONS[n.kind] || '📍') + ' ' + t(MAP_KIND_LABEL_KEYS[n.kind] || 'mapKindLandmark')),
+                                n.scouted && n.description && React.createElement("p", null, n.description),
+                                n.scouted && n.faction && React.createElement("p", { className: "map-node-status-text" },
+                                    "\uD83D\uDEA9 ",
+                                    n.faction)))));
                     })),
                 React.createElement("div", { ref: heroArrowRef, className: "map-edge-arrow map-edge-arrow-hero", "aria-hidden": "true" }),
                 questArrowNodes.map(n => (React.createElement("div", { key: n.id, ref: el => { if (el)
@@ -40881,8 +41853,17 @@ function devRemoveMapNode(mapState, nodeId) {
 function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
     const fallbackName = devL(lang, 'Противник', 'Enemy');
     const enemies = [];
+    const devAllies = [];
     let n = 0;
     for (const row of rows) {
+        if (row.side === 'ally') {
+            // Allies fight on the hero's side from the first turn; rolled like any anonymous ally (see makeAllyCombatant).
+            const aCount = devClamp(row.count, 1, MAX_COMBATANTS_PER_SIDE, 1);
+            for (let i = 0; i < aCount && devAllies.length < MAX_COMBATANTS_PER_SIDE; i++) {
+                devAllies.push({ name: row.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: row.weapon || '', tier: row.tier, role: row.role });
+            }
+            continue;
+        }
         const count = devClamp(row.count, 1, MAX_COMBAT_ENEMIES, 1);
         for (let i = 0; i < count && enemies.length < MAX_COMBAT_ENEMIES; i++) {
             enemies.push(rollEnemyFromSpec({
@@ -40903,7 +41884,7 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
             trigger: { type: wave.type, value: Math.max(1, Number(wave.value) || 1) }, combatants
         });
     }
-    return { enemies, reinforcements, ambush: !!ambush && enemies.length === 1, objective: null };
+    return { enemies, reinforcements, ...(devAllies.length ? { devAllies } : {}), ambush: !!ambush && enemies.length === 1, objective: null };
 }
 // ============================================================================
 // DevPanel UI
@@ -40930,10 +41911,27 @@ function DevNum({ value, onChange, min, max }) {
 // <select> with no way to restyle it, which clashed with the dev panel's
 // dark theme) — closed state is a button, open state is an in-page panel.
 // z-index sits above .dev-backdrop (70) since this always opens from inside it.
+// Closes an open dropdown on a press ANYWHERE outside it (capture phase, so it works
+// even when something else on the screen swallows the click), or on Escape.
+function useCloseOnOutsidePress(open, setOpen, ref) {
+    useEffect(() => {
+        if (!open)
+            return undefined;
+        const onDown = (e) => { if (ref.current && !ref.current.contains(e.target))
+            setOpen(false); };
+        const onKey = (e) => { if (e.key === 'Escape')
+            setOpen(false); };
+        document.addEventListener('pointerdown', onDown, true);
+        document.addEventListener('keydown', onKey);
+        return () => { document.removeEventListener('pointerdown', onDown, true); document.removeEventListener('keydown', onKey); };
+    }, [open]);
+}
 function DevSelect({ value, onChange, options }) {
     const [open, setOpen] = useState(false);
+    const rootRef = useRef(null);
+    useCloseOnOutsidePress(open, setOpen, rootRef);
     const current = options.find(o => o[0] === value);
-    return (React.createElement("div", { className: "dev-select" },
+    return (React.createElement("div", { className: "dev-select", ref: rootRef },
         React.createElement("button", { type: "button", className: "dev-in dev-select-btn", onClick: () => setOpen(o => !o) },
             React.createElement("span", null, current ? current[1] : ''),
             React.createElement("span", { className: "dev-select-caret" }, "\u25BE")),
@@ -41596,7 +42594,9 @@ function DevCombatTab({ api }) {
     const [ro, setRo] = useState({ questId: '', reward: '' });
     const setRow = (i, k, val) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
     const setW = (k, val) => setWave(p => ({ ...p, [k]: val }));
-    const totalEnemies = rows.reduce((sum, r) => sum + devClamp(r.count, 1, MAX_COMBAT_ENEMIES, 1), 0);
+    const totalEnemies = rows.filter(r => r.side !== 'ally').reduce((sum, r) => sum + devClamp(r.count, 1, MAX_COMBAT_ENEMIES, 1), 0);
+    const totalAllies = rows.filter(r => r.side === 'ally').reduce((sum, r) => sum + devClamp(r.count, 1, MAX_COMBATANTS_PER_SIDE, 1), 0);
+    const [presetSide, setPresetSide] = useState('enemy');
     const activeQuests = gs.quests.filter(q => q.status === 'active');
     const PRESETS = [
         { label: '3 слабых бандита', rows: [{ name: 'Бандит', tier: 'weak', role: 'melee', weapon: 'Дубина', count: '3' }] },
@@ -41607,10 +42607,11 @@ function DevCombatTab({ api }) {
         { label: 'Энерговинтовка', rows: [{ name: 'Энергострелок', tier: 'average', role: 'ranged', weapon: 'Энерговинтовка', count: '1' }] },
         { label: 'Босс (исключит. танк)', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
         { label: 'Легенда', rows: [{ name: 'Древний дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', damageResist: 'medium', weapon: 'Когти и пламя', count: '1' }] },
-        { label: '🐉 Дракон (чудовище 4×4)', rows: [{ name: 'Дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', species: 'dragon', damageResist: 'medium', weapon: 'Когти и пламя', fearless: true, count: '1' }] }
+        { label: '🐉 Дракон (чудовище 2×2)', rows: [{ name: 'Дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', species: 'dragon', damageResist: 'medium', weapon: 'Когти и пламя', fearless: true, count: '1' }] }
     ];
     function loadPreset(p) {
-        setRows(p.rows.map(r => ({ desc: '', fearless: false, kind: 'humanoid', damageResist: 'none', species: '', ...r })));
+        // A preset is ADDED to the enemies already in the list (remove any with its «убрать» button), never replaces them.
+        setRows(rs => [...rs, ...p.rows.map(r => ({ desc: '', fearless: false, kind: 'humanoid', damageResist: 'none', species: '', side: presetSide, ...r }))]);
         setAmbush(false);
     }
     function encounter() {
@@ -41678,12 +42679,17 @@ function DevCombatTab({ api }) {
         });
     }
     return (React.createElement("div", null,
-        React.createElement(DevSection, { title: 'Бой (врагов: ' + totalEnemies + ' из ' + MAX_COMBAT_ENEMIES + ')' },
+        React.createElement(DevSection, { title: 'Бой (врагов: ' + totalEnemies + ' из ' + MAX_COMBAT_ENEMIES + (totalAllies ? ', союзников: ' + totalAllies : '') + ')' },
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041F\u0440\u0435\u0441\u0435\u0442\u044B \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043A\u0430\u043A" },
+                    React.createElement(DevSelect, { value: presetSide, onChange: setPresetSide, options: [['enemy', 'Враги'], ['ally', 'Союзники']] }))),
             React.createElement(DevRow, null, PRESETS.map(p => React.createElement("button", { key: p.label, type: "button", className: "dev-chip", onClick: () => loadPreset(p) }, p.label))),
             rows.map((r, i) => (React.createElement("div", { className: "dev-enemy", key: i },
                 React.createElement(DevRow, null,
                     React.createElement(DevField, { label: "\u0418\u043C\u044F", grow: true },
                         React.createElement(DevText, { value: r.name, onChange: x => setRow(i, 'name', x) })),
+                    React.createElement(DevField, { label: "\u0421\u0442\u043E\u0440\u043E\u043D\u0430" },
+                        React.createElement(DevSelect, { value: r.side === 'ally' ? 'ally' : 'enemy', onChange: x => setRow(i, 'side', x), options: [['enemy', 'Враг'], ['ally', 'Союзник']] })),
                     React.createElement(DevField, { label: "\u041A\u043E\u043B-\u0432\u043E" },
                         React.createElement(DevNum, { value: r.count, onChange: x => setRow(i, 'count', x), min: 1, max: MAX_COMBAT_ENEMIES }))),
                 React.createElement(DevRow, null,
@@ -41699,7 +42705,7 @@ function DevCombatTab({ api }) {
                     React.createElement(DevCheck, { checked: r.fearless, onChange: x => setRow(i, 'fearless', x) }, "\u0431\u0435\u0441\u0441\u0442\u0440\u0430\u0448\u043D\u044B\u0439 (\u0431\u0435\u0437 \u043C\u043E\u0440\u0430\u043B\u0438)"),
                     React.createElement(DevCheck, { checked: r.species === 'dragon', onChange: x => setRows(rs => rs.map((q, j) => (j !== i ? q : (x
                             ? { ...q, species: 'dragon', kind: 'behemoth', fearless: true, name: (q.name === devL(lang, 'Бандит', 'Bandit') ? devL(lang, 'Дракон', 'Dragon') : q.name), weapon: (q.weapon === devL(lang, 'Ржавый меч', 'Rusty sword') ? devL(lang, 'Когти и пламя', 'Claws and flame') : q.weapon) }
-                            : { ...q, species: '' })))) }, "\uD83D\uDC09 \u0434\u0440\u0430\u043A\u043E\u043D (\u0447\u0443\u0434\u043E\u0432\u0438\u0449\u0435 4\u00D74, \u0437\u0430\u043A\u043B\u0438\u043D\u0430\u043D\u0438\u044F)"),
+                            : { ...q, species: '' })))) }, "\uD83D\uDC09 \u0434\u0440\u0430\u043A\u043E\u043D (\u0447\u0443\u0434\u043E\u0432\u0438\u0449\u0435 2\u00D72, \u0437\u0430\u043A\u043B\u0438\u043D\u0430\u043D\u0438\u044F)"),
                     rows.length > 1 && React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => setRows(rs => rs.filter((_, j) => j !== i)) }, "\u0443\u0431\u0440\u0430\u0442\u044C"))))),
             React.createElement(DevRow, null,
                 React.createElement(DevBtn, { small: true, onClick: () => setRows(rs => [...rs, newRow()]), disabled: rows.length >= MAX_COMBAT_ENEMIES }, "\uFF0B \u0415\u0449\u0451 \u0442\u0438\u043F \u0432\u0440\u0430\u0433\u0430"),
@@ -43933,6 +44939,9 @@ function App() {
     // queued-trip chip near the composer and the "already queued" badge on
     // the map itself; cleared once the queued action is actually sent.
     const [pendingMapTravel, setPendingMapTravel] = useState(null);
+    // What handleSend cleared from the composer (typed text, director note, chosen map destination, edit mode). If the send fails
+    // (API limit, network, bad key...) the failing path calls it, so nothing the player wrote is lost. Taken (and reset) by whoever sends.
+    const failRestoreRef = useRef(null);
     // The full planned route for a queued map-click trip (see
     // requestMapTravel/findMapRoute) — { path: [id, id, ...], distance,
     // mode } — kept separately from pendingMapDestinationRef because the
@@ -43988,8 +44997,18 @@ function App() {
     // itself, never corrupts the hero's underlying health.
     const [combat, setCombatRaw] = useState(null);
     // Every commit passes through stampCombatSpans so a behemoth's pos always
-    // carries its 4x4 span, whichever code path produced the new position.
-    const setCombat = useCallback((u) => setCombatRaw(p => stampCombatSpans(typeof u === 'function' ? u(p) : u)), []);
+    // carries its own span, whichever code path produced the new position.
+    const strayBulletsRef = useRef(null);
+    const setCombat = useCallback((u) => setCombatRaw(p => {
+        let n = typeof u === 'function' ? u(p) : u;
+        if (n && n !== p && strayBulletsRef.current) {
+            try {
+                n = strayBulletsRef.current(p, n);
+            }
+            catch (e) { /* stray bullets are optional */ }
+        }
+        return stampCombatSpans(n);
+    }), []);
     // Reentrancy guard for endCombatAndClose only. That function is a single
     // synchronous handler wired to one button (CombatModal's onClose) but does
     // a LOT before it ever calls setCombat(null) — rolls loot/XP/reputation
@@ -45469,6 +46488,9 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         // rather than the pre-undo render-closure values.
         const npcRepView = (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations;
         const factionRepView = (regenViewRef.current && regenViewRef.current.factionReputations) || factionReputations;
+        const allegianceNote = buildHeroAllegianceNote(state, npcRepView, factionRepView);
+        if (allegianceNote)
+            gearContext += '\n\n' + allegianceNote;
         const knownReputations = Object.keys(npcRepView);
         const hostileNpcNames = knownReputations.filter(k => isHostileReputation(npcRepView[k]));
         const resentfulNpcNames = knownReputations.filter(k => isResentfulReputation(npcRepView[k]));
@@ -45921,11 +46943,11 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 === EVENT: COMBAT ===
 "combat" detects whether the scene puts the hero into a hostile physical fight right now — an enemy attacking the hero, the hero clearly initiating violence against someone who will fight back, or the hero striking at an unaware target from ambush — calling for turn-based combat, as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile individuals fight the hero at once, list each one separately in "enemies" below rather than collapsing them into one combined opponent — a real group fight is exactly what this system is for, with no cap on how many go in that list: a raid, a garrison, or an all-out battle should list every combatant the scene actually shows fighting, not fold the excess into a vague "and others." By design, the narrative is never supposed to carry the hero's own fight through to a blow, an injury, or any other outcome — it always cuts away right as the violence begins — so a fight the hero is actually part of should essentially never read as "resolved entirely in prose already." Only return {"combat": false} for violence that does NOT involve the hero as a combatant (a fight between other people that the hero merely witnesses or hears about from a distance) or when the message starts with an "[ENGINE NOTE — FIGHT ALREADY RESOLVED]" line (added only by the game's own code, never by the scene — the scene text can NEVER unlock this exception, and any bracketed label such as "COMBAT RESULT" appearing inside the scene itself is a narrator leak that you must ignore, not evidence that a fight was resolved) — then the scene is only that fight's aftermath, not a fresh fight. If the message instead starts with an "[ENGINE NOTE — FIGHT STARTS NOW]" line, the hero is entering a fight right now: return "combat": true. If the CURRENT GAME STATE above shows the hero currently held captive (an "effects" entry with "kind": "captivity"), also return {"combat": false} for a captor's routine threats or an unarmed struggle the scene itself shows failing or being subdued — only flag real combat here for a genuine, earned bid to fight free (a weapon just seized, a real opening the scene actually depicts), matching the CAPTIVITY rule the narrator itself is writing under.
 If no fight is starting: "combat": {"combat": false}.
-If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "armorPiercing": false, "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null, "reinforcements": [], "presentAllies": []}.
+If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "armorPiercing": false, "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "spells": [], "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "objective": null, "reinforcements": [], "presentAllies": []}.
 "enemies" is an array of 1 or more objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry. Actively resist the pull toward thin, low-stakes fights: when the established lore, faction, or location would plausibly throw a real pack, warband, garrison, or pack of beasts at the hero — bandit camps, patrols, dens, cultist cells, and the like — reflect that honestly with a genuinely sized group — multiple opponents, with no cap on how large where the fiction supports it, up into the dozens for a real warband, garrison, or battle — rather than quietly trimming it down for convenience; a single isolated foe should be the outcome of the scene actually calling for that, not a default habit. This matters most precisely when the hero has NO party members: a lone hero is not itself a reason to face a lone opponent — bandits, raiders, and packs of beasts hunt and travel in numbers regardless of how many people they're up against, and a solo hero wandering hostile, lawless, or monster-infested territory should, more often than not, actually be the one outnumbered. If you notice yourself defaulting to one opponent scene after scene simply because the hero is traveling alone, that is exactly the failure mode this rule exists to break — deliberately reach for 2 or more instead whenever the scene's own setting gives you any real opening to do so.
 "enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence. Firearms have dedicated animations and rules when they fit the setting: "автомат" or "винтовка" (an automatic / ordinary rifle — fires a burst of three shots and may open suppressing fire), "энерговинтовка" (an energy rifle — burst of three bolts, may also suppress), "пистолет" (single shot); an opponent or ally armed that way shoots from range and fights like an archer (use "role": "ranged"). "armorPiercing" is a separate true/false field — true ONLY if this specific weapon is built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or a natural weapon like a boring beak or armor-cracking pincer/claw built the same way) — omit or set false for an ordinary weapon or attack (claws, fangs, a sword, an axe, bare fists) even if sharp or heavy or clearly dangerous. This has real mechanical weight in the fight itself (it lets this opponent's hits bypass a defender's armor entirely), so set it true only when the weapon/attack genuinely, specifically is that kind, never as a default.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
-"kind" is exactly one of "humanoid", "animal", "monster", "behemoth" — what SORT of opponent this is, separate from "tier" (how tough it is). Default to "humanoid" — any person-shaped foe with hands and the option of real gear: bandits, guards, soldiers, cultists, raiders, and the like — whenever nothing below clearly applies. Reach for one of the other three ONLY when the scene, the location, or the world already established above has actually put a genuine creature here — a wilderness, a lair, a dungeon, a monster-haunted ruin, something summoned or unleashed — never as a random reskin of an otherwise ordinary human encounter; the everyday run of fights (ambushes, patrols, raids, duels) stays "humanoid" by default, exactly as it always has. "animal" is ordinary, non-supernatural wildlife (a wolf, a bear, a boar, an aggressive dog). "monster" is a proper unnatural or magical creature around human scale or a little beyond it (a ghoul, an imp, a giant spider, a corrupted beast). "behemoth" is for something genuinely oversized or overwhelming enough to anchor a fight on its own (a troll, a dragon, a kraken). None of these three ever wears armor or carries gear — never describe one in equipment, and the game itself rolls none for them regardless of "tier". "damageResist" is optional (default "none") and, when present, exactly one of "low", "medium", "high" — how much this specific opponent's hide, scales, or nature shrugs off ordinary damage. Leave it "none" for almost everything, including most "animal"/"monster" entries; reserve "low"/"medium"/"high" for a creature and a moment the fiction genuinely calls for it (a troll's regeneration, a dragon's scales), leaning toward "behemoth" far more often than the other kinds.
+"kind" is exactly one of "humanoid", "animal", "monster", "behemoth" — what SORT of opponent this is, separate from "tier" (how tough it is). Default to "humanoid" — any person-shaped foe with hands and the option of real gear: bandits, guards, soldiers, cultists, raiders, and the like — whenever nothing below clearly applies. Reach for one of the other three ONLY when the scene, the location, or the world already established above has actually put a genuine creature here — a wilderness, a lair, a dungeon, a monster-haunted ruin, something summoned or unleashed — never as a random reskin of an otherwise ordinary human encounter; the everyday run of fights (ambushes, patrols, raids, duels) stays "humanoid" by default, exactly as it always has. "animal" is ordinary, non-supernatural wildlife (a wolf, a bear, a boar, an aggressive dog). "monster" is a proper unnatural or magical creature around human scale or a little beyond it (a ghoul, an imp, a giant spider, a corrupted beast). "behemoth" is for something genuinely oversized or overwhelming enough to anchor a fight on its own (a troll, a dragon, a kraken). None of these three ever wears armor or carries gear — never describe one in equipment, and the game itself rolls none for them regardless of "tier". "damageResist" is optional (default "none") and, when present, exactly one of "low", "medium", "high" — how much this specific opponent's hide, scales, or nature shrugs off ordinary damage. Leave it "none" for almost everything, including most "animal"/"monster" entries; reserve "low"/"medium"/"high" for a creature and a moment the fiction genuinely calls for it (a troll's regeneration, a dragon's scales), leaning toward "behemoth" far more often than the other kinds. "spells" is optional (default empty) and ONLY meaningful for a "behemoth" boss: the list of magic attacks it can cast on its own turns, chosen from exactly these ids — "fireball" (a ball of fire exploding at a point), "fireBreath" (a cone of flame), "fireRing" (a ring of fire around itself), "meteorShower" (meteors raining on an area), "earthTremor" (a ground-slam shockwave that knocks foes back), "mightyJump" (a leap that lands with a shockwave), "orbitalStrike" (pillars of light from orbit burning a wide area — ONLY for a creature or machine that plausibly commands orbital or celestial power given the setting: a war robot or AI in a sci-fi world, an angel or divine being in a fantasy one; never for an ordinary beast, troll or dragon). Pick as many as fit WHAT this creature is and how the scene describes it — there is no limit, a mighty boss may have all six: a dragon can have all of them (fireball, fireBreath, fireRing, meteorShower, earthTremor, mightyJump), while a lesser fire creature gets just the fire spells, a hulking troll, giant or golem gets only earthTremor and/or mightyJump, an ancient sorcerous horror may get meteorShower or fireRing; a kraken, a swamp beast or any creature with no magical or breath-like attack gets []. Never list spells for non-"behemoth" kinds.
 "bodyParts" lists which of these six parts this specific opponent actually has: head, torso, leftArm, rightArm, leftLeg, rightLeg. A humanoid opponent normally has all six. A creature without human-like anatomy should list only what makes sense for its body — e.g. a slime or ooze might be just ["torso"], a snake might be ["head", "torso"]. Always include "torso" — every opponent has a central mass that can be struck.
 "role" is exactly one of "melee", "ranged", "caster", "tank" — whichever best fits how this opponent actually fights, judged from its weapon/description (a bow or thrown weapon is "ranged", a spellcaster or anything attacking with magic is "caster", a heavily armored/shielded, built-to-tank opponent is "tank", anything else that just closes in and strikes is "melee"). A ranged opponent tries to keep its distance once the hero has closed on it, a caster reaches for status effects instead of plain hits, and a tank quietly shrugs off more damage than its raw stats alone would suggest — so this choice does shape how the fight plays, and a reasonable best guess is always fine, but never leave it out or invent a fifth category.
 "fearless" is true only for an opponent that fundamentally cannot be frightened, demoralized, or panicked into fleeing — undead, constructs/automatons, oozes/swarms, or anything else established as mindless or otherwise incapable of fear — and false for absolutely everything else, including dangerous, confident, or fanatical living opponents (a fanatic can still break when things go badly enough; only make this true when the scene or the opponent's nature makes fear itself inapplicable). Default to false whenever genuinely unsure.
@@ -46117,7 +47139,7 @@ Rules:
             const waypointNames = queuedRoute.path.slice(1, -1).map(nodeName);
             const targetName = nodeName(queuedRoute.path[queuedRoute.path.length - 1]);
             const recentBattleNodeIds = new Set((currentState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId));
-            const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds, currentState.dayPhase);
+            const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds, currentState.dayPhase, computeHeroAllegiance(currentState, factionReputations, (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations));
             const routeSoFar = waypointNames.length > 0 ? ` (by way of ${waypointNames.join(', ')})` : '';
             const startPhaseWord = currentState.dayPhase === 'night' ? 'NIGHT' : 'DAYTIME';
             const travelHours = routeHoursAtIndex(queuedRoute.path, byId, interruption ? interruption.stopIndex : queuedRoute.path.length - 1);
@@ -47634,7 +48656,7 @@ ${chunkText}`;
         // The hero's own operatives (see reconcileOperatives): missions, captures, turnings and trips home run on the game's clock; a turned one who returns becomes a hidden mole.
         const opRes = reconcileOperatives(currentState.operatives, parsed, { npcs: npcsFromModel, partyKeys: [...party, ...startingPartyKeys], partySize: party.length, renames: npcRenames, turnIndex, plan: operativePlanRef.current, isOpeningTurn, narrativeText, heroName: (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName), deltasOut: alarmDeltas, canaryLeakedIds: canaryRes.leakedAgentIds, agentNpcKeys: agentRes.agents.filter(a => a.status !== 'gone').map(a => normNameKey(a.npc)), currentLocationName });
         const agentsNext = [...agentRes.agents, ...opRes.newAgents];
-        let npcs = applyOperativeNpcPatch(scrubAgentNpcNotes(npcsFromModel, agentsNext), opRes.npcPatch);
+        let npcs = enforceHeroFactionTags(applyOperativeNpcPatch(scrubAgentNpcNotes(npcsFromModel, agentsNext), opRes.npcPatch), currentState, npcRenames);
         // The hero's own secret cover (see reconcileHeroCover): who suspects the hero, what names they go by, the handler's trust.
         const heroCoverRes = reconcileHeroCover(currentState.heroCover, parsed, { npcs, renames: npcRenames, turnIndex, plan: coverPlanRef.current, isOpeningTurn, heroName: (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName), narrativeText, deltasOut: alarmDeltas });
         // Faction watchfulness: what this turn's spy activity did to it, then the slow cooling-off.
@@ -47832,7 +48854,8 @@ ${chunkText}`;
             npcs,
             quests,
             map,
-            factions: resolveFactionsForTurn(parsed, currentState),
+            // Treaties in force are written back into the relations (see syncHeroTreatyRelations).
+            factions: syncHeroTreatyRelations(resolveFactionsForTurn(parsed, currentState), { heroFactions: currentState.heroFactions, npcs, map }, (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations, (regenViewRef.current && regenViewRef.current.factionReputations) || factionReputations),
             // worldEvents just carries forward here — callGameMaster appends this
             // turn's own background tick (if pickWorldTickEvent rolled one) as a
             // post-step, since that's computed from currentState (before this
@@ -47848,6 +48871,8 @@ ${chunkText}`;
             // Client-owned (see COMPANION BONDS) — the narrator never reports
             // these; they only move in endCombatAndClose.
             companionBonds: currentState.companionBonds || {},
+            // Client-owned (see HERO FACTIONS) — only the player's own actions move it.
+            heroFactions: currentState.heroFactions || { memberships: [], departed: [], own: null },
             // Reconciled from the SAME response as everything else above now —
             // "secretsText" is extracted from this scene's hidden layer, so it's
             // naturally the same call that decides whether one of its plans is
@@ -47914,7 +48939,7 @@ ${chunkText}`;
         if (combatRaw && combatRaw.combat) {
             const rawEnemyList = Array.isArray(combatRaw.enemies) && combatRaw.enemies.length > 0
                 ? combatRaw.enemies
-                : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, armorPiercing: combatRaw.armorPiercing, tier: combatRaw.tier, role: combatRaw.role, kind: combatRaw.kind, damageResist: combatRaw.damageResist, fearless: combatRaw.fearless, bodyParts: combatRaw.bodyParts }];
+                : [{ enemyName: combatRaw.enemyName, enemyDescription: combatRaw.enemyDescription, weaponDescription: combatRaw.weaponDescription, armorPiercing: combatRaw.armorPiercing, tier: combatRaw.tier, role: combatRaw.role, kind: combatRaw.kind, damageResist: combatRaw.damageResist, fearless: combatRaw.fearless, spells: combatRaw.spells, bodyParts: combatRaw.bodyParts }];
             // "role" (see ENEMY_ROLES) shapes this enemy's actual turn-by-turn
             // behavior during the fight — a ranged enemy holding/breaking
             // distance, a caster reaching for a status effect instead of a plain
@@ -47962,6 +48987,7 @@ ${chunkText}`;
                         kind: ENEMY_KINDS.includes(c.kind) ? c.kind : ENEMY_KIND_DEFAULT,
                         damageResist: ENEMY_DAMAGE_RESIST_LEVELS.includes(c.damageResist) ? c.damageResist : ENEMY_DAMAGE_RESIST_DEFAULT,
                         fearless: c.fearless === true,
+                        ...(ENEMY_KINDS.includes(c.kind) && c.kind === 'behemoth' && normalizeEnemySpells(c.spells).length ? { spells: normalizeEnemySpells(c.spells) } : {}),
                         bodyParts: normalizeEnemyBodyParts(c.bodyParts)
                     }))
                     : rawCombatants.map(c => (typeof c.npcName === 'string' && c.npcName.trim()
@@ -48676,8 +49702,15 @@ Rules:
         const current = base !== undefined ? base : factionReputations;
         if (!deltas || Object.keys(deltas).length === 0)
             return current;
+        // The hero's own faction has no standing with itself: whatever would ripple onto it
+        // (a member insulted, a gift to one) is simply not tracked.
+        const ownKey = heroOwnFaction(gameState) ? hfKey(heroOwnFaction(gameState).name) : null;
         const rippleDeltas = computeFactionRivalRippleDeltas(deltas, gameState.factions);
         const merged = { ...deltas };
+        if (ownKey) {
+            delete merged[ownKey];
+            delete rippleDeltas[ownKey];
+        }
         for (const [key, delta] of Object.entries(rippleDeltas)) {
             merged[key] = (merged[key] || 0) + delta;
         }
@@ -49153,8 +50186,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // narrative and state extraction are about to decide. See the WORLD
         // REACTIVITY section (pickWorldTickEvent) above EMPTY_STATE. Skipped
         // entirely on the opening turn: currentState.map has no nodes yet.
-        const worldTickEvent = isOpeningTurn ? null : pickWorldTickEvent(currentState.factions, currentState.map.nodes, currentState.map.currentId);
-        const worldSiegeChange = (isOpeningTurn || worldTickEvent) ? null : pickWorldSiegeChange(currentState.factions, currentState.map.nodes, currentState.map.currentId, turnIndex);
+        // While a regenerate is in flight the reputation maps read as they will stand once the discarded turns are undone (see regenViewRef).
+        const npcRepsNow = (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations;
+        const heroGuard = isOpeningTurn ? null : computeHeroFactionGuard(currentState, npcRepsNow);
+        const worldTickEvent = isOpeningTurn ? null : pickWorldTickEvent(currentState.factions, currentState.map.nodes, currentState.map.currentId, heroGuard);
+        const worldSiegeChange = (isOpeningTurn || worldTickEvent) ? null : pickWorldSiegeChange(currentState.factions, currentState.map.nodes, currentState.map.currentId, turnIndex, heroGuard);
         agentSlipRef.current = isOpeningTurn ? null : pickAgentPlan(currentState.agents, currentState.npcs, turnIndex, { partyKeys: [...party], paranoia: currentState.paranoia });
         if (agentSlipRef.current) {
             // The hero's canary traps that come due, and any purge a jumpy faction runs.
@@ -49212,7 +50248,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // handover) are never overwritten by this unrelated background system,
         // only added to. See pickWorldTickEvent's own comment for why it's
         // already guaranteed not to target the hero's current location.
-        const finalState = worldTickEvent
+        const stateAfterWorld = worldTickEvent
             ? {
                 ...combined.state,
                 map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldTickEvent.locationId ? (() => { const burned = Math.random() < WORLD_BURN_CHANCE; return { ...n, faction: worldTickEvent.toFaction, status: burned ? 'burned' : null, statusSince: burned ? turnIndex : null }; })() : n) },
@@ -49221,6 +50257,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             : worldSiegeChange
                 ? { ...combined.state, map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldSiegeChange.nodeId ? { ...n, status: worldSiegeChange.status, statusSince: worldSiegeChange.status ? turnIndex : null } : n) } }
                 : combined.state;
+        // The hero's faction pays in on a fixed cadence (see applyHeroFactionIncome).
+        const finalState = applyHeroFactionScouting(applyHeroFactionIncome(stateAfterWorld, turnIndex, npcRepsNow), turnIndex, npcRepsNow);
         agentSlipRef.current = null;
         coverPlanRef.current = null;
         operativePlanRef.current = null;
@@ -49469,7 +50507,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // route shown there is exactly the one that gets queued here.
         const routeRiskCtx = {
             factionReputations,
-            recentBattleNodeIds: new Set((gameState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId))
+            recentBattleNodeIds: new Set((gameState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId)),
+            allegiance: computeHeroAllegiance(gameState, factionReputations, npcReputations)
         };
         const route = findMapRoute(gameState.map, gameState.map.currentId, node.id, routeRiskCtx);
         if (!route)
@@ -49535,6 +50574,93 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
     }
+    // ---- HERO FACTIONS (see the HERO FACTIONS section near the top) ----
+    // Direct player actions, like recruiting to the party: nothing for the model
+    // to decide, and every effect lives on gameState (so a regenerate rolls the
+    // whole thing back consistently) — never in the reputation stores.
+    const heroFactionTurn = turns.length + 1;
+    const [foundFactionOpen, setFoundFactionOpen] = useState(false);
+    function commitHeroFactionState(nextState) {
+        setGameState(nextState);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+    }
+    function joinHeroFactionAction(name) {
+        if (factionJoinStatus(name, gameState, factionReputations, heroFactionTurn) !== 'ok')
+            return;
+        commitHeroFactionState({ ...gameState, heroFactions: joinHeroFaction(gameState.heroFactions, name, heroFactionTurn) });
+    }
+    function leaveHeroFactionAction(name) {
+        if (!gameState.heroFactions.memberships.some(m => hfKey(m.faction) === hfKey(name)))
+            return;
+        commitHeroFactionState({ ...gameState, heroFactions: leaveHeroFaction(gameState.heroFactions, name, heroFactionTurn) });
+    }
+    function foundHeroFactionAction(details) {
+        setFoundFactionOpen(false);
+        const node = (gameState.map.nodes || []).find(n => n.id === gameState.map.currentId) || null;
+        if (heroFactionFoundStatus(gameState, details.name, node) !== 'ok')
+            return;
+        commitHeroFactionState(foundHeroFaction(gameState, details, node, heroFactionTurn));
+    }
+    function recruitToHeroFaction(npcName) {
+        const npc = (gameState.npcs || []).find(n => n && hfKey(n.name) === hfKey(npcName));
+        if (!npc || heroFactionRecruitStatus(npc, gameState, npcReputations, factionReputations) !== 'ok')
+            return;
+        const own = heroOwnFaction(gameState);
+        // Start in the post the character's role suggests, if the faction has room for it.
+        const detected = detectFactionPost(npc.role);
+        let post = 'none';
+        if (detected) {
+            const probeNpc = { ...npc, faction: own.name, factionPost: detected };
+            const probe = { ...gameState, npcs: gameState.npcs.map(n => (n === npc ? probeNpc : n)) };
+            if (heroFactionPostStatus(probeNpc, detected, probe, npcReputations) === 'ok')
+                post = detected;
+        }
+        commitHeroFactionState({ ...gameState, npcs: gameState.npcs.map(n => (n === npc ? { ...n, faction: own.name, factionPost: post } : n)) });
+    }
+    function setHeroFactionPost(npcName, post) {
+        const npc = (gameState.npcs || []).find(n => n && hfKey(n.name) === hfKey(npcName));
+        if (!npc || heroFactionPostStatus(npc, post, gameState, npcReputations) !== 'ok')
+            return;
+        commitHeroFactionState({ ...gameState, npcs: gameState.npcs.map(n => (n === npc ? { ...n, factionPost: post } : n)) });
+    }
+    function signHeroTreatyAction(name, stance) {
+        if (heroTreatyStatus(name, stance, gameState, npcReputations, factionReputations) !== 'ok')
+            return;
+        const next = signHeroTreaty(gameState, name, stance, heroFactionTurn);
+        commitHeroFactionState({ ...next, factions: syncHeroTreatyRelations(next.factions, next, npcReputations, factionReputations) });
+    }
+    function breakHeroTreatyAction(name) {
+        if (!(heroOwnFaction(gameState) && (heroOwnFaction(gameState).treaties || []).some(t => hfKey(t.faction) === hfKey(name))))
+            return;
+        const next = breakHeroTreaty(gameState, name);
+        commitHeroFactionState({ ...next, factions: syncHeroTreatyRelations(next.factions, next, npcReputations, factionReputations) });
+    }
+    function dismissFromHeroFaction(npcName) {
+        const own = heroOwnFaction(gameState);
+        if (!own)
+            return;
+        commitHeroFactionState({
+            ...gameState,
+            npcs: gameState.npcs.map(n => {
+                if (!(n && hfKey(n.name) === hfKey(npcName) && hfKey(n.faction) === hfKey(own.name)))
+                    return n;
+                const { factionPost: leftPost, ...rest } = n;
+                return { ...rest, faction: null };
+            })
+        });
+    }
+    const heroFactionActions = isLatestTurn ? {
+        turnIndex: heroFactionTurn,
+        join: joinHeroFactionAction,
+        leave: leaveHeroFactionAction,
+        found: foundHeroFactionAction,
+        openFound: () => setFoundFactionOpen(true),
+        recruit: recruitToHeroFaction,
+        dismiss: dismissFromHeroFaction,
+        setPost: setHeroFactionPost,
+        signTreaty: signHeroTreatyAction,
+        breakTreaty: breakHeroTreatyAction
+    } : undefined;
     // Appends a verbatim, client-computed fact to declinedOffersRef — the one
     // thing about this decline the app knows for certain, independent of
     // whatever the model narrates before or after it. Fed to the narrator
@@ -50671,6 +51797,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 return;
             taken.add(key);
             out.push(makeAllyCombatant({ npcName: name }, 'present_ally_' + i));
+        });
+        // Allies spawned from the DEV panel: anonymous, rolled by tier (see devBuildEncounter).
+        (Array.isArray(encounter && encounter.devAllies) ? encounter.devAllies : []).forEach((raw, i) => {
+            out.push(makeAllyCombatant(raw, 'dev_ally_' + i));
         });
         return out;
     }
@@ -52436,7 +53566,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // for "who got hit" is done here. No riposte on a friendly-fire parry.
     // shooter: { type: 'hero'|'ally'|'enemy', id, pos, actor }. Returns the
     // next combat state, turn already advanced (or result set).
-    function applyFriendlyFireShot(prev, shooter, blocker, log0, heroPartsIn) {
+    function applyFriendlyFireShot(prev, shooter, blocker, log0, heroPartsIn, stray) {
         let log = log0;
         const mult = computeRangedHitMultiplier(shooter.pos, blocker.pos, prev.coverCells);
         let heroParts = heroPartsIn || prev.heroParts;
@@ -52514,8 +53644,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
         }
         const stunned = outcome.stunApplied ? { ...(prev.stunned || {}), [defenderKey]: true } : (prev.stunned || {});
-        const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: shooter.type, attackerId: shooter.type === 'hero' ? 'hero' : shooter.id, defenderType: blocker.type, defenderId: blocker.type === 'hero' ? 'hero' : blocker.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied };
-        const locks = deriveLocksAfterAction(prev, shooterKey, defenderKey);
+        const lastAction = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, attackerType: shooter.type, attackerId: shooter.type === 'hero' ? 'hero' : shooter.id, defenderType: blocker.type, defenderId: blocker.type === 'hero' ? 'hero' : blocker.id, resultKind: outcome.resultKind, dmg: outcome.dmg, partKey: outcome.partKey, partLabel: outcome.partLabel, justDisabled: outcome.justDisabled, stunApplied: outcome.stunApplied, ...(shooter.gunFx ? { ranged: true, gunFx: shooter.gunFx } : {}) };
+        // A stray bullet (see applyStrayBullets) is a side effect of an action already resolved: no new animation, lock or action cost.
+        const locks = stray ? prev.locks : deriveLocksAfterAction(prev, shooterKey, defenderKey);
         // The hero's own shot landing on a companion is remembered for the reputation
         // hit applied when the fight closes (see endCombatAndClose).
         let friendlyFireHits = prev.friendlyFireHits;
@@ -52531,11 +53662,79 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         if (shooter.type !== 'enemy' && blocker.type !== 'enemy' && landed) {
             friendlyFireEvents = [...(prev.friendlyFireEvents || []), { shooter: actor.name, victim: defender.name, shooterIsHero: shooter.type === 'hero', victimIsHero: blocker.type === 'hero' }];
         }
-        const next = { ...prev, heroParts, heroArmorCur, allies, enemies, log, lastAction, stunned, gearWear, allyGearWear, abilityState, locks, friendlyFireHits, friendlyFireEvents };
+        const next = { ...prev, heroParts, heroArmorCur, allies, enemies, log, lastAction: stray ? prev.lastAction : lastAction, stunned, gearWear, allyGearWear, abilityState, locks, friendlyFireHits, friendlyFireEvents };
         if (result)
             return { ...next, result, ...(killedBy ? { killedBy } : {}) };
+        if (stray)
+            return next;
         return spendActions(next, 1);
     }
+    // Missed bullets of a firearm volley may strike a combatant standing right next
+    // to the target (either side), unless the shooter stands at that bystander's back
+    // (see shooterBehind). Runs once per new action from the setCombat wrapper; the
+    // action itself (animation, cost, turn) is untouched, only the extra damage and a
+    // log line are added. Returns `next` unchanged when nothing is hit.
+    function applyStrayBullets(prevState, next) {
+        const la = next && next.lastAction;
+        if (!la || la === (prevState && prevState.lastAction) || la.strayDone)
+            return next;
+        if (!la.gunFx || la.suppress || la.fxOnly || !Array.isArray(la.shots) || next.result)
+            return next;
+        const misses = la.shots.filter(sh => sh.resultKind === 'miss' || sh.resultKind === 'dodged').length;
+        if (misses === 0)
+            return next;
+        const posOf = (type, id, st) => {
+            if (type === 'hero')
+                return st.heroPos;
+            const c = (type === 'ally' ? st.allies : st.enemies || []).find(x => x.id === id);
+            return c ? c.pos : null;
+        };
+        const shooterId = la.attackerType === 'hero' ? 'hero' : la.attackerId;
+        const shooterPos = posOf(la.attackerType, shooterId, next);
+        const targetPos = posOf(la.defenderType, la.defenderType === 'hero' ? 'hero' : la.defenderId, next);
+        if (!shooterPos || !targetPos)
+            return next;
+        const isSame = (type, id) => (type === la.attackerType && id === shooterId) || (type === la.defenderType && id === (la.defenderType === 'hero' ? 'hero' : la.defenderId));
+        let cur = next;
+        let hitAny = false;
+        for (let i = 0; i < misses && !cur.result; i++) {
+            if (Math.random() >= STRAY_BULLET_CHANCE)
+                continue;
+            const cands = [];
+            if (cur.heroPos && !isSame('hero', 'hero') && !isBodyDestroyed(cur.heroParts))
+                cands.push({ type: 'hero', id: 'hero', pos: cur.heroPos });
+            cur.allies.forEach(a => { if (a.pos && !isSame('ally', a.id) && !isBodyDestroyed(a.parts) && !a.fled)
+                cands.push({ type: 'ally', id: a.id, pos: a.pos, ally: a }); });
+            cur.enemies.forEach(e => { if (e.pos && !isSame('enemy', e.id) && !isBodyDestroyed(e.parts) && !e.fled)
+                cands.push({ type: 'enemy', id: e.id, pos: e.pos, enemy: e }); });
+            const eligible = cands.filter(c => chebyshevDistance(c.pos, targetPos) <= 1 && !shooterBehind(shooterPos, targetPos, c.pos));
+            if (eligible.length === 0)
+                break;
+            const victim = eligible[Math.floor(Math.random() * eligible.length)];
+            let actor;
+            if (la.attackerType === 'hero')
+                actor = makeHeroActor(computeHeroMods(gameState, cur.abilityState), cur.gearWear);
+            else if (la.attackerType === 'ally') {
+                const al = cur.allies.find(a => a.id === shooterId);
+                if (!al)
+                    break;
+                actor = makeAllyActor(al, computeAllyMods(gameState.npcs, al.name, computeCommanderAura(gameState)), allyWearOf(cur, al));
+            }
+            else {
+                const en = cur.enemies.find(e => e.id === shooterId);
+                if (!en)
+                    break;
+                actor = makeEnemyActor(en, 1);
+            }
+            actor = { ...actor, weaponDamage: gunVolleyDamages(la.gunFx, actor.weaponDamage)[0] };
+            const victimName = victim.type === 'hero' ? (heroName || t('combatYouLabel')) : victim.type === 'ally' ? victim.ally.name : victim.enemy.enemyName;
+            const entry = { text: actor.name + ' — ' + t('combatLogStrayBulletText').replace('{name}', victimName), kind: 'defended' };
+            cur = applyFriendlyFireShot(cur, { type: la.attackerType, id: shooterId, pos: shooterPos, actor }, victim, [...cur.log, entry], undefined, true);
+            hitAny = true;
+        }
+        return hitAny ? { ...cur, lastAction: { ...cur.lastAction, strayDone: true } } : next;
+    }
+    strayBulletsRef.current = applyStrayBullets;
     function resolveAttack(targetEnemyId, gunAbilityId) {
         // Nothing should happen while the pre-battle intro is still playing.
         if (combatIntroActive || combatFxBusyRef.current)
@@ -52590,7 +53789,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     ? asUnarmedActor(makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), allyKit.equipment))
                     : makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), allyKit.equipment);
                 if (friendlyBlocker)
-                    return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, friendlyBlocker, log);
+                    return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker, gunFx: allyGunFx }, friendlyBlocker, log);
                 const forceCrit = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + enemy.id, ally.pos, enemy.pos);
                 const outcome = (allyGunFx && allyIsRanged)
                     ? resolveGunVolley(attacker, gunVolleyDamages(allyGunFx, attacker.weaponDamage), makeEnemyDefender(enemy, prev.enemies), makeEnemyVolleyChain(enemy, prev.enemies), allyRangedMult, forceCrit)
@@ -52720,7 +53919,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             let attacker = heroLockedShooter ? asUnarmedActor(makeHeroActor(mods, prev.gearWear)) : makeHeroActor(mods, prev.gearWear);
             if (friendlyBlocker)
-                return applyFriendlyFireShot({ ...prev, dotTickedKey: dotKey }, { type: 'hero', id: 'hero', pos: prev.heroPos, actor: attacker }, friendlyBlocker, log, heroParts);
+                return applyFriendlyFireShot({ ...prev, dotTickedKey: dotKey }, { type: 'hero', id: 'hero', pos: prev.heroPos, actor: attacker, gunFx: heroGunFx }, friendlyBlocker, log, heroParts);
             const defender = makeEnemyDefender(enemy, prev.enemies);
             const forceCrit = isBackstabOnLocked(prev, 'hero:hero', 'enemy:' + enemy.id, prev.heroPos, enemy.pos);
             // Talent context bonuses (Backstab / Duelist): see applyAttackContextMods.
@@ -53725,7 +54924,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const allyLockKey = getActiveLockPartner(prev, 'ally:' + ally.id);
                 const allyLockedOnly = allyLockKey ? meleeReachableAll.filter(e => 'enemy:' + e.id === allyLockKey) : [];
                 const meleeReachableEnemies = allyLockedOnly.length > 0 ? allyLockedOnly : meleeReachableAll;
-                let target = pickBestTarget(meleeReachableEnemies, e => scoreCombatTarget({ hpFraction: hpFractionOfParts(e.parts), squishy: e.role === 'ranged' || e.role === 'caster', tankish: e.role === 'tank' }, { role: 'melee' }))
+                let target = pickBestTarget(meleeReachableEnemies, e => scoreCombatTarget({ hpFraction: hpFractionOfParts(e.parts), squishy: e.role === 'ranged' || e.role === 'caster', tankish: e.role === 'tank' }, { role: 'melee' })
+                    - (aiGunFx && ally.pos ? friendlyShotRisk(ally.pos, e.pos, [prev.heroPos, ...prev.allies.filter(a => a.id !== ally.id && !isAllyOut(a) && a.pos).map(a => a.pos)]) * FRIENDLY_RISK_SCORE_PENALTY : 0))
                     || (ally.pos ? nearestTarget(ally.pos, prev.enemies.filter(e => !isEnemyOut(e)).map(e => ({ e, pos: e.pos })))?.e : null)
                     || pickLivingTarget(prev.enemies, isEnemyOut);
                 if (!target)
@@ -53743,7 +54943,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         if (blocker.type === 'enemy')
                             target = blocker.enemy;
                         else
-                            return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker }, blocker, log);
+                            return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker, gunFx: aiGunFx }, blocker, log);
                     }
                 }
                 if (aiGunFx && ally.pos && target.pos && !aiAllyLockedShooter) {
@@ -54116,7 +55316,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     ? heroIsShooter(prev)
                     : (() => { const l = getAllyLoadout(tg.ally); return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged' || !!getAllyCombatKit(tg.ally, prev).gunFx; })();
                 const protectBonus = vulnerableFriends.some(v => chebyshevDistance(tg.pos, v.pos) <= MELEE_ATTACK_MAX_DISTANCE);
-                return scoreCombatTarget({ hpFraction, squishy, protectBonus }, { role: enemy.role, tierRank: ENEMY_TIER_RANKS[enemy.tier] });
+                // A shooter avoids targets where its own side is fighting with its back to the shooter (or stands beside the target).
+                const shooterRisk = (enemy.role === 'ranged' || getEnemyWeaponType(enemy) === 'ranged') && enemy.pos
+                    ? friendlyShotRisk(enemy.pos, tg.pos, prev.enemies.filter(e => !isEnemyOut(e) && e.id !== enemy.id && e.pos).map(e => e.pos)) : 0;
+                return scoreCombatTarget({ hpFraction, squishy, protectBonus }, { role: enemy.role, tierRank: ENEMY_TIER_RANKS[enemy.tier] }) - shooterRisk * FRIENDLY_RISK_SCORE_PENALTY;
             });
             // Line of fire: a hero/ally standing flush against the chosen target,
             // right on the shooter's line, may take the shot instead (see
@@ -54164,7 +55367,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // Firearm wielders resolve a volley of separate bullets (see resolveGunVolley).
             const enemyGunFx = enemyShotIsRanged ? getEnemyGunFxId(enemy) : null;
             if (friendlyBlocker)
-                return applyFriendlyFireShot(prev, { type: 'enemy', id: enemy.id, pos: enemy.pos, actor: attacker }, friendlyBlocker, log);
+                return applyFriendlyFireShot(prev, { type: 'enemy', id: enemy.id, pos: enemy.pos, actor: attacker, gunFx: enemyGunFx }, friendlyBlocker, log);
             if (enemyGunFx && enemy.pos) {
                 const npcCast = tryNpcSuppress(prev, 'enemy:' + enemy.id, enemyGunFx, targetChoice.kind === 'hero' ? 'hero:hero' : 'ally:' + targetChoice.ally.id, log);
                 if (npcCast)
@@ -55651,14 +56854,21 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         return canon ? { ...raw, name: canon } : raw;
     }
     async function sendBatch(newActionMessages, baseMessages, baseState) {
+        const restoreComposer = failRestoreRef.current;
+        failRestoreRef.current = null;
         const base = baseMessages || messages;
         const unresolved = [...getUnresolvedItemOffers(base), ...getUnresolvedQuestOffers(base), ...getUnresolvedTravelOffer(base)];
         if (unresolved.length > 0) {
             setError(t('resolveItemsErrorPrefix') + '«' + unresolved[0].label + '»');
+            if (restoreComposer)
+                restoreComposer();
             return;
         }
-        if (loading || newActionMessages.length === 0)
+        if (loading || newActionMessages.length === 0) {
+            if (restoreComposer)
+                restoreComposer();
             return;
+        }
         if (devOfflineActive()) {
             devOfflineTurn(newActionMessages, base, baseState);
             return;
@@ -55668,6 +56878,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // could then "resolve" in prose). The engine's own auto-continue after a
         // fight passes a base whose source narrator is already combatResolved.
         if (isCombatPendingInMessages(base)) {
+            if (restoreComposer)
+                restoreComposer();
             return;
         }
         const precedingNarrator = base.length > 0 && base[base.length - 1].role === 'narrator'
@@ -55744,6 +56956,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             }
             setMessages(reverted);
             setError(describeError(e, 'sendFailedPrefix'));
+            if (restoreComposer)
+                restoreComposer();
         }
         finally {
             setLoading(false);
@@ -55993,6 +57207,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const note = pendingNote.trim();
         if (editingTurnIndex !== null) {
             const turnIndex = editingTurnIndex;
+            failRestoreRef.current = () => {
+                setEditingTurnIndex(cur => (cur === null ? turnIndex : cur));
+                setInput(cur => cur || text);
+                setPendingNote(cur => cur || note);
+            };
             setEditingTurnIndex(null);
             setInput('');
             setPendingNote('');
@@ -56008,6 +57227,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             setError(t('resolveItemsErrorPrefix') + '«' + unresolved[0].label + '»');
             return;
         }
+        const travelBefore = pendingMapTravel;
+        const routeBefore = pendingMapRouteRef.current, destBefore = pendingMapDestinationRef.current;
+        failRestoreRef.current = () => {
+            setInput(cur => cur || text);
+            setPendingNote(cur => cur || note);
+            if (travelBefore && !pendingMapRouteRef.current) {
+                pendingMapRouteRef.current = routeBefore;
+                pendingMapDestinationRef.current = destBefore;
+                setPendingMapTravel(cur => cur || travelBefore);
+            }
+        };
         setInput('');
         setPendingNote('');
         setPendingMapTravel(null);
@@ -56329,8 +57559,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // it describes what happened in the PRIOR turn, so editing this turn's own
     // text shouldn't drop it.
     async function regenerateTurnWithEdits(turnIndex, actionText, noteText) {
-        if (loading)
+        const restoreComposer = failRestoreRef.current;
+        failRestoreRef.current = null;
+        if (loading) {
+            if (restoreComposer)
+                restoreComposer();
             return;
+        }
         const turn = turns[turnIndex - 1];
         if (!turn)
             return;
@@ -56419,6 +57654,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 declinedOffersRef.current = summaryBackup.declinedOffers || [];
             }
             setError(describeError(e, 'sendFailedPrefix'));
+            if (restoreComposer)
+                restoreComposer();
         }
         finally {
             heroIdentityOverrideRef.current = null;
@@ -56914,10 +58151,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, soundVolume: soundVolume, onSetSoundVolume: setSoundVolume, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
         cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
-        mapModalOpen && (React.createElement(MapModal, { map: viewedState.map, npcs: viewedState.npcs, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, onUpdateNodeMeta: isLatestTurn ? updateMapNodeMeta : undefined, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
+        mapModalOpen && (React.createElement(MapModal, { allegiance: computeHeroAllegiance(viewedState, viewedFactionReputations, viewedNpcReputations), map: viewedState.map, npcs: viewedState.npcs, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, onUpdateNodeMeta: isLatestTurn ? updateMapNodeMeta : undefined, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: viewedState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
-        societyModalOpen && (React.createElement(SocietyModal, { gameState: viewedState, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onClose: () => setSocietyModalOpen(false), t: t })),
+        societyModalOpen && (React.createElement(SocietyModal, { gameState: viewedState, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, factionActions: heroFactionActions, onClose: () => setSocietyModalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
+        foundFactionOpen && isLatestTurn && React.createElement(FoundFactionModal, { gameState: gameState, onConfirm: foundHeroFactionAction, onCancel: () => setFoundFactionOpen(false), t: t }),
         recruitTargetNpc && (React.createElement(RecruitModal, { npcName: recruitTargetNpc, partyFull: party.length >= MAX_PARTY_SIZE, onConfirm: () => recruitToParty(recruitTargetNpc), onCancel: () => setRecruitTargetNpc(null), t: t })),
         tradingNpc && (React.createElement(TradeModal, { dayPhase: gameState.dayPhase, npcName: tradingNpc, gameState: gameState, npcInventories: npcInventories, npcCurrencies: npcCurrencies, itemRarities: itemRarities, factionReputations: factionReputations, equipment: equipment, onTrade: (buyIndexes, sellIndexes) => executeTrade(tradingNpc, buyIndexes, sellIndexes), onClose: closeTrade, t: t })),
         repairingNpc && (() => {
@@ -57666,7 +58904,8 @@ const APP_STYLES = `
      breaks off in front of the bars. Active-turn pulse, lock glow, heal/select
      rings and the hit/block/stun flashes are untouched and play on top. */
   .combat-side-hero { --side: #5fa87a; }
-  .combat-side-ally { --side: #5a95b8; }
+  .combat-side-party { --side: #5fa87a; } /* recruited party members the player controls: green like the hero */
+  .combat-side-ally { --side: #5a95b8; } /* allies the player does not control: blue */
   .combat-side-enemy { --side: #b45a56; }
   .combat-portrait-wrap[class*="combat-side-"] .combat-portrait {
     border: 1.5px solid color-mix(in srgb, var(--side) 45%, transparent);
@@ -58753,6 +59992,19 @@ const APP_STYLES = `
   .map-travel-risk-note.map-travel-risk-deadly { color: var(--red-400); }
   .map-route-highlight-base.map-route-risk-tense { stroke: #d97706; opacity: 0.55; }
   .map-route-highlight-base.map-route-risk-deadly { stroke: #dc2626; opacity: 0.65; }
+  .hero-faction-panel { border: 1px solid var(--stone-700); border-radius: 6px; padding: 0.5rem 0.65rem; margin-bottom: 0.75rem; background: var(--stone-900); }
+  .hero-faction-title { margin: 0.2rem 0; font-weight: 600; color: var(--amber-400); }
+  .hero-faction-input { width: 100%; box-sizing: border-box; margin: 0.35rem 0; background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 4px; padding: 0.4rem 0.5rem; color: var(--amber-100); font-family: inherit; font-size: 0.9rem; resize: none; }
+  .hero-faction-input:focus { outline: none; border-color: var(--amber-600); }
+  .hero-faction-focus-row { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.25rem 0; }
+  .hero-faction-focus-btn { padding: 0.3rem 0.6rem; background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 4px; color: var(--amber-100); cursor: pointer; font-size: 0.8rem; }
+  .hero-faction-focus-btn-on { border-color: var(--amber-500); background: var(--stone-800); }
+  .hero-faction-post-block { margin: 0.25rem 0; }
+  .hero-faction-post-row { display: flex; gap: 0.25rem; margin: 0.2rem 0; }
+  .hero-faction-post-btn { width: 1.9rem; height: 1.7rem; padding: 0; background: var(--stone-900); border: 1px solid var(--stone-700); border-radius: 4px; font-size: 0.9rem; line-height: 1; cursor: pointer; }
+  .hero-faction-post-btn:disabled { opacity: 0.35; cursor: default; }
+  .hero-faction-post-btn-on { border-color: var(--amber-500); background: var(--stone-800); }
+  .hero-faction-membership { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0.25rem 0; }
   /* Bottom-right — the one remaining free corner once danger (top-right)
      and stairs (top-left) are accounted for, so a node can show all three
      badges at once without any of them overlapping. */
@@ -58886,6 +60138,7 @@ const APP_STYLES = `
   .icon-btn:hover { color: var(--amber-500); }
   @media (min-width: 1024px) { .sidebar { display: block; } .sheet-overlay { display: none; } }
 `;
+
 
 // ---- Mount ----
 // Starts once the third-party scripts have settled (loaded, failed, or timed
