@@ -18087,6 +18087,12 @@ const TRANSLATIONS = {
         combatCoverFullLabel: 'Полное укрытие',
         combatCoverPartialLabel: 'Частичное укрытие',
         combatSkipTurnButtonLabel: 'Завершить ход',
+        combatReloadButtonLabel: 'Перезарядить',
+        combatReloadNoClipsHint: 'в инвентаре нет обойм',
+        combatReloadClipsLeft: 'обойм: {n}',
+        combatLogReloadText: 'перезаряжает оружие',
+        combatLogGunEmptyText: 'магазин пуст — нужна перезарядка',
+        gunClipItemName: 'Обойма',
         combatLogToggleLabel: 'Журнал боя',
         combatFullscreenLabel: 'На весь экран',
         combatExitFullscreenLabel: 'Свернуть поле боя',
@@ -19069,6 +19075,12 @@ const TRANSLATIONS = {
         combatCoverFullLabel: 'Full cover',
         combatCoverPartialLabel: 'Partial cover',
         combatSkipTurnButtonLabel: 'End turn',
+        combatReloadButtonLabel: 'Reload',
+        combatReloadNoClipsHint: 'no clips in the inventory',
+        combatReloadClipsLeft: 'clips: {n}',
+        combatLogReloadText: 'reloads',
+        combatLogGunEmptyText: 'the magazine is empty — reload needed',
+        gunClipItemName: 'Ammo clip',
         combatLogToggleLabel: 'Combat log',
         combatFullscreenLabel: 'Fullscreen',
         combatExitFullscreenLabel: 'Exit fullscreen',
@@ -20349,7 +20361,8 @@ function normalizeInventoryItem(raw) {
     }
     if (!raw || typeof raw !== 'object' || typeof raw.name !== 'string' || !raw.name.trim())
         return null;
-    const slot = EQUIPMENT_SLOT_TYPES.includes(raw.slot) ? raw.slot : 'none';
+    // A spare magazine is never equipment, whatever slot the model guessed.
+    const slot = isGunClipName(raw.name) ? 'none' : (EQUIPMENT_SLOT_TYPES.includes(raw.slot) ? raw.slot : 'none');
     const questId = typeof raw.questId === 'string' && raw.questId.trim() ? raw.questId.trim() : null;
     // "shield" is the model's own explicit tag (more reliable than guessing
     // from the name — see isShieldItemName) when present; a legacy save or a
@@ -20394,6 +20407,10 @@ function normalizeInventoryItem(raw) {
     // is (re)built, never here, so re-normalizing can't silently re-roll.
     if (isValidStatRoll(raw.statRoll) && isStatRollSlot(slot))
         item.statRoll = raw.statRoll;
+    // A firearm's own magazine (see FIREARM MAGAZINES) — only kept when valid; a gun
+    // without one gets a random full magazine the first time it's used in a fight.
+    if (slot === 'weapon' && isValidGunMag(raw.mag))
+        item.mag = { cur: raw.mag.cur, max: raw.mag.max };
     return item;
 }
 // An item's "quest gold signature" is live ONLY while the quest it's tagged
@@ -23399,7 +23416,7 @@ const COMBAT_OBJECTIVE_TYPES = ['defeatAll', 'surviveTurns', 'protect', 'retreat
 //           open space, another dimension/plane, a pocket reality, etc.
 const COMBAT_LIGHT_LEVELS = ['lit', 'dark'];
 const COMBAT_REALMS = ['material', 'other'];
-const DEFAULT_COMBAT_ENVIRONMENT = { time: 'day', light: 'lit', realm: 'material' };
+const DEFAULT_COMBAT_ENVIRONMENT = { time: 'day', light: 'lit', realm: 'material', indoors: false, weather: 'none', weatherRange: null };
 // encounter.lighting / encounter.realm come from the model (null when it
 // said nothing). Missing lighting falls back to the hour: day -> lit,
 // night -> dark. dayPhase is the story's current phase.
@@ -23409,13 +23426,49 @@ function buildCombatEnvironment(encounter, dayPhase) {
     const light = encounter && COMBAT_LIGHT_LEVELS.includes(encounter.lighting)
         ? encounter.lighting
         : (time === 'night' ? 'dark' : 'lit');
-    return { time, light, realm };
+    // indoors: roofed/enclosed place. weather ('none' | 'lightSnow' | 'heavySnow' | 'blizzard', see
+    // COMBAT_WEATHERS) only ever exists outdoors in the ordinary world, so it is forced to 'none' otherwise.
+    const indoors = !!(encounter && encounter.indoors === true);
+    const weather = !indoors && realm === 'material' && encounter && COMBAT_WEATHERS.includes(encounter.weather) ? encounter.weather : 'none';
+    // weatherRange (set from the editor, never by the narrator): { min, max, mode } over WEATHER_ORDER. The fight
+    // starts at `min`; mode 'range' lets the weather wander between min and max, 'escalate' only ever strengthens
+    // it up to max. min === max pins it. null = the default (free drift over every gradation, see rollWeatherShift).
+    let weatherRange = null, weatherNow = weather;
+    const wr = encounter && encounter.weatherRange;
+    if (wr && !indoors && realm === 'material' && WEATHER_ORDER.includes(wr.min) && WEATHER_ORDER.includes(wr.max)
+        && WEATHER_ORDER.indexOf(wr.min) <= WEATHER_ORDER.indexOf(wr.max)) {
+        weatherRange = { min: wr.min, max: wr.max, mode: wr.mode === 'escalate' ? 'escalate' : 'range' };
+        weatherNow = wr.min;
+    }
+    return { time, light, realm, indoors, weather: weatherNow, weatherRange };
 }
-// The flat list of active environment tags, e.g. ['night', 'dark', 'material'].
+// Weather drifts from round to round: each new round has a WEATHER_SHIFT_CHANCE chance to step the fight's
+// snowfall one notch along WEATHER_ORDER (light <-> heavy <-> blizzard). env.weatherRange (editor only) limits the
+// walk to [min, max]; mode 'escalate' allows only stronger steps; min === max never changes. Without a range the
+// whole scale is open. Pure: returns the same object when nothing changes; 'none' never changes.
+const WEATHER_SHIFT_CHANCE = 0.22;
+function rollWeatherShift(env) {
+    if (!env || !env.weather || env.weather === 'none')
+        return env;
+    const r = env.weatherRange;
+    const lo = r ? WEATHER_ORDER.indexOf(r.min) : 0, hi = r ? WEATHER_ORDER.indexOf(r.max) : WEATHER_ORDER.length - 1;
+    const cur = WEATHER_ORDER.indexOf(env.weather);
+    if (cur < 0 || lo >= hi || Math.random() >= WEATHER_SHIFT_CHANCE)
+        return env;
+    const moves = [];
+    if (cur < hi)
+        moves.push(cur + 1);
+    if (cur > lo && !(r && r.mode === 'escalate'))
+        moves.push(cur - 1);
+    if (moves.length === 0)
+        return env;
+    return { ...env, weather: WEATHER_ORDER[moves[Math.floor(Math.random() * moves.length)]] };
+}
+// The flat list of active environment tags, e.g. ['night', 'dark', 'material', 'outdoors', 'blizzard'].
 // Effects can test membership instead of poking at the three axes directly.
 function getCombatEnvTags(combat) {
     const env = (combat && combat.environment) || DEFAULT_COMBAT_ENVIRONMENT;
-    return [env.time, env.light, env.realm].filter(Boolean);
+    return [env.time, env.light, env.realm, env.indoors ? 'indoors' : 'outdoors', env.weather && env.weather !== 'none' ? env.weather : null].filter(Boolean);
 }
 function combatHasEnvTag(combat, tag) {
     return getCombatEnvTags(combat).includes(tag);
@@ -23577,6 +23630,8 @@ const NARRATIVE_ITEM_SLOT_KEYWORDS = [
 function inferEquipSlotFromItemName(name) {
     if (typeof name !== 'string' || !name.trim())
         return 'none';
+    if (isGunClipName(name))
+        return 'none';
     const tokens = narrativeItemNameTokens(name);
     // A repair kit is two words ("ремонтный набор", "repair kit"), which the
     // single-token keyword table below can't express — checked first.
@@ -23607,9 +23662,9 @@ function inferEquipSlotFromItemName(name) {
 // inferEquipSlotFromItemName above.
 const NON_HEALING_LEGACY_CONSUMABLE_KEYWORDS = [
     'факел', 'свеч', 'фонар', 'масл', 'стрел', 'колчан', 'болт', 'патрон',
-    'боеприпас', 'снаряд', 'порох', 'свиток',
+    'боеприпас', 'снаряд', 'порох', 'свиток', 'обойм', 'магазин', 'энергоячейк',
     'torch', 'candle', 'lantern', 'oil', 'arrow', 'quiver', 'bolt',
-    'cartridge', 'ammo', 'ammunition', 'gunpowder', 'scroll'
+    'cartridge', 'ammo', 'ammunition', 'gunpowder', 'scroll', 'clip', 'magazine', 'energycell'
 ];
 function itemActuallyHeals(name) {
     if (typeof name !== 'string' || !name.trim())
@@ -23755,6 +23810,8 @@ function getGunFxIdFromName(name) {
     const tokens = narrativeItemNameTokens(name);
     if (tokens.length === 0)
         return null;
+    if (isGunClipName(name))
+        return null;
     const hasToken = pats => tokens.some(tok => pats.some(re => re.test(tok)));
     if (hasToken([/^рельс/, /^railgun/, /^rail$/]))
         return 'railSingle';
@@ -23803,6 +23860,128 @@ function gunVolleyDamages(fxId, totalDamage) {
     const def = GUN_FX_DEFS[fxId];
     const shots = def ? Math.max(1, def.perBurst * def.hands.length) : 1;
     return Array.from({ length: shots }, () => totalDamage / shots);
+}
+// ==============================================================================
+// FIREARM MAGAZINES
+// Every firearm has its own magazine: a random capacity (the same
+// GUN_MAG_MIN..GUN_MAG_MAX range for every gun — never tied to rarity/quality
+// or to the gun type) and a current count. One attack (a volley/burst; with two
+// pistols, one round from EACH pistol) spends one round; at 0 the gun can't
+// fire until it is reloaded, which costs 1 action. The HERO's reload also
+// spends one "clip" item (see isGunClipItem) from the inventory per gun
+// reloaded; companions and enemies reload for free (they carry their own).
+// The hero's magazine lives on the inventory item itself (item.mag =
+// { cur, max }) so it carries over between fights; during a fight it's tracked
+// in combat.gunMags[ownerKey + ':' + handKey] ('hero:weaponRight',
+// 'ally:<id>:weaponLeft', 'enemy:<id>:main') and written back into the
+// inventory when the fight closes (see foldHeroGunMags).
+// ==============================================================================
+const GUN_MAG_MIN = 6;
+const GUN_MAG_MAX = 12;
+const GUN_HAND_KEYS = ['weaponRight', 'weaponLeft'];
+function rollGunMag() {
+    const max = GUN_MAG_MIN + Math.floor(Math.random() * (GUN_MAG_MAX - GUN_MAG_MIN + 1));
+    return { cur: max, max };
+}
+function isValidGunMag(m) {
+    return !!m && Number.isFinite(m.cur) && Number.isFinite(m.max) && m.max > 0 && m.cur >= 0 && m.cur <= m.max;
+}
+// A spare magazine / clip / energy cell. A GUN merely mentioning its magazine
+// ("пистолет с магазином") is not a clip: a gun noun BEFORE the clip word means
+// it's the gun ("обойма для пистолета" is a clip, "пистолет с обоймой" a gun).
+const GUN_CLIP_TOKEN_PATTERNS = [/^обойм/, /^магазин/, /^clip/, /^magazine/, /^энергоячейк/, /^energycell/];
+const GUN_NOUN_TOKEN_PATTERN = /^(пистолет|револьвер|винтовк|карабин|ружь|дробовик|пулем|автомат(?!ическ|ичн)|pistol|revolver|rifle|carbine|shotgun|smg|handgun)/;
+function isGunClipName(name) {
+    if (typeof name !== 'string' || !name.trim())
+        return false;
+    const tokens = narrativeItemNameTokens(name);
+    const idx = tokens.findIndex(tok => GUN_CLIP_TOKEN_PATTERNS.some(re => re.test(tok)));
+    if (idx < 0)
+        return false;
+    return !tokens.slice(0, idx).some(tok => GUN_NOUN_TOKEN_PATTERN.test(tok));
+}
+function isGunClipItem(item) {
+    return !!item && item.slot !== 'weapon' && isGunClipName(item.name);
+}
+// Firearms in a loadout's hands: [{ handKey, name, item }]. resolvedHands is
+// the result of resolveEquippedItems (optional — without it item is null).
+function getFirearmHands(equipmentObj, resolvedHands) {
+    const eq = equipmentObj || {};
+    const out = [];
+    for (const handKey of GUN_HAND_KEYS) {
+        const name = eq[handKey];
+        if (!name)
+            continue;
+        const item = resolvedHands ? resolvedHands[handKey] : null;
+        if (isShieldItemName(name) || (item && isShieldItem(item)))
+            continue;
+        if (!getGunFxIdFromName(name))
+            continue;
+        out.push({ handKey, name, item: item || null });
+    }
+    return out;
+}
+function gunMagKey(ownerKey, handKey) { return ownerKey + ':' + handKey; }
+// The mags map with an entry for every listed hand: a hand with none yet takes
+// its item's saved magazine, or a freshly rolled full one. Never mutates input.
+function ensureGunMags(mags, ownerKey, hands) {
+    let out = mags || {};
+    for (const h of hands) {
+        const key = gunMagKey(ownerKey, h.handKey);
+        if (isValidGunMag(out[key]))
+            continue;
+        if (out === mags)
+            out = { ...mags };
+        out[key] = (h.item && isValidGunMag(h.item.mag)) ? { cur: h.item.mag.cur, max: h.item.mag.max } : rollGunMag();
+    }
+    return out;
+}
+function loadedGunHands(mags, ownerKey, hands) {
+    return hands.filter(h => { const m = mags && mags[gunMagKey(ownerKey, h.handKey)]; return !!m && m.cur > 0; });
+}
+function spendGunRounds(mags, ownerKey, hands) {
+    const out = { ...(mags || {}) };
+    for (const h of hands) {
+        const k = gunMagKey(ownerKey, h.handKey);
+        if (out[k] && out[k].cur > 0)
+            out[k] = { ...out[k], cur: out[k].cur - 1 };
+    }
+    return out;
+}
+function refillGunMags(mags, ownerKey, hands) {
+    const out = { ...(mags || {}) };
+    for (const h of hands) {
+        const k = gunMagKey(ownerKey, h.handKey);
+        if (out[k])
+            out[k] = { ...out[k], cur: out[k].max };
+    }
+    return out;
+}
+function initHeroGunMags(equipmentObj, inventoryList) {
+    const eq = equipmentObj || {};
+    return ensureGunMags({}, 'hero', getFirearmHands(eq, resolveEquippedItems(eq, inventoryList || [])));
+}
+// Writes the hero's end-of-fight magazines back onto the equipped gun items.
+function foldHeroGunMags(inventoryList, equipmentObj, mags) {
+    if (!mags || !Array.isArray(inventoryList))
+        return inventoryList;
+    const eq = equipmentObj || {};
+    const used = new Set();
+    let next = inventoryList;
+    for (const handKey of GUN_HAND_KEYS) {
+        const m = mags[gunMagKey('hero', handKey)];
+        const name = eq[handKey];
+        if (!isValidGunMag(m) || !name)
+            continue;
+        const idx = inventoryList.findIndex((it, i) => !used.has(i) && it && it.name === name && it.slot === 'weapon');
+        if (idx < 0)
+            continue;
+        used.add(idx);
+        if (next === inventoryList)
+            next = inventoryList.slice();
+        next[idx] = { ...next[idx], mag: { cur: m.cur, max: m.max } };
+    }
+    return next;
 }
 // True for a weapon-slot item that's a handgun (never a shield, never the
 // ranged/two-handed submachine-gun case).
@@ -35458,6 +35637,8 @@ function fxKit() {
                 p.vy -= p.by * dt;
             if (p.vr)
                 p.rot += p.vr * dt;
+            if (combatWind.active && (p.k === 'smoke' || p.k === 'dust' || p.k === 'vap'))
+                p.vx += combatWind.x * 0.35 * dt; // gun smoke leans with the battlefield wind
             const d = Math.max(0, 1 - p.dr * dt);
             p.vx *= d;
             p.vy *= d;
@@ -37396,10 +37577,12 @@ function createAbilityFxEngine(host) {
             if (p.w)
                 p.vx += Math.sin(gt * 11 + p.ph) * p.w * dt;
             p.vy -= p.b * dt;
+            // Wind takes the smoke at the end of its life. With weather on the battlefield it is THE shared wind
+            // (getCombatWind: same direction as the snow, calms while the wind turns); otherwise the old fixed drift.
             if (p.k === 's') {
                 const ag = 1 - k;
-                p.vx += 600 * ag * ag * ag * dt;
-            } // wind takes the smoke at the end of its life
+                p.vx += (combatWind.active ? combatWind.x * 1.45 : 600) * ag * ag * ag * dt;
+            }
             p.x += p.vx * dt;
             p.y += p.vy * dt;
             p.vx *= d;
@@ -38388,7 +38571,364 @@ function getAbilityStatus(id, fightState, round) {
     }
     return { available: true, cooldown: null, usedUp: false };
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, introActive, fxBusy, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {}, heroFirearm = false, allyFirearms = {} }) {
+// ============================================================================
+// COMBAT WEATHER — snow on the battlefield (picture + synthesized sound)
+// ============================================================================
+// The weather of a fight comes from combat.environment.weather (see
+// buildCombatEnvironment): 'none' | 'lightSnow' | 'heavySnow' | 'blizzard',
+// and only ever outdoors in the ordinary world. CombatWeatherLayer (rendered
+// inside the battlefield viewport) owns one createCombatWeather engine for as
+// long as the fight is on screen.
+//
+//  * The snow lives in FIELD coordinates, not screen ones: panning/zooming the
+//    camera moves it together with the board. Flakes outside the view are not
+//    drawn, so the cost does not grow with the size of the board.
+//  * Changing the level (engine.setLevel) blends density / wind / haze / sound
+//    over about a second, so it can change from round to round ("light" ->
+//    "heavy" -> "blizzard") without a jump.
+//  * ONE shared wind (combatWind) drives snow, haze and sound. It occasionally
+//    turns round, calming down on the way through zero. Anything else that
+//    drifts on the battlefield (smoke from fire abilities, later) must read
+//    getCombatWind() so smoke and snow never blow in opposite directions.
+//  * The sound is three looping mp3 files (WEATHER_SOUND_URLS, in the usual
+//    sounds folder, one per level) played through the shared SFX audio context;
+//    nothing is embedded in this file. Levels cross-fade, the volume follows the
+//    Settings sound volume, and it dips for a moment while the wind turns.
+//    A missing file simply means silence for that level.
+//  * Rain is deliberately not implemented yet.
+const COMBAT_WEATHERS = ['none', 'lightSnow', 'heavySnow', 'blizzard'];
+const WEATHER_ORDER = ['lightSnow', 'heavySnow', 'blizzard']; // gradations from weakest to strongest
+const WEATHER_LEVELS = {
+    none: { snow: 0, wind: 0, gust: 0, haze: 0, tint: 0, speed: 1 },
+    lightSnow: { snow: .16, wind: 12, gust: 8, haze: 0, tint: .06, speed: .8 },
+    heavySnow: { snow: .62, wind: 90, gust: 60, haze: .15, tint: .16, speed: 1.25 },
+    blizzard: { snow: 1.0, wind: 410, gust: 170, haze: .34, tint: .22, speed: 1.45 }
+};
+const WEATHER_KEYS = ['snow', 'wind', 'gust', 'haze', 'tint', 'speed'];
+const WEATHER_AUDIO_GAIN = 1.0; // overall loudness of the ambience loops relative to the Settings volume
+// One seamless loop per level (files live next to the other sounds).
+const WEATHER_SOUND_URLS = {
+    lightSnow: SOUNDS_BASE + 'snow_1_light.mp3',
+    heavySnow: SOUNDS_BASE + 'snow_2_heavy.mp3',
+    blizzard: SOUNDS_BASE + 'snow_3_blizzard.mp3'
+};
+// Live shared wind. x: field pixels per second (signed, <0 blows left),
+// dir: -1..1 (0 while it turns), strength: 0..1. Zeroed when no weather runs.
+const combatWind = { x: 0, dir: 1, strength: 0, active: false }; // active: a weather engine is running (otherwise smoke keeps its old fixed drift)
+function getCombatWind() { return combatWind; }
+let weatherSprites = null;
+function getWeatherSprites() {
+    if (weatherSprites)
+        return weatherSprites;
+    const mk = (w, h, fn) => { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); return c; };
+    const radial = (g, size, stops) => { const r = size / 2, gr = g.createRadialGradient(r, r, 0, r, r, r); stops.forEach(([o, a, col]) => gr.addColorStop(o, 'rgba(' + col + ',' + a + ')')); g.fillStyle = gr; g.fillRect(0, 0, size, size); };
+    weatherSprites = {
+        soft: mk(64, 64, g => radial(g, 64, [[0, 1, '240,247,255'], [.35, .55, '240,247,255'], [1, 0, '240,247,255']])),
+        core: mk(32, 32, g => radial(g, 32, [[0, 1, '246,250,255'], [.28, .95, '246,250,255'], [.5, .25, '246,250,255'], [1, 0, '246,250,255']])),
+        blob: mk(128, 128, g => radial(g, 128, [[0, 1, '226,235,246'], [.5, .45, '226,235,246'], [1, 0, '226,235,246']])),
+        // blizzard streak: bright head on the right, tail fading to the left, soft edges
+        streak: mk(128, 24, (g, w, h) => {
+            const hg = g.createLinearGradient(0, 0, w, 0);
+            hg.addColorStop(0, 'rgba(244,249,255,0)');
+            hg.addColorStop(.55, 'rgba(244,249,255,.35)');
+            hg.addColorStop(.93, 'rgba(244,249,255,.95)');
+            hg.addColorStop(1, 'rgba(244,249,255,0)');
+            g.fillStyle = hg;
+            g.fillRect(0, 0, w, h);
+            g.globalCompositeOperation = 'destination-in';
+            const vg = g.createLinearGradient(0, 0, 0, h);
+            vg.addColorStop(0, 'rgba(0,0,0,0)');
+            vg.addColorStop(.5, 'rgba(0,0,0,1)');
+            vg.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = vg;
+            g.fillRect(0, 0, w, h);
+        })
+    };
+    return weatherSprites;
+}
+// ---- weather sound: looping files, one voice per level, cross-faded ----
+function createWeatherSound(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0;
+    master.connect(ctx.destination);
+    const voices = {};
+    let level = 'none', dead = false, lastVol = -1;
+    function ensure(name) {
+        const url = WEATHER_SOUND_URLS[name];
+        if (!url || voices[name])
+            return;
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        gain.connect(master);
+        const v = voices[name] = { gain, src: null };
+        // decodeAudioData + a looping buffer source gives a gapless loop (an <audio loop> clicks at the seam)
+        fetch(url).then(r => { if (!r.ok)
+            throw new Error('missing'); return r.arrayBuffer(); })
+            .then(ab => ctx.decodeAudioData(ab))
+            .then(buf => {
+            if (dead)
+                return;
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.loop = true;
+            src.connect(gain);
+            src.start(0, Math.random() * buf.duration);
+            v.src = src;
+        })
+            .catch(() => { });
+    }
+    return {
+        setLevel(name) { level = name; ensure(name); },
+        // lull 0..1: quiet spell while the wind turns (1 = normal)
+        update(lull, hidden) {
+            const at = ctx.currentTime;
+            const vol = hidden ? 0 : (soundVolumeStep / SOUND_VOLUME_MAX) * WEATHER_AUDIO_GAIN * lull;
+            if (Math.abs(vol - lastVol) > .002) {
+                master.gain.setTargetAtTime(vol, at, .35);
+                lastVol = vol;
+            }
+            Object.keys(voices).forEach(n => voices[n].gain.gain.setTargetAtTime(n === level ? 1 : 0, at, .8)); // cross-fade between levels
+        },
+        loaded() { return Object.keys(voices).filter(n => voices[n].src); },
+        stop() {
+            dead = true;
+            try {
+                master.gain.cancelScheduledValues(ctx.currentTime);
+                master.gain.setTargetAtTime(0, ctx.currentTime, .12);
+            }
+            catch (e) { /* ignore */ }
+            setTimeout(() => { Object.keys(voices).forEach(n => { try {
+                if (voices[n].src)
+                    voices[n].src.stop();
+            }
+            catch (e) { /* ignore */ } }); try {
+                master.disconnect();
+            }
+            catch (e) { /* ignore */ } }, 700);
+        }
+    };
+}
+// canvas — the overlay inside the battlefield viewport; getCam() -> { pan, zoom, w, h } (live camera)
+function createCombatWeather(canvas, getCam, initialLevel) {
+    const cx = canvas.getContext('2d');
+    const spr = getWeatherSprites();
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const worldW = (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX, worldH = (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX;
+    const MARGIN = 320, RX0 = -MARGIN, RY0 = -MARGIN, RW = worldW + MARGIN * 2, RH = worldH + MARGIN * 2;
+    const MAX_FLAKES = Math.round(1050 * (RW * RH) / (1100 * 650)); // ~1050 flakes on screen at zoom 1 in a full blizzard
+    const flakes = Array.from({ length: MAX_FLAKES }, () => ({
+        th: Math.random(), x: RX0 + Math.random() * RW, y: RY0 + Math.random() * RH,
+        layer: Math.random() < .55 ? 0 : Math.random() < .72 ? 1 : 2, // 0 small, 1 medium, 2 large soft
+        ph: rnd(0, 6.28), sw: rnd(.5, 1.5), k: rnd(.8, 1.25)
+    }));
+    const LAYER = [
+        { size: 1.5, fall: 36, a: .6, par: .85, spr: spr.core },
+        { size: 2.6, fall: 60, a: .8, par: .95, spr: spr.core },
+        { size: 7.5, fall: 92, a: .42, par: 1.1, spr: spr.soft }
+    ];
+    const bands = Array.from({ length: 22 }, () => ({ x: RX0 + Math.random() * RW, y: RY0 + Math.random() * RH, w: rnd(700, 1400), h: rnd(260, 560), v: rnd(.6, 1.4), a: rnd(.55, 1) }));
+    const cur = { ...WEATHER_LEVELS.none };
+    let target = WEATHER_LEVELS[initialLevel] || WEATHER_LEVELS.none;
+    if (WEATHER_LEVELS[initialLevel])
+        Object.assign(cur, WEATHER_LEVELS[initialLevel], { snow: 0 }); // snow thickens from nothing at the start of the fight
+    let t = 0, gustNow = 0, windDir = Math.random() < .5 ? -1 : 1, windDirTarget = windDir, nextFlipAt = rnd(14, 26);
+    let W = 0, H = 0, DPR = 1, raf = 0, last = performance.now(), dead = false;
+    // ---- sound (best effort: the shared SFX context, unlocked by the first tap) ----
+    let sound = null;
+    try {
+        const ctx = getSfxContext();
+        if (ctx) {
+            if (ctx.state !== 'running')
+                ctx.resume().catch(() => { });
+            sound = createWeatherSound(ctx);
+            sound.setLevel(initialLevel);
+        }
+    }
+    catch (e) {
+        sound = null;
+    }
+    function windLull() { return .68 + .32 * Math.pow(Math.abs(windDir), 1.5); }
+    function updateWind(dt) {
+        if (t >= nextFlipAt && cur.snow > .05) {
+            windDirTarget = -windDirTarget;
+            nextFlipAt = t + rnd(16, 38) * (1 - .45 * Math.min(1, cur.wind / 500)); // stronger weather turns more often
+        }
+        const d = windDirTarget - windDir, stepMax = dt / 4; // a full turn takes ~8 s
+        windDir += Math.max(-stepMax, Math.min(stepMax, d));
+    }
+    function resize(cam) {
+        const w = Math.max(1, Math.round(cam.w || canvas.clientWidth)), h = Math.max(1, Math.round(cam.h || canvas.clientHeight)), dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (w !== W || h !== H || dpr !== DPR) {
+            W = w;
+            H = h;
+            DPR = dpr;
+            canvas.width = Math.round(W * DPR);
+            canvas.height = Math.round(H * DPR);
+        }
+    }
+    function drawFlakes(li, wind, windN, dt, view, zoomK) {
+        const L = LAYER[li], dens = cur.snow;
+        if (dens <= .002)
+            return;
+        const fall = L.fall * cur.speed, windAbs = Math.abs(windN);
+        for (let i = 0; i < MAX_FLAKES; i++) {
+            const f = flakes[i];
+            if (f.layer !== li || f.th > dens)
+                continue;
+            const sway = Math.sin(t * f.sw + f.ph) * 22 * (1 - windAbs);
+            f.y += fall * f.k * dt;
+            f.x += (wind * L.par + sway * .6) * dt;
+            if (f.y > RY0 + RH) {
+                f.y -= RH;
+                f.x = RX0 + Math.random() * RW;
+            }
+            if (f.x > RX0 + RW)
+                f.x -= RW;
+            if (f.x < RX0)
+                f.x += RW;
+            const size = L.size * f.k * zoomK, pad = size * 5 + 80;
+            if (f.x < view.x0 - pad || f.x > view.x1 + pad || f.y < view.y0 - pad || f.y > view.y1 + pad)
+                continue;
+            const fade = Math.min(1, (dens - f.th) * 8);
+            cx.globalAlpha = L.a * fade * (li === 2 ? .85 + .15 * Math.sin(t * 2.2 + f.ph) : 1);
+            if (windAbs > .3 && li < 2) {
+                const vx = wind * L.par + sway * .6, vy = fall * f.k;
+                const len = Math.max(size * 3, Math.hypot(vx, vy) * (.03 + windAbs * .035)), th = size * 2.6;
+                cx.globalAlpha *= .75;
+                cx.save();
+                cx.translate(f.x, f.y);
+                cx.rotate(Math.atan2(vy, vx));
+                cx.drawImage(spr.streak, -len, -th / 2, len, th);
+                cx.restore();
+            }
+            else {
+                const d = size * 2.4;
+                cx.drawImage(L.spr, f.x - d / 2, f.y - d / 2, d, d);
+            }
+        }
+        cx.globalAlpha = 1;
+    }
+    function frame(now) {
+        if (dead)
+            return;
+        raf = requestAnimationFrame(frame);
+        const dt = Math.min(.05, Math.max(0, (now - last) / 1000));
+        last = now;
+        const cam = getCam() || { pan: { x: 0, y: 0 }, zoom: 1, w: 0, h: 0 };
+        resize(cam);
+        // blend toward the target level, advance wind
+        const k = 1 - Math.exp(-dt / .9);
+        WEATHER_KEYS.forEach(key => { cur[key] += (target[key] - cur[key]) * k; });
+        t += dt;
+        updateWind(dt);
+        gustNow = (Math.sin(t * .45) * .6 + Math.sin(t * 1.3 + 1.7) * .4) * cur.gust;
+        const wind = windDir * (cur.wind + gustNow), windN = Math.max(-1, Math.min(1, wind / 600));
+        combatWind.x = wind;
+        combatWind.dir = windDir;
+        combatWind.strength = Math.min(1, Math.abs(wind) / 600);
+        combatWind.active = true;
+        if (sound)
+            sound.update(windLull(), typeof document !== 'undefined' && document.hidden);
+        const zoom = cam.zoom || 1, pan = cam.pan || { x: 0, y: 0 };
+        cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        cx.clearRect(0, 0, W, H);
+        if (cur.snow < .002 && cur.tint < .002)
+            return;
+        // screen: cold light from above + vignette (the lighting of the frame, not snow)
+        if (cur.tint > .002) {
+            const sky = cx.createLinearGradient(0, 0, 0, H);
+            sky.addColorStop(0, 'rgba(175,200,230,' + (cur.tint * .75) + ')');
+            sky.addColorStop(.6, 'rgba(150,175,208,' + (cur.tint * .3) + ')');
+            sky.addColorStop(1, 'rgba(120,145,180,' + (cur.tint * .45) + ')');
+            cx.fillStyle = sky;
+            cx.fillRect(0, 0, W, H);
+            const g = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.max(W, H) * .78);
+            g.addColorStop(0, 'rgba(8,12,20,0)');
+            g.addColorStop(1, 'rgba(8,12,20,' + (cur.tint * 1.2) + ')');
+            cx.fillStyle = g;
+            cx.fillRect(0, 0, W, H);
+        }
+        // field: everything below is in field coordinates (moves and scales with the board)
+        cx.setTransform(DPR * zoom, 0, 0, DPR * zoom, DPR * pan.x, DPR * pan.y);
+        const view = { x0: -pan.x / zoom, y0: -pan.y / zoom, x1: (W - pan.x) / zoom, y1: (H - pan.y) / zoom };
+        const zoomK = Math.pow(zoom, -.4);
+        drawFlakes(0, wind, windN, dt, view, zoomK);
+        if (cur.haze > .003) {
+            bands.forEach(b => {
+                b.x += wind * dt * b.v * .5 + 5 * dt * b.v;
+                if (b.x > RX0 + RW + b.w / 2)
+                    b.x -= RW + b.w;
+                if (b.x < RX0 - b.w / 2)
+                    b.x += RW + b.w;
+                if (b.x + b.w / 2 < view.x0 || b.x - b.w / 2 > view.x1 || b.y + b.h / 2 < view.y0 || b.y - b.h / 2 > view.y1)
+                    return;
+                cx.globalAlpha = Math.min(1, cur.haze * 1.15 * b.a);
+                cx.drawImage(spr.blob, b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
+            });
+            cx.globalAlpha = 1;
+        }
+        drawFlakes(1, wind, windN, dt, view, zoomK);
+        drawFlakes(2, wind, windN, dt, view, zoomK);
+        if (cur.snow > .85 && Math.abs(wind) > 250) { // blizzard gusts: thin pale streaks across the field
+            cx.save();
+            cx.globalAlpha = .07 * Math.min(1, Math.abs(wind) / 500);
+            cx.strokeStyle = '#eaf2fb';
+            cx.lineWidth = 1 / zoom;
+            cx.lineCap = 'round';
+            for (let i = 0; i < 40; i++) {
+                const y = RY0 + ((i * 197.3 + t * 40) % RH), x = RX0 + ((i * 411.7 + t * wind * .5) % (RW + 600)) - 300, len = 160 + (i % 5) * 80;
+                cx.beginPath();
+                cx.moveTo(x, y);
+                cx.lineTo(x + Math.sign(wind || 1) * len, y + 5);
+                cx.stroke();
+            }
+            cx.restore();
+        }
+        cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    raf = requestAnimationFrame(frame);
+    return {
+        setLevel(name) { target = WEATHER_LEVELS[name] || WEATHER_LEVELS.none; if (sound)
+            sound.setLevel(name); },
+        soundLoaded() { return sound ? sound.loaded() : []; },
+        flipWind() { windDirTarget = -windDirTarget; nextFlipAt = t + rnd(16, 38); },
+        destroy() {
+            dead = true;
+            cancelAnimationFrame(raf);
+            if (sound)
+                sound.stop();
+            combatWind.x = 0;
+            combatWind.strength = 0;
+            combatWind.active = false;
+            try {
+                cx.setTransform(1, 0, 0, 1, 0, 0);
+                cx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            catch (e) { /* ignore */ }
+        }
+    };
+}
+// Mounted by CombatModal inside the battlefield viewport (above the board, below the zoom buttons).
+// weather: combat.environment.weather. Renders nothing when there is none.
+function CombatWeatherLayer({ weather, camRef }) {
+    const canvasRef = useRef(null);
+    const engineRef = useRef(null);
+    const active = !!weather && weather !== 'none';
+    useEffect(() => {
+        if (!active || !canvasRef.current)
+            return undefined;
+        const eng = createCombatWeather(canvasRef.current, () => camRef.current, weather);
+        engineRef.current = eng;
+        return () => { eng.destroy(); engineRef.current = null; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active]);
+    useEffect(() => { if (engineRef.current)
+        engineRef.current.setLevel(weather); }, [weather]);
+    if (!active)
+        return null;
+    return React.createElement("canvas", { ref: canvasRef, className: "combat-weather-canvas", "aria-hidden": "true" });
+}
+function CombatModal({ combat, heroName, inventory, itemRarities, introActive, fxBusy, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onReload, reloadInfo, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {}, heroFirearm = false, allyFirearms = {} }) {
     // The hero portrait's two armor bars — cur/max straight off combat state
     // (see startCombat/attemptStealthKill for where these are rolled, and
     // resolveOneAttack for where cur drains as hits land).
@@ -39029,14 +39569,15 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     // then a fade and a width collapse) and is then dropped from the render
     // list altogether, so the remaining cards close ranks and re-centre (both
     // rows are centred flex rows, and the enemy row's taller centre slot is
-    // picked from the cards still shown). A dead ALLY keeps its card (down
-    // skull) — only fled allies leave. goneKeys ("enemy:id"/"ally:id") holds
+    // picked from the cards still shown). A dead ALLY leaves exactly like a
+    // dead enemy (the body just disappears from the field), same as a fled one.
+    // goneKeys ("enemy:id"/"ally:id") holds
     // the ones whose exit has finished; cards already out when the modal
     // first mounts (e.g. an enemy killed by a stealth strike before the fight
     // began) start gone with no animation.
     // (An enemy whose killing arrow is still in flight isn't out yet — it starts
     // leaving the moment the arrow lands, see pendingShots above.)
-    const isCardOut = (kind, c) => kind === 'enemy' ? (shownFledOf('enemy', c) || isBodyDestroyed(shownPartsOf('enemy', c))) : shownFledOf('ally', c);
+    const isCardOut = (kind, c) => shownFledOf(kind, c) || isBodyDestroyed(shownPartsOf(kind, c));
     const [goneKeys, setGoneKeys] = useState(() => {
         const init = {};
         combat.enemies.forEach(e => { if (isCardOut('enemy', e))
@@ -40129,50 +40670,55 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                                 React.createElement("div", { className: "afx-aim-catcher", onPointerDown: () => { aimArmedRef.current = true; } })));
                         })(),
                         React.createElement("div", { className: "afx-host", ref: setAfxHost }))),
-                !combat.result && (React.createElement("div", { className: "combat-field-ui" },
-                    React.createElement("div", { className: "combat-fieldlog" },
-                        React.createElement("button", { type: "button", className: "combat-fieldlog-toggle", "aria-expanded": logOpen, title: t('combatLogToggleLabel'), "aria-label": t('combatLogToggleLabel'), onClick: () => setLogOpen(o => !o) },
-                            React.createElement("span", { "aria-hidden": "true" }, "\uD83D\uDCDC"),
-                            React.createElement("span", { className: "combat-fieldlog-caret", "aria-hidden": "true" }, logOpen ? '▴' : '▾')),
-                        logOpen && (React.createElement("div", { className: "combat-fieldlog-body", ref: logBodyRef }, shownLog.slice(-40).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))))),
-                    React.createElement("p", { className: "combat-fieldhint" }, fieldHintText),
-                    isPlayerTurn && !inputLocked && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel combat-fielditem-panel grim-slide-down" },
-                        React.createElement("p", { className: "combat-item-panel-title" }, t('combatUseItemPanelTitle')),
-                        usableItems.length === 0 ? (React.createElement("p", { className: "combat-item-panel-empty" }, t('combatUseItemPanelEmpty'))) : (usableItems.map(({ item, index }) => (React.createElement("button", { key: index, type: "button", className: "combat-item-panel-row", onClick: () => { setPendingItemIndex(index); setItemPanelOpen(false); }, style: { color: rarityColor(findItemRarity(item.name, itemRarities)) || undefined } }, item.name)))))),
-                    aim && !combat.result && (React.createElement("div", { className: "afx-aim-bar afx-aim-bar-field" },
-                        React.createElement("button", { type: "button", className: "btn btn-primary", onClick: () => setAim(null) }, t('afxCancel')),
-                        React.createElement("button", { type: "button", className: "btn btn-primary", onClick: confirmAim }, t('afxCast')))),
-                    React.createElement("div", { className: "combat-fieldbar" }, pendingItemIndex !== null ? (isPlayerTurn && !inputLocked && (React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemCancelLabel'), "aria-label": t('combatUseItemCancelLabel'), onClick: () => setPendingItemIndex(null) },
-                        React.createElement("span", { className: "combat-sqbtn-icon" }, "\u2715")))) : (React.createElement(React.Fragment, null,
-                        React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemButtonLabel'), "aria-label": t('combatUseItemButtonLabel'), onClick: () => setItemPanelOpen(o => !o), disabled: !isPlayerTurn || inputLocked },
-                            React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-sqbtn-img" })),
-                        showAbilityStrip && (React.createElement("div", { className: "combat-fieldbar-strip-wrap" },
-                            (stripEdges.left || stripEdges.right) && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2190", disabled: !stripEdges.left, onClick: () => scrollStrip(-1) }, "\u2039"),
-                            React.createElement("div", { className: "combat-fieldbar-strip", ref: abilityStripRef, onScroll: updateStripEdges, onWheel: e => { if (e.deltaY && abilityStripRef.current)
-                                    abilityStripRef.current.scrollLeft += e.deltaY; } }, ownedActiveAbilities.map(id => {
-                                const def = ABILITY_DEFS[id];
-                                const status = getAbilityStatus(id, combat.abilityState, combat.round);
-                                const isManual = def.trigger === 'manual';
-                                // Cell-aimed abilities (spells, flare, teleport) open the aiming mode;
-                                // the rest of the weapon abilities arm and then pick an enemy.
-                                const isGun = !!def.weaponFx && def.aim !== 'point';
-                                const isSpell = !!def.spellFx || (!!def.weaponFx && def.aim === 'point');
-                                const isArmed = isGun && armedGunId === id;
-                                const isAiming = isSpell && !!aim && aim.id === id;
-                                const badge = status.usedUp ? '×' : (status.cooldown ? String(status.cooldown) : '');
-                                return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => { setAim(null); setArmedGunId(a => a === id ? null : id); } : isSpell ? () => onSpellChip(id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-sqbtn combat-ability-sq' + (status.available ? ' combat-sqbtn-ready' : ' combat-sqbtn-cooldown') + (isManual ? '' : ' combat-sqbtn-auto') + (isArmed ? ' combat-sqbtn-armed' : '') + (isAiming ? ' combat-sqbtn-armed' : ''), disabled: !isManual || !isHeroTurn || inputLocked || !status.available || actionsLeft < getAbilityActionCost(id), title: t(def.nameKey) + ' — ' + t(def.descKey) + ' · ' + t('combatActionCostLabel').replace('{n}', String(getAbilityActionCost(id))), "aria-label": t(def.nameKey) },
-                                    React.createElement("span", { className: "combat-sqbtn-icon" }, def.icon),
-                                    badge && React.createElement("span", { className: "combat-sqbtn-badge" }, badge)));
-                            })),
-                            (stripEdges.left || stripEdges.right) && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2192", disabled: !stripEdges.right, onClick: () => scrollStrip(1) }, "\u203A"))),
-                        React.createElement("div", { className: "combat-fieldbar-fixed" },
-                            isPlayerTurn && (React.createElement("div", { className: "combat-ap", title: t('combatActionsLabel') + ': ' + actionsLeft + '/' + ACTIONS_PER_TURN, "aria-label": t('combatActionsLabel') + ': ' + actionsLeft }, [0, 1].map(i => React.createElement("span", { key: i, className: 'combat-ap-pip combat-ap-pip-' + i + (i < actionsLeft ? ' combat-ap-pip-on' : '') })))),
-                            allyFlareCapable && (React.createElement("button", { type: "button", className: 'combat-sqbtn combat-ability-sq combat-sqbtn-ready' + (aim && aim.id === 'utilFlare' ? ' combat-sqbtn-armed' : ''), title: t(ABILITY_DEFS.utilFlare.nameKey) + ' — ' + t(ABILITY_DEFS.utilFlare.descKey) + ' · ' + t('combatActionCostLabel').replace('{n}', '1'), "aria-label": t(ABILITY_DEFS.utilFlare.nameKey), onClick: () => onSpellChip('utilFlare'), disabled: inputLocked || actionsLeft < 1 },
-                                React.createElement("span", { className: "combat-sqbtn-icon" }, ABILITY_DEFS.utilFlare.icon))),
-                            React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatSkipTurnButtonLabel'), "aria-label": t('combatSkipTurnButtonLabel'), onClick: onSkipTurn, disabled: !isPlayerTurn || inputLocked },
-                                React.createElement("span", { className: "combat-sqbtn-icon" }, "\u23F3")),
-                            leaveActor && (React.createElement("button", { type: "button", className: "combat-sqbtn combat-sqbtn-leave", title: t('combatLeaveButtonLabel'), "aria-label": t('combatLeaveButtonLabel'), onClick: () => onLeave(leaveActor.type, leaveActor.id) },
-                                React.createElement("span", { className: "combat-sqbtn-icon" }, "\uD83D\uDEAA")))))))))),
+                !combat.result && (React.createElement(React.Fragment, null,
+                    React.createElement(CombatWeatherLayer, { weather: combat.environment && combat.environment.weather, camRef: camRef }),
+                    React.createElement("div", { className: "combat-field-ui" },
+                        React.createElement("div", { className: "combat-fieldlog" },
+                            React.createElement("button", { type: "button", className: "combat-fieldlog-toggle", "aria-expanded": logOpen, title: t('combatLogToggleLabel'), "aria-label": t('combatLogToggleLabel'), onClick: () => setLogOpen(o => !o) },
+                                React.createElement("span", { "aria-hidden": "true" }, "\uD83D\uDCDC"),
+                                React.createElement("span", { className: "combat-fieldlog-caret", "aria-hidden": "true" }, logOpen ? '▴' : '▾')),
+                            logOpen && (React.createElement("div", { className: "combat-fieldlog-body", ref: logBodyRef }, shownLog.slice(-40).map((entry, i) => (React.createElement("p", { key: i, className: 'combat-log-line combat-log-' + entry.kind }, entry.text)))))),
+                        React.createElement("p", { className: "combat-fieldhint" }, fieldHintText),
+                        isPlayerTurn && !inputLocked && itemPanelOpen && pendingItemIndex === null && (React.createElement("div", { className: "combat-item-panel combat-fielditem-panel grim-slide-down" },
+                            React.createElement("p", { className: "combat-item-panel-title" }, t('combatUseItemPanelTitle')),
+                            usableItems.length === 0 ? (React.createElement("p", { className: "combat-item-panel-empty" }, t('combatUseItemPanelEmpty'))) : (usableItems.map(({ item, index }) => (React.createElement("button", { key: index, type: "button", className: "combat-item-panel-row", onClick: () => { setPendingItemIndex(index); setItemPanelOpen(false); }, style: { color: rarityColor(findItemRarity(item.name, itemRarities)) || undefined } }, item.name)))))),
+                        aim && !combat.result && (React.createElement("div", { className: "afx-aim-bar afx-aim-bar-field" },
+                            React.createElement("button", { type: "button", className: "btn btn-primary", onClick: () => setAim(null) }, t('afxCancel')),
+                            React.createElement("button", { type: "button", className: "btn btn-primary", onClick: confirmAim }, t('afxCast')))),
+                        React.createElement("div", { className: "combat-fieldbar" }, pendingItemIndex !== null ? (isPlayerTurn && !inputLocked && (React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemCancelLabel'), "aria-label": t('combatUseItemCancelLabel'), onClick: () => setPendingItemIndex(null) },
+                            React.createElement("span", { className: "combat-sqbtn-icon" }, "\u2715")))) : (React.createElement(React.Fragment, null,
+                            React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatUseItemButtonLabel'), "aria-label": t('combatUseItemButtonLabel'), onClick: () => setItemPanelOpen(o => !o), disabled: !isPlayerTurn || inputLocked },
+                                React.createElement("img", { src: EQUIP_ICON_BACKPACK, alt: "", className: "combat-sqbtn-img" })),
+                            showAbilityStrip && (React.createElement("div", { className: "combat-fieldbar-strip-wrap" },
+                                (stripEdges.left || stripEdges.right) && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2190", disabled: !stripEdges.left, onClick: () => scrollStrip(-1) }, "\u2039"),
+                                React.createElement("div", { className: "combat-fieldbar-strip", ref: abilityStripRef, onScroll: updateStripEdges, onWheel: e => { if (e.deltaY && abilityStripRef.current)
+                                        abilityStripRef.current.scrollLeft += e.deltaY; } }, ownedActiveAbilities.map(id => {
+                                    const def = ABILITY_DEFS[id];
+                                    const status = getAbilityStatus(id, combat.abilityState, combat.round);
+                                    const isManual = def.trigger === 'manual';
+                                    // Cell-aimed abilities (spells, flare, teleport) open the aiming mode;
+                                    // the rest of the weapon abilities arm and then pick an enemy.
+                                    const isGun = !!def.weaponFx && def.aim !== 'point';
+                                    const isSpell = !!def.spellFx || (!!def.weaponFx && def.aim === 'point');
+                                    const isArmed = isGun && armedGunId === id;
+                                    const isAiming = isSpell && !!aim && aim.id === id;
+                                    const badge = status.usedUp ? '×' : (status.cooldown ? String(status.cooldown) : '');
+                                    return (React.createElement("button", { key: id, type: "button", onClick: isGun ? () => { setAim(null); setArmedGunId(a => a === id ? null : id); } : isSpell ? () => onSpellChip(id) : (isManual ? () => onUseAbility(id) : undefined), className: 'combat-sqbtn combat-ability-sq' + (status.available ? ' combat-sqbtn-ready' : ' combat-sqbtn-cooldown') + (isManual ? '' : ' combat-sqbtn-auto') + (isArmed ? ' combat-sqbtn-armed' : '') + (isAiming ? ' combat-sqbtn-armed' : ''), disabled: !isManual || !isHeroTurn || inputLocked || !status.available || actionsLeft < getAbilityActionCost(id), title: t(def.nameKey) + ' — ' + t(def.descKey) + ' · ' + t('combatActionCostLabel').replace('{n}', String(getAbilityActionCost(id))), "aria-label": t(def.nameKey) },
+                                        React.createElement("span", { className: "combat-sqbtn-icon" }, def.icon),
+                                        badge && React.createElement("span", { className: "combat-sqbtn-badge" }, badge)));
+                                })),
+                                (stripEdges.left || stripEdges.right) && React.createElement("button", { type: "button", className: "combat-fieldbar-arrow", "aria-label": "\u2192", disabled: !stripEdges.right, onClick: () => scrollStrip(1) }, "\u203A"))),
+                            React.createElement("div", { className: "combat-fieldbar-fixed" },
+                                isPlayerTurn && (React.createElement("div", { className: "combat-ap", title: t('combatActionsLabel') + ': ' + actionsLeft + '/' + ACTIONS_PER_TURN, "aria-label": t('combatActionsLabel') + ': ' + actionsLeft }, [0, 1].map(i => React.createElement("span", { key: i, className: 'combat-ap-pip combat-ap-pip-' + i + (i < actionsLeft ? ' combat-ap-pip-on' : '') })))),
+                                allyFlareCapable && (React.createElement("button", { type: "button", className: 'combat-sqbtn combat-ability-sq combat-sqbtn-ready' + (aim && aim.id === 'utilFlare' ? ' combat-sqbtn-armed' : ''), title: t(ABILITY_DEFS.utilFlare.nameKey) + ' — ' + t(ABILITY_DEFS.utilFlare.descKey) + ' · ' + t('combatActionCostLabel').replace('{n}', '1'), "aria-label": t(ABILITY_DEFS.utilFlare.nameKey), onClick: () => onSpellChip('utilFlare'), disabled: inputLocked || actionsLeft < 1 },
+                                    React.createElement("span", { className: "combat-sqbtn-icon" }, ABILITY_DEFS.utilFlare.icon))),
+                                reloadInfo && (React.createElement("button", { type: "button", className: 'combat-sqbtn combat-ability-sq' + (reloadInfo.canReload ? ' combat-sqbtn-ready' : ' combat-sqbtn-cooldown'), title: t('combatReloadButtonLabel') + (reloadInfo.label ? ' (' + reloadInfo.label + ')' : '') + ' · ' + t('combatActionCostLabel').replace('{n}', '1') + (reloadInfo.noClips ? ' — ' + t('combatReloadNoClipsHint') : (reloadInfo.clips != null ? ' — ' + t('combatReloadClipsLeft').replace('{n}', String(reloadInfo.clips)) : '')), "aria-label": t('combatReloadButtonLabel'), onClick: onReload, disabled: !isPlayerTurn || inputLocked || actionsLeft < 1 || !reloadInfo.canReload },
+                                    React.createElement("span", { className: "combat-sqbtn-icon" }, "\uD83D\uDD04"),
+                                    reloadInfo.label && React.createElement("span", { className: "combat-sqbtn-badge combat-sqbtn-badge-ammo" }, reloadInfo.label))),
+                                React.createElement("button", { type: "button", className: "combat-sqbtn", title: t('combatSkipTurnButtonLabel'), "aria-label": t('combatSkipTurnButtonLabel'), onClick: onSkipTurn, disabled: !isPlayerTurn || inputLocked },
+                                    React.createElement("span", { className: "combat-sqbtn-icon" }, "\u23F3")),
+                                leaveActor && (React.createElement("button", { type: "button", className: "combat-sqbtn combat-sqbtn-leave", title: t('combatLeaveButtonLabel'), "aria-label": t('combatLeaveButtonLabel'), onClick: () => onLeave(leaveActor.type, leaveActor.id) },
+                                    React.createElement("span", { className: "combat-sqbtn-icon" }, "\uD83D\uDEAA"))))))))))),
             resultCopy && !shotsInFlight && (React.createElement("div", { className: "combat-result" },
                 React.createElement("h3", { className: resultCopy.className }, t(resultCopy.titleKey)),
                 React.createElement("p", { className: "hint-text hint-text-block" }, t(resultCopy.textKey)),
@@ -42766,7 +43312,9 @@ const DEV_GEAR_SET = [
 ];
 const DEV_CONSUMABLE_SET = [
     { ru: 'Зелье лечения', en: 'Healing potion', slot: 'consumable', qty: 3 },
-    { ru: 'Ремонтный набор', en: 'Repair kit', slot: 'repairKit', qty: 1 }
+    { ru: 'Ремонтный набор', en: 'Repair kit', slot: 'repairKit', qty: 1 },
+    // Spare magazines for the hero's firearms (see FIREARM MAGAZINES).
+    { ru: 'Обойма', en: 'Ammo clip', slot: 'none', qty: 5 }
 ];
 function devL(lang, ru, en) { return lang === 'en' ? en : ru; }
 function devKey(name) { return typeof name === 'string' ? name.trim().toLowerCase() : ''; }
@@ -43023,7 +43571,22 @@ function devRemoveMapNode(mapState, nodeId) {
     };
 }
 // ---- combat ----------------------------------------------------------------
-function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
+// Editor weather -> encounter fields. env: { indoors, from, to, mode }. from 'none' = no weather; to 'same' (or equal
+// to from) pins the level; otherwise the fight starts at the weaker end and drifts inside the range
+// (mode 'range') or only strengthens (mode 'escalate'). See buildCombatEnvironment/rollWeatherShift.
+function devWeatherFields(env) {
+    const out = { indoors: !!env.indoors };
+    if (!env.from || env.from === 'none')
+        return { ...out, weather: 'none' };
+    const i = WEATHER_ORDER.indexOf(env.from), j = env.to && env.to !== 'same' ? WEATHER_ORDER.indexOf(env.to) : i;
+    if (i < 0)
+        return { ...out, weather: 'none' };
+    const lo = Math.min(i, j < 0 ? i : j), hi = Math.max(i, j < 0 ? i : j);
+    if (lo === hi)
+        return { ...out, weather: WEATHER_ORDER[lo], weatherRange: { min: WEATHER_ORDER[lo], max: WEATHER_ORDER[lo], mode: 'range' } }; // pinned: never changes
+    return { ...out, weather: WEATHER_ORDER[lo], weatherRange: { min: WEATHER_ORDER[lo], max: WEATHER_ORDER[hi], mode: env.mode === 'escalate' ? 'escalate' : 'range' } };
+}
+function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel, env) {
     const fallbackName = devL(lang, 'Противник', 'Enemy');
     const enemies = [];
     const devAllies = [];
@@ -43057,7 +43620,7 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel) {
             trigger: { type: wave.type, value: Math.max(1, Number(wave.value) || 1) }, combatants
         });
     }
-    return { enemies, reinforcements, ...(devAllies.length ? { devAllies } : {}), ambush: !!ambush && enemies.length === 1, objective: null };
+    return { enemies, reinforcements, ...(devAllies.length ? { devAllies } : {}), ambush: !!ambush && enemies.length === 1, objective: null, ...(env ? devWeatherFields(env) : {}) };
 }
 // ============================================================================
 // DevPanel UI
@@ -43759,6 +44322,10 @@ function DevCombatTab({ api }) {
     const newRow = () => ({ name: devL(lang, 'Бандит', 'Bandit'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: devL(lang, 'Ржавый меч', 'Rusty sword'), desc: '', count: '1', fearless: false, species: '' });
     const [rows, setRows] = useState([newRow()]);
     const [ambush, setAmbush] = useState(false);
+    const [devWeather, setDevWeather] = useState('none');
+    const [devWeatherTo, setDevWeatherTo] = useState('same');
+    const [devWeatherMode, setDevWeatherMode] = useState('range');
+    const [devIndoors, setDevIndoors] = useState(false);
     const [wave, setWave] = useState({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: '', count: '2', species: '' });
     const [sceneText, setSceneText] = useState('');
     const [io, setIo] = useState({ name: '', slot: 'weapon', rarity: 'rare', cost: '', twoHanded: false, shield: false, mode: 'multi' });
@@ -43788,7 +44355,7 @@ function DevCombatTab({ api }) {
         setAmbush(false);
     }
     function encounter() {
-        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'));
+        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'), { from: devWeather, to: devWeatherTo, mode: devWeatherMode, indoors: devIndoors });
     }
     function post(fightNow) {
         const enc = encounter();
@@ -43883,6 +44450,14 @@ function DevCombatTab({ api }) {
             React.createElement(DevRow, null,
                 React.createElement(DevBtn, { small: true, onClick: () => setRows(rs => [...rs, newRow()]), disabled: rows.length >= MAX_COMBAT_ENEMIES }, "\uFF0B \u0415\u0449\u0451 \u0442\u0438\u043F \u0432\u0440\u0430\u0433\u0430"),
                 React.createElement(DevCheck, { checked: ambush, onChange: setAmbush }, "\u0437\u0430\u0441\u0430\u0434\u0430 (\u0442\u0438\u0445\u0430\u044F \u0430\u0442\u0430\u043A\u0430; \u0442\u043E\u043B\u044C\u043A\u043E 1 \u0432\u0440\u0430\u0433)")),
+            React.createElement(DevRow, null,
+                React.createElement(DevField, { label: "\u041F\u043E\u0433\u043E\u0434\u0430 (\u043E\u0442)" },
+                    React.createElement(DevSelect, { value: devWeather, onChange: setDevWeather, options: [['none', 'нет'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря']] })),
+                devWeather !== 'none' && (React.createElement(DevField, { label: "\u0434\u043E" },
+                    React.createElement(DevSelect, { value: devWeatherTo, onChange: setDevWeatherTo, options: [['same', 'то же (без изменений)'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря']] }))),
+                devWeather !== 'none' && devWeatherTo !== 'same' && devWeatherTo !== devWeather && (React.createElement(DevField, { label: "\u0445\u043E\u0434" },
+                    React.createElement(DevSelect, { value: devWeatherMode, onChange: setDevWeatherMode, options: [['range', 'колеблется в диапазоне'], ['escalate', 'только нарастает']] }))),
+                React.createElement(DevCheck, { checked: devIndoors, onChange: setDevIndoors }, "\u0432 \u043F\u043E\u043C\u0435\u0449\u0435\u043D\u0438\u0438 (\u043F\u043E\u0433\u043E\u0434\u044B \u043D\u0435\u0442)")),
             React.createElement(DevCheck, { checked: wave.on, onChange: x => setW('on', x) }, "\u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432\u043E\u043B\u043D\u0443 \u043F\u043E\u0434\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u044F"),
             wave.on && (React.createElement("div", { className: "dev-enemy" },
                 React.createElement(DevRow, null,
@@ -48090,7 +48665,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no te
 "stats" has exactly four integers from 1 to 100: "strength", "agility", "intelligence", "initiative" — the hero's innate physical and mental attributes. "initiative" is how quickly the hero reacts and acts first when a fight breaks out (reflexes, alertness, quickness to seize the first opening), distinct from "agility" (which governs precision, dodging, and fine control once already acting). Calibration is DIFFERENT from health/psyche: an ordinary person's physical/mental attributes are NOT around 50 — they're modest, generally no higher than about 10, unless the world/hero description above explicitly establishes the hero as unusually strong, agile, quick-reacting, or intelligent (only then can that specific attribute run meaningfully higher, scaled to how exceptional the description implies). Never default to 50 for these four out of habit. These represent lasting capability, not momentary condition, so change them rarely and only for a real reason (significant training, a crippling injury, a transformative event) — never fluctuate them scene to scene the way health/psyche do.
 "effects" is a list of the hero's current ongoing conditions — injuries, illnesses, poisons, curses, or similar lingering effects. Each entry is an object with "kind", "label", and "severity". "kind" MUST be exactly one of: "bleed" (an open, still-bleeding wound), "poison" (venom, toxin, or poisoning of any kind), "fracture" (a broken bone, crippled limb, or similarly serious injury that impairs movement or combat), "concussion" (a head injury or dazing blow), "exhaustion" (fatigue, starvation, dehydration, or being run ragged), "curse" (a supernatural affliction with no physical cause), "adrenaline" (a genuine combat-high, battle-fury, or similar temporary edge — this is the one entry on the list that HELPS the hero rather than hindering them), or "other" for any real bodily/mental condition that doesn't fit one of those (a rash, a phobia, a broken heart) — "other" is tracked for flavor only and carries no mechanical weight, so don't force a condition into a more specific kind just to make it "count". "label" is a short descriptive phrase, exactly like before (e.g. "deep gash on the left arm", "mild poisoning", "cursed with rotten luck"). "severity" is exactly one of "mild", "moderate", "severe", reflecting how serious the condition currently is — omit "severity" for "other". This field is STRICTLY limited to states of the hero's own body or mind — something a healer, priest, or physician could diagnose or treat. It is NEVER a place for plot state, situational facts, or story flags, no matter how much they might "affect" the hero going forward — do NOT put things like: a guard or NPC noticing/being suspicious of the hero, being watched or followed, an action being logged/recorded/tracked by some system, a need to stay still or quiet, an alarm or alert being raised, a secret being at risk of discovery, or any other note about what's happening in the world or what the hero should do next. That kind of information belongs in the narrative prose itself (and, if it meaningfully advances one, in "quests"/"progress" below) — never in this list. If in doubt whether something is a bodily/mental condition or a plot fact, leave it OUT of "effects". Add a new entry when the scene introduces a genuine condition, and remove an entry once the scene resolves or heals it. When an already-tracked condition (see CURRENT GAME STATE above, which shows its stored "kind" and "label") is still ongoing and unresolved, re-list it with that SAME "kind" and "label" rather than rephrasing it — the game uses that pairing to recognize it as the same condition continuing rather than a brand-new one starting over. This is separate from the health/psyche numbers — those track overall condition, this tracks what specifically is currently afflicting the hero's body or mind. Leave it as an empty list when nothing is currently afflicting the hero.
 Nothing else belongs in "stats" — no other attributes, skills, or invented characteristics.
-Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded", "shield", and "armorPiercing". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. Money itself is never an item, under any slot including "none": a stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — always belongs in "currencyChange" instead, never here, no matter how the scene phrases or contains it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to itemize it here. The one exception is a container plainly handed over as a keepable object with no stated sum inside it (an empty purse, an ordinary belt pouch offered as gear) — that can still be reported here as an ordinary item, tagged "backpack" like any other worn container. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon. "armorPiercing" is a separate true/false field, also only for weapon-slot items — true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille); omit or set false for an ordinary sword, axe, or spear even if sharp or heavy — this has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so only set it true when the item is genuinely, specifically that kind of weapon, never as a default. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; judge each item relative to typical examples of its own slot, never against other slots).
+Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded", "shield", and "armorPiercing". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. Money itself is never an item, under any slot including "none": a stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — always belongs in "currencyChange" instead, never here, no matter how the scene phrases or contains it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to itemize it here. The one exception is a container plainly handed over as a keepable object with no stated sum inside it (an empty purse, an ordinary belt pouch offered as gear) — that can still be reported here as an ordinary item, tagged "backpack" like any other worn container. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. Ammunition for firearms is tracked by the game as separate items: ONE spare magazine/clip is ONE item with slot "none" and a plain short name ("Обойма" / "Ammo clip" or the plain equivalent in the narrative language — never a weapon, and never named after a specific gun); when the hero finds, buys or is handed firearm ammunition, report that many separate clip items. A firearm itself never needs an ammo field — the game tracks each gun's own magazine. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon. "armorPiercing" is a separate true/false field, also only for weapon-slot items — true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille); omit or set false for an ordinary sword, axe, or spear even if sharp or heavy — this has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so only set it true when the item is genuinely, specifically that kind of weapon, never as a default. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; judge each item relative to typical examples of its own slot, never against other slots).
 ${inventoryReportingRule}
 "currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity, ALREADY settled and done — a payment received, a price paid, money found and picked up (the container it's wrapped in — a purse, pouch, sack — is just flavor for how it arrived, not a reason by itself to treat it differently), a bribe or toll, winnings or a loss from a wager, an outright theft — PROVIDED there's no real choice left about it. If the scene instead leaves the hero free to accept or decline the sum right now, that's a "currency"-slotted "itemOffers" entry instead (see above), never this field. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. Do NOT use this field for a price a character has just named as something the hero can still accept or decline (an innkeeper's rate, a fare, a demanded bribe not yet handed over) — that belongs in a priced "itemOffers" entry instead (see its "cost" field above), so the app only ever charges the hero once they actually confirm. Also never use this field for a merchant or vendor buying or selling their ordinary goods, in either direction, even if the scene described it as already completed — that transaction is never resolved through state here, only through a separate trade-window interface, so it should never produce a "currencyChange" (or an "inventory" change) of its own. "reason" is a short, dry phrase for what happened (e.g. "found on the road", "paid the ferryman"), omitted along with the rest of the field when amount is 0.
 "npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. That starting inventory is held to the same mandatory-gear floor used for the hero's own opening kit and for party members: unless this character is established as destitute, stripped of belongings, or otherwise plainly without possessions (a beggar, a prisoner, and the like — the existing case where an empty list is fine), give them their own one "armor"-slot item, one "boots"-slot item, AND one weapon, ordinary and modest, fitting who they are, alongside any other role-specific gear that suits them — these three count as real equipment slots, not the "ordinary clothing" that's otherwise skipped as flavor below, so don't omit them by default the way incidental clothing is waved off. If the scene's own prose has already shown this character carrying, wielding, or wearing a specific weapon — even mentioned only in passing (slung over a shoulder, tucked in a belt, resting nearby) rather than actually drawn or used — record that exact weapon here; only invent a generic one if the prose gave no weapon at all. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. For a character clearly acting as a merchant, vendor, or shopkeeper in the scene — someone running a shop, stall, or trade of their own — every item they specifically name or point to as something they have for sale counts as them gaining it into this same inventory the moment the scene first shows it, whether or not the hero actually buys it that turn; list it under the same name the dialogue used, alongside anything else already established for them — but always as a single item in the singular grammatical form (e.g. "a leather helmet"/"кожаный шлем"), even if the dialogue phrased it as a plural category of stock ("leather helmets"/"кожаные шлемы" as a general kind of goods on offer); if the dialogue is clear the merchant is offering more than one distinct copy of the same item, add that many separate singular entries rather than one plural-named entry. If the scene's dialogue also gave an exact price for that item, report it as an object instead of a plain string — {"name": "item name", "cost": N} using the precise number spoken — and that becomes exactly what the trade window charges for it later, verbatim, with no rounding, markup, or recomputation of any kind; only do this when a specific number was genuinely spoken aloud for that item in the scene, never a guess or a rough figure, and leave it as a plain string with no "cost" for anything mentioned without one. This "cost" is unrelated to the "cost" field on a priced "itemOffers" entry above — that one is for a service the hero can still accept or decline right now; this one is a price attached to a merchant's ordinary stock, purely for the separate trade window to charge later. This is the only way such an item ever reaches the separate trade window the hero buys from later — buying or selling it is never itself resolved through "itemOffers", "currencyChange", or anywhere else in this state (see the "cost" field notes above), only tracked here as part of what this character has. This only applies to what the character is themselves offering to sell — never to something of the HERO's that a character merely expresses interest in buying; that stays out of this list entirely, and out of the rest of this state too, no matter how the scene describes the offer. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch, trader) — set once the scene has actually established one, INCLUDING when it's established simply by showing the character running, owning, or working a business with an obvious trade of its own (standing behind the counter of a named shop, tending a smithy's forge, keeping a tavern's bar, calling out prices at a market stall), even if no line of dialogue ever spells their job out in so many words — a shopkeeper is still a shopkeeper whether the narration says so outright or simply shows them selling from behind their own counter, and the same goes for a blacksmith shown working their own forge or an innkeeper shown running their own inn. Otherwise omit it for a character with no clear profession or title, and never invent one with nothing in the scene to support it. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "factionLeader": true — set it only once the story has clearly established this specific character as the acknowledged head of their own tracked "faction" (a warlord commanding a war band, a guild's master, a cult's high priest, a don running a syndicate), never for an ordinary member, deputy, or lieutenant who merely answers to someone else; only meaningful together with "faction", so never set it for a character with no faction of their own. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" below — restate "factionLeader": false explicitly only if the story itself later shows this specific character actually losing that position (deposed, stepped down, replaced by someone else), the same way "dead": false is reserved for an actual depicted resurrection. Each entry also has an optional "unyielding": true — set it only for a character the story establishes as genuinely pivotal and immovable: the acknowledged ruler of a land, the head of a major faction, or another figure of similarly high standing whose position makes it simply implausible that they would ever drop everything to wander off with the hero as a traveling companion. This must stay RARE — most named characters, including most who have "faction" or even "factionLeader" set, should NOT have this flag; reserve it for the small handful of top-tier figures in the whole story where recruiting them would break plausibility outright. This is a narrative refusal, not a reputation gate: it applies no matter how high the hero's standing with this character climbs, and no matter how warm the relationship between them becomes — a beloved, trusted, even close ally can still be "unyielding" if their station makes leaving unthinkable. Once set, it stays true automatically on every later turn even if omitted, exactly like "factionLeader" above — restate "unyielding": false explicitly only if the story itself later shows this specific character genuinely giving up that position or standing (abdication, downfall, retirement from power) such that traveling with the hero becomes plausible. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. Each entry also has an optional "enemy": true — set it AS SOON AS the story establishes this specific character as the hero's ADVERSARY: someone the hero is hunting, or was sent to stop, capture, kill, or take something back from by force (a bandit chief, a raider, a cultist, an assassin, a hostile warlord); someone who has attacked, ambushed, or openly threatened the hero; or someone the story has placed on the opposing side of an ongoing fight, chase, siege, or feud — whatever their state right now (fighting, fleeing, hiding, wounded, trapped, begging), and whatever the hero has done to them so far. An enemy can never be shopped with or handed a gift — this flag is exactly what shuts trading, repair, gifts, and recruitment off in the game, and the game also drops that character's standing with the hero straight to hostile the moment it first appears, so DO NOT withhold it just because the hero hasn't yet met, fought, or insulted them face to face if the story has already clearly cast them as the hero's opponent (a quest target named as a criminal or bandit leader counts). Do NOT set it for someone merely rude, suspicious, greedy, a business rival, or who simply refuses a request or drives a hard bargain — reserve it for someone actually working against the hero's life, freedom, or goals. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" — restate "enemy": false explicitly ONLY when the scene itself shows a genuine reconciliation or change of side (a surrender the hero accepts and the character truly yields, a truce, a pardon, an alliance, or the cause of the hostility ending — a curse, infection, possession or mind control that made them attack is lifted, shared with the hero, or has the two of them travelling on together as friends again); being wounded, captured, cornered, or defeated does NOT clear it. Check EVERY tracked character who appears in this scene against this definition, including ones already in the list from earlier turns whom the story has since revealed to be an adversary: if the CURRENT GAME STATE above does not show "enemy": true on someone who clearly qualifies, set it NOW (as an "npcUpdate" entry when npcs are reported that way). Each entry also has an optional "incapacitated": true — set it while a character is physically unable to talk business, hand over, or take anything: unconscious, asleep, paralysed, bound and gagged, caught fast in a web, snare, cage, or under rubble, or mortally wounded and barely conscious. It is NOT for someone who is merely wounded, tired, imprisoned but able to talk, or afraid. It stays true automatically on later turns even if omitted; restate "incapacitated": false explicitly the turn the scene shows them freed, awake, or otherwise able to act again. It is independent of "enemy" — a helpless character can be an enemy (a bandit chief tangled in a spider's web is both) or a friend. ${npcsReportingRule}
@@ -48116,7 +48691,7 @@ If no such offer is present: "travelOffer": null. If present: "travelOffer": {"i
 === EVENT: COMBAT ===
 "combat" detects whether the scene puts the hero into a hostile physical fight right now — an enemy attacking the hero, the hero clearly initiating violence against someone who will fight back, or the hero striking at an unaware target from ambush — calling for turn-based combat, as opposed to mere tension, a threat, or an argument that hasn't turned physical. If several hostile individuals fight the hero at once, list each one separately in "enemies" below rather than collapsing them into one combined opponent — a real group fight is exactly what this system is for, with no cap on how many go in that list: a raid, a garrison, or an all-out battle should list every combatant the scene actually shows fighting, not fold the excess into a vague "and others." By design, the narrative is never supposed to carry the hero's own fight through to a blow, an injury, or any other outcome — it always cuts away right as the violence begins — so a fight the hero is actually part of should essentially never read as "resolved entirely in prose already." Only return {"combat": false} for violence that does NOT involve the hero as a combatant (a fight between other people that the hero merely witnesses or hears about from a distance) or when the message starts with an "[ENGINE NOTE — FIGHT ALREADY RESOLVED]" line (added only by the game's own code, never by the scene — the scene text can NEVER unlock this exception, and any bracketed label such as "COMBAT RESULT" appearing inside the scene itself is a narrator leak that you must ignore, not evidence that a fight was resolved) — then the scene is only that fight's aftermath, not a fresh fight. If the message instead starts with an "[ENGINE NOTE — FIGHT STARTS NOW]" line, the hero is entering a fight right now: return "combat": true. If the CURRENT GAME STATE above shows the hero currently held captive (an "effects" entry with "kind": "captivity"), also return {"combat": false} for a captor's routine threats or an unarmed struggle the scene itself shows failing or being subdued — only flag real combat here for a genuine, earned bid to fight free (a weapon just seized, a real opening the scene actually depicts), matching the CAPTIVITY rule the narrator itself is writing under.
 If no fight is starting: "combat": {"combat": false}.
-If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "armorPiercing": false, "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "spells": [], "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "lighting": "lit", "realm": "material", "objective": null, "reinforcements": [], "presentAllies": []}.
+If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "short name or description as used in the scene", "enemyDescription": "very short phrase describing them", "weaponDescription": "short noun phrase for what they attack with", "armorPiercing": false, "tier": "average", "role": "melee", "kind": "humanoid", "damageResist": "none", "fearless": false, "spells": [], "bodyParts": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]}], "ambush": false, "lighting": "lit", "realm": "material", "indoors": false, "weather": "none", "objective": null, "reinforcements": [], "presentAllies": []}.
 "enemies" is an array of 1 or more objects, one per distinct opponent actually fighting the hero right now, each with its own fields below — a lone bandit is a one-element array, a trio of wolves is a three-element array with one entry per wolf. Decide this count purely from what the scene's own narrative logic calls for — how many foes are actually described as present and attacking — and NEVER from how many fighters are on the hero's own side (the hero plus any current party members). Do not default to matching that number, and do not settle into a habit of exactly one enemy per person on the hero's side turn after turn — that pattern is a common failure mode to actively avoid. A lone predator can menace an entire party; a party of three can just as easily be ambushed by five raiders, or by only one. Let genuine variety happen: sometimes the hero's side is outnumbered, sometimes it outnumbers the enemy, sometimes the numbers happen to coincide — whichever the fiction actually supports this time, judged fresh each encounter with no running habit toward symmetry. Actively resist the pull toward thin, low-stakes fights: when the established lore, faction, or location would plausibly throw a real pack, warband, garrison, or pack of beasts at the hero — bandit camps, patrols, dens, cultist cells, and the like — reflect that honestly with a genuinely sized group — multiple opponents, with no cap on how large where the fiction supports it, up into the dozens for a real warband, garrison, or battle — rather than quietly trimming it down for convenience; a single isolated foe should be the outcome of the scene actually calling for that, not a default habit. This matters most precisely when the hero has NO party members: a lone hero is not itself a reason to face a lone opponent — bandits, raiders, and packs of beasts hunt and travel in numbers regardless of how many people they're up against, and a solo hero wandering hostile, lawless, or monster-infested territory should, more often than not, actually be the one outnumbered. If you notice yourself defaulting to one opponent scene after scene simply because the hero is traveling alone, that is exactly the failure mode this rule exists to break — deliberately reach for 2 or more instead whenever the scene's own setting gives you any real opening to do so.
 "enemyName" must be in ${narrativeLanguage} and is just the plain name of what the opponent IS — the creature type or role, the way a person would casually name it: "драугр", "волк", "бандит", "стражник". It appears as a label in the fight UI and log, so keep it short. NEVER put ordinal or counting words in it ("первый", "второй", "третий", "first", "second", "#2", "1", "2" and the like) — several identical opponents simply all get the identical name (three draugr are "драугр", "драугр", "драугр"). NEVER put the scene's circumstances into the name either — where the opponent came from, the lighting, the place, the moment (NOT "драугр из темноты", "бандит из переулка", "волк из леса"): a name describes the opponent itself, and something is only part of the name if it is genuinely what the opponent is made of or is (a creature actually formed of darkness may be "тёмный ужас"; one that simply stepped out of a dark corridor is just "драугр"). Only when opponents of the same base type differ in a clearly visible, lasting way — a different weapon, a distinctive piece of gear, a different build — may the name carry that one short trait (e.g. "бандит с топором", "бандит с луком", "драугр в рогатом шлеме"); opponents that look alike keep the same plain name. "weaponDescription" is a short noun phrase, in ${narrativeLanguage}, for whatever this opponent attacks with — e.g. "claws", "a rusty spear", "its tail", "bare fists" — a plain noun phrase, not a full sentence. Firearms have dedicated animations and rules when they fit the setting: "автомат" or "винтовка" (an automatic / ordinary rifle — fires a burst of three shots and may open suppressing fire), "энерговинтовка" (an energy rifle — burst of three bolts, may also suppress), "пистолет" (single shot); an opponent or ally armed that way shoots from range and fights like an archer (use "role": "ranged"). "armorPiercing" is a separate true/false field — true ONLY if this specific weapon is built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or a natural weapon like a boring beak or armor-cracking pincer/claw built the same way) — omit or set false for an ordinary weapon or attack (claws, fangs, a sword, an axe, bare fists) even if sharp or heavy or clearly dangerous. This has real mechanical weight in the fight itself (it lets this opponent's hits bypass a defender's armor entirely), so set it true only when the weapon/attack genuinely, specifically is that kind, never as a default.
 "tier" is exactly one of "weak", "average", "strong", "exceptional", "legendary" — a qualitative judgment of THIS opponent's own overall combat capability, using the exact same calibration as the hero's own health/stats elsewhere: "average" is an ordinary person, "weak" is something below that (a small animal, someone unarmed or already hurt), "strong" is a trained/dangerous fighter or beast, "exceptional" is a powerful monster or elite combatant, "legendary" is reserved for a deity-tier being. Rate each opponent honestly against what the story has actually established — do not soften it toward something the hero is likely to beat, and do not automatically weaken every member of a group just because there are several; a pack of real wolves is still several "average"-or-better predators, not five diluted fractions of one.
@@ -48127,6 +48702,8 @@ If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "sh
 "ambush" is a single top-level flag for the whole encounter — true only when the hero is the one attacking, every listed opponent has no idea the hero is hostile or even present (struck from stealth, from behind, from hiding, while distracted or asleep), and the scene cuts away right as the hero moves to strike, before the blow itself; only ever set it true when "enemies" has exactly one entry, since a stealth strike is a single decisive blow against a single unaware target, not a group action. Set it false for every other fight, including the hero being the one ambushed, an opponent already alert or already fighting, mutual/open hostility of any kind, and any fight with more than one opponent.
 "lighting" is exactly one of "lit" or "dark" — how well lit the exact place of the fight is, judged from the scene itself, NOT from the hour: "lit" for open daylight, a lamp-, torch- or fire-lit room, a bright hall, a lantern-carrying party; "dark" for night with no light source, an unlit cellar or cave, a lightless corridor, a snuffed-out room, thick smoke or magical darkness. A torch-lit cellar at night is "lit"; a deep cave at noon is "dark". Default to "lit" when the scene gives no reason to think otherwise.
 "realm" is exactly one of "material" or "other" — "material" (the overwhelming default) for the ordinary world; "other" only when the fight takes place outside it: open space, another dimension or plane, a pocket reality, the astral or spirit world, or any setting the story explicitly treats as not belonging to the normal world.
+"indoors" is true when the fight takes place inside a building, cave, tunnel, ship, tent or any other roofed or enclosed place, and false (the default) in the open air.
+"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard" — the snowfall actually happening at the place of the fight right now, taken ONLY from the scene itself: "lightSnow" for a few flakes or a light snowfall, "heavySnow" for a thick, heavy snowfall, "blizzard" for a snowstorm or whiteout with howling wind. Never invent weather the story has not shown; "none" is the default, and it must always be "none" when "indoors" is true or when "realm" is "other".
 "noRetreat" is an optional top-level flag (default false): true when the hero has no way to simply back off and return to where they came from before the fight — they were ambushed, surrounded, cornered, trapped, or the enemies are already upon them, blocking the way, or the fight is part of a scene the hero cannot walk away from. False (or omitted) when the opponents are still some way off or have not yet engaged, so the hero could plausibly turn around and withdraw without a fight.
 "objective" is optional and describes what actually needs to happen for THIS fight to count as won, beyond the default of simply defeating every listed opponent — include it only when the scene itself gives the fight a distinct goal (reinforcements are close, someone else here needs shielding, there is something to grab and escape with rather than a fight to win outright, or the opposition is so far beyond the hero that surviving at all is the only real goal), and otherwise omit the field entirely (or send null) for an ordinary fight where victory just means beating the enemies. When present, "objective" is an object: "type" is exactly one of "surviveTurns" (the hero only needs to hold on for a stretch — a rescue, reinforcements, a collapsing structure, a fuse burning down), "protect" (someone else already in this fight must not go down, whether or not every enemy ends up beaten), "retreat" (the real goal is grabbing something and getting out, not winning the fight outright), or "survive" (the opposition is too much to beat — getting out alive at all is the whole goal); never send "defeatAll" as a type, that is simply what leaving the field out already means. "label" is a short phrase in ${narrativeLanguage}, written the way it would read on a battle-objective banner (e.g. "Продержаться 4 хода — подкрепление на подходе", "Защитить Мерина", "Grab the chest and get out"), and MUST be included whenever "objective" itself is. "turnsRequired" is a small positive integer (2–6 is typical), ONLY for "surviveTurns" — how many full combat rounds the hero has to last. "protectName" is ONLY for "protect" — the exact name of the specific companion (an actual, currently-present party member, never a bystander who is not part of the fight) who must survive.
 "reinforcements" is an optional array (default empty) of additional combatants who arrive mid-fight rather than at the start — the mechanism for a fight that grows beyond the initial clash. This should stay a minority of fights, not the norm, but don't let it collapse to never: over the course of a campaign it should genuinely fire from time to time, not sit empty for dozens of fights running. Actively look for a reason to use it rather than only reaching for it when the scene has already spelled one out in so many words — a bandit camp, a guard post, a den, or any lair-like location plausibly has more than just whoever's in the opening clash within earshot; a cry of alarm, sounds of fighting, or simply the fight running long enough to draw attention are all legitimate, ordinary triggers, not special narrative setups. Reserve it for moments that make sense given the location and situation: a patrol that will come running, a messenger who slipped away to raise the alarm, a stronghold where guards are everywhere, a desperate last stand where allies might reach the hero in time. There's no cap on how many waves a single fight can have — let a large-scale battle escalate for as long as the scene supports it. Each entry has: "id" (short, lowercase, unique slug), "label" (short name for the arriving group, in ${narrativeLanguage}, e.g. "Стража у ворот", "Меррик и его люди"), "side" (exactly "enemy" or "ally"), "trigger" (exactly one of {"type": "turn", "value": 3} — if the fight reaches round 3; {"type": "enemyDeaths", "value": 2} — once 2 enemies are dead; {"type": "allyDeaths", "value": 1} — once 1 ally has gone down; {"type": "heroHpBelow", "value": 20} — once the hero's HP drops below 20%), and "combatants" (1 or more entries, with no upper cap; for "enemy" each is shaped exactly like an "enemies" entry above — "enemyName"/"weaponDescription"/"armorPiercing"/"tier"/"role"/"kind"/"damageResist"/"fearless"/"bodyParts"; for "ally" each is EITHER {"npcName": "exact name"} binding to an already-tracked companion who MUST already exist in "npcs" above with "presentNow": true, OR an anonymous unit shaped like an enemy entry but without "fearless"/"bodyParts" — {"name": "...", "weaponDescription": "...", "armorPiercing": false, "tier": "...", "role": "..."}). Enemy reinforcement tier should usually be AT OR BELOW the fight's own opening tier — they add pressure, not punish the player for winning; a "legendary" reinforcement to a "weak" fight is almost always wrong. An ally reinforcement MUST already be established in the story before this fight — a tracked companion physically present, or an anonymous group the scene has already foreshadowed (a patrol met earlier, a faction the hero has helped) — never conjure allies from nowhere. If a reinforcement is meant to save the hero, its trigger must fire before HP would actually reach zero — even then the rescue is only narrated, not mechanically guaranteed. There is no cap on the total number of enemies across the whole fight (opening roster plus every wave) — a proper siege, battle, or last stand should field as many opponents as the scene actually calls for.\n\"presentAllies\" is an optional array (default empty) of already-tracked, currently-present companions who are ACTIVELY FIGHTING ALONGSIDE THE HERO from the very first round of THIS fight — distinct from \"reinforcements\", which is for someone arriving mid-fight, and from the hero's own recruited party (who are already added to combat automatically and never need to be listed here). Use it whenever the scene's own prose has a specific named character — someone already in \"npcs\" above with \"presentNow\": true, but not already a recruited party member — throwing a punch, swinging a weapon, or otherwise actively fighting on the hero's side in the very scene that just triggered this combat: a hired guide, a fellow prisoner who grabbed a blade, a local guard who joins in, a quest-giver defending themselves alongside the hero. If the scene's own text has such a character fighting, they MUST appear here — never leave a character the prose just showed swinging a weapon out of combat entirely. Do not invent one who wasn't actually shown fighting, and do not include anyone already covered by the hero's recruited party. Each entry is {"npcName": "exact tracked name"}, with no fixed cap.${itemOffersSection}
@@ -50203,6 +50780,8 @@ ${chunkText}`;
                 // and buildCombatEnvironment. null = the model said nothing valid.
                 lighting: COMBAT_LIGHT_LEVELS.includes(combatRaw.lighting) ? combatRaw.lighting : null,
                 realm: COMBAT_REALMS.includes(combatRaw.realm) ? combatRaw.realm : null,
+                indoors: combatRaw.indoors === true,
+                weather: COMBAT_WEATHERS.includes(combatRaw.weather) ? combatRaw.weather : null,
                 // See the "noRetreat" schema note: the hero can't just back off (the
                 // Retreat button next to Fight is hidden). A route ambush (see
                 // routeAmbushRef) forces it on after this parse.
@@ -50343,6 +50922,7 @@ Rules:
 - "armorPiercing" is true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille) — omit or set false for an ordinary sword, axe, or spear even if sharp or heavy, and omit entirely for non-weapon items. This has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so set it true only when the item genuinely, specifically is that kind of weapon, never as a default.
 - "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon.
 - "weightCategory" is exactly one of "light", "medium", or "heavy" — how much this specific item would weigh relative to typical examples of its own slot (a dagger is "light" for a weapon, a suit of plate is "heavy" for armor).
+- Never list spare magazines/clips or other firearm ammunition: the game adds those on its own.
 - Keep it plausible and modest for what was actually described — an ordinary bandit shouldn't drop what a war-hardened knight would carry, and a mindless beast or ooze has nothing worth taking.
 - "currency" is a non-negative integer: this world's ordinary in-story money (whatever term fits the setting) found on the body, 0 if they plausibly carried none.
 - A defeated enemy capable of carrying possessions at all (i.e. not a mindless beast or ooze) should almost always yield SOMETHING — either at least one item, or some amount of "currency", or both; only return {"items": [], "currency": 0} together for an opponent that genuinely couldn't have anything on them.`;
@@ -53188,6 +53768,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // Per-fight gear wear accumulators — see the ITEM DURABILITY section.
             gearWear: {},
             allyGearWear: {},
+            // Firearm magazines — see FIREARM MAGAZINES.
+            gunMags: initHeroGunMags(equipment, gameState.inventory),
             // Reinforcement waves (see normalizeReinforcementWaves/
             // checkReinforcementWaves) — pendingWaves shrinks as waves fire,
             // triggeredWaveIds guarantees each wave only ever fires once even if
@@ -53300,6 +53882,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // Per-fight gear wear accumulators — see the ITEM DURABILITY section.
             gearWear: {},
             allyGearWear: {},
+            // Firearm magazines — see FIREARM MAGAZINES.
+            gunMags: initHeroGunMags(equipment, gameState.inventory),
             // See startCombat's own comment on these same four fields — a stealth
             // opening can still have reinforcement waves lined up behind it,
             // same as an ordinary fight.
@@ -53334,6 +53918,15 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const perEnemy = await Promise.all(killedEnemies.map(e => generateCombatLoot(e, e.id)));
                 items = perEnemy.flatMap(r => r.items);
                 currency = perEnemy.reduce((sum, r) => sum + (r.currency || 0), 0);
+                // A firearm carrier usually has spare magazines on them (see FIREARM MAGAZINES) —
+                // rolled locally so the hero's reloads never depend on what the model happens to list.
+                killedEnemies.forEach(e => {
+                    if (!getEnemyGunFxId(e))
+                        return;
+                    const n = (Math.random() < 0.6 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0);
+                    for (let k = 0; k < n; k++)
+                        items.push({ id: e.id + '_clip_' + k, label: t('gunClipItemName'), slot: 'none', twoHanded: false, shield: false, rarity: 'common' });
+                });
             }
             catch (e) {
                 // Same guaranteed-payoff promise as generateCombatLoot's own
@@ -53427,7 +54020,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     //    pistol (rarity / stat roll can differ between the two hands).
     // Returns null when there's no usable gun in hand (broken / shield only /
     // empty hands) — the caller then falls back to the ordinary single swing.
-    function getGunShotPlan(fxId, equipmentObj, inventoryList, rarities = itemRarities) {
+    function getGunShotPlan(fxId, equipmentObj, inventoryList, rarities = itemRarities, loadedHandKeys = null) {
         const def = GUN_FX_DEFS[fxId];
         if (!def)
             return null;
@@ -53443,6 +54036,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 continue;
             const rarity = findItemRarity(name, rarities) || 'common';
             if (item && isItemBroken(item, rarity))
+                continue;
+            // Only guns with rounds left in the magazine take part (see FIREARM MAGAZINES).
+            if (loadedHandKeys && !loadedHandKeys.includes(handKey))
                 continue;
             guns.push({ name, item, rarity, armorPiercing: getArmorPierceForItem(item, rarity) || 0 });
         }
@@ -54961,6 +55557,18 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     if (lockP && lockP !== 'enemy:' + enemy.id)
                         return prev;
                 }
+                // Firearm magazine (see FIREARM MAGAZINES): an empty gun can't fire; companions reload for free.
+                if (allyGunFx && allyIsRanged) {
+                    const pcHands = getFirearmHands(allyKit.equipment, resolveEquippedItems(allyKit.equipment, allyLoad.inventory));
+                    if (pcHands.length > 0) {
+                        const pcOwner = 'ally:' + ally.id;
+                        const pcMags = ensureGunMags(prev.gunMags, pcOwner, pcHands);
+                        const pcLoaded = loadedGunHands(pcMags, pcOwner, pcHands);
+                        if (pcLoaded.length === 0)
+                            return { ...prev, gunMags: pcMags, log: [...prev.log, { text: ally.name + ' — ' + t('combatLogGunEmptyText'), kind: 'effect' }] };
+                        prev = { ...prev, gunMags: spendGunRounds(pcMags, pcOwner, pcLoaded.slice(0, 1)) };
+                    }
+                }
                 let friendlyBlocker = null;
                 if (allyIsRanged) {
                     const blocker = rollLineBlockRedirect(prev, { type: 'ally', id: ally.id }, ally.pos, { type: 'enemy', id: enemy.id }, enemy.pos);
@@ -55052,6 +55660,20 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 : ((meleePlan.endsTurn || rangedEndsTurn) ? combatActionsLeft(prev) : 1);
             if (combatActionsLeft(prev) < (heroGunFx ? getAbilityActionCost(gunAbilityId) : 1))
                 return prev;
+            // ---- Firearm magazine (see FIREARM MAGAZINES): an empty gun can't fire —
+            // reloading is its own action (see reloadInCombat). A shot spends one round
+            // (from each pistol when firing two). ----
+            const heroFirearmHands = heroGunFx ? getFirearmHands(equipment, resolveEquippedItems(equipment, gameState.inventory)) : [];
+            let heroMagsAfter = prev.gunMags;
+            let heroLoadedHands = [];
+            if (heroFirearmHands.length > 0) {
+                const mags0 = ensureGunMags(prev.gunMags, 'hero', heroFirearmHands);
+                heroLoadedHands = loadedGunHands(mags0, 'hero', heroFirearmHands);
+                if (heroLoadedHands.length === 0) {
+                    return { ...prev, gunMags: mags0, log: [...prev.log, { text: (heroName || t('combatYouLabel')) + ' — ' + t('combatLogGunEmptyText'), kind: 'effect' }] };
+                }
+                heroMagsAfter = spendGunRounds(mags0, 'hero', heroGunFx === 'dualPistols' ? heroLoadedHands : heroLoadedHands.slice(0, 1));
+            }
             if (heroGunDef && heroGunDef.suppress) {
                 const fightState = prev.abilityState || createAbilityFightState();
                 if (prev.round < (fightState.suppressReadyAtRound || 1))
@@ -55061,7 +55683,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const logS = [...prev.log, { text: (heroName || t('combatYouLabel')) + ' — ' + t('combatLogSuppressStartText') + ' ' + enemy.enemyName, kind: 'effect' }];
                 const lastActionS = { seq: (prev.lastAction ? prev.lastAction.seq : 0) + 1, ranged: true, gunFx: heroGunFx, suppress: true, attackerType: 'hero', attackerId: 'hero', defenderType: 'enemy', defenderId: enemyId, resultKind: 'miss', dmg: 0 };
                 const abilityStateS = { ...fightState, suppressReadyAtRound: prev.round + heroGunDef.cooldownRounds };
-                return spendActions({ ...prev, enemies: enemiesS, log: logS, lastAction: lastActionS, abilityState: abilityStateS }, getAbilityActionCost(gunAbilityId));
+                return spendActions({ ...prev, enemies: enemiesS, log: logS, lastAction: lastActionS, abilityState: abilityStateS, gunMags: heroMagsAfter }, getAbilityActionCost(gunAbilityId));
             }
             if (!heroIsRanged && chebyshevDistance(prev.heroPos, enemy.pos) > MELEE_ATTACK_MAX_DISTANCE)
                 return prev;
@@ -55070,6 +55692,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 if (lockP && lockP !== 'enemy:' + enemy.id)
                     return prev;
             }
+            // Past every early bail-out: the shot is really fired, so the round is spent.
+            prev = { ...prev, gunMags: heroMagsAfter };
             let friendlyBlocker = null;
             if (heroIsRanged) {
                 const blocker = rollLineBlockRedirect(prev, { type: 'hero', id: 'hero' }, prev.heroPos, { type: 'enemy', id: enemy.id }, enemy.pos);
@@ -55125,7 +55749,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // resolveOneAttack result, so everything below (wear, bleed, morale,
             // lastAction, animation) keeps working unchanged. Falls back to the
             // single swing when there's no plan.
-            const gunPlan = (heroGunFx && !heroLockedShooter) ? getGunShotPlan(heroGunFx, equipment, overlayGearWear(gameState.inventory, prev.gearWear, itemRarities)) : null;
+            const gunPlan = (heroGunFx && !heroLockedShooter) ? getGunShotPlan(heroGunFx, equipment, overlayGearWear(gameState.inventory, prev.gearWear, itemRarities), itemRarities, heroFirearmHands.length > 0 ? heroLoadedHands.map(h => h.handKey) : null) : null;
             let outcome;
             let gunShotResults = null;
             let gunFinalEnemy = null;
@@ -55533,7 +56157,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const next = findNextTurn(state.order, state.allies, state.enemies, state.turnPos + 1, state.round);
         if (!next)
             return state;
-        const advanced = fogExpireFlares(tickSuppression({ ...state, turnPos: next.pos, round: next.round }));
+        const advancedBase = fogExpireFlares(tickSuppression({ ...state, turnPos: next.pos, round: next.round }));
+        // a new round may shift the weather one notch (see rollWeatherShift)
+        const advanced = next.round !== state.round && advancedBase.environment
+            ? { ...advancedBase, environment: rollWeatherShift(advancedBase.environment) }
+            : advancedBase;
         // A "surviveTurns" objective (see COMBAT_OBJECTIVE_TYPES/combat.objective)
         // wins the fight outright the moment the hero has lasted the required
         // number of full rounds — checked here, the one place a round actually
@@ -55671,6 +56299,77 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 nextState = { ...nextState, effects: cureAllEffects(nextState.effects), psyche: Math.min(nextState.maxPsyche, nextState.psyche + healAmount) };
             }
         }
+        setGameState(nextState);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+    }
+    // ---- Firearm reload (see FIREARM MAGAZINES) ----
+    // Whose guns the current turn belongs to: the hero (reloading spends clips
+    // from the hero's inventory) or a player-controlled companion (free reload).
+    function getTurnFirearmKit(c) {
+        const current = c && c.order ? c.order[c.turnPos] : null;
+        if (!current)
+            return null;
+        if (current.type === 'hero') {
+            return { ownerKey: 'hero', free: false, name: heroName || t('combatYouLabel'), hands: getFirearmHands(equipment, resolveEquippedItems(equipment, gameState.inventory)) };
+        }
+        if (current.type === 'ally') {
+            const ally = c.allies.find(a => a.id === current.id);
+            if (!ally || !ally.playerControlled || ally.routing || isAllyOut(ally))
+                return null;
+            const kit = getAllyCombatKit(ally, c);
+            return { ownerKey: 'ally:' + ally.id, free: true, name: ally.name, hands: getFirearmHands(kit.equipment, resolveEquippedItems(kit.equipment, getAllyLoadout(ally).inventory)) };
+        }
+        return null;
+    }
+    // What CombatModal's reload button shows: the magazine count(s), and whether a reload is possible right now.
+    function getReloadInfo(c) {
+        if (!c || c.result)
+            return null;
+        const kit = getTurnFirearmKit(c);
+        if (!kit || kit.hands.length === 0)
+            return null;
+        const mags = c.gunMags || {};
+        const known = kit.hands.map(h => mags[gunMagKey(kit.ownerKey, h.handKey)]).filter(isValidGunMag);
+        const clips = kit.free ? null : gameState.inventory.filter(isGunClipItem).length;
+        return {
+            label: known.map(m => m.cur + '/' + m.max).join(' · '),
+            empty: known.length > 0 && known.every(m => m.cur <= 0),
+            canReload: known.some(m => m.cur < m.max) && (kit.free || clips > 0),
+            noClips: !kit.free && clips === 0,
+            clips
+        };
+    }
+    // One action: refills every gun in hand that isn't full. The hero spends one
+    // clip item per gun refilled (dual pistols = up to two clips, still one action).
+    function reloadInCombat() {
+        if (combatIntroActive || combatFxBusyRef.current)
+            return;
+        const clipIdxs = [];
+        gameState.inventory.forEach((it, i) => { if (isGunClipItem(it))
+            clipIdxs.push(i); });
+        let reloaded = false;
+        let spentClips = 0;
+        setCombat(prev => {
+            if (!prev || prev.result || combatActionsLeft(prev) < 1)
+                return prev;
+            const kit = getTurnFirearmKit(prev);
+            if (!kit || kit.hands.length === 0)
+                return prev;
+            const mags = ensureGunMags(prev.gunMags, kit.ownerKey, kit.hands);
+            const needy = kit.hands
+                .filter(h => mags[gunMagKey(kit.ownerKey, h.handKey)].cur < mags[gunMagKey(kit.ownerKey, h.handKey)].max)
+                .sort((a, b) => mags[gunMagKey(kit.ownerKey, a.handKey)].cur - mags[gunMagKey(kit.ownerKey, b.handKey)].cur);
+            const take = kit.free ? needy : needy.slice(0, clipIdxs.length);
+            if (take.length === 0)
+                return prev;
+            reloaded = true;
+            spentClips = kit.free ? 0 : take.length;
+            return spendActions({ ...prev, gunMags: refillGunMags(mags, kit.ownerKey, take), log: [...prev.log, { text: kit.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
+        });
+        if (!reloaded || spentClips <= 0)
+            return;
+        const drop = new Set(clipIdxs.slice(0, spentClips));
+        const nextState = { ...gameState, inventory: gameState.inventory.filter((_, i) => !drop.has(i)) };
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
     }
@@ -56235,6 +56934,19 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), aiKit.equipment);
                 const attackerRaw = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
                 const attacker = ally.suppressed ? { ...attackerRaw, weaponDamage: attackerRaw.weaponDamage * COMBAT_TUNING.suppressedDamageMult } : attackerRaw;
+                // Firearm magazine (see FIREARM MAGAZINES): an empty gun spends the action on a (free) reload.
+                if (aiGunFx && !aiAllyLockedShooter) {
+                    const aiHands = getFirearmHands(aiKit.equipment, resolveEquippedItems(aiKit.equipment, getAllyLoadout(ally).inventory));
+                    if (aiHands.length > 0) {
+                        const aiOwner = 'ally:' + ally.id;
+                        const aiMags = ensureGunMags(prev.gunMags, aiOwner, aiHands);
+                        const aiLoaded = loadedGunHands(aiMags, aiOwner, aiHands);
+                        if (aiLoaded.length === 0) {
+                            return spendActions({ ...prev, gunMags: refillGunMags(aiMags, aiOwner, aiHands), log: [...log, { text: ally.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
+                        }
+                        prev = { ...prev, gunMags: spendGunRounds(aiMags, aiOwner, aiLoaded.slice(0, 1)) };
+                    }
+                }
                 // Firearm shot: a friend standing on the line of fire may take it.
                 if (aiGunFx && ally.pos && target.pos) {
                     const blocker = rollLineBlockRedirect(prev, { type: 'ally', id: ally.id }, ally.pos, { type: 'enemy', id: target.id }, target.pos);
@@ -56638,6 +57350,16 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // firearm user keeps shooting.
             const enemyIsShooter = enemy.role === 'ranged' || getEnemyWeaponType(enemy) === 'ranged';
             const enemyPunching = enemyIsShooter && isEnemyBowUser(enemy) && !!getActiveLockPartner(prev, 'enemy:' + enemy.id);
+            // Firearm magazine (see FIREARM MAGAZINES): an empty gun spends the action on a (free) reload.
+            if (enemyIsShooter && !enemyPunching && getEnemyGunFxId(enemy)) {
+                const enHands = [{ handKey: 'main', item: null }];
+                const enOwner = 'enemy:' + enemy.id;
+                const enMags = ensureGunMags(prev.gunMags, enOwner, enHands);
+                if (loadedGunHands(enMags, enOwner, enHands).length === 0) {
+                    return spendActions({ ...prev, gunMags: refillGunMags(enMags, enOwner, enHands), log: [...log, { text: enemy.enemyName + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
+                }
+                prev = { ...prev, gunMags: spendGunRounds(enMags, enOwner, enHands) };
+            }
             let targetChoice = initialTargetChoice;
             let friendlyBlocker = null;
             if (enemy.role === 'ranged' && enemy.pos && !enemyPunching) {
@@ -57233,7 +57955,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // real inventory now — everything up to this point in the fight only
         // ever read it as an overlay (see overlayGearWear/makeHeroActor etc.),
         // never touching gameState mid-fight.
-        const wornInventory = overlayGearWear(gameState.inventory, combat.gearWear, itemRarities);
+        const wornInventory = foldHeroGunMags(overlayGearWear(gameState.inventory, combat.gearWear, itemRarities), equipment, combat.gunMags);
         const nextInventory = takenLoot.length > 0
             ? [...wornInventory, ...takenLoot.map(it => ({ name: it.label, slot: it.slot, twoHanded: it.twoHanded, shield: it.shield, weightCategory: it.weightCategory, statRoll: it.statRoll, ...(it.durability !== undefined ? { durability: it.durability } : {}) }))]
             : wornInventory;
@@ -59416,7 +60138,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const k = a.name.trim().toLowerCase();
                 const l = getAllyLoadout(a);
                 return [k, getLoadoutWeaponType(l.equipment, l.inventory)];
-            })), introActive: combatIntroActive, fxBusy: combatFxBusy, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
+            })), introActive: combatIntroActive, fxBusy: combatFxBusy, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, onReload: reloadInCombat, reloadInfo: getReloadInfo(combat), movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
         talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, onLearn: isLatestTurn ? learnTalent : undefined, onToggleTrait: isLatestTurn ? toggleWorldTrait : undefined, onClose: () => setTalentTreeModalOpen(false), t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: viewedState, itemRarities: viewedItemRarities, equipment: viewedEquipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, party: viewedParty, partyInventories: partyInventories, partyEquipment: partyEquipment, repairKitName: isLatestTurn && repairKitIndex !== null && gameState.inventory[repairKitIndex] && gameState.inventory[repairKitIndex].slot === 'repairKit' ? gameState.inventory[repairKitIndex].name : null, onApplyRepairKit: isLatestTurn ? applyRepairKitToIndex : undefined, onCancelRepairKit: cancelRepairKit, onClose: () => { setInventoryModalOpen(false); setRepairKitIndex(null); }, t: t })),
@@ -60009,6 +60731,8 @@ const APP_STYLES = `
     touch-action: none; cursor: grab;
   }
   .combat-grid-viewport-planning { cursor: crosshair; }
+  /* Snow overlay (see CombatWeatherLayer): above the board, below the zoom buttons (z-index 5); never takes taps. */
+  .combat-weather-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
   .combat-grid-zoom-controls {
     position: absolute; top: 0.5rem; right: 0.5rem; z-index: 5;
     display: flex; flex-direction: column; gap: 0.3rem;
@@ -60855,6 +61579,8 @@ const APP_STYLES = `
   .combat-sqbtn-armed { border-color: var(--amber-300); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.55); }
   .combat-sqbtn-leave { border-color: var(--amber-300); }
   .combat-sqbtn-badge { position: absolute; top: 1px; right: 3px; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; color: var(--amber-300); }
+  /* Magazine count(s) on the reload button: along the bottom edge, so "7/10 · 5/8" (two pistols) still fits. */
+  .combat-sqbtn-badge-ammo { top: auto; bottom: 1px; right: 50%; transform: translateX(50%); font-size: 0.5rem; white-space: nowrap; letter-spacing: -0.02em; }
   .combat-fielditem-panel { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(3.8rem + env(safe-area-inset-bottom, 0px)); width: min(90%, 18rem); margin: 0; z-index: 4; }
   .combat-item-panel { margin-top: 0.6rem; background: var(--stone-900); border: 1px solid var(--amber-700); border-radius: 4px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; max-height: 9rem; overflow-y: auto; }
   .combat-item-panel-title { margin: 0 0 0.2rem; font-size: 0.7rem; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
