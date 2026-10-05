@@ -18092,6 +18092,10 @@ const TRANSLATIONS = {
         combatReloadClipsLeft: 'обойм: {n}',
         combatLogReloadText: 'перезаряжает оружие',
         combatLogGunEmptyText: 'магазин пуст — нужна перезарядка',
+        combatLogOutOfAmmoText: 'патроны закончились — оружие бесполезно',
+        combatLogEnemyOutOfAmmoText: 'расстрелял все обоймы и бросается в рукопашную',
+        combatLogOutOfAmmoSwapText: 'расстрелял все обоймы и меняет оружие на: {w}',
+        combatFallbackMeleeName: 'Нож',
         gunClipItemName: 'Обойма',
         combatLogToggleLabel: 'Журнал боя',
         combatFullscreenLabel: 'На весь экран',
@@ -19080,6 +19084,10 @@ const TRANSLATIONS = {
         combatReloadClipsLeft: 'clips: {n}',
         combatLogReloadText: 'reloads',
         combatLogGunEmptyText: 'the magazine is empty — reload needed',
+        combatLogOutOfAmmoText: 'out of ammo — the weapon is useless',
+        combatLogEnemyOutOfAmmoText: 'has run out of clips and charges into melee',
+        combatLogOutOfAmmoSwapText: 'has run out of clips and switches weapon to: {w}',
+        combatFallbackMeleeName: 'Knife',
         gunClipItemName: 'Ammo clip',
         combatLogToggleLabel: 'Combat log',
         combatFullscreenLabel: 'Fullscreen',
@@ -23416,7 +23424,7 @@ const COMBAT_OBJECTIVE_TYPES = ['defeatAll', 'surviveTurns', 'protect', 'retreat
 //           open space, another dimension/plane, a pocket reality, etc.
 const COMBAT_LIGHT_LEVELS = ['lit', 'dark'];
 const COMBAT_REALMS = ['material', 'other'];
-const DEFAULT_COMBAT_ENVIRONMENT = { time: 'day', light: 'lit', realm: 'material', indoors: false, weather: 'none', weatherRange: null };
+const DEFAULT_COMBAT_ENVIRONMENT = { time: 'day', light: 'lit', realm: 'material', indoors: false, weather: 'none', weatherRange: null, weatherEveryTurn: false };
 // encounter.lighting / encounter.realm come from the model (null when it
 // said nothing). Missing lighting falls back to the hour: day -> lit,
 // night -> dark. dayPhase is the story's current phase.
@@ -23440,20 +23448,24 @@ function buildCombatEnvironment(encounter, dayPhase) {
         weatherRange = { min: wr.min, max: wr.max, mode: wr.mode === 'escalate' ? 'escalate' : 'range' };
         weatherNow = wr.min;
     }
-    return { time, light, realm, indoors, weather: weatherNow, weatherRange };
+    // weatherEveryTurn (editor only): the weather is guaranteed to shift at the start of every round instead of rolling WEATHER_SHIFT_CHANCE.
+    const weatherEveryTurn = !!(encounter && encounter.weatherEveryTurn) && weatherNow !== 'none';
+    return { time, light, realm, indoors, weather: weatherNow, weatherRange, weatherEveryTurn };
 }
 // Weather drifts from round to round: each new round has a WEATHER_SHIFT_CHANCE chance to step the fight's
 // snowfall one notch along WEATHER_ORDER (light <-> heavy <-> blizzard). env.weatherRange (editor only) limits the
-// walk to [min, max]; mode 'escalate' allows only stronger steps; min === max never changes. Without a range the
+// walk to [min, max]; mode 'escalate' allows only stronger steps; min === max never changes. env.weatherEveryTurn (editor)
+// makes the shift certain every round. Without a range the
 // whole scale is open. Pure: returns the same object when nothing changes; 'none' never changes.
-const WEATHER_SHIFT_CHANCE = 0.22;
+const WEATHER_SHIFT_CHANCE = 0.5;
 function rollWeatherShift(env) {
     if (!env || !env.weather || env.weather === 'none')
         return env;
     const r = env.weatherRange;
     const lo = r ? WEATHER_ORDER.indexOf(r.min) : 0, hi = r ? WEATHER_ORDER.indexOf(r.max) : WEATHER_ORDER.length - 1;
     const cur = WEATHER_ORDER.indexOf(env.weather);
-    if (cur < 0 || lo >= hi || Math.random() >= WEATHER_SHIFT_CHANCE)
+    const chance = env.weatherEveryTurn ? 1 : WEATHER_SHIFT_CHANCE;
+    if (cur < 0 || lo >= hi || Math.random() >= chance)
         return env;
     const moves = [];
     if (cur < hi)
@@ -23581,7 +23593,7 @@ const NARRATIVE_ITEM_SLOT_KEYWORDS = [
             'sword', 'blade', 'dagger', 'knife', 'axe', 'mace', 'flail', 'hammer', 'staff', 'wand', 'crossbow', 'bow',
             'pistol', 'musket', 'rapier', 'saber', 'sabre', 'epee', 'stiletto', 'club', 'cudgel', 'halberd', 'pike',
             'trident', 'spear', 'lance', 'claymore', 'katana', 'javelin', 'sling', 'shield',
-            'револьвер', 'автомат', 'винтовк', 'карабин', 'дробовик', 'ружь', 'ружей', 'пулем', 'обрез', 'энерговинтовк',
+            'револьвер', 'автомат', 'винтовк', 'карабин', 'дробовик', 'ружь', 'ружей', 'пулем', 'обрез', 'энерговинтовк', 'лазган', 'лазкарабин', 'плазмоган', 'lasgun',
             'revolver', 'rifle', 'shotgun', 'carbine', 'smg', 'handgun', 'railgun', 'machinegun'
         ]],
     ['armor', [
@@ -23632,6 +23644,9 @@ function inferEquipSlotFromItemName(name) {
         return 'none';
     if (isGunClipName(name))
         return 'none';
+    // The model already identified this name as a weapon (see the weapon class registry).
+    if (getRegisteredWeaponClass(name))
+        return 'weapon';
     const tokens = narrativeItemNameTokens(name);
     // A repair kit is two words ("ремонтный набор", "repair kit"), which the
     // single-token keyword table below can't express — checked first.
@@ -23704,11 +23719,64 @@ function inferTwoHandedFromItemName(name) {
 // for now: they stay ordinary one-handed weapons. A submachine gun named
 // "пистолет-пулемёт" is the exception (it has a long-gun token too).
 // ==============================================================================
+// ==============================================================================
+// AI-DETERMINED WEAPON CLASS REGISTRY
+// The keyword/regex tables below only know a fixed vocabulary, so an invented
+// or genre-specific name ("лазган", "бластер", "gauss rifle") used to fall
+// through to "ordinary one-handed weapon". Instead the model classifies such a
+// name ONCE into a weapon class (see classifyWeaponClassNames in App() and the
+// weaponClass field of the item classifier), the answer lands in this registry
+// (persisted under WEAPON_CLASS_CACHE_KEY, shared by every save), and every
+// name-based helper below (isRangedWeaponName, isBowWeaponName,
+// isHandgunWeaponName, getGunFxIdFromName) consults it BEFORE its regexes — so
+// portrait, shot animation, two-handedness and damage all follow automatically,
+// for the hero, allies and enemies alike. Keys are the lower-cased trimmed name.
+// ==============================================================================
+const WEAPON_CLASS_CACHE_KEY = 'grimoire-rpg-weapon-classes';
+const WEAPON_CLASSES = ['melee', 'bow', 'handgun', 'longgun', 'smg', 'energyRifle', 'railgun'];
+const RANGED_WEAPON_CLASSES = ['bow', 'longgun', 'smg', 'energyRifle', 'railgun'];
+const WEAPON_CLASS_TO_GUN_FX = { handgun: 'pistol', longgun: 'smg', smg: 'smg', energyRifle: 'energyRifle', railgun: 'railSingle' };
+const weaponClassRegistry = new Map();
+function weaponClassKey(name) {
+    return typeof name === 'string' ? name.trim().toLowerCase() : '';
+}
+function getRegisteredWeaponClass(name) {
+    const key = weaponClassKey(name);
+    return key ? (weaponClassRegistry.get(key) || null) : null;
+}
+function persistWeaponClassRegistry() {
+    try {
+        if (typeof window !== 'undefined' && window.storage) {
+            window.storage.set(WEAPON_CLASS_CACHE_KEY, JSON.stringify(Object.fromEntries(weaponClassRegistry)), false).catch(() => { });
+        }
+    }
+    catch (e) { /* classes just won't persist — they get re-asked next session */ }
+}
+// entries: { name: weaponClass }. Returns true if anything actually changed.
+function registerWeaponClasses(entries, persist = true) {
+    let changed = false;
+    for (const [name, cls] of Object.entries(entries || {})) {
+        const key = weaponClassKey(name);
+        if (!key || !WEAPON_CLASSES.includes(cls))
+            continue;
+        if (weaponClassRegistry.get(key) !== cls) {
+            weaponClassRegistry.set(key, cls);
+            changed = true;
+        }
+    }
+    if (changed && persist)
+        persistWeaponClassRegistry();
+    return changed;
+}
+function loadWeaponClassRegistry(obj) {
+    return obj && typeof obj === 'object' ? registerWeaponClasses(obj, false) : false;
+}
 const RANGED_WEAPON_TOKEN_PATTERNS = [
     /^лук(а|у|ом|е|и|ов|ам|ами|ах)?$/, /^лучни/, /^арбалет/, /^самострел/,
     /^мушкет/, /^аркебуз/, /^винтовк/, /^дробовик/, /^ружь/, /^ружей/,
     /^обрез(а|у|ом|е|ы|ов)?$/, /^автомат(а|у|ом|е|ы|ов|ам|ами|ах)?$/,
     /^пулем/, /^калашников/, /^снайпер/, /^энерговинтовк/, /^энергокарабин/, /^рельс/, /^railgun/,
+    /^лазган/, /^лазкарабин/, /^лазвинтовк/, /^плазмоган/, /^плазмовинтовк/, /^плазмакарабин/, /^lasgun/, /^lascarbine/, /^plasmagun/,
     /^(long|short|war|cross|compound|recurve|hunting)?bows?$/, /^crossbow/, /^arquebus/,
     /^musket/, /^rifle/, /^shotgun/, /^carbine/, /^submachine/, /^smg$/,
     /^archer/, /^sniper/, /^machinegun/
@@ -23720,6 +23788,9 @@ const SUBMACHINE_GUN_TOKEN_PATTERNS = [/^пулем/, /^submachine/, /^smg$/];
 function isRangedWeaponName(name) {
     if (typeof name !== 'string' || !name.trim())
         return false;
+    const registered = getRegisteredWeaponClass(name);
+    if (registered)
+        return RANGED_WEAPON_CLASSES.includes(registered);
     const lower = name.toLowerCase();
     const tokens = narrativeItemNameTokens(name);
     if (tokens.length === 0)
@@ -23745,6 +23816,9 @@ const BOW_WEAPON_TOKEN_PATTERNS = [
 function isBowWeaponName(name) {
     if (typeof name !== 'string' || !name.trim())
         return false;
+    const registered = getRegisteredWeaponClass(name);
+    if (registered)
+        return registered === 'bow';
     const tokens = narrativeItemNameTokens(name);
     return tokens.some(tok => BOW_WEAPON_TOKEN_PATTERNS.some(re => re.test(tok)));
 }
@@ -23778,6 +23852,9 @@ function isRangedWeaponItem(item) {
 function isHandgunWeaponName(name) {
     if (typeof name !== 'string' || !name.trim())
         return false;
+    const registered = getRegisteredWeaponClass(name);
+    if (registered)
+        return registered === 'handgun';
     const tokens = narrativeItemNameTokens(name);
     if (tokens.length === 0)
         return false;
@@ -23797,7 +23874,7 @@ function isHandgunWeaponName(name) {
 // damage is split across its 3 shots (each shot rolls hit/part/damage on its
 // own); a pistol fires one shot at its normal damage. null = not a firearm.
 // ==============================================================================
-const ENERGY_RIFLE_TOKEN_PATTERNS = [/^энерговинтовк/, /^энергокарабин/, /^plasmarifle/, /^energyrifle/];
+const ENERGY_RIFLE_TOKEN_PATTERNS = [/^энерговинтовк/, /^энергокарабин/, /^plasmarifle/, /^energyrifle/, /^лазган/, /^лазкарабин/, /^лазвинтовк/, /^плазмоган/, /^плазмовинтовк/, /^плазмакарабин/, /^lasgun/, /^lascarbine/, /^plasmagun/];
 // A rifle / carbine / sniper rifle (any adjective in front: "штурмовая
 // винтовка", "assault rifle") and the energy adjectives that turn one into an
 // energy rifle ("плазменная винтовка", "laser rifle"). Muskets, shotguns and
@@ -23812,6 +23889,9 @@ function getGunFxIdFromName(name) {
         return null;
     if (isGunClipName(name))
         return null;
+    const registered = getRegisteredWeaponClass(name);
+    if (registered)
+        return WEAPON_CLASS_TO_GUN_FX[registered] || null;
     const hasToken = pats => tokens.some(tok => pats.some(re => re.test(tok)));
     if (hasToken([/^рельс/, /^railgun/, /^rail$/]))
         return 'railSingle';
@@ -23869,7 +23949,9 @@ function gunVolleyDamages(fxId, totalDamage) {
 // pistols, one round from EACH pistol) spends one round; at 0 the gun can't
 // fire until it is reloaded, which costs 1 action. The HERO's reload also
 // spends one "clip" item (see isGunClipItem) from the inventory per gun
-// reloaded; companions and enemies reload for free (they carry their own).
+// reloaded; companions and enemies reload without touching the inventory, but
+// they are NOT unlimited: each carries a finite pool of spare clips
+// (combat.gunClips[ownerKey], see SPARE CLIPS below) and every reload spends one.
 // The hero's magazine lives on the inventory item itself (item.mag =
 // { cur, max }) so it carries over between fights; during a fight it's tracked
 // in combat.gunMags[ownerKey + ':' + handKey] ('hero:weaponRight',
@@ -23956,6 +24038,56 @@ function refillGunMags(mags, ownerKey, hands) {
             out[k] = { ...out[k], cur: out[k].max };
     }
     return out;
+}
+// ---- SPARE CLIPS for enemies and companions ----
+// Every shooter that isn't the hero — enemy or companion alike — carries the
+// SAME limited number of spare clips for the whole fight (a long supply, but not
+// endless). One reload (all the guns in hand at once) costs one clip. Rolled
+// lazily the first time an owner needs it, so reinforcement waves and late
+// joiners work without setup. The `kind` argument is kept for call-site
+// compatibility but no longer changes the amount.
+const SPARE_CLIPS_MIN = 6;
+const SPARE_CLIPS_MAX = 8;
+function rollSpareClips(kind) {
+    return SPARE_CLIPS_MIN + Math.floor(Math.random() * (SPARE_CLIPS_MAX - SPARE_CLIPS_MIN + 1));
+}
+// The clips map with an entry for ownerKey. Never mutates input.
+function ensureSpareClips(clips, ownerKey, kind) {
+    if (clips && Number.isFinite(clips[ownerKey]))
+        return clips;
+    return { ...(clips || {}), [ownerKey]: rollSpareClips(kind) };
+}
+function spareClipsLeft(clips, ownerKey) {
+    return clips && Number.isFinite(clips[ownerKey]) ? clips[ownerKey] : 0;
+}
+function takeSpareClip(clips, ownerKey) {
+    const n = spareClipsLeft(clips, ownerKey);
+    return { ...(clips || {}), [ownerKey]: Math.max(0, n - 1) };
+}
+// A shooter that has run dry (see isGunsDry) draws a ONE-HANDED melee weapon: the
+// first intact one-handed non-gun, non-bow, non-shield weapon in its inventory,
+// otherwise a plain fallback (a knife). Costs 1 action (see the callers).
+function pickMeleeSidearmName(inventoryList, rarities, fallbackName) {
+    const inv = Array.isArray(inventoryList) ? inventoryList : [];
+    for (const it of inv) {
+        if (!it || it.slot !== 'weapon' || !it.name)
+            continue;
+        if (it.shield === true || (it.shield === undefined && isShieldItemName(it.name)))
+            continue;
+        if (it.twoHanded === true || (it.twoHanded === undefined && inferTwoHandedFromItemName(it.name)))
+            continue;
+        if (getGunFxIdFromName(it.name) || isRangedWeaponName(it.name) || isBowWeaponName(it.name))
+            continue;
+        const rarity = findItemRarity(it.name, rarities || {}) || 'common';
+        if (isItemBroken(it, rarity))
+            continue;
+        return it.name;
+    }
+    return fallbackName;
+}
+// Empty magazine in every hand and no spare clip left: the gun is dead weight.
+function isGunsDry(mags, clips, ownerKey, hands) {
+    return loadedGunHands(mags, ownerKey, hands).length === 0 && spareClipsLeft(clips, ownerKey) <= 0;
 }
 function initHeroGunMags(equipmentObj, inventoryList) {
     const eq = equipmentObj || {};
@@ -24099,6 +24231,37 @@ function getWeaponTypeFromName(text) {
     if (isUnarmedText(text))
         return 'unarmed';
     return WEAPON_TYPE_DEFAULT;
+}
+// True when the local vocabulary already recognises this weapon text (or it
+// isn't a weapon description at all), so no model call is needed. An unknown
+// invented name ("лазган", "бластер") returns false and gets sent to the
+// model once — see classifyWeaponClassNames/the WEAPON CLASS effect in App().
+function hasKnownWeaponToken(text) {
+    if (typeof text !== 'string' || !text.trim())
+        return true;
+    if (getRegisteredWeaponClass(text))
+        return true;
+    if (isUnarmedText(text) || isShieldMentionText(text))
+        return true;
+    const tokens = narrativeItemNameTokens(text);
+    if (tokens.length === 0)
+        return true;
+    if (isGunClipName(text))
+        return true;
+    if (isRangedWeaponName(text) || isHandgunWeaponName(text) || getGunFxIdFromName(text))
+        return true;
+    const a = analyzeOneHandedWeaponText(text);
+    if (a.single > 0 || a.plural > 0)
+        return true;
+    const weaponGroup = NARRATIVE_ITEM_SLOT_KEYWORDS.find(g => g[0] === 'weapon');
+    const kws = weaponGroup ? weaponGroup[1] : [];
+    if (tokens.some(tok => kws.some(kw => tok.startsWith(kw))))
+        return true;
+    if (tokens.some(tok => NARRATIVE_TWO_HANDED_KEYWORDS.some(kw => tok.startsWith(kw))))
+        return true;
+    if (tokens.some(tok => THROWN_WEAPON_TOKEN_PATTERNS.some(re => re.test(tok))))
+        return true;
+    return false;
 }
 // Type of one inventory item on its own (shields and non-weapons: default).
 function getWeaponTypeOfItem(item) {
@@ -26620,8 +26783,11 @@ function loadLaserBuffer(url) {
 }
 function preloadLaserSounds() { [LASER_START_URL, LASER_LOOP_URL, LASER_END_URL].forEach(u => { if (!laserReady[u])
     loadLaserBuffer(u); }); }
-// beams: [{ fire, dur }] in ms from this moment
-function playLaserBeams(beams) {
+// beams: [{ fire, dur, x, y }] in ms from this moment (x, y = world pixels of the impact).
+// attFn(beam) -> 0..1 closeness to the camera (see cameraAttenuation). Every beam has its own bus
+// (gain + low-pass + a little echo) that the returned controller re-tunes with update() each frame,
+// so the sound follows the camera while the pillar burns. Without attFn everything stays neutral.
+function playLaserBeams(beams, attFn) {
     try {
         const ctx = getSfxContext(), A = laserReady[LASER_START_URL], B = laserReady[LASER_LOOP_URL], C = laserReady[LASER_END_URL];
         if (!ctx || !A || !B || !C)
@@ -26644,7 +26810,35 @@ function playLaserBeams(beams) {
         }
         laserMaster.gain.value = soundVolumeStep / SOUND_VOLUME_MAX * 0.8;
         const t0 = ctx.currentTime + 0.03;
-        const voice = (buf, when, loop) => {
+        const vol = soundVolumeStep / SOUND_VOLUME_MAX * 0.8;
+        const buses = beams.map(b => {
+            const inp = ctx.createGain(), lp = ctx.createBiquadFilter(), dry = ctx.createGain(), wet = ctx.createGain();
+            lp.type = 'lowpass';
+            lp.Q.value = 0.5;
+            inp.connect(lp);
+            lp.connect(dry);
+            dry.connect(laserMaster);
+            lp.connect(wet);
+            wet.connect(getSfxReverbInput(ctx));
+            const bus = { inp, lp, dry, wet, b };
+            bus.set = (immediate) => {
+                const c = attFn ? attFn(b) : 1, p = sfxDistanceParams(c), now = ctx.currentTime;
+                const put = (param, v) => { if (immediate)
+                    param.setValueAtTime(v, now);
+                else
+                    param.setTargetAtTime(v, now, 0.06); };
+                put(dry.gain, p.dry);
+                put(wet.gain, vol * p.wet);
+                put(lp.frequency, p.cutoff);
+            };
+            bus.set(true);
+            setTimeout(() => { [inp, lp, dry, wet].forEach(n => { try {
+                n.disconnect();
+            }
+            catch (e) { /* ignore */ } }); }, b.fire + b.dur + 3000);
+            return bus;
+        });
+        const voice = (buf, when, loop, bus) => {
             const s = ctx.createBufferSource(), g = ctx.createGain();
             s.buffer = buf;
             if (loop) {
@@ -26653,7 +26847,7 @@ function playLaserBeams(beams) {
                 s.loopEnd = LASER_LOOP_TO_S;
             }
             s.connect(g);
-            g.connect(laserMaster);
+            g.connect(bus.inp);
             s.start(when, 0);
             const v = { s, g };
             laserVoices.add(v);
@@ -26663,23 +26857,31 @@ function playLaserBeams(beams) {
             catch (e) { /* ignore */ } };
             return v;
         };
-        beams.forEach(b => {
+        beams.forEach((b, bi) => {
+            const bus = buses[bi];
             const at = t0 + b.fire / 1000, endT = t0 + (b.fire + b.dur) / 1000 - LASER_END_LEAD_S;
-            voice(A, at, false);
+            voice(A, at, false, bus);
             if (endT > at + LASER_BED_S) {
-                const l = voice(B, at + LASER_BED_S, true);
+                const l = voice(B, at + LASER_BED_S, true, bus);
                 l.g.gain.setValueAtTime(0, at + LASER_BED_S);
                 l.g.gain.linearRampToValueAtTime(1, at + LASER_BED_S + 0.012);
                 l.g.gain.setValueAtTime(1, endT);
                 l.g.gain.linearRampToValueAtTime(0, endT + 0.1);
                 l.s.stop(endT + 0.12);
             }
-            const o = voice(C, endT, false);
+            const o = voice(C, endT, false, bus);
             o.g.gain.setValueAtTime(0, endT);
             o.g.gain.linearRampToValueAtTime(1, endT + 0.08);
         });
+        return { update() { buses.forEach(bus => { try {
+                bus.set(false);
+            }
+            catch (e) { /* ignore */ } }); } };
     }
-    catch (e) { /* ignore */ }
+    catch (e) {
+        return null;
+    }
+    return null;
 }
 function stopLaserSounds() {
     const ctx = sfxCtx;
@@ -36106,6 +36308,8 @@ function flareFxRun(layer, start, end) {
             if (glows[i].t > 1)
                 glows.splice(i, 1);
         }
+        // Дым и искры рисуем ПЕРВЫМИ, а свет шашки — поверх них (иначе дым перекрывает свечение).
+        K.draw(ctx, t);
         ctx.globalCompositeOperation = 'lighter';
         glows.forEach(g => {
             const a = Math.pow(1 - g.t, 2), gr = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.R);
@@ -36133,7 +36337,6 @@ function flareFxRun(layer, start, end) {
             ctx.globalAlpha = 1;
         }
         ctx.globalCompositeOperation = 'source-over';
-        K.draw(ctx, t);
         return lit || !fl || K.P.length > 0 || glows.length > 0;
     });
 }
@@ -37451,7 +37654,7 @@ function createLightningFx(ctx) {
         done() { return queue.length === 0 && bolts.length === 0 && fx.length === 0 && parts.length === 0 && simT >= endAt; }
     };
 }
-function createAbilityFxEngine(host) {
+function createAbilityFxEngine(host, cameraAtt) {
     const C = GRID_CELL_PX;
     const W = (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * C, H = (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * C;
     const world = host.parentElement;
@@ -37970,7 +38173,7 @@ function createAbilityFxEngine(host) {
             if (ev.vibe)
                 vib(ev.vibe);
             const endAt = Math.max(...bs.map(b => b.fire + b.dur)) + 700;
-            playLaserBeams(bs);
+            const laserSnd = playLaserBeams(bs, b => (cameraAtt ? cameraAtt([{ x: b.x, y: b.y }]) : 1));
             const prof = (s, d, seed, tt) => s < IN ? 0.035 + 0.965 * (1 - Math.pow(1 - s / IN, 3))
                 : s > d - OUT ? (() => { const u = Math.max(0, (d - s) / OUT); return 0.035 + 0.965 * u * u * (3 - 2 * u); })()
                     : 0.94 + 0.06 * Math.sin(tt * 0.07 + seed * 9);
@@ -38161,6 +38364,8 @@ function createAbilityFxEngine(host) {
                 last2 = now;
                 const el = now - t0;
                 let active = 0, shake = 0;
+                if (laserSnd)
+                    laserSnd.update(); // the sound follows the camera (pan / zoom) while the pillars burn
                 for (const b of bs) {
                     const s = el - b.fire;
                     if (s >= 0 && !b.fired) {
@@ -39212,7 +39417,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     useEffect(() => {
         if (!afxHost)
             return undefined;
-        const eng = createAbilityFxEngine(afxHost);
+        const eng = createAbilityFxEngine(afxHost, pts => cameraAttenuation(pts));
         afxRef.current = eng;
         return () => { eng.dispose(); afxRef.current = null; };
     }, [afxHost]);
@@ -43571,7 +43776,7 @@ function devRemoveMapNode(mapState, nodeId) {
     };
 }
 // ---- combat ----------------------------------------------------------------
-// Editor weather -> encounter fields. env: { indoors, from, to, mode }. from 'none' = no weather; to 'same' (or equal
+// Editor weather -> encounter fields. env: { indoors, from, to, mode, everyTurn }. from 'none' = no weather; to 'same' (or equal
 // to from) pins the level; otherwise the fight starts at the weaker end and drifts inside the range
 // (mode 'range') or only strengthens (mode 'escalate'). See buildCombatEnvironment/rollWeatherShift.
 function devWeatherFields(env) {
@@ -43582,6 +43787,11 @@ function devWeatherFields(env) {
     if (i < 0)
         return { ...out, weather: 'none' };
     const lo = Math.min(i, j < 0 ? i : j), hi = Math.max(i, j < 0 ? i : j);
+    if (env.everyTurn)
+        out.weatherEveryTurn = true;
+    // «every turn» with a single level («то же») opens the whole scale from that level instead of pinning it.
+    if (lo === hi && env.everyTurn)
+        return { ...out, weather: WEATHER_ORDER[lo] };
     if (lo === hi)
         return { ...out, weather: WEATHER_ORDER[lo], weatherRange: { min: WEATHER_ORDER[lo], max: WEATHER_ORDER[lo], mode: 'range' } }; // pinned: never changes
     return { ...out, weather: WEATHER_ORDER[lo], weatherRange: { min: WEATHER_ORDER[lo], max: WEATHER_ORDER[hi], mode: env.mode === 'escalate' ? 'escalate' : 'range' } };
@@ -43672,8 +43882,8 @@ function DevSelect({ value, onChange, options }) {
             React.createElement("span", null, current ? current[1] : ''),
             React.createElement("span", { className: "dev-select-caret" }, "\u25BE")),
         open && (React.createElement(React.Fragment, null,
-            React.createElement("div", { className: "dev-select-backdrop", onClick: () => setOpen(false) }),
-            React.createElement("div", { className: "dev-select-dropdown" }, options.map(o => (React.createElement("button", { key: o[0], type: "button", className: 'dev-select-option' + (o[0] === value ? ' dev-select-option-active' : ''), onClick: () => { onChange(o[0]); setOpen(false); } }, o[1]))))))));
+            React.createElement("div", { className: "dev-select-backdrop", onClick: e => { e.preventDefault(); e.stopPropagation(); setOpen(false); } }),
+            React.createElement("div", { className: "dev-select-dropdown", onClick: e => e.preventDefault() }, options.map(o => (React.createElement("button", { key: o[0], type: "button", className: 'dev-select-option' + (o[0] === value ? ' dev-select-option-active' : ''), onClick: () => { onChange(o[0]); setOpen(false); } }, o[1]))))))));
 }
 function DevCheck({ checked, onChange, children }) {
     return (React.createElement("label", { className: "dev-check" },
@@ -44325,6 +44535,7 @@ function DevCombatTab({ api }) {
     const [devWeather, setDevWeather] = useState('none');
     const [devWeatherTo, setDevWeatherTo] = useState('same');
     const [devWeatherMode, setDevWeatherMode] = useState('range');
+    const [devWeatherEvery, setDevWeatherEvery] = useState(false);
     const [devIndoors, setDevIndoors] = useState(false);
     const [wave, setWave] = useState({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: '', count: '2', species: '' });
     const [sceneText, setSceneText] = useState('');
@@ -44355,7 +44566,7 @@ function DevCombatTab({ api }) {
         setAmbush(false);
     }
     function encounter() {
-        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'), { from: devWeather, to: devWeatherTo, mode: devWeatherMode, indoors: devIndoors });
+        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'), { from: devWeather, to: devWeatherTo, mode: devWeatherMode, everyTurn: devWeatherEvery, indoors: devIndoors });
     }
     function post(fightNow) {
         const enc = encounter();
@@ -44457,6 +44668,7 @@ function DevCombatTab({ api }) {
                     React.createElement(DevSelect, { value: devWeatherTo, onChange: setDevWeatherTo, options: [['same', 'то же (без изменений)'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря']] }))),
                 devWeather !== 'none' && devWeatherTo !== 'same' && devWeatherTo !== devWeather && (React.createElement(DevField, { label: "\u0445\u043E\u0434" },
                     React.createElement(DevSelect, { value: devWeatherMode, onChange: setDevWeatherMode, options: [['range', 'колеблется в диапазоне'], ['escalate', 'только нарастает']] }))),
+                devWeather !== 'none' && (React.createElement(DevCheck, { checked: devWeatherEvery, onChange: setDevWeatherEvery }, "\u043C\u0435\u043D\u044F\u0442\u044C \u043F\u043E\u0433\u043E\u0434\u0443 \u043A\u0430\u0436\u0434\u044B\u0439 \u0445\u043E\u0434 (\u0438\u043D\u0430\u0447\u0435 \u2014 \u0448\u0430\u043D\u0441 50 %)")),
                 React.createElement(DevCheck, { checked: devIndoors, onChange: setDevIndoors }, "\u0432 \u043F\u043E\u043C\u0435\u0449\u0435\u043D\u0438\u0438 (\u043F\u043E\u0433\u043E\u0434\u044B \u043D\u0435\u0442)")),
             React.createElement(DevCheck, { checked: wave.on, onChange: x => setW('on', x) }, "\u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432\u043E\u043B\u043D\u0443 \u043F\u043E\u0434\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u044F"),
             wave.on && (React.createElement("div", { className: "dev-enemy" },
@@ -46563,6 +46775,10 @@ function App() {
     // Global and cross-save, loaded once on mount below, unlike the rest of
     // this block which is per-playthrough (see NARRATIVE_ITEM_SLOT_CACHE_KEY).
     const [narrativeItemSlots, setNarrativeItemSlots] = useState({});
+    // Bumped whenever the AI-determined weapon class registry changes, so effects
+    // and renders that read it (it lives outside React state) re-run.
+    const [weaponClassTick, setWeaponClassTick] = useState(0);
+    const classifyingWeaponClassRef = useRef(new Set());
     // Names currently out for classification, so the effect below never
     // fires a second overlapping call for the same name while the first is
     // still in flight (e.g. two npcs sharing an item name in the same
@@ -47032,6 +47248,18 @@ function App() {
             }
             catch (e) {
                 // default (show the confirmation) stands
+            }
+            try {
+                // Must load BEFORE the save below is normalised, so already-classified
+                // weapons come out two-handed/ranged straight away.
+                const weaponClassResult = await window.storage.get(WEAPON_CLASS_CACHE_KEY, false);
+                if (!cancelled && weaponClassResult && weaponClassResult.value) {
+                    if (loadWeaponClassRegistry(JSON.parse(weaponClassResult.value)))
+                        setWeaponClassTick(n => n + 1);
+                }
+            }
+            catch (e) {
+                // no cached weapon classes yet
             }
             try {
                 const slotCacheResult = await window.storage.get(NARRATIVE_ITEM_SLOT_CACHE_KEY, false);
@@ -51045,12 +51273,13 @@ Rules:
 You will be given a JSON array of item names, each exactly as already written in the story (possibly in different languages). Classify EVERY single one — never skip, merge, split, rename, or invent an item; the "name" you return for each must be copied back verbatim from the input.
 
 Respond with ONLY valid JSON and nothing else (no markdown, no text before or after):
-{"items": [{"name": "copied verbatim from input", "slot": "weapon", "twoHanded": false, "shield": false, "armorPiercing": false, "weightCategory": "medium"}]}
+{"items": [{"name": "copied verbatim from input", "slot": "weapon", "twoHanded": false, "shield": false, "armorPiercing": false, "weaponClass": "melee", "weightCategory": "medium"}]}
 
 Rules:
 - "slot" must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (an ordinary document, key, valuable, or keepsake that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon". "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack). "ring" also covers hand/wrist jewelry (bracelet, bangle, cuff); "amulet" is strictly neck-worn (pendant, necklace, talisman, medallion, charm, locket) and must never be used for a bracelet. "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, ammunition, a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it.
 - "twoHanded" is true only for a weapon needing both hands — omit or set false otherwise, and omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed.
 - "armorPiercing" is true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille) — omit or set false for an ordinary sword, axe, or spear even if sharp or heavy, and omit entirely for non-weapon items. This has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so set it true only when the item genuinely, specifically is that kind of weapon, never as a default.
+- "weaponClass" is only for "slot": "weapon" items (omit for everything else) and is exactly one of: "melee" (any hand-held weapon or shield, including thrown knives), "bow" (bow, crossbow, sling-like draw weapons), "handgun" (one-handed pistol/revolver, including energy/laser/plasma pistols and blasters held in one hand), "longgun" (two-handed bullet firearm: rifle, shotgun, musket, sniper rifle), "smg" (automatic weapon: submachine gun, machine gun, assault rifle), "energyRifle" (two-handed laser/plasma/energy long gun — e.g. a lasgun, laser rifle, plasma rifle, blaster rifle), "railgun" (railgun, coilgun, gauss rifle). Judge by what the item MEANS, including invented or genre-specific names in any language (a "lasgun"/"лазган" is a laser rifle = "energyRifle"). A ranged class always implies "twoHanded": true; "handgun" is one-handed.
 - "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon.
 - "weightCategory" is exactly one of "light", "medium", or "heavy" — how much this specific item would weigh relative to typical examples of its own slot (a dagger is "light" for a weapon, a suit of plate is "heavy" for armor; a plain ring is "light" for a ring, even though every ring is a few grams).
 - Every input name must produce exactly one output entry, in any order.`;
@@ -51074,11 +51303,16 @@ Rules:
         const parsed = extractJsonObject(raw);
         const items = parsed && Array.isArray(parsed.items) ? parsed.items : [];
         const result = {};
+        let weaponClassChanged = false;
         for (const item of items) {
             const name = typeof item.name === 'string' ? item.name.trim() : '';
             if (!name)
                 continue;
             const slot = EQUIPMENT_SLOT_TYPES.includes(item.slot) ? item.slot : 'none';
+            if (slot === 'weapon' && item.shield !== true && WEAPON_CLASSES.includes(item.weaponClass)) {
+                if (registerWeaponClasses({ [name]: item.weaponClass }))
+                    weaponClassChanged = true;
+            }
             result[name] = {
                 slot,
                 twoHanded: slot === 'weapon' && (item.twoHanded === true || (item.shield !== true && isRangedWeaponName(name))),
@@ -51099,7 +51333,49 @@ Rules:
                 result[name] = { slot, twoHanded: slot === 'weapon' && inferTwoHandedFromItemName(name), shield: slot === 'weapon' && isShieldItemName(name), armorPiercing: false, weightCategory: undefined };
             }
         }
+        if (weaponClassChanged)
+            setWeaponClassTick(n => n + 1);
         return result;
+    }
+    // Standalone weapon-class classification for any weapon name the local
+    // vocabulary doesn't recognise (loot, shop stock, enemy weapon text, ...).
+    // Same idea as the weaponClass field above, but not tied to an NPC's
+    // narrative belongings. Registers answers in the weapon class registry.
+    // Returns true if the call succeeded, false on a hard failure.
+    async function classifyWeaponClassNames(names) {
+        const system = `You classify weapon names from a text role-playing game into a weapon class, by what the weapon MEANS (names may be invented or genre-specific, in any language).
+
+You get a JSON array of names. Respond with ONLY valid JSON, no markdown:
+{"items": [{"name": "copied verbatim from input", "weaponClass": "melee"}]}
+
+"weaponClass" is exactly one of:
+- "melee": any hand-held close-combat weapon (sword, axe, club, staff, knife, power sword...) — also thrown blades.
+- "bow": bow, crossbow, other draw/launch weapons firing arrows or bolts.
+- "handgun": a ONE-handed firearm or energy sidearm (pistol, revolver, laser/plasma pistol, hand blaster).
+- "longgun": a two-handed bullet firearm (rifle, shotgun, musket, sniper rifle).
+- "smg": an automatic weapon (submachine gun, machine gun, assault rifle).
+- "energyRifle": a two-handed laser/plasma/energy long gun (lasgun, laser rifle, plasma rifle, blaster rifle, pulse rifle).
+- "railgun": railgun, coilgun, gauss rifle.
+- "none": not a weapon at all (ammo, a magazine or energy cell, a tool, armor, a shield...).
+Examples: "лазган" -> energyRifle; "плазменный пистолет" -> handgun; "ржавый тесак" -> melee. Every input name must produce exactly one entry with the name copied back verbatim.`;
+        let raw;
+        try {
+            raw = await callGemini(system, [{ role: 'user', content: JSON.stringify(names) }]);
+        }
+        catch (e) {
+            return false;
+        }
+        const parsed = extractJsonObject(raw);
+        const items = parsed && Array.isArray(parsed.items) ? parsed.items : [];
+        const entries = {};
+        for (const item of items) {
+            const name = item && typeof item.name === 'string' ? item.name.trim() : '';
+            if (name && WEAPON_CLASSES.includes(item.weaponClass))
+                entries[name] = item.weaponClass;
+        }
+        if (registerWeaponClasses(entries))
+            setWeaponClassTick(n => n + 1);
+        return items.length > 0;
     }
     // Quest offers, reward offers, and the travel offer are now detected as
     // part of the single combined call — see buildStateAndEventsSystemPrompt/
@@ -53770,6 +54046,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             allyGearWear: {},
             // Firearm magazines — see FIREARM MAGAZINES.
             gunMags: initHeroGunMags(equipment, gameState.inventory),
+            gunClips: {},
             // Reinforcement waves (see normalizeReinforcementWaves/
             // checkReinforcementWaves) — pendingWaves shrinks as waves fire,
             // triggeredWaveIds guarantees each wave only ever fires once even if
@@ -53884,6 +54161,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             allyGearWear: {},
             // Firearm magazines — see FIREARM MAGAZINES.
             gunMags: initHeroGunMags(equipment, gameState.inventory),
+            gunClips: {},
             // See startCombat's own comment on these same four fields — a stealth
             // opening can still have reinforcement waves lined up behind it,
             // same as an ordinary fight.
@@ -54190,6 +54468,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // ally's gear goes through here. wearKey is the combat.allyGearWear key
     // (unique combat id for own gear, since two "Guard" reinforcements share a name).
     function getAllyLoadout(ally) {
+        const base = getAllyLoadoutBase(ally);
+        // A dry gunner that drew a one-handed melee weapon (see pickMeleeSidearmName) fights with that for the rest of the fight.
+        return ally.swapEquip ? { ...base, equipment: ally.swapEquip } : base;
+    }
+    function getAllyLoadoutBase(ally) {
         if (ally.ownGear)
             return { equipment: ally.ownGear.equipment, inventory: ally.ownGear.inventory, itemRarities: ally.ownGear.itemRarities, wearKey: 'own:' + ally.id };
         const key = ally.name.trim().toLowerCase();
@@ -56330,12 +56613,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return null;
         const mags = c.gunMags || {};
         const known = kit.hands.map(h => mags[gunMagKey(kit.ownerKey, h.handKey)]).filter(isValidGunMag);
-        const clips = kit.free ? null : gameState.inventory.filter(isGunClipItem).length;
+        // The hero reloads from inventory clip items; a companion from its own finite pool (see SPARE CLIPS).
+        const clips = kit.free ? spareClipsLeft(ensureSpareClips(c.gunClips, kit.ownerKey, 'ally'), kit.ownerKey) : gameState.inventory.filter(isGunClipItem).length;
         return {
             label: known.map(m => m.cur + '/' + m.max).join(' · '),
             empty: known.length > 0 && known.every(m => m.cur <= 0),
-            canReload: known.some(m => m.cur < m.max) && (kit.free || clips > 0),
-            noClips: !kit.free && clips === 0,
+            canReload: known.some(m => m.cur < m.max) && clips > 0,
+            noClips: clips === 0,
             clips
         };
     }
@@ -56359,12 +56643,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const needy = kit.hands
                 .filter(h => mags[gunMagKey(kit.ownerKey, h.handKey)].cur < mags[gunMagKey(kit.ownerKey, h.handKey)].max)
                 .sort((a, b) => mags[gunMagKey(kit.ownerKey, a.handKey)].cur - mags[gunMagKey(kit.ownerKey, b.handKey)].cur);
-            const take = kit.free ? needy : needy.slice(0, clipIdxs.length);
+            // A companion's whole reload costs one clip from its own pool (see SPARE CLIPS).
+            const allyClips = kit.free ? ensureSpareClips(prev.gunClips, kit.ownerKey, 'ally') : null;
+            const take = kit.free ? (spareClipsLeft(allyClips, kit.ownerKey) > 0 ? needy : []) : needy.slice(0, clipIdxs.length);
             if (take.length === 0)
                 return prev;
             reloaded = true;
             spentClips = kit.free ? 0 : take.length;
-            return spendActions({ ...prev, gunMags: refillGunMags(mags, kit.ownerKey, take), log: [...prev.log, { text: kit.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
+            return spendActions({ ...prev, gunMags: refillGunMags(mags, kit.ownerKey, take), ...(kit.free ? { gunClips: takeSpareClip(allyClips, kit.ownerKey) } : {}), log: [...prev.log, { text: kit.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
         });
         if (!reloaded || spentClips <= 0)
             return;
@@ -56854,14 +57140,36 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // A summoned/AI companion armed with a firearm shoots from where it
                 // stands (no walking up to melee range), at any living enemy.
                 const aiKit = getAllyCombatKit(ally, prev);
+                // Out of ammo for good (see SPARE CLIPS) — same rule as for enemies: a
+                // gunner with empty magazines and no spare clips left spends 1 action
+                // drawing a one-handed melee weapon (see pickMeleeSidearmName) and then
+                // fights like any melee companion for the rest of the fight.
+                if (!ally.gunDry && aiKit.gunFx) {
+                    const dryHands = getFirearmHands(aiKit.equipment, resolveEquippedItems(aiKit.equipment, getAllyLoadout(ally).inventory));
+                    if (dryHands.length > 0) {
+                        const dryOwner = 'ally:' + ally.id;
+                        const dryMags = ensureGunMags(prev.gunMags, dryOwner, dryHands);
+                        const dryClips = ensureSpareClips(prev.gunClips, dryOwner, 'ally');
+                        if (isGunsDry(dryMags, dryClips, dryOwner, dryHands)) {
+                            const load = getAllyLoadout(ally);
+                            const swapName = pickMeleeSidearmName(load.inventory, load.itemRarities, t('combatFallbackMeleeName'));
+                            const eq = load.equipment || {};
+                            const swapEquip = { ...eq, weaponRight: swapName, weaponLeft: (eq.weaponLeft && isShieldItemName(eq.weaponLeft)) ? eq.weaponLeft : null };
+                            log = [...log, { text: ally.name + ' — ' + t('combatLogOutOfAmmoSwapText').replace('{w}', swapName), kind: 'effect' }];
+                            return spendActions({ ...prev, gunMags: dryMags, gunClips: dryClips, log, allies: prev.allies.map(x => x.id === ally.id ? { ...x, gunDry: true, swapEquip, aiTactic: rollAiTactic('melee') } : x) }, 1);
+                        }
+                        if (dryMags !== prev.gunMags || dryClips !== prev.gunClips)
+                            prev = { ...prev, gunMags: dryMags, gunClips: dryClips };
+                    }
+                }
                 const aiGunFx = aiKit.gunFx;
                 // Tactical AI: roll this companion's personality the first time it
                 // acts (see AI_TACTIC_DEFS) and keep it for the rest of the fight.
-                let aiAlly = ally;
-                if (!ally.aiTactic) {
+                let aiAlly = prev.allies.find(x => x.id === ally.id) || ally;
+                if (!aiAlly.aiTactic) {
                     const aiTactic = rollAiTactic(aiGunFx ? 'ranged' : 'melee');
                     prev = { ...prev, allies: prev.allies.map(a => a.id === ally.id ? { ...a, aiTactic } : a) };
-                    aiAlly = { ...ally, aiTactic };
+                    aiAlly = { ...aiAlly, aiTactic };
                 }
                 const allyPinnedNow = !!ally.suppressed && Math.random() * 100 < COMBAT_TUNING.suppressedHoldChance;
                 // A gunner doesn't just plant itself where it spawned: it takes up a
@@ -56940,11 +57248,16 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     if (aiHands.length > 0) {
                         const aiOwner = 'ally:' + ally.id;
                         const aiMags = ensureGunMags(prev.gunMags, aiOwner, aiHands);
+                        const aiClips = ensureSpareClips(prev.gunClips, aiOwner, 'ally');
                         const aiLoaded = loadedGunHands(aiMags, aiOwner, aiHands);
                         if (aiLoaded.length === 0) {
-                            return spendActions({ ...prev, gunMags: refillGunMags(aiMags, aiOwner, aiHands), log: [...log, { text: ally.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
+                            // Finite clips (see SPARE CLIPS) — companions carry plenty, but not forever.
+                            if (spareClipsLeft(aiClips, aiOwner) <= 0) {
+                                return spendActions({ ...prev, gunMags: aiMags, gunClips: aiClips, log: [...log, { text: ally.name + ' — ' + t('combatLogOutOfAmmoText'), kind: 'effect' }] }, 1);
+                            }
+                            return spendActions({ ...prev, gunMags: refillGunMags(aiMags, aiOwner, aiHands), gunClips: takeSpareClip(aiClips, aiOwner), log: [...log, { text: ally.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
                         }
-                        prev = { ...prev, gunMags: spendGunRounds(aiMags, aiOwner, aiLoaded.slice(0, 1)) };
+                        prev = { ...prev, gunMags: spendGunRounds(aiMags, aiOwner, aiLoaded.slice(0, 1)), gunClips: aiClips };
                     }
                 }
                 // Firearm shot: a friend standing on the line of fire may take it.
@@ -57057,6 +57370,29 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogBossEnrageText'), kind: 'crit' }];
                 prev = { ...prev, enemies, log };
                 enemy = prev.enemies.find(e => e.id === enemy.id);
+            }
+            // ---- Out of ammo for good (see SPARE CLIPS): a firearm enemy with an
+            // empty magazine and no spare clips left is done shooting. It drops its
+            // ranged role for the rest of the fight (so it closes in like any melee
+            // enemy) and punches instead (see enemyPunching below). Doesn't consume
+            // the turn — it acts normally right after. ----
+            if (!enemy.gunDry && enemy.pos && getEnemyGunFxId(enemy)) {
+                const dryOwner = 'enemy:' + enemy.id;
+                const dryHands = [{ handKey: 'main', item: null }];
+                const dryMags = ensureGunMags(prev.gunMags, dryOwner, dryHands);
+                const dryClips = ensureSpareClips(prev.gunClips, dryOwner, 'enemy');
+                if (isGunsDry(dryMags, dryClips, dryOwner, dryHands)) {
+                    // Same rule as for companions: 1 action to draw a one-handed melee weapon.
+                    const swapName = pickMeleeSidearmName(enemy.inventory, enemy.itemRarities, t('combatFallbackMeleeName'));
+                    const eqE = enemy.equipment;
+                    const swapEq = eqE ? { ...eqE, weaponRight: swapName, weaponLeft: (eqE.weaponLeft && isShieldItemName(eqE.weaponLeft)) ? eqE.weaponLeft : null } : eqE;
+                    const enemies = prev.enemies.map(e => e.id === enemy.id ? { ...e, gunDry: true, role: 'melee', engaged: false, weaponDescription: swapName, ...(swapEq ? { equipment: swapEq } : {}) } : e);
+                    log = [...log, { text: enemy.enemyName + ' — ' + t('combatLogOutOfAmmoSwapText').replace('{w}', swapName), kind: 'effect' }];
+                    return spendActions({ ...prev, gunMags: dryMags, gunClips: dryClips, enemies, log }, 1);
+                }
+                else if (dryMags !== prev.gunMags || dryClips !== prev.gunClips) {
+                    prev = { ...prev, gunMags: dryMags, gunClips: dryClips };
+                }
             }
             // ---- routing: morale broke into a 'flee' (see moraleBreakFlags —
             // 'surrender' routes the same way now) — no longer fights
@@ -57336,7 +57672,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     : (() => { const l = getAllyLoadout(tg.ally); return getLoadoutWeaponType(l.equipment, l.inventory) === 'ranged' || !!getAllyCombatKit(tg.ally, prev).gunFx; })();
                 const protectBonus = vulnerableFriends.some(v => chebyshevDistance(tg.pos, v.pos) <= MELEE_ATTACK_MAX_DISTANCE);
                 // A shooter avoids targets where its own side is fighting with its back to the shooter (or stands beside the target).
-                const shooterRisk = (enemy.role === 'ranged' || getEnemyWeaponType(enemy) === 'ranged') && enemy.pos
+                const shooterRisk = !enemy.gunDry && (enemy.role === 'ranged' || getEnemyWeaponType(enemy) === 'ranged') && enemy.pos
                     ? friendlyShotRisk(enemy.pos, tg.pos, prev.enemies.filter(e => !isEnemyOut(e) && e.id !== enemy.id && e.pos).map(e => e.pos)) : 0;
                 return scoreCombatTarget({ hpFraction, squishy, protectBonus }, { role: enemy.role, tierRank: ENEMY_TIER_RANKS[enemy.tier] }) - shooterRisk * FRIENDLY_RISK_SCORE_PENALTY;
             });
@@ -57349,16 +57685,19 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // redirect, no aimed-shot bonus, no ranged rules on the blow). A
             // firearm user keeps shooting.
             const enemyIsShooter = enemy.role === 'ranged' || getEnemyWeaponType(enemy) === 'ranged';
-            const enemyPunching = enemyIsShooter && isEnemyBowUser(enemy) && !!getActiveLockPartner(prev, 'enemy:' + enemy.id);
+            const enemyPunching = enemyIsShooter && (!!enemy.gunDry || (isEnemyBowUser(enemy) && !!getActiveLockPartner(prev, 'enemy:' + enemy.id)));
             // Firearm magazine (see FIREARM MAGAZINES): an empty gun spends the action on a (free) reload.
             if (enemyIsShooter && !enemyPunching && getEnemyGunFxId(enemy)) {
                 const enHands = [{ handKey: 'main', item: null }];
                 const enOwner = 'enemy:' + enemy.id;
                 const enMags = ensureGunMags(prev.gunMags, enOwner, enHands);
+                const enClips = ensureSpareClips(prev.gunClips, enOwner, 'enemy');
                 if (loadedGunHands(enMags, enOwner, enHands).length === 0) {
-                    return spendActions({ ...prev, gunMags: refillGunMags(enMags, enOwner, enHands), log: [...log, { text: enemy.enemyName + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
+                    // An empty gun with no spare clip never gets here (see the out-of-ammo
+                    // switch to melee above), so a clip is always available for this reload.
+                    return spendActions({ ...prev, gunMags: refillGunMags(enMags, enOwner, enHands), gunClips: takeSpareClip(enClips, enOwner), log: [...log, { text: enemy.enemyName + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
                 }
-                prev = { ...prev, gunMags: spendGunRounds(enMags, enOwner, enHands) };
+                prev = { ...prev, gunMags: spendGunRounds(enMags, enOwner, enHands), gunClips: enClips };
             }
             let targetChoice = initialTargetChoice;
             let friendlyBlocker = null;
@@ -58256,6 +58595,82 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // Weight no longer needs a backfill pass — computeItemWeight is a pure
     // function of an item's own name/slot/twoHanded, so there is nothing to
     // roll once or catch up on (see the ITEM WEIGHT SYSTEM section above).
+    // ---- WEAPON CLASS EFFECTS (AI-determined weapon kinds) ----
+    // 1) Any weapon name the local vocabulary doesn't recognise — in the hero's,
+    //    party's or NPCs' inventories, anything equipped, or an enemy's weapon
+    //    text in a fight — is sent to the model ONCE (batched); the answer is
+    //    persisted in the weapon class registry. A name is only tried once per
+    //    session, so a failed call (no API key, offline) never loops.
+    useEffect(() => {
+        const pending = new Set();
+        const consider = raw => {
+            if (typeof raw !== 'string')
+                return;
+            const name = raw.trim();
+            if (!name || name.length > 80)
+                return;
+            if (classifyingWeaponClassRef.current.has(name))
+                return;
+            if (hasKnownWeaponToken(name))
+                return;
+            pending.add(name);
+        };
+        const considerItems = list => (list || []).forEach(it => { if (it && it.slot === 'weapon' && it.shield !== true)
+            consider(it.name); });
+        considerItems(gameState.inventory);
+        Object.values(partyInventories || {}).forEach(considerItems);
+        Object.values(npcInventories || {}).forEach(considerItems);
+        [equipment, ...Object.values(partyEquipment || {})].forEach(eq => {
+            if (eq) {
+                consider(eq.weaponRight);
+                consider(eq.weaponLeft);
+            }
+        });
+        if (combat && Array.isArray(combat.enemies)) {
+            combat.enemies.forEach(e => { if (e && (!e.kind || e.kind === ENEMY_KIND_DEFAULT))
+                consider(e.weaponDescription); });
+        }
+        if (pending.size === 0)
+            return;
+        const names = [...pending].slice(0, 30);
+        names.forEach(n => classifyingWeaponClassRef.current.add(n));
+        classifyWeaponClassNames(names);
+    }, [gameState.inventory, partyInventories, npcInventories, equipment, partyEquipment, combat, weaponClassTick]);
+    // 2) Once a name is known to be a ranged weapon, make sure the stored
+    //    twoHanded flag of matching items agrees (an item saved earlier as
+    //    one-handed would otherwise keep showing "Одноручное оружие").
+    useEffect(() => {
+        const fixList = list => {
+            if (!Array.isArray(list))
+                return list;
+            let changed = false;
+            const out = list.map(it => {
+                if (it && it.slot === 'weapon' && it.shield !== true && it.twoHanded !== true && isRangedWeaponName(it.name)) {
+                    changed = true;
+                    return { ...it, twoHanded: true };
+                }
+                return it;
+            });
+            return changed ? out : list;
+        };
+        const fixMap = prev => {
+            let changed = false;
+            const next = {};
+            for (const [k, list] of Object.entries(prev || {})) {
+                const fixed = fixList(list);
+                if (fixed !== list)
+                    changed = true;
+                next[k] = fixed;
+            }
+            return changed ? next : prev;
+        };
+        setGameState(prev => {
+            const inv = fixList(prev.inventory);
+            return inv === prev.inventory ? prev : { ...prev, inventory: inv };
+        });
+        setPartyInventories(fixMap);
+        setNpcInventories(fixMap);
+    }, [gameState.inventory, partyInventories, npcInventories, weaponClassTick]);
     // ---- NARRATIVE BELONGINGS SLOT CLASSIFICATION (cache-filling effect) ----
     // Watches every tracked NPC's n.inventory for a name that isn't in
     // narrativeItemSlots yet (and isn't already out for classification —
