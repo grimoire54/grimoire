@@ -47969,9 +47969,18 @@ function App() {
     // making the player wait two minutes for nothing.
     const GEMINI_RETRY_WINDOW_MS = 120000;
     const GEMINI_RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
+    // Diagnostics for the "model overloaded" screen: which request failed, with what HTTP status and how big it was.
+    // The player-facing text hides Google's raw answer, so without this a persistent 503 can't be traced to a call.
+    const geminiDiagRef = { current: null };
     async function geminiFetch(url, init) {
         const deadline = Date.now() + GEMINI_RETRY_WINDOW_MS;
         let delay = 2000;
+        const bodyChars = init && typeof init.body === 'string' ? init.body.length : 0;
+        let stageHint = '';
+        try {
+            stageHint = JSON.parse(init.body).systemInstruction.parts[0].text.replace(/\s+/g, ' ').trim().slice(0, 60);
+        }
+        catch (e) { /* not a standard request */ }
         while (true) {
             let response = null;
             let netError = null;
@@ -47981,6 +47990,7 @@ function App() {
             catch (e) {
                 netError = e;
             }
+            geminiDiagRef.current = { status: response ? response.status : 'network', stage: stageHint, chars: bodyChars };
             if (response) {
                 if (!GEMINI_RETRYABLE_STATUSES.includes(response.status))
                     return response;
@@ -48013,6 +48023,8 @@ function App() {
         const message = (data && data.error && data.error.message) || 'API request failed';
         const err = new Error(message);
         err.apiStatus = status || '';
+        err.diag = { ...(geminiDiagRef.current || {}), apiStatus: status || '', msg: String(message).replace(/\s+/g, ' ').slice(0, 140) };
+        console.warn('[Grimoire RPG] Gemini request failed:', err.diag);
         if (status === 'UNAVAILABLE')
             err.overloaded = true;
         if (status === 'RESOURCE_EXHAUSTED' || status === 'UNAVAILABLE') {
@@ -48028,13 +48040,24 @@ function App() {
         }
         throw err;
     }
+    // Short technical tail for the two "Google side" messages: HTTP status, Google's own status word, request size,
+    // the first words of the request's system prompt (= which call of the turn failed) and Google's message.
+    function diagSuffix(e) {
+        const d = e && e.diag;
+        if (!d)
+            return '';
+        const parts = ['HTTP ' + d.status, d.apiStatus, d.chars ? Math.round(d.chars / 1024) + ' KB' : '', d.stage ? '\u00AB' + d.stage + '\u00BB' : '', d.msg].filter(Boolean);
+        return ' [' + parts.join(' \u00B7 ') + ']';
+    }
     function describeError(e, prefixKey) {
         if (e.code === 'rate_limit') {
+            // Suggest a model other than the one already selected (the old text always named the default, even when it was in use).
+            const altModel = geminiModel === DEFAULT_GEMINI_MODEL ? 'gemini-3.8-flash' : DEFAULT_GEMINI_MODEL;
             if (e.overloaded)
-                return t('overloadedError').replace('{model}', DEFAULT_GEMINI_MODEL);
+                return t('overloadedError').replace('{model}', altModel) + diagSuffix(e);
             // Real quota hit (RESOURCE_EXHAUSTED) — show only the short translated
             // explanation, not Google's raw text.
-            return t('rateLimitError');
+            return t('rateLimitError') + diagSuffix(e);
         }
         if (e.code === 'auth')
             return t('authError');
