@@ -17741,8 +17741,6 @@ const TRANSLATIONS = {
         abilityDesc_gunEnergy: 'Очередь из трёх энергетических зарядов по выбранной цели.',
         abilityName_gunEnergySuppress: 'Энерговинтовка подавление',
         abilityDesc_gunEnergySuppress: 'Подавляющий энергоогонь по цели до вашего следующего хода: если враг двинется, он получит урон, и подавление прервётся. Прерывается, если вы получите урон. Раз в 3 раунда.',
-        abilityName_gunRail: 'Рельсотрон: выстрел',
-        abilityDesc_gunRail: 'Одиночный выстрел из рельсотрона по выбранной цели: короткая зарядка и сверхбыстрый снаряд. Выберите способность, затем тапните по врагу.',
         abilityName_gunRailTriple: 'Рельсотрон: тройной выстрел',
         abilityDesc_gunRailTriple: 'Три выстрела из рельсотрона подряд по выбранной цели.',
         abilityName_gunRailSuppress: 'Рельсотрон: подавление',
@@ -18096,6 +18094,8 @@ const TRANSLATIONS = {
         combatLogEnemyOutOfAmmoText: 'расстрелял все обоймы и бросается в рукопашную',
         combatLogOutOfAmmoSwapText: 'расстрелял все обоймы и меняет оружие на: {w}',
         combatFallbackMeleeName: 'Нож',
+        combatLogScavengeClipsText: 'подбирает обоймы ({n}) у павшего: {name}',
+        combatLogScavengeMoveText: 'спешит за обоймами к павшему: {name}',
         gunClipItemName: 'Обойма',
         combatLogToggleLabel: 'Журнал боя',
         combatFullscreenLabel: 'На весь экран',
@@ -18360,7 +18360,6 @@ const TRANSLATIONS = {
         heroFactionPeople: 'Людей',
         heroFactionInfluence: 'Влияние',
         heroFactionSeat: 'Штаб',
-        heroFactionTurnsShort: 'ходов',
         heroFactionYours: 'Это ваша фракция',
         heroFactionRankLabel: 'Ранг',
         heroFactionRank_1: 'Соратник',
@@ -18390,10 +18389,10 @@ const TRANSLATIONS = {
         heroFactionPost_envoy: 'Дипломат',
         heroFactionPost_quartermaster: 'Казначей',
         heroFactionPost_none: 'Без должности',
-        heroFactionPostHint_guard: 'Защищает ваши территории от захвата и осады',
-        heroFactionPostHint_scout: 'Раз в 4 хода раскрывает ближайшее неизвестное место и предупреждает о засадах. Мест: по уровню фракции',
+        heroFactionPostHint_guard: 'Должность в фракции. Игровых эффектов пока нет',
+        heroFactionPostHint_scout: 'Должность в фракции. Игровых эффектов пока нет',
         heroFactionPostHint_envoy: 'Заключает союзы и мир. Каждый дипломат держит два договора. Мест: по уровню фракции',
-        heroFactionPostHint_quartermaster: 'Приносит доход каждые 10 ходов',
+        heroFactionPostHint_quartermaster: 'Должность в фракции. Игровых эффектов пока нет',
         heroFactionPostHint_none: 'Просто член фракции',
         heroTreatyAllied: 'Союз заключён',
         heroTreatyPeace: 'Мир заключён',
@@ -18740,8 +18739,6 @@ const TRANSLATIONS = {
         abilityDesc_gunEnergy: 'A three-bolt burst of energy at the chosen target.',
         abilityName_gunEnergySuppress: 'Energy Rifle Suppression',
         abilityDesc_gunEnergySuppress: 'Suppressing energy fire on a target until your next turn: if it moves it takes damage and the suppression breaks. Breaks if you take damage. Once every 3 rounds.',
-        abilityName_gunRail: 'Railgun: Shot',
-        abilityDesc_gunRail: 'A single railgun shot at the chosen target: a short charge, then a hypervelocity slug. Pick the ability, then tap an enemy.',
         abilityName_gunRailTriple: 'Railgun: Triple Shot',
         abilityDesc_gunRailTriple: 'Three railgun shots in a row at the chosen target.',
         abilityName_gunRailSuppress: 'Railgun: Suppression',
@@ -19088,6 +19085,8 @@ const TRANSLATIONS = {
         combatLogEnemyOutOfAmmoText: 'has run out of clips and charges into melee',
         combatLogOutOfAmmoSwapText: 'has run out of clips and switches weapon to: {w}',
         combatFallbackMeleeName: 'Knife',
+        combatLogScavengeClipsText: 'picks up spare clips ({n}) from the fallen: {name}',
+        combatLogScavengeMoveText: 'rushes to the fallen for spare clips: {name}',
         gunClipItemName: 'Ammo clip',
         combatLogToggleLabel: 'Combat log',
         combatFullscreenLabel: 'Fullscreen',
@@ -19348,7 +19347,6 @@ const TRANSLATIONS = {
         heroFactionPeople: 'Members',
         heroFactionInfluence: 'Influence',
         heroFactionSeat: 'Seat',
-        heroFactionTurnsShort: 'turns',
         heroFactionYours: 'This is your faction',
         heroFactionRankLabel: 'Rank',
         heroFactionRank_1: 'Associate',
@@ -19378,10 +19376,10 @@ const TRANSLATIONS = {
         heroFactionPost_envoy: 'Diplomat',
         heroFactionPost_quartermaster: 'Treasurer',
         heroFactionPost_none: 'No post',
-        heroFactionPostHint_guard: 'Defends your territory against takeover and siege',
-        heroFactionPostHint_scout: 'Every 4 turns reveals the nearest unexplored place and warns of ambushes. Places: by faction level',
+        heroFactionPostHint_guard: 'A post in the faction. No gameplay effects yet',
+        heroFactionPostHint_scout: 'A post in the faction. No gameplay effects yet',
         heroFactionPostHint_envoy: 'Signs alliances and peace. Each diplomat keeps two treaties. Places: by faction level',
-        heroFactionPostHint_quartermaster: 'Brings in income every 10 turns',
+        heroFactionPostHint_quartermaster: 'A post in the faction. No gameplay effects yet',
         heroFactionPostHint_none: 'Just a member of the faction',
         heroTreatyAllied: 'Alliance in force',
         heroTreatyPeace: 'Peace in force',
@@ -19496,6 +19494,7 @@ const EMPTY_STATE = {
     // 'day' so a fresh game and every pre-existing save load into daylight
     // rather than an undefined state.
     dayPhase: 'day',
+    weather: 'none',
     // A short, capped log of background faction territory flips — see
     // pickWorldTickEvent. Entirely code-driven, never narrator-declared,
     // which is what lets a war the hero walked away from keep moving on its
@@ -19870,14 +19869,8 @@ const ABILITY_DEFS = {
         promptHint: 'Pins targets down with repeated energy bursts.'
     },
     // Railgun family (canvas FX, see railFxRun). Same pattern as the energy rifle:
-    // single shot / three-shot burst / suppression bound (suppressHitFx) to the
-    // railgun's own shot animation.
-    gunRail: {
-        icon: '🔩', nameKey: 'abilityName_gunRail', descKey: 'abilityDesc_gunRail',
-        type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'railSingle',
-        promptLabel: 'Railgun',
-        promptHint: 'Takes single, charged railgun shots.'
-    },
+    // three-shot volley / suppression bound (suppressHitFx) to the railgun's own
+    // shot animation. There is no single railgun shot.
     gunRailTriple: {
         icon: '🔩', nameKey: 'abilityName_gunRailTriple', descKey: 'abilityDesc_gunRailTriple',
         type: 'active', trigger: 'manual', frequency: 'unlimited', weaponFx: 'railTriple',
@@ -20145,8 +20138,7 @@ const TALENT_KEYSTONES = [
     { id: 'k_utilFlare', branch: 'gunner', row: 4, gate: 'gunHit_5', abilityId: 'utilFlare' },
     { id: 'k_gunEnergy', branch: 'gunner', row: 5, gate: 'gunHit_6', abilityId: 'gunEnergy', world: ['scifi'] },
     { id: 'k_gunEnergySuppress', branch: 'gunner', row: 6, gate: 'gunDamage_7', abilityId: 'gunEnergySuppress', world: ['scifi'] },
-    { id: 'k_gunRail', branch: 'gunner', row: 7, gate: 'gunHit_8', abilityId: 'gunRail', world: ['scifi'] },
-    { id: 'k_gunRailTriple', branch: 'gunner', row: 8, gate: 'gunDamage_9', abilityId: 'gunRailTriple', world: ['scifi'] },
+    { id: 'k_gunRailTriple', branch: 'gunner', row: 7, gate: 'gunHit_8', abilityId: 'gunRailTriple', world: ['scifi'] },
     { id: 'k_gunRailSuppress', branch: 'gunner', row: 9, gate: 'gunDamage_10', abilityId: 'gunRailSuppress', world: ['scifi'] },
     { id: 'k_orbitalStrike', branch: 'gunner', row: 10, gate: 'gunHit_10', abilityId: 'orbitalStrike', world: ['scifi'] },
     // Mage
@@ -20201,6 +20193,8 @@ function visibleTalentBranches(traits) { return TALENT_BRANCHES.filter(b => worl
 // Save-load hygiene for gameState.talents — drops any id no longer in
 // TALENT_DEFS (a renamed or retired node since the save was made) and
 // clamps every rank into [0, maxRank], dropping zero-rank entries entirely.
+// Talent nodes that no longer exist -> points they cost (refunded on load, see normalizeGameState).
+const RETIRED_TALENT_REFUNDS = { k_gunRail: 3 };
 function normalizeTalents(raw) {
     const out = {};
     if (!raw || typeof raw !== 'object')
@@ -20762,8 +20756,6 @@ function normalizeMapNode(raw) {
         arrowPending: raw.arrowPending === true,
         // Player's own marker and note for this place (never sent to the model).
         pin: MAP_PIN_OPTIONS.includes(raw.pin) ? raw.pin : null,
-        // Set by the hero faction's scouts (see applyHeroFactionScouting): an unexplored place's name, description and owner show on the map.
-        scouted: raw.scouted === true,
         note: typeof raw.note === 'string' ? raw.note.slice(0, MAP_NOTE_MAX) : '',
         // 'besieged' | 'burned' | null — set by the background world tick.
         status: MAP_NODE_STATUSES.includes(raw.status) ? raw.status : null,
@@ -21501,20 +21493,15 @@ function routeLegRisk(node, legDistance, factionReputations, recentBattleNodeIds
         chance += ROUTE_NIGHT_BONUS;
         reasons.push('night');
     }
-    // The hero's own side: lands of a faction they belong to or lead are safe
-    // to cross; lands of that faction's enemies are not, even while the
-    // hero's own standing there is still neutral.
+    // Picking a side has a price: lands of a faction at war with one the hero
+    // belongs to or leads are hostile ground, even while the hero's own standing
+    // there is still neutral. (Being on a faction's good side buys nothing yet.)
     if (allegiance) {
         const factionKey = hfKey(node.faction);
-        if (factionKey && allegiance.friendly.has(factionKey)) {
-            chance -= FACTION_ROUTE_FRIENDLY_REDUCTION;
-            reasons.push('friendly');
-        }
-        else if (factionKey && allegiance.enemy.has(factionKey) && !reasons.includes('hostile')) {
+        if (factionKey && allegiance.enemy.has(factionKey) && !reasons.includes('hostile')) {
             chance += ROUTE_ENCOUNTER_HOSTILE_BONUS;
             reasons.push('hostile');
         }
-        chance -= allegiance.globalReduction || 0;
     }
     return { chance: Math.max(0, Math.min(ROUTE_ENCOUNTER_MAX_CHANCE, chance)), reasons };
 }
@@ -21713,7 +21700,11 @@ function normalizeGameState(raw) {
                 resolvedTalents[ks.id] = 1;
         }
     }
-    const resolvedTalentPoints = Math.max(0, Math.round(Number(raw.talentPoints) || 0))
+    // Retired keystones (normalizeTalents drops them): give the spent points back.
+    const retiredTalentRefund = raw.talents && typeof raw.talents === 'object'
+        ? Object.keys(RETIRED_TALENT_REFUNDS).reduce((sum, id) => sum + (Number(raw.talents[id]) > 0 ? RETIRED_TALENT_REFUNDS[id] : 0), 0)
+        : 0;
+    const resolvedTalentPoints = Math.max(0, Math.round(Number(raw.talentPoints) || 0)) + retiredTalentRefund
         + (migratingOldSave && Array.isArray(raw.pendingLevelUps) ? raw.pendingLevelUps.length * TALENT_POINTS_PER_LEVEL : 0);
     return {
         time: typeof raw.time === 'string' ? raw.time : '',
@@ -21759,6 +21750,7 @@ function normalizeGameState(raw) {
         // rather than crashing on undefined, and the two logs just fall back to
         // empty rather than dropping the whole save.
         dayPhase: raw.dayPhase === 'night' ? 'night' : 'day',
+        weather: COMBAT_WEATHERS.includes(raw.weather) ? raw.weather : 'none',
         worldEvents: normalizeWorldEvents(raw.worldEvents),
         heroFactions: normalizeHeroFactions(raw.heroFactions),
         heroDeeds: normalizeHeroDeeds(raw.heroDeeds),
@@ -22179,7 +22171,7 @@ function computeFactionTerritoryCounts(factions, mapNodes) {
 // territory to a faction with no stake in the fight, and it never touches
 // the hero's own current location — a flip happening literally under the
 // hero's feet belongs to the scene itself, not to this background system.
-function pickWorldTickEvent(factions, mapNodes, currentLocationId, heroGuard) {
+function pickWorldTickEvent(factions, mapNodes, currentLocationId) {
     const nodes = Array.isArray(mapNodes) ? mapNodes : [];
     const warPairs = [];
     const seenPairs = new Set();
@@ -22207,9 +22199,6 @@ function pickWorldTickEvent(factions, mapNodes, currentLocationId, heroGuard) {
     const besiegedCandidates = candidates.filter(n => n.status === 'besieged');
     const pool = (besiegedCandidates.length > 0 && Math.random() < 0.7) ? besiegedCandidates : candidates;
     const target = pool[Math.floor(Math.random() * pool.length)];
-    // The hero's own fighters can turn a conquest of their lands aside (see heroGuardHolds).
-    if (heroGuardHolds(heroGuard, target))
-        return null;
     return { id: `we-${Date.now()}-${target.id}`, locationId: target.id, locationName: target.name, fromFaction: defender, toFaction: attacker };
 }
 // Statuses of places off-screen. A siege lasts WORLD_SIEGE_MAX_TURNS and then
@@ -22236,7 +22225,7 @@ function pickWorldStatusExpiry(mapNodes, turnIndex, currentLocationId) {
     }
     return null;
 }
-function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex, heroGuard) {
+function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex) {
     const nodes = Array.isArray(mapNodes) ? mapNodes : [];
     const expired = pickWorldStatusExpiry(nodes, turnIndex, currentLocationId);
     if (expired)
@@ -22255,10 +22244,7 @@ function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex, 
     const candidates = nodes.filter(n => n && n.id !== currentLocationId && !n.status && typeof n.faction === 'string' && warFactions.has(n.faction.trim().toLowerCase()));
     if (candidates.length === 0)
         return null;
-    const target = candidates[Math.floor(Math.random() * candidates.length)];
-    if (heroGuardHolds(heroGuard, target))
-        return null;
-    return { nodeId: target.id, status: 'besieged' };
+    return { nodeId: candidates[Math.floor(Math.random() * candidates.length)].id, status: 'besieged' };
 }
 // ==============================================================================
 // HERO FACTIONS
@@ -22275,8 +22261,14 @@ function pickWorldSiegeChange(factions, mapNodes, currentLocationId, turnIndex, 
 //      - an NPC counts as a loyal member only while their own standing
 //        toward the hero stays >= 0 (a deserter stays tagged, but counts for
 //        nothing until they warm up again or the hero dismisses them);
-//      - level, slots, influence, income and siege cover are all computed
-//        from the current members and held territory.
+//      - level, slots and influence are computed from the current members
+//        and held territory.
+//  * NO PASSIVE BONUSES, for now: belonging to or leading a faction gives no
+//    income, no cover for its lands, no safer roads, no free information —
+//    that will come from buildings the faction builds and people it hires,
+//    which don't exist yet. What stays is bookkeeping (members, posts,
+//    treaties, relations) and the consequences of picking a side (enemies by
+//    association are dangerous ground).
 //  * Outcomes are deterministic thresholds, not dice — same spirit as
 //    recruiting to the party ("reputation already gates who's eligible").
 //  * The narrator is TOLD these facts (buildHeroAllegianceNote) and never
@@ -22290,12 +22282,6 @@ const FACTION_FOUND_COST = 100;
 const FACTION_NAME_MAX = 40;
 const FACTION_NOTE_MAX = 140;
 const FACTION_LEVELS = [{ minInfluence: 0, slots: 3 }, { minInfluence: 6, slots: 6 }, { minInfluence: 14, slots: 10 }];
-const FACTION_INCOME_INTERVAL = 10;
-const FACTION_INCOME_PER_TERRITORY = 4;
-const FACTION_INCOME_PER_TRADER = 3;
-const FACTION_ROUTE_FRIENDLY_REDUCTION = 12;
-const FACTION_GUARD_PER_FIGHTER = 0.25;
-const FACTION_GUARD_MAX = 0.75;
 const FACTION_MARTIAL_ROLE_PATTERN = /стражн|страж|воин|солдат|капитан|рыцар|наёмн|охран|ратник|гвард|лучник|боец|военн|полицей|офицер|сержант|десантник|морпех|снайпер|стрелок|телохранител|милиц|патрул|дружинник|security|guard|soldier|warrior|captain|knight|mercenary|sentinel|fighter|archer|police|officer|sergeant|marine|trooper|sniper|gunman|bodyguard|militia|patrol|enforcer|bouncer/i;
 function hfKey(value) {
     return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -22382,12 +22368,12 @@ function activeMemberships(state, factionReputations) {
 }
 // Which factions are the hero's own side and which are their enemies by
 // association (at war with a faction the hero belongs to or leads).
-function computeHeroAllegiance(state, factionReputations, npcReputations) {
+function computeHeroAllegiance(state, factionReputations) {
     const friendly = new Set();
     const enemy = new Set();
     const enemyNames = [];
     if (!state || !state.heroFactions)
-        return { friendly, enemy, enemyNames, globalReduction: 0 };
+        return { friendly, enemy, enemyNames };
     const own = heroOwnFaction(state);
     const friendlyNames = activeMemberships(state, factionReputations).map(m => m.faction);
     if (own)
@@ -22402,18 +22388,7 @@ function computeHeroAllegiance(state, factionReputations, npcReputations) {
             }
         }
     }
-    // Scouts warn of ambushes; allies of the hero's own faction count as friendly
-    // ground (but their enemies don't become the hero's — no cascading feuds).
-    let globalReduction = 0;
-    const stats = own ? heroFactionStats(state, npcReputations || {}) : null;
-    if (stats) {
-        globalReduction += Math.min(FACTION_SCOUT_REDUCTION_MAX, stats.scouts * FACTION_SCOUT_AMBUSH_REDUCTION);
-        for (const t of heroFactionActiveTreaties(state, npcReputations || {}, factionReputations)) {
-            if (t.stance === 'allied')
-                friendly.add(hfKey(t.faction));
-        }
-    }
-    return { friendly, enemy, enemyNames, globalReduction };
+    return { friendly, enemy, enemyNames };
 }
 // 'ok', or why the hero can't swear into this faction right now.
 function factionJoinStatus(factionName, state, factionReputations, turnIndex) {
@@ -22620,9 +22595,10 @@ function heroFactionActiveMembers(state, npcReputations) {
 // ---- Posts: what each member does for the faction ----
 // A member holds one post, picked by the player (npc.factionPost) or — until
 // they pick — read from the character's role. 'none' is an explicit "no post".
-// Scouts and envoys are capped at the faction's level; the cap is applied when
+// Envoys are capped at the faction's level; the cap is applied when
 // the holders are derived, so a lost level or a changed roster can never leave
-// more of them working than the faction can field.
+// more of them working than the faction can field. For now a post is a title —
+// only the envoy's carries a function (treaties) — so only envoys are capped.
 const FACTION_POSTS = ['guard', 'scout', 'envoy', 'quartermaster'];
 const FACTION_POST_DETECT_ORDER = ['envoy', 'scout', 'quartermaster', 'guard'];
 const FACTION_POST_PATTERNS = {
@@ -22631,9 +22607,6 @@ const FACTION_POST_PATTERNS = {
     envoy: /посол|дипломат|гонец|глашатай|посланник|переговорщик|представител|парламентёр|парламентер|посредник|консул|envoy|ambassador|diplomat|emissary|herald|negotiator|liaison|representative|spokes|mediator|consul/i,
     quartermaster: /торгов|купец|купц|лавочн|продав|казначей|кладовщик|квартирмейстер|снабженец|бухгалтер|финансист|завхоз|банкир|кассир|merchant|trader|shopkeeper|vendor|treasurer|quartermaster|steward|provisioner|accountant|banker|broker|supplier|logistic|bursar|paymaster|cashier/i
 };
-const FACTION_SCOUT_INTERVAL = 4;
-const FACTION_SCOUT_AMBUSH_REDUCTION = 3;
-const FACTION_SCOUT_REDUCTION_MAX = 9;
 const FACTION_TREATY_COST = 50;
 const FACTION_TREATIES_PER_ENVOY = 2;
 function detectFactionPost(role) {
@@ -22659,7 +22632,7 @@ function heroFactionPostHolders(members, level) {
         const post = heroFactionPostOf(n);
         if (!post)
             continue;
-        if ((post === 'scout' || post === 'envoy') && out[post].length >= level)
+        if (post === 'envoy' && out[post].length >= level)
             continue;
         out[post].push(n);
     }
@@ -22678,16 +22651,13 @@ function heroFactionStats(state, npcReputations) {
     const holders = heroFactionPostHolders(members, levelIndex + 1);
     const fighters = holders.guard.length;
     const traders = holders.quartermaster.length;
-    const incomeRaw = territories * FACTION_INCOME_PER_TERRITORY + traders * FACTION_INCOME_PER_TRADER;
     return {
         own, members, territories, influence,
         level: levelIndex + 1,
         slots: FACTION_LEVELS[levelIndex].slots,
         holders, fighters, traders,
         scouts: holders.scout.length,
-        envoys: holders.envoy.length,
-        income: incomeRaw,
-        guardProtection: Math.min(FACTION_GUARD_MAX, fighters * FACTION_GUARD_PER_FIGHTER)
+        envoys: holders.envoy.length
     };
 }
 // 'ok', or why this member can't take that post now.
@@ -22697,34 +22667,13 @@ function heroFactionPostStatus(npc, post, state, npcReputations) {
         return 'none';
     if (!stats.members.some(m => hfKey(m.name) === hfKey(npc.name)))
         return 'notmember';
-    if (post === 'none' || post === 'guard' || post === 'quartermaster')
+    if (post === 'none' || post === 'guard' || post === 'quartermaster' || post === 'scout')
         return 'ok';
-    if (post !== 'scout' && post !== 'envoy')
+    if (post !== 'envoy')
         return 'invalid';
     if (stats.holders[post].some(m => hfKey(m.name) === hfKey(npc.name)))
         return 'ok';
     return stats.holders[post].length >= stats.level ? 'full' : 'ok';
-}
-// Scouts: every FACTION_SCOUT_INTERVAL turns each active scout learns what lies
-// in the nearest unexplored place — its name, description and owner show on
-// the map (the node's `scouted` flag) — nearest to the hero first.
-function applyHeroFactionScouting(state, turnIndex, npcReputations) {
-    if (!state || !(turnIndex > 0) || turnIndex % FACTION_SCOUT_INTERVAL !== 0)
-        return state;
-    const stats = heroFactionStats(state, npcReputations);
-    if (!stats || stats.scouts === 0)
-        return state;
-    const nodes = state.map.nodes || [];
-    const here = nodes.find(n => n.id === state.map.currentId) || null;
-    const score = n => (here ? mapNodeDistance(here, n) + ((n.layer || 0) !== (here.layer || 0) ? 1000 : 0) : 0);
-    const picked = nodes
-        .filter(n => !n.discovered && !n.scouted)
-        .sort((a, b) => score(a) - score(b) || String(a.id).localeCompare(String(b.id)))
-        .slice(0, stats.scouts)
-        .map(n => n.id);
-    if (picked.length === 0)
-        return state;
-    return { ...state, map: { ...state.map, nodes: nodes.map(n => (picked.includes(n.id) ? { ...n, scouted: true } : n)) } };
 }
 // ---- HERO FACTION TREATIES ----
 // Envoys sign treaties for the hero's faction: an alliance (with a faction
@@ -22861,24 +22810,6 @@ function heroFactionRecruitStatus(npc, state, npcReputations, factionReputations
         return 'full';
     return 'ok';
 }
-// Background cover for the hero's own lands: fighters make a besieging or
-// conquering move against them fail some of the time. Null without a faction.
-function computeHeroFactionGuard(state, npcReputations) {
-    const stats = heroFactionStats(state, npcReputations);
-    return stats ? { key: hfKey(stats.own.name), protection: stats.guardProtection } : null;
-}
-function heroGuardHolds(heroGuard, node) {
-    return !!(heroGuard && heroGuard.protection > 0 && node && hfKey(node.faction) === heroGuard.key && Math.random() < heroGuard.protection);
-}
-// Every FACTION_INCOME_INTERVAL turns the faction's lands and traders pay in.
-function applyHeroFactionIncome(state, turnIndex, npcReputations) {
-    if (!state || !(turnIndex > 0) || turnIndex % FACTION_INCOME_INTERVAL !== 0)
-        return state;
-    const stats = heroFactionStats(state, npcReputations);
-    if (!stats || stats.income <= 0)
-        return state;
-    return { ...state, currency: clampCurrency(state.currency + stats.income, state.currency) };
-}
 const HERO_FACTION_RANK_EN = { 1: 'an associate', 2: 'a member', 3: 'an officer' };
 const HERO_FACTION_LEVEL_EN = { 1: 'a small group', 2: 'an organization', 3: 'a major organization' };
 // The narrator's state extraction restates every character each turn, so it
@@ -22930,7 +22861,7 @@ function buildHeroAllegianceNote(state, npcReputations, factionReputations) {
     }
     if (parts.length === 0)
         return '';
-    const { enemyNames } = computeHeroAllegiance(state, factionReputations, npcReputations);
+    const { enemyNames } = computeHeroAllegiance(state, factionReputations);
     let extra = '';
     if (stats) {
         const names = list => list.map(n => n.name).join(', ');
@@ -23428,7 +23359,7 @@ const DEFAULT_COMBAT_ENVIRONMENT = { time: 'day', light: 'lit', realm: 'material
 // encounter.lighting / encounter.realm come from the model (null when it
 // said nothing). Missing lighting falls back to the hour: day -> lit,
 // night -> dark. dayPhase is the story's current phase.
-function buildCombatEnvironment(encounter, dayPhase) {
+function buildCombatEnvironment(encounter, dayPhase, storyWeather) {
     const realm = encounter && COMBAT_REALMS.includes(encounter.realm) ? encounter.realm : 'material';
     const time = realm === 'other' ? null : (dayPhase === 'night' ? 'night' : 'day');
     const light = encounter && COMBAT_LIGHT_LEVELS.includes(encounter.lighting)
@@ -23437,7 +23368,8 @@ function buildCombatEnvironment(encounter, dayPhase) {
     // indoors: roofed/enclosed place. weather ('none' | 'lightSnow' | 'heavySnow' | 'blizzard', see
     // COMBAT_WEATHERS) only ever exists outdoors in the ordinary world, so it is forced to 'none' otherwise.
     const indoors = !!(encounter && encounter.indoors === true);
-    const weather = !indoors && realm === 'material' && encounter && COMBAT_WEATHERS.includes(encounter.weather) ? encounter.weather : 'none';
+    const wantWeather = encounter && COMBAT_WEATHERS.includes(encounter.weather) && encounter.weather !== 'none' ? encounter.weather : (COMBAT_WEATHERS.includes(storyWeather) ? storyWeather : 'none');
+    const weather = !indoors && realm === 'material' ? wantWeather : 'none';
     // weatherRange (set from the editor, never by the narrator): { min, max, mode } over WEATHER_ORDER. The fight
     // starts at `min`; mode 'range' lets the weather wander between min and max, 'escalate' only ever strengthens
     // it up to max. min === max pins it. null = the default (free drift over every gradation, see rollWeatherShift).
@@ -24046,6 +23978,8 @@ function refillGunMags(mags, ownerKey, hands) {
 // lazily the first time an owner needs it, so reinforcement waves and late
 // joiners work without setup. The `kind` argument is kept for call-site
 // compatibility but no longer changes the amount.
+// How far (small grid cells) a dry shooter will go to loot spare clips off a corpse.
+const SCAVENGE_MAX_DISTANCE = 12; // = 6 old cells (UNIT_SPAN is 2 small cells; the const is declared further down, so the literal)
 const SPARE_CLIPS_MIN = 6;
 const SPARE_CLIPS_MAX = 8;
 function rollSpareClips(kind) {
@@ -24707,14 +24641,6 @@ function HeroFactionPanel({ gameState, npcReputations, onFound, onEdit, t }) {
             stats.envoys,
             " \u00B7 \uD83D\uDCB0 ",
             stats.traders),
-        stats.income > 0 && React.createElement("p", { className: "sheet-npc-note" },
-            React.createElement(CurrencyMark, null),
-            " +",
-            stats.income,
-            " / ",
-            FACTION_INCOME_INTERVAL,
-            " ",
-            t('heroFactionTurnsShort')),
         React.createElement("button", { onClick: onEdit, className: "sheet-heading-link", type: "button" },
             "\u270F\uFE0F ",
             t('heroFactionEdit'))));
@@ -29102,7 +29028,11 @@ function posSpan(p) { return (p && p.span) || UNIT_SPAN; }
 function withSpan(p, span) { return span && span !== UNIT_SPAN ? { x: p.x, y: p.y, span } : { x: p.x, y: p.y }; }
 function spanLike(p, src) { return withSpan(p, posSpan(src)); }
 function spanOfRef(combat, ref) {
-    if (!ref || ref.type !== 'enemy' || !combat)
+    if (!ref || !combat)
+        return UNIT_SPAN;
+    if (ref.type === 'ally')
+        return combatantSpan((combat.allies || []).find(a => a.id === ref.id));
+    if (ref.type !== 'enemy')
         return UNIT_SPAN;
     return combatantSpan((combat.enemies || []).find(e => e.id === ref.id));
 }
@@ -29110,19 +29040,22 @@ function stampCombatSpans(c) {
     if (!c || !Array.isArray(c.enemies))
         return c;
     let changed = false;
-    const enemies = c.enemies.map(e => {
-        if (!e || !e.pos)
-            return e;
-        const sp = combatantSpan(e);
-        if (posSpan(e.pos) === sp)
-            return e;
+    const stamp = u => {
+        if (!u || !u.pos)
+            return u;
+        const sp = combatantSpan(u);
+        if (posSpan(u.pos) === sp)
+            return u;
         changed = true;
-        return { ...e, pos: withSpan(e.pos, sp) };
-    });
-    return changed ? { ...c, enemies } : c;
+        return { ...u, pos: withSpan(u.pos, sp) };
+    };
+    const enemies = c.enemies.map(stamp);
+    const allies = Array.isArray(c.allies) ? c.allies.map(stamp) : c.allies;
+    return changed ? { ...c, enemies, allies } : c;
 }
 const GRID_RENDER_MIN_X = -18, GRID_RENDER_MAX_X = 18;
-const GRID_RENDER_MIN_Y = -2, GRID_RENDER_MAX_Y = 22;
+// 37 x 37 cells: a square board (it used to be 37 x 25).
+const GRID_RENDER_MIN_Y = -2, GRID_RENDER_MAX_Y = 34;
 // .combat-portrait's own fixed CSS box — a square (6.25rem @ 16px root =
 // 100px) that exactly matches a UNIT_SPAN x UNIT_SPAN footprint
 // (UNIT_SPAN*GRID_CELL_PX), so the card's own border now reaches every edge
@@ -30265,7 +30198,8 @@ function startColumnSlots(count, baseX, outwardSign, offsetsFor) {
 // board's middle row, and wraps once it would run past START_UNITS_PER_COLUMN
 // ordinary rows. Returns null when everyone is ordinary-sized (the regular
 // slot layout then applies unchanged).
-function startColumnSlotsBySpan(enemies, baseX) {
+function startColumnSlotsBySpan(enemies, baseX, outwardSign) {
+    const sign = outwardSign === -1 ? -1 : 1;
     const spans = enemies.map(e => combatantSpan(e));
     if (spans.every(sp => sp === UNIT_SPAN))
         return null;
@@ -30284,22 +30218,24 @@ function startColumnSlotsBySpan(enemies, baseX) {
     if (cur.length)
         cols.push(cur);
     const slots = new Array(enemies.length);
-    let x = baseX;
+    // sign -1 (the hero's side): columns grow to the left, leaving the hero's own tile clear.
+    let x = sign === 1 ? baseX : baseX - UNIT_SPAN;
     cols.forEach(idxs => {
         const H = idxs.reduce((sum, i) => sum + spans[i], 0), W = Math.max(...idxs.map(i => spans[i]));
+        const colX = sign === 1 ? x : x - W;
         let y = GRID_CENTER_Y + 1 - Math.round(H / 2);
         idxs.forEach(i => {
             const yy = Math.max(GRID_RENDER_MIN_Y, Math.min(GRID_RENDER_MAX_Y - (spans[i] - 1), y));
-            slots[i] = withSpan({ x, y: yy }, spans[i]);
+            slots[i] = withSpan({ x: colX, y: yy }, spans[i]);
             y += spans[i];
         });
-        x += W;
+        x = sign === 1 ? x + W : colX;
     });
     return slots;
 }
 function layoutInitialPositions(allies, enemies) {
     const heroPos = { x: HERO_START_X, y: GRID_CENTER_Y };
-    const allySlots = startColumnSlots(allies.length, HERO_START_X, -1, sideOffsets);
+    const allySlots = startColumnSlotsBySpan(allies, HERO_START_X, -1) || startColumnSlots(allies.length, HERO_START_X, -1, sideOffsets);
     const alliesWithPos = allies.map((a, i) => ({ ...a, pos: allySlots[i] }));
     const enemySlots = startColumnSlotsBySpan(enemies, ENEMY_START_X) || startColumnSlots(enemies.length, ENEMY_START_X, 1, centeredOffsets);
     const enemiesWithPos = enemies.map((e, i) => ({ ...e, pos: enemySlots[i] }));
@@ -35708,7 +35644,8 @@ const GUN_FX_DEFS = {
     // Canvas-drawn effects (see railFxRun / flareFxRun / teleportFxRun). `pre` =
     // charge time before the first shot; `total` overrides gunFxDuration.
     // railSingle/railTriple also feed getGunShotPlan (perBurst = shots per volley).
-    railSingle: { rail: true, bursts: 1, perBurst: 1, gap: 0, pause: 0, hands: [0], stagger: 0, flare: 1, pre: 380 },
+    // railSingle is only the railgun's id (basic attacks, flares, suppression hit fx): it always fires the full 3-shot volley, there is no single railgun shot.
+    railSingle: { rail: true, bursts: 1, perBurst: 3, gap: 170, pause: 0, hands: [0], stagger: 0, flare: 1, pre: 380, sounds: RAIL_SOUND_URLS, soundDelay: 0 },
     railTriple: { rail: true, bursts: 1, perBurst: 3, gap: 170, pause: 0, hands: [0], stagger: 0, flare: 1, pre: 380, sounds: RAIL_SOUND_URLS, soundDelay: 0 },
     railSuppress: { rail: true, bursts: 1, perBurst: 3, gap: 170, pause: 0, hands: [0], stagger: 0, flare: 1, pre: 380, sounds: RAIL_SOUND_URLS, soundDelay: 0 },
     flare: { flareFx: true, bursts: 1, perBurst: 1, gap: 0, pause: 0, hands: [0], stagger: 0, flare: 1, total: 1350 },
@@ -36813,15 +36750,19 @@ function buildAbilityScript(id, combat, target, level, rnd, dmgMult, caster) {
     // `caster` (optional, { type: 'enemy', id, pos }) means an enemy is casting:
     // the victims are then the hero and the living allies instead of the enemies.
     const hero = caster ? caster.pos : combat.heroPos, dm = afxAbilityDamage(id, level, dmgMult);
-    const casterRef = caster ? { type: 'enemy', id: caster.id } : { type: 'hero' };
-    const enemies = caster
+    // caster.type 'ally' = an allied creature (dragon) casting at the ENEMIES, like the hero does.
+    const casterType = caster ? (caster.type === 'ally' ? 'ally' : 'enemy') : 'hero';
+    const casterRef = caster ? { type: casterType, id: caster.id } : { type: 'hero' };
+    const enemies = (caster && casterType === 'enemy')
         ? [
             ...(!(combat.heroParts && isBodyDestroyed(combat.heroParts)) ? [{ id: 'hero', type: 'hero', key: 'hero', pos: combat.heroPos }] : []),
             ...(combat.allies || []).filter(a => a.pos && !isBodyDestroyed(a.parts) && !a.fled).map(a => ({ id: a.id, type: 'ally', key: 'ally:' + a.id, pos: a.pos }))
         ]
         : afxLivingEnemies(combat).map(e => ({ id: e.id, type: 'enemy', key: 'enemy:' + e.id, pos: e.pos }));
     const casterAt = (L) => (caster
-        ? { ...combat, enemies: combat.enemies.map(o => (o.id === caster.id ? { ...o, pos: L } : o)) }
+        ? (casterType === 'ally'
+            ? { ...combat, allies: (combat.allies || []).map(o => (o.id === caster.id ? { ...o, pos: L } : o)) }
+            : { ...combat, enemies: combat.enemies.map(o => (o.id === caster.id ? { ...o, pos: L } : o)) })
         : { ...combat, heroPos: L });
     const px = (cx) => (cx - GRID_RENDER_MIN_X) * C, py = (cy) => (cy - GRID_RENDER_MIN_Y) * C;
     const centerPx = (pos) => ({ x: px(pos.x) + C * posSpan(pos) / 2, y: py(pos.y) + C * posSpan(pos) / 2 });
@@ -36948,7 +36889,7 @@ function buildAbilityScript(id, combat, target, level, rnd, dmgMult, caster) {
             enemies.forEach(e => {
                 const hit = footprintCells(e.pos).some(c => c.x >= b.x && c.x < b.x + BS && c.y >= b.y && c.y < b.y + BS);
                 if (hit)
-                    TICKS.forEach(k => addHit(e, fire + DUR * k, Math.max(1, Math.round(dm / TICKS.length))));
+                    TICKS.forEach(k => addHit(e, fire + DUR * k, Math.max(1, Math.round(dm / TICKS.length)), { tick: true })); // tick: the damage lands on the board the moment it ticks, not when the animation ends
             });
         });
         fx = { kind: 'orbital', beams, charge: CH, vibe: afxOrbitalVibe(beams) };
@@ -36996,8 +36937,8 @@ function buildAbilityScript(id, combat, target, level, rnd, dmgMult, caster) {
     else
         return null;
     const commitMs = Math.round(Math.max(commitBase, ...hits.map(h => h.delay + (h.knock ? 560 : 160))));
-    const casterKey = caster ? 'enemy:' + caster.id : 'hero';
-    return { id, casterId: caster ? caster.id : null, fx: { ...fx, casterKey, hits: fxHits(), commitMs }, hits, heroMove, commitMs };
+    const casterKey = caster ? casterType + ':' + caster.id : 'hero';
+    return { id, casterId: caster ? caster.id : null, casterType, fx: { ...fx, casterKey, hits: fxHits(), commitMs }, hits, heroMove, commitMs };
 }
 // ---- Visual engine ----------------------------------------------------------
 // Sprites, palette lookup and the like are built once, on first use.
@@ -38577,12 +38518,27 @@ function afxDamageParts(parts, dmg) {
     }
     return { parts: cur, dealt };
 }
+// A damage tick that lands mid-animation (Orbital Strike): the HP is taken off the board
+// at the very moment the tick plays. The commit afterwards only logs it and handles the rest.
+function afxApplyTickHit(prev, h) {
+    const type = h.victimType || 'enemy';
+    if (type === 'hero')
+        return { ...prev, heroParts: afxDamageParts(prev.heroParts, h.dmg).parts };
+    if (type === 'ally')
+        return { ...prev, allies: (prev.allies || []).map(a => (a.id === h.enemyId ? { ...a, parts: afxDamageParts(a.parts, h.dmg).parts } : a)) };
+    return { ...prev, enemies: prev.enemies.map(e => (e.id === h.enemyId ? { ...e, parts: afxDamageParts(e.parts, h.dmg).parts } : e)) };
+}
+function afxScheduleTicks(script, isLive, apply) {
+    return script.hits.filter(h => h.tick).map(h => setTimeout(() => apply(p => (p && !p.result && isLive(p) ? afxApplyTickHit(p, h) : p)), h.delay));
+}
 function afxCommitScript(prev, script, abilityId, t, youLabel, cooldownFraction) {
     const def = ABILITY_DEFS[abilityId];
     const agg = new Map();
     script.hits.forEach(h => {
-        const a = agg.get(h.enemyId) || { dmg: 0, knock: null };
+        const a = agg.get(h.enemyId) || { dmg: 0, late: 0, knock: null };
         a.dmg += h.dmg;
+        if (!h.tick)
+            a.late += h.dmg;
         if (h.knock)
             a.knock = h.knock;
         agg.set(h.enemyId, a);
@@ -38592,7 +38548,8 @@ function afxCommitScript(prev, script, abilityId, t, youLabel, cooldownFraction)
         const a = agg.get(e.id);
         if (!a)
             return e;
-        const wasOut = afxEnemyOut(e), r = afxDamageParts(e.parts, a.dmg);
+        // Tick damage is already on the body; everyone hit was alive when the spell started.
+        const ticked = a.late < a.dmg, wasOut = ticked ? false : afxEnemyOut(e), r = afxDamageParts(e.parts, a.late);
         const next = { ...e, parts: r.parts };
         if (a.knock)
             next.pos = a.knock;
@@ -38616,7 +38573,7 @@ function afxCommitScript(prev, script, abilityId, t, youLabel, cooldownFraction)
 // that would hit the most of the hero's side from where it stands (or, for the
 // leap, from where it would land), with the chosen cell for aimed spells. Null
 // when nothing ready would hit anyone — the enemy then acts as usual.
-function aiPlanEnemySpell(combat, enemy, canSee) {
+function aiPlanEnemySpell(combat, enemy, canSee, side) {
     if (!enemy.pos || !Array.isArray(enemy.spells) || enemy.spells.length === 0)
         return null;
     const ready = enemy.spells.filter(id => {
@@ -38626,13 +38583,20 @@ function aiPlanEnemySpell(combat, enemy, canSee) {
     if (ready.length === 0)
         return null;
     const foes = [];
-    if (combat.heroPos && !(combat.heroParts && isBodyDestroyed(combat.heroParts)) && (!canSee || canSee(combat.heroPos)))
-        foes.push({ pos: combat.heroPos });
-    (combat.allies || []).forEach(a => { if (a.pos && !isBodyDestroyed(a.parts) && !a.fled && (!canSee || canSee(a.pos)))
-        foes.push({ pos: a.pos }); });
+    if (side === 'ally') {
+        // An allied caster aims at the living enemies.
+        (combat.enemies || []).forEach(e => { if (e.pos && !isBodyDestroyed(e.parts) && !e.fled && (!canSee || canSee(e.pos)))
+            foes.push({ pos: e.pos }); });
+    }
+    else {
+        if (combat.heroPos && !(combat.heroParts && isBodyDestroyed(combat.heroParts)) && (!canSee || canSee(combat.heroPos)))
+            foes.push({ pos: combat.heroPos });
+        (combat.allies || []).forEach(a => { if (a.pos && !isBodyDestroyed(a.parts) && !a.fled && (!canSee || canSee(a.pos)))
+            foes.push({ pos: a.pos }); });
+    }
     if (foes.length === 0)
         return null;
-    const ref = { type: 'enemy', id: enemy.id };
+    const ref = { type: side === 'ally' ? 'ally' : 'enemy', id: enemy.id };
     const nearestGap = Math.min(...foes.map(f => chebyshevDistance(enemy.pos, f.pos)));
     const countHit = (cells) => {
         const set = new Set(cells.map(c => c.x + ',' + c.y));
@@ -38671,8 +38635,10 @@ function afxCommitEnemySpell(prev, script, spellId, enemyId, t, heroLabel) {
     const agg = new Map();
     script.hits.forEach(h => {
         const k = (h.victimType || 'enemy') + ':' + h.enemyId;
-        const a = agg.get(k) || { dmg: 0, knock: null };
+        const a = agg.get(k) || { dmg: 0, late: 0, knock: null };
         a.dmg += h.dmg;
+        if (!h.tick)
+            a.late += h.dmg;
         if (h.knock)
             a.knock = h.knock;
         agg.set(k, a);
@@ -38681,7 +38647,7 @@ function afxCommitEnemySpell(prev, script, spellId, enemyId, t, heroLabel) {
     let heroParts = prev.heroParts, heroPos = prev.heroPos, result = null, killedBy;
     const hx = agg.get('hero:hero');
     if (hx) {
-        const r = afxDamageParts(heroParts, hx.dmg);
+        const r = afxDamageParts(heroParts, hx.late);
         heroParts = r.parts;
         if (hx.knock)
             heroPos = hx.knock;
@@ -38697,7 +38663,7 @@ function afxCommitEnemySpell(prev, script, spellId, enemyId, t, heroLabel) {
         const x = agg.get('ally:' + a.id);
         if (!x)
             return a;
-        const wasOut = isBodyDestroyed(a.parts) || !!a.fled, r = afxDamageParts(a.parts, x.dmg);
+        const wasOut = x.late < x.dmg ? false : (isBodyDestroyed(a.parts) || !!a.fled), r = afxDamageParts(a.parts, x.late);
         const next = { ...a, parts: r.parts };
         if (x.knock)
             next.pos = x.knock;
@@ -38722,6 +38688,48 @@ function afxCommitEnemySpell(prev, script, spellId, enemyId, t, heroLabel) {
         combat: { ...prev, heroParts, heroPos, allies, enemies, log, abilityFx: null, pendingEnemySpell: null, abilityFxCommit: (prev.abilityFxCommit || 0) + 1 },
         result, killedBy
     };
+}
+// Applies a finished spell cast by an ALLIED creature (a dragon on the hero's side): damage and
+// knockback on the enemies, the caster's own landing (leap) and cooldown. Ends the fight in
+// victory when nothing hostile is left standing.
+function afxCommitAllySpell(prev, script, spellId, allyId, t) {
+    const def = ABILITY_DEFS[spellId];
+    const caster = (prev.allies || []).find(a => a.id === allyId);
+    const agg = new Map();
+    script.hits.forEach(h => {
+        const a = agg.get(h.enemyId) || { dmg: 0, knock: null };
+        a.dmg += h.dmg;
+        if (h.knock)
+            a.knock = h.knock;
+        agg.set(h.enemyId, a);
+    });
+    const log = [...prev.log, { text: t('afxLogCast').replace('{who}', caster ? caster.name : '').replace('{name}', t(def.nameKey)), kind: 'hit' }];
+    const enemies = prev.enemies.map(e => {
+        const a = agg.get(e.id);
+        if (!a)
+            return e;
+        const wasOut = afxEnemyOut(e), r = afxDamageParts(e.parts, a.dmg);
+        const next = { ...e, parts: r.parts };
+        if (a.knock)
+            next.pos = a.knock;
+        log.push({ text: t('afxLogHit').replace('{name}', e.enemyName).replace('{dmg}', String(a.dmg)), kind: 'hit' });
+        if (a.knock)
+            log.push({ text: t('afxLogKnock').replace('{name}', e.enemyName), kind: 'hit' });
+        if (!wasOut && afxEnemyOut(next))
+            log.push({ text: t('afxLogDown').replace('{name}', e.enemyName), kind: 'vital' });
+        return next;
+    });
+    if (!agg.size)
+        log.push({ text: t('afxLogMiss'), kind: 'hit' });
+    const allies = prev.allies.map(a => {
+        if (a.id !== allyId)
+            return a;
+        const next = { ...a, spellReadyAt: { ...(a.spellReadyAt || {}), [spellId]: prev.round + Math.max(1, def.cooldownRounds) } };
+        if (script.heroMove)
+            next.pos = script.heroMove;
+        return next;
+    });
+    return { combat: { ...prev, enemies, allies, log, abilityFx: null, pendingEnemySpell: null, abilityFxCommit: (prev.abilityFxCommit || 0) + 1 }, allDown: enemies.every(afxEnemyOut) };
 }
 const AFX_UI_CSS = `
   .afx-aim-catcher { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 7; cursor: crosshair; }
@@ -38919,7 +38927,7 @@ function createCombatWeather(canvas, getCam, initialLevel) {
     const spr = getWeatherSprites();
     const rnd = (a, b) => a + Math.random() * (b - a);
     const worldW = (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX, worldH = (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX;
-    const MARGIN = 320, RX0 = -MARGIN, RY0 = -MARGIN, RW = worldW + MARGIN * 2, RH = worldH + MARGIN * 2;
+    const MARGIN = 0, RX0 = -MARGIN, RY0 = -MARGIN, RW = worldW + MARGIN * 2, RH = worldH + MARGIN * 2;
     const MAX_FLAKES = Math.round(1050 * (RW * RH) / (1100 * 650)); // ~1050 flakes on screen at zoom 1 in a full blizzard
     const flakes = Array.from({ length: MAX_FLAKES }, () => ({
         th: Math.random(), x: RX0 + Math.random() * RW, y: RY0 + Math.random() * RH,
@@ -38932,6 +38940,42 @@ function createCombatWeather(canvas, getCam, initialLevel) {
         { size: 7.5, fall: 92, a: .42, par: 1.1, spr: spr.soft }
     ];
     const bands = Array.from({ length: 22 }, () => ({ x: RX0 + Math.random() * RW, y: RY0 + Math.random() * RH, w: rnd(700, 1400), h: rnd(260, 560), v: rnd(.6, 1.4), a: rnd(.55, 1) }));
+    // ---- storm extras (blizzard only; `storm` 0..1 grows with the wind strength, so light/heavy snowfall stay calm) ----
+    // gust fronts: tall wind-driven bands. They thicken the snow, speed it up and whiten the air as they pass,
+    // so the storm comes in surges with calmer spells between them instead of one even flow.
+    let storm = 0;
+    const GT_N = 96;
+    const gustTab = new Float32Array(GT_N + 1);
+    const fronts = Array.from({ length: 7 }, (_, i) => ({ x: RX0 + (i / 7) * RW + rnd(-150, 150), v: rnd(1.0, 1.35), w: rnd(520, 900), ph: rnd(0, 6.28), a: rnd(.7, 1), p: 1 }));
+    function updateFronts(dt, wind) {
+        fronts.forEach(fr => {
+            fr.x += wind * dt * fr.v;
+            if (fr.x > RX0 + RW)
+                fr.x -= RW;
+            if (fr.x < RX0)
+                fr.x += RW;
+            fr.p = .55 + .45 * Math.sin(t * .5 + fr.ph);
+        });
+        for (let i = 0; i <= GT_N; i++) {
+            const x = RX0 + (i / GT_N) * RW;
+            let g = 0;
+            for (let j = 0; j < fronts.length; j++) {
+                const fr = fronts[j];
+                let d = Math.abs(x - fr.x);
+                if (d > RW / 2)
+                    d = RW - d;
+                const q = d / fr.w;
+                g += Math.exp(-q * q) * fr.p * fr.a;
+            }
+            gustTab[i] = g > 1 ? 1 : g;
+        }
+    }
+    function gustAt(x) { let u = (x - RX0) / RW; u = u - Math.floor(u); const f = u * GT_N, i = f | 0; return gustTab[i] + (gustTab[i + 1] - gustTab[i]) * (f - i); }
+    // near layer: big out-of-focus flakes whipping past the "camera", motion-blurred into soft streaks
+    const NEAR_N = Math.round(64 * (RW * RH) / (1100 * 650));
+    const nearFlakes = Array.from({ length: NEAR_N }, () => ({ x: RX0 + Math.random() * RW, y: RY0 + Math.random() * RH, k: rnd(.7, 1.4), th: Math.random() }));
+    // spindrift: faint soft streaks of snow racing along just above the ground, faster than the falling snow
+    const drift = Array.from({ length: Math.round(46 * (RW * RH) / (1100 * 650) / 2.2) }, () => ({ x: RX0 + Math.random() * RW, y: RY0 + Math.random() * RH, len: rnd(90, 220), th: rnd(3, 6), v: rnd(1.25, 1.9), a: rnd(.55, 1), ph: rnd(0, 6.28) }));
     const cur = { ...WEATHER_LEVELS.none };
     let target = WEATHER_LEVELS[initialLevel] || WEATHER_LEVELS.none;
     if (WEATHER_LEVELS[initialLevel])
@@ -38972,7 +39016,7 @@ function createCombatWeather(canvas, getCam, initialLevel) {
         }
     }
     function drawFlakes(li, wind, windN, dt, view, zoomK) {
-        const L = LAYER[li], dens = cur.snow;
+        const L = LAYER[li], dens = cur.snow * (1 - .3 * storm); // a bit sparser in a storm
         if (dens <= .002)
             return;
         const fall = L.fall * cur.speed, windAbs = Math.abs(windN);
@@ -38981,8 +39025,15 @@ function createCombatWeather(canvas, getCam, initialLevel) {
             if (f.layer !== li || f.th > dens)
                 continue;
             const sway = Math.sin(t * f.sw + f.ph) * 22 * (1 - windAbs);
-            f.y += fall * f.k * dt;
-            f.x += (wind * L.par + sway * .6) * dt;
+            let gm = 1, G = 0, tx = 0, ty = 0;
+            if (storm > .02) {
+                G = gustAt(f.x);
+                gm = 1 + G * .7 * storm; // gusts speed the flakes up
+                tx = Math.cos(f.y * .0045 + t * 1.2 + f.ph) * 55 * storm; // turbulence: eddies swirl the flakes
+                ty = Math.sin(f.x * .004 + t * 1.5) * 40 * storm;
+            }
+            f.y += (fall * f.k + ty) * dt;
+            f.x += (wind * L.par * gm + sway * .6 + tx) * dt;
             if (f.y > RY0 + RH) {
                 f.y -= RH;
                 f.x = RX0 + Math.random() * RW;
@@ -38995,14 +39046,14 @@ function createCombatWeather(canvas, getCam, initialLevel) {
             if (f.x < view.x0 - pad || f.x > view.x1 + pad || f.y < view.y0 - pad || f.y > view.y1 + pad)
                 continue;
             const fade = Math.min(1, (dens - f.th) * 8);
-            cx.globalAlpha = L.a * fade * (li === 2 ? .85 + .15 * Math.sin(t * 2.2 + f.ph) : 1);
-            if (windAbs > .3 && li < 2) {
-                const vx = wind * L.par + sway * .6, vy = fall * f.k;
-                const len = Math.max(size * 3, Math.hypot(vx, vy) * (.03 + windAbs * .035)), th = size * 2.6;
+            cx.globalAlpha = Math.min(1, L.a * fade * (1 + G * .5 * storm) * (li === 2 ? .85 + .15 * Math.sin(t * 2.2 + f.ph) : 1));
+            if (false) {
+                const vx = wind * L.par * gm + sway * .6 + tx, vy = fall * f.k + ty;
+                const len = Math.max(size * 3, Math.hypot(vx, vy) * (.03 + windAbs * .035)) * (1 + G * .45 * storm), th = size * 2.6;
                 cx.globalAlpha *= .75;
                 cx.save();
                 cx.translate(f.x, f.y);
-                cx.rotate(Math.atan2(vy, vx));
+                cx.rotate(Math.atan2(fall * f.k, wind * L.par * gm + sway * .6));
                 cx.drawImage(spr.streak, -len, -th / 2, len, th);
                 cx.restore();
             }
@@ -39034,11 +39085,22 @@ function createCombatWeather(canvas, getCam, initialLevel) {
         combatWind.active = true;
         if (sound)
             sound.update(windLull(), typeof document !== 'undefined' && document.hidden);
+        storm = Math.max(0, Math.min(1, (cur.wind - 60) / 330)) * Math.min(1, cur.snow * 1.2);
+        if (storm > .02)
+            updateFronts(dt, wind);
         const zoom = cam.zoom || 1, pan = cam.pan || { x: 0, y: 0 };
         cx.setTransform(DPR, 0, 0, DPR, 0, 0);
         cx.clearRect(0, 0, W, H);
         if (cur.snow < .002 && cur.tint < .002)
             return;
+        // The weather ends exactly at the edge of the board: everything below is clipped to the visible part of the map.
+        const mx0 = Math.max(0, pan.x), my0 = Math.max(0, pan.y), mx1 = Math.min(W, pan.x + worldW * zoom), my1 = Math.min(H, pan.y + worldH * zoom);
+        if (mx1 <= mx0 || my1 <= my0)
+            return;
+        cx.save();
+        cx.beginPath();
+        cx.rect(mx0, my0, mx1 - mx0, my1 - my0);
+        cx.clip();
         // screen: cold light from above + vignette (the lighting of the frame, not snow)
         if (cur.tint > .002) {
             const sky = cx.createLinearGradient(0, 0, 0, H);
@@ -39049,7 +39111,7 @@ function createCombatWeather(canvas, getCam, initialLevel) {
             cx.fillRect(0, 0, W, H);
             const g = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.max(W, H) * .78);
             g.addColorStop(0, 'rgba(8,12,20,0)');
-            g.addColorStop(1, 'rgba(8,12,20,' + (cur.tint * 1.2) + ')');
+            g.addColorStop(1, 'rgba(8,12,20,' + (cur.tint * 1.2 * (1 - storm * .6)) + ')');
             cx.fillStyle = g;
             cx.fillRect(0, 0, W, H);
         }
@@ -39073,23 +39135,82 @@ function createCombatWeather(canvas, getCam, initialLevel) {
             cx.globalAlpha = 1;
         }
         drawFlakes(1, wind, windN, dt, view, zoomK);
-        drawFlakes(2, wind, windN, dt, view, zoomK);
-        if (cur.snow > .85 && Math.abs(wind) > 250) { // blizzard gusts: thin pale streaks across the field
-            cx.save();
-            cx.globalAlpha = .07 * Math.min(1, Math.abs(wind) / 500);
-            cx.strokeStyle = '#eaf2fb';
-            cx.lineWidth = 1 / zoom;
-            cx.lineCap = 'round';
-            for (let i = 0; i < 40; i++) {
-                const y = RY0 + ((i * 197.3 + t * 40) % RH), x = RX0 + ((i * 411.7 + t * wind * .5) % (RW + 600)) - 300, len = 160 + (i % 5) * 80;
-                cx.beginPath();
-                cx.moveTo(x, y);
-                cx.lineTo(x + Math.sign(wind || 1) * len, y + 5);
-                cx.stroke();
+        if (storm > .02) {
+            // gust fronts: slanted tall white walls drifting with the wind; the air whites out as one passes
+            const sg = Math.sign(wind || 1);
+            fronts.forEach(fr => {
+                const w = fr.w * 2.4;
+                if (fr.x + w / 2 < view.x0 || fr.x - w / 2 > view.x1)
+                    return;
+                cx.globalAlpha = Math.min(1, .34 * storm * fr.p * fr.a);
+                cx.save();
+                cx.translate(fr.x, RY0 + RH / 2);
+                cx.rotate(-.2 * windDir);
+                cx.drawImage(spr.blob, -w / 2, -RH * .6, w, RH * 1.2);
+                cx.restore();
+            });
+            // spindrift
+            for (let i = 0; i < drift.length; i++) {
+                const d = drift[i];
+                d.x += wind * dt * d.v;
+                if (d.x > RX0 + RW + d.len)
+                    d.x -= RW + d.len * 2;
+                if (d.x < RX0 - d.len)
+                    d.x += RW + d.len * 2;
+                const yy = d.y + Math.sin(t * .8 + d.ph) * 14;
+                if (d.x < view.x0 - d.len || d.x > view.x1 + d.len || yy < view.y0 - 20 || yy > view.y1 + 20)
+                    continue;
+                cx.globalAlpha = .12 * d.a * storm * (.55 + .45 * gustAt(d.x)) * Math.min(1, Math.abs(windDir) * 2.2);
+                cx.save();
+                cx.translate(d.x, yy);
+                cx.scale(windDir < 0 ? -1 : 1, 1);
+                cx.drawImage(spr.streak, -d.len, -d.th / 2, d.len, d.th);
+                cx.restore();
             }
-            cx.restore();
+        }
+        cx.globalAlpha = 1;
+        drawFlakes(2, wind, windN, dt, view, zoomK);
+        cx.globalAlpha = 1;
+        if (storm > .02) {
+            // near layer: blurred big flakes rushing past the camera
+            const sg = Math.sign(wind || 1);
+            for (let i = 0; i < NEAR_N; i++) {
+                const f = nearFlakes[i];
+                if (f.th > storm * .6)
+                    continue;
+                const G = gustAt(f.x);
+                const nvy = 150 * f.k;
+                f.y += nvy * dt;
+                const nvx = wind * 1.55 * (1 + G * .5);
+                f.x += nvx * dt;
+                if (f.y > RY0 + RH) {
+                    f.y -= RH;
+                    f.x = RX0 + Math.random() * RW;
+                }
+                if (f.x > RX0 + RW)
+                    f.x -= RW;
+                if (f.x < RX0)
+                    f.x += RW;
+                const len = 22 * f.k * zoomK, th = 22 * f.k * zoomK;
+                if (f.x < view.x0 - len || f.x > view.x1 + len || f.y < view.y0 - th || f.y > view.y1 + th)
+                    continue;
+                cx.globalAlpha = Math.min(1, .11 * (.6 + G * .6) * storm * f.k);
+                cx.drawImage(spr.soft, f.x - len, f.y - len, len * 2, len * 2);
+            }
+            cx.globalAlpha = 1;
         }
         cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        if (storm > .02) { // screen: white veil that swells with the gusts + pale vignette (visibility falls off toward the edges)
+            const gc = gustAt((-pan.x + W / 2) / zoom);
+            cx.fillStyle = 'rgba(214,226,240,' + (storm * (.06 + .12 * gc)).toFixed(3) + ')';
+            cx.fillRect(0, 0, W, H);
+            const pv = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .22, W / 2, H / 2, Math.max(W, H) * .75);
+            pv.addColorStop(0, 'rgba(205,219,236,0)');
+            pv.addColorStop(1, 'rgba(205,219,236,' + (storm * .34).toFixed(3) + ')');
+            cx.fillStyle = pv;
+            cx.fillRect(0, 0, W, H);
+        }
+        cx.restore();
     }
     raf = requestAnimationFrame(frame);
     return {
@@ -40824,9 +40945,9 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             const shownParts = heldShot ? heldShot.parts : ally.parts;
                             const allyFogged = !ally.playerControlled && !partySees(ally.pos);
                             return (React.createElement("div", { key: ally.id, "data-fxkey": 'ally:' + ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : '') + (allyFogged ? ' combat-grid-token-fogged' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X, ally.pos.span), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y, ally.pos.span) } },
-                                React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
+                                React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + (COMBAT_CARD_GRID_SCALE * posSpan(ally.pos) / UNIT_SPAN) + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { suppressed: !!ally.suppressed, side: ally.playerControlled ? 'party' : 'ally', name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), firearm: allyFirearms[ally.name.trim().toLowerCase()], t: t })))));
+                                        React.createElement(CombatPortrait, { emoji: ally.portraitEmoji, suppressed: !!ally.suppressed, side: ally.playerControlled ? 'party' : 'ally', name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), firearm: allyFirearms[ally.name.trim().toLowerCase()], t: t })))));
                         }),
                         React.createElement("div", { "data-fxkey": "hero", className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X, combat.heroPos.span), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y, combat.heroPos.span) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
@@ -40875,8 +40996,8 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                                 React.createElement("div", { className: "afx-aim-catcher", onPointerDown: () => { aimArmedRef.current = true; } })));
                         })(),
                         React.createElement("div", { className: "afx-host", ref: setAfxHost }))),
+                React.createElement(CombatWeatherLayer, { weather: combat.environment && combat.environment.weather, camRef: camRef }),
                 !combat.result && (React.createElement(React.Fragment, null,
-                    React.createElement(CombatWeatherLayer, { weather: combat.environment && combat.environment.weather, camRef: camRef }),
                     React.createElement("div", { className: "combat-field-ui" },
                         React.createElement("div", { className: "combat-fieldlog" },
                             React.createElement("button", { type: "button", className: "combat-fieldlog-toggle", "aria-expanded": logOpen, title: t('combatLogToggleLabel'), "aria-label": t('combatLogToggleLabel'), onClick: () => setLogOpen(o => !o) },
@@ -42820,8 +42941,8 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
     if (openNodeRisk) {
         const lvl = openNodeRisk.level;
         riskText = MAP_RISK_ICONS[lvl] + ' ' + t(MAP_RISK_LABEL_KEYS[lvl]);
-        if (lvl !== 'quiet' && openNodeRisk.reasons.some(r => r !== 'friendly'))
-            riskText += ' · ' + openNodeRisk.reasons.filter(r => r !== 'friendly').map(r => t('mapRiskReason_' + r)).join(', ');
+        if (lvl !== 'quiet' && openNodeRisk.reasons.length > 0)
+            riskText += ' · ' + openNodeRisk.reasons.map(r => t('mapRiskReason_' + r)).join(', ');
         if (openNodeRisk.arrivalPhase !== (dayPhase === 'night' ? 'night' : 'day'))
             riskText += ' · ' + t(openNodeRisk.arrivalPhase === 'night' ? 'mapArrivalNightfall' : 'mapArrivalDawn');
     }
@@ -43001,7 +43122,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                     map.nodes.filter(n => !n.discovered && onViewLayer(n)).map(n => {
                         const open = openNodeId === n.id;
                         const p = posOf(n);
-                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : '') + (mapFilter ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": n.scouted ? n.name : t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
+                        return (React.createElement("div", { key: n.id, className: 'map-node map-node-fog' + (open ? ' map-node-open' : '') + (mapFilter ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, "aria-label": t('mapFogLabel'), onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
                                 onDismissArrow(n.id); }, onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setOpenNodeId(open ? null : n.id);
@@ -43012,18 +43133,11 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                                 React.createElement("span", { className: "map-node-icon map-node-icon-fog" }, "?"),
                                 n.danger && React.createElement("span", { className: "map-node-danger-badge", title: t('mapDangerLabel'), "aria-hidden": "true" }, "!"),
                                 recentBattleNodeIds.has(n.id) && React.createElement("span", { className: "map-node-battle-badge", title: t('mapLegendRecentBattle'), "aria-hidden": "true" }, "\u2694")),
-                            n.scouted && React.createElement("span", { className: "map-node-label" },
-                                "\uD83D\uDD2D ",
-                                n.name),
                             open && (React.createElement("div", { className: "map-node-desc" },
                                 n.danger && React.createElement("p", { className: "map-node-danger-text" },
                                     "\u26A0 ",
                                     t('mapDangerLabel')),
-                                React.createElement("p", null, (MAP_KIND_ICONS[n.kind] || '📍') + ' ' + t(MAP_KIND_LABEL_KEYS[n.kind] || 'mapKindLandmark')),
-                                n.scouted && n.description && React.createElement("p", null, n.description),
-                                n.scouted && n.faction && React.createElement("p", { className: "map-node-status-text" },
-                                    "\uD83D\uDEA9 ",
-                                    n.faction)))));
+                                React.createElement("p", null, (MAP_KIND_ICONS[n.kind] || '📍') + ' ' + t(MAP_KIND_LABEL_KEYS[n.kind] || 'mapKindLandmark'))))));
                     })),
                 React.createElement("div", { ref: heroArrowRef, className: "map-edge-arrow map-edge-arrow-hero", "aria-hidden": "true" }),
                 questArrowNodes.map(n => (React.createElement("div", { key: n.id, ref: el => { if (el)
@@ -43806,7 +43920,12 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel, env) {
             // Allies fight on the hero's side from the first turn; rolled like any anonymous ally (see makeAllyCombatant).
             const aCount = devClamp(row.count, 1, MAX_COMBATANTS_PER_SIDE, 1);
             for (let i = 0; i < aCount && devAllies.length < MAX_COMBATANTS_PER_SIDE; i++) {
-                devAllies.push({ name: row.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: row.weapon || '', tier: row.tier, role: row.role });
+                const aDragon = row.species === 'dragon';
+                devAllies.push({
+                    name: row.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: row.weapon || '', tier: row.tier, role: row.role,
+                    // Same creature fields an enemy row carries — so an allied dragon is the same dragon.
+                    kind: aDragon ? 'behemoth' : row.kind, species: row.species, damageResist: row.damageResist, fearless: aDragon || row.fearless === true
+                });
             }
             continue;
         }
@@ -43822,7 +43941,7 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel, env) {
     if (wave && wave.on) {
         const count = devClamp(wave.count, 1, MAX_REINFORCEMENT_WAVE_COMBATANTS, 1);
         const combatants = Array.from({ length: count }, () => (wave.side === 'ally'
-            ? { name: wave.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: wave.weapon || '', tier: wave.tier, role: wave.role }
+            ? { name: wave.name || devL(lang, 'Союзник', 'Ally'), weaponDescription: wave.weapon || '', tier: wave.tier, role: wave.role, ...(wave.species === 'dragon' ? { kind: 'behemoth', species: 'dragon', fearless: true } : {}) }
             : { enemyName: wave.name || fallbackName, enemyDescription: '', weaponDescription: wave.weapon || unarmedLabel, tier: wave.tier, role: wave.role, kind: wave.species === 'dragon' ? 'behemoth' : wave.kind, species: wave.species, damageResist: wave.damageResist, fearless: wave.species === 'dragon', bodyParts: normalizeEnemyBodyParts(undefined) }));
         reinforcements.push({
             id: 'dev_wave_1', label: wave.side === 'ally' ? devL(lang, 'Подмога', 'Backup') : devL(lang, 'Подкрепление', 'Reinforcements'),
@@ -44459,14 +44578,15 @@ function DevWorldTab({ api }) {
     }
     const current = map.nodes.find(n => n.id === map.currentId) || null;
     return (React.createElement("div", null,
-        React.createElement(DevSection, { title: 'Время: ' + (gs.time || '—') + ' · ' + (gs.dayPhase === 'night' ? 'ночь' : 'день') },
+        React.createElement(DevSection, { title: 'Время: ' + (gs.time || '—') + ' · ' + (gs.dayPhase === 'night' ? 'ночь' : 'день') + ' · погода: ' + (gs.weather || 'none') },
             React.createElement(DevRow, null, DEV_TIME_PRESETS.map(p => React.createElement("button", { key: p.label, type: "button", className: "dev-chip", onClick: () => applyTime(p.time, p.phase) }, p.label))),
             React.createElement(DevRow, null,
                 React.createElement(DevField, { label: "\u0422\u0435\u043A\u0441\u0442 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 (\u0444\u0430\u0437\u0430 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u044F\u0435\u0442\u0441\u044F \u043F\u043E \u043D\u0435\u043C\u0443)", grow: true },
                     React.createElement(DevText, { value: time, onChange: setTime })),
                 React.createElement(DevBtn, { onClick: () => applyTime(time) }, "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C")),
             React.createElement(DevRow, null,
-                React.createElement(DevBtn, { onClick: newMorning }, "\uD83C\uDF05 \u041D\u043E\u0432\u043E\u0435 \u0443\u0442\u0440\u043E (\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0442\u043E\u0432\u0430\u0440\u044B)"))),
+                React.createElement(DevBtn, { onClick: newMorning }, "\uD83C\uDF05 \u041D\u043E\u0432\u043E\u0435 \u0443\u0442\u0440\u043E (\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0442\u043E\u0432\u0430\u0440\u044B)")),
+            React.createElement(DevRow, null, [['none', 'Без осадков'], ['lightSnow', 'Слабый снег'], ['heavySnow', 'Сильный снег'], ['blizzard', 'Буря']].map(([k, l]) => (React.createElement("button", { key: k, type: "button", className: "dev-chip", style: (gs.weather || 'none') === k ? { outline: '2px solid currentColor' } : undefined, onClick: () => patchState(s => ({ ...s, weather: k })) }, l))))),
         React.createElement(DevSection, { title: 'Карта (' + map.nodes.length + ') · сейчас: ' + (current ? current.name : '—') },
             map.nodes.map(n => (React.createElement("div", { className: "dev-item", key: n.id },
                 React.createElement("div", { className: "dev-item-main" },
@@ -44556,9 +44676,8 @@ function DevCombatTab({ api }) {
         { label: 'Рельсотрон', rows: [{ name: 'Рельсотронщик', tier: 'average', role: 'ranged', weapon: 'Рельсотрон', count: '1' }] },
         { label: 'Пистолет', rows: [{ name: 'Пистолетчик', tier: 'average', role: 'ranged', weapon: 'Пистолет', count: '1' }] },
         { label: 'Энерговинтовка', rows: [{ name: 'Энергострелок', tier: 'average', role: 'ranged', weapon: 'Энерговинтовка', count: '1' }] },
-        { label: 'Босс (исключит. танк)', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
-        { label: 'Легенда', rows: [{ name: 'Древний дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', damageResist: 'medium', weapon: 'Когти и пламя', count: '1' }] },
-        { label: '🐉 Дракон (чудовище 2×2)', rows: [{ name: 'Дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', species: 'dragon', damageResist: 'medium', weapon: 'Когти и пламя', fearless: true, count: '1' }] }
+        { label: 'Страж врат', rows: [{ name: 'Страж врат', tier: 'exceptional', role: 'tank', weapon: 'Огромный молот', count: '1' }] },
+        { label: '🐉 Дракон', rows: [{ name: 'Дракон', tier: 'legendary', role: 'melee', kind: 'behemoth', species: 'dragon', damageResist: 'medium', weapon: 'Когти и пламя', fearless: true, count: '1' }] }
     ];
     function loadPreset(p) {
         // A preset is ADDED to the enemies already in the list (remove any with its «убрать» button), never replaces them.
@@ -44692,7 +44811,7 @@ function DevCombatTab({ api }) {
                         React.createElement(DevSelect, { value: wave.role, onChange: x => setW('role', x), options: Object.keys(ENEMY_ROLES).map(k => [k, DEV_ROLE_LABELS[k] || k]) })),
                     wave.side === 'enemy' && React.createElement(DevField, { label: "\u0422\u0438\u043F" },
                         React.createElement(DevSelect, { value: wave.kind, onChange: x => setW('kind', x), options: ENEMY_KINDS.map(k => [k, DEV_ENEMY_KIND_LABELS[k] || k]) })),
-                    wave.side === 'enemy' && React.createElement(DevCheck, { checked: wave.species === 'dragon', onChange: x => setWave(p => (x ? { ...p, species: 'dragon', kind: 'behemoth' } : { ...p, species: '' })) }, "\uD83D\uDC09 \u0434\u0440\u0430\u043A\u043E\u043D"),
+                    React.createElement(DevCheck, { checked: wave.species === 'dragon', onChange: x => setWave(p => (x ? { ...p, species: 'dragon', kind: 'behemoth' } : { ...p, species: '' })) }, "\uD83D\uDC09 \u0434\u0440\u0430\u043A\u043E\u043D"),
                     React.createElement(DevField, { label: "\u041E\u0440\u0443\u0436\u0438\u0435", grow: true },
                         React.createElement(DevText, { value: wave.weapon, onChange: x => setW('weapon', x) }))))),
             React.createElement(DevRow, null,
@@ -48627,6 +48746,9 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         // Always present (dayPhase always resolves to 'day' or 'night', even on
         // a save from before this field existed — see EMPTY_STATE/
         // normalizeGameState) rather than gated like the rules around it.
+        const weatherRuleNum = ++ruleNum;
+        const curWeather = COMBAT_WEATHERS.includes(state.weather) ? state.weather : 'none';
+        const weatherRule = `\n${weatherRuleNum}. WEATHER — the current OUTDOOR weather in the story is: ${({ none: 'NONE (no snowfall; ordinary weather for the setting and season)', lightSnow: 'LIGHT SNOWFALL (a few flakes drifting down, a light wind)', heavySnow: 'HEAVY SNOWFALL (thick snow, poor visibility, snowdrifts building, a steady wind)', blizzard: 'BLIZZARD (a howling snowstorm, near-whiteout, biting wind, hard to see or hear anything)' })[curWeather]}. When the hero is OUTDOORS, let this weather show naturally in the prose (what they see, feel and hear, how it slows travel or hides things) and never contradict it. Indoors, underground or in another dimension the weather simply does not apply — do not describe snow falling inside. The weather changes ONLY when the story gives a reason: time passing, a long journey to another region or climate, a storm building or easing, magic. Such a change must be shown in the narration itself (never announced as a game term) and in steps — light to heavy to blizzard and back — not by jumping from none to a blizzard in one turn unless the story calls for something sudden. Do not invent snow in a setting or season where it makes no sense. Any fight that starts outdoors takes place in this same weather.`;
         const dayPhaseRuleNum = ++ruleNum;
         const isNight = state.dayPhase === 'night';
         const dayPhaseRule = `\n${dayPhaseRuleNum}. TIME OF DAY — it is currently ${isNight ? 'NIGHT' : 'DAY'} in the story: ${isNight
@@ -48751,7 +48873,7 @@ GAME MASTER RULES:
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
 8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands. The one exception: a merchant or vendor buying or selling their ordinary goods from/to the hero is never written as a completed exchange here at all, with or without a number — see the trade rule below.
 9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.
-10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${riskyLootRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${captivityRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${enemyRule}${incapacitatedRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${worldRule}${partyRule}${abilitiesRule}${pendingSecretsRule}${identityRule}${agentRule}${coverRule}${dialRule}${opsRule}
+10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${riskyLootRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${captivityRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${enemyRule}${incapacitatedRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${weatherRule}${worldRule}${partyRule}${abilitiesRule}${pendingSecretsRule}${identityRule}${agentRule}${coverRule}${dialRule}${opsRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own, and no bracketed note copied in from above (see the "never reproduce a bracketed note" rule) — just the scene itself.`;
     }
@@ -48905,9 +49027,10 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.${stateContractNote}
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text (REQUIRED, never empty)", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "weather": "none", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text (REQUIRED, never empty)", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
+"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard" — the OUTDOOR weather at the hero's location as it stands at the END of this scene, taken ONLY from what the scene shows or states. Keep the previous value (see CURRENT GAME STATE) unless the scene itself shows a change or the hero moved somewhere with different weather; weather described in the narration always wins. Being indoors does not change this value (it is the weather outside).
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
 "health" is an integer from 1 to 1000 representing the hero's CURRENT physical condition right now — how banged up, exhausted, or healed-up they are THIS turn — and must never exceed "maxHealth" (below). Calibrate against this anchor: an ordinary healthy adult sits around 50 — treat that as the normal baseline, not a low score. 1 is at death's door. Values climb above 50 only for genuinely superior physical condition (a seasoned soldier, a battle-hardened veteran, a powerful monster), reaching into the hundreds solely for truly exceptional beings, with 1000 reserved for an actual deity or equivalent cosmic-tier being. Adjust it plausibly, relative to that baseline, based on injury, healing, exhaustion, etc. — it moves scene to scene, dropping with harm and rising back up toward "maxHealth" with rest, healing, or recovery, but never past it.
 "maxHealth" is an integer from 1 to 1000 representing the hero's overall physical CAPACITY at their best — the ceiling "health" recovers toward, not their condition in this exact moment. Use the exact same 1-1000 scale and baseline-50 calibration as "health" above, but treat it like "stats" below: a lasting trait, not a momentary reading. Do NOT lower it for a temporary injury, a hard fight, or ordinary exhaustion — that's what dragging "health" below it is for. Change "maxHealth" only for a real, lasting reason: significant training or conditioning over time, a permanent crippling injury, a major magical or physical transformation, or similar genuine long-term growth or decline established by the story. On the large majority of turns, simply repeat the value already tracked in the state above unchanged.
@@ -48954,7 +49077,7 @@ If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "sh
 "lighting" is exactly one of "lit" or "dark" — how well lit the exact place of the fight is, judged from the scene itself, NOT from the hour: "lit" for open daylight, a lamp-, torch- or fire-lit room, a bright hall, a lantern-carrying party; "dark" for night with no light source, an unlit cellar or cave, a lightless corridor, a snuffed-out room, thick smoke or magical darkness. A torch-lit cellar at night is "lit"; a deep cave at noon is "dark". Default to "lit" when the scene gives no reason to think otherwise.
 "realm" is exactly one of "material" or "other" — "material" (the overwhelming default) for the ordinary world; "other" only when the fight takes place outside it: open space, another dimension or plane, a pocket reality, the astral or spirit world, or any setting the story explicitly treats as not belonging to the normal world.
 "indoors" is true when the fight takes place inside a building, cave, tunnel, ship, tent or any other roofed or enclosed place, and false (the default) in the open air.
-"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard" — the snowfall actually happening at the place of the fight right now, taken ONLY from the scene itself: "lightSnow" for a few flakes or a light snowfall, "heavySnow" for a thick, heavy snowfall, "blizzard" for a snowstorm or whiteout with howling wind. Never invent weather the story has not shown; "none" is the default, and it must always be "none" when "indoors" is true or when "realm" is "other".
+"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard" — the snowfall actually happening at the place of the fight right now; it MUST match the CURRENT WEATHER given in the rules (the story weather) unless the scene itself shows it changing, taken ONLY from the scene itself: "lightSnow" for a few flakes or a light snowfall, "heavySnow" for a thick, heavy snowfall, "blizzard" for a snowstorm or whiteout with howling wind. Never invent weather the story has not shown; "none" is the default, and it must always be "none" when "indoors" is true or when "realm" is "other".
 "noRetreat" is an optional top-level flag (default false): true when the hero has no way to simply back off and return to where they came from before the fight — they were ambushed, surrounded, cornered, trapped, or the enemies are already upon them, blocking the way, or the fight is part of a scene the hero cannot walk away from. False (or omitted) when the opponents are still some way off or have not yet engaged, so the hero could plausibly turn around and withdraw without a fight.
 "objective" is optional and describes what actually needs to happen for THIS fight to count as won, beyond the default of simply defeating every listed opponent — include it only when the scene itself gives the fight a distinct goal (reinforcements are close, someone else here needs shielding, there is something to grab and escape with rather than a fight to win outright, or the opposition is so far beyond the hero that surviving at all is the only real goal), and otherwise omit the field entirely (or send null) for an ordinary fight where victory just means beating the enemies. When present, "objective" is an object: "type" is exactly one of "surviveTurns" (the hero only needs to hold on for a stretch — a rescue, reinforcements, a collapsing structure, a fuse burning down), "protect" (someone else already in this fight must not go down, whether or not every enemy ends up beaten), "retreat" (the real goal is grabbing something and getting out, not winning the fight outright), or "survive" (the opposition is too much to beat — getting out alive at all is the whole goal); never send "defeatAll" as a type, that is simply what leaving the field out already means. "label" is a short phrase in ${narrativeLanguage}, written the way it would read on a battle-objective banner (e.g. "Продержаться 4 хода — подкрепление на подходе", "Защитить Мерина", "Grab the chest and get out"), and MUST be included whenever "objective" itself is. "turnsRequired" is a small positive integer (2–6 is typical), ONLY for "surviveTurns" — how many full combat rounds the hero has to last. "protectName" is ONLY for "protect" — the exact name of the specific companion (an actual, currently-present party member, never a bystander who is not part of the fight) who must survive.
 "reinforcements" is an optional array (default empty) of additional combatants who arrive mid-fight rather than at the start — the mechanism for a fight that grows beyond the initial clash. This should stay a minority of fights, not the norm, but don't let it collapse to never: over the course of a campaign it should genuinely fire from time to time, not sit empty for dozens of fights running. Actively look for a reason to use it rather than only reaching for it when the scene has already spelled one out in so many words — a bandit camp, a guard post, a den, or any lair-like location plausibly has more than just whoever's in the opening clash within earshot; a cry of alarm, sounds of fighting, or simply the fight running long enough to draw attention are all legitimate, ordinary triggers, not special narrative setups. Reserve it for moments that make sense given the location and situation: a patrol that will come running, a messenger who slipped away to raise the alarm, a stronghold where guards are everywhere, a desperate last stand where allies might reach the hero in time. There's no cap on how many waves a single fight can have — let a large-scale battle escalate for as long as the scene supports it. Each entry has: "id" (short, lowercase, unique slug), "label" (short name for the arriving group, in ${narrativeLanguage}, e.g. "Стража у ворот", "Меррик и его люди"), "side" (exactly "enemy" or "ally"), "trigger" (exactly one of {"type": "turn", "value": 3} — if the fight reaches round 3; {"type": "enemyDeaths", "value": 2} — once 2 enemies are dead; {"type": "allyDeaths", "value": 1} — once 1 ally has gone down; {"type": "heroHpBelow", "value": 20} — once the hero's HP drops below 20%), and "combatants" (1 or more entries, with no upper cap; for "enemy" each is shaped exactly like an "enemies" entry above — "enemyName"/"weaponDescription"/"armorPiercing"/"tier"/"role"/"kind"/"damageResist"/"fearless"/"bodyParts"; for "ally" each is EITHER {"npcName": "exact name"} binding to an already-tracked companion who MUST already exist in "npcs" above with "presentNow": true, OR an anonymous unit shaped like an enemy entry but without "fearless"/"bodyParts" — {"name": "...", "weaponDescription": "...", "armorPiercing": false, "tier": "...", "role": "..."}). Enemy reinforcement tier should usually be AT OR BELOW the fight's own opening tier — they add pressure, not punish the player for winning; a "legendary" reinforcement to a "weak" fight is almost always wrong. An ally reinforcement MUST already be established in the story before this fight — a tracked companion physically present, or an anonymous group the scene has already foreshadowed (a patrol met earlier, a faction the hero has helped) — never conjure allies from nowhere. If a reinforcement is meant to save the hero, its trigger must fire before HP would actually reach zero — even then the rescue is only narrated, not mechanically guaranteed. There is no cap on the total number of enemies across the whole fight (opening roster plus every wave) — a proper siege, battle, or last stand should field as many opponents as the scene actually calls for.\n\"presentAllies\" is an optional array (default empty) of already-tracked, currently-present companions who are ACTIVELY FIGHTING ALONGSIDE THE HERO from the very first round of THIS fight — distinct from \"reinforcements\", which is for someone arriving mid-fight, and from the hero's own recruited party (who are already added to combat automatically and never need to be listed here). Use it whenever the scene's own prose has a specific named character — someone already in \"npcs\" above with \"presentNow\": true, but not already a recruited party member — throwing a punch, swinging a weapon, or otherwise actively fighting on the hero's side in the very scene that just triggered this combat: a hired guide, a fellow prisoner who grabbed a blade, a local guard who joins in, a quest-giver defending themselves alongside the hero. If the scene's own text has such a character fighting, they MUST appear here — never leave a character the prose just showed swinging a weapon out of combat entirely. Do not invent one who wasn't actually shown fighting, and do not include anyone already covered by the hero's recruited party. Each entry is {"npcName": "exact tracked name"}, with no fixed cap.${itemOffersSection}
@@ -49142,7 +49265,7 @@ Rules:
             const waypointNames = queuedRoute.path.slice(1, -1).map(nodeName);
             const targetName = nodeName(queuedRoute.path[queuedRoute.path.length - 1]);
             const recentBattleNodeIds = new Set((currentState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId));
-            const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds, currentState.dayPhase, computeHeroAllegiance(currentState, factionReputations, (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations));
+            const interruption = resolveRouteInterruption(queuedRoute.path, currentState.map, factionReputations, recentBattleNodeIds, currentState.dayPhase, computeHeroAllegiance(currentState, factionReputations));
             const routeSoFar = waypointNames.length > 0 ? ` (by way of ${waypointNames.join(', ')})` : '';
             const startPhaseWord = currentState.dayPhase === 'night' ? 'NIGHT' : 'DAYTIME';
             const travelHours = routeHoursAtIndex(queuedRoute.path, byId, interruption ? interruption.stopIndex : queuedRoute.path.length - 1);
@@ -50829,6 +50952,7 @@ ${chunkText}`;
             // no longer asked for it. No phase word/clock in the text -> keep the
             // current phase (a stray legacy "dayPhase" in a reply is honored only as
             // a last resort before that).
+            weather: COMBAT_WEATHERS.includes(parsed.weather) ? parsed.weather : (currentState.weather || 'none'),
             dayPhase: inferDayPhaseFromTime(parsed.time || currentState.time) || ((parsed.dayPhase === 'day' || parsed.dayPhase === 'night') ? parsed.dayPhase : (currentState.dayPhase || 'day')),
             health,
             maxHealth,
@@ -52244,11 +52368,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // narrative and state extraction are about to decide. See the WORLD
         // REACTIVITY section (pickWorldTickEvent) above EMPTY_STATE. Skipped
         // entirely on the opening turn: currentState.map has no nodes yet.
-        // While a regenerate is in flight the reputation maps read as they will stand once the discarded turns are undone (see regenViewRef).
-        const npcRepsNow = (regenViewRef.current && regenViewRef.current.npcReputations) || npcReputations;
-        const heroGuard = isOpeningTurn ? null : computeHeroFactionGuard(currentState, npcRepsNow);
-        const worldTickEvent = isOpeningTurn ? null : pickWorldTickEvent(currentState.factions, currentState.map.nodes, currentState.map.currentId, heroGuard);
-        const worldSiegeChange = (isOpeningTurn || worldTickEvent) ? null : pickWorldSiegeChange(currentState.factions, currentState.map.nodes, currentState.map.currentId, turnIndex, heroGuard);
+        const worldTickEvent = isOpeningTurn ? null : pickWorldTickEvent(currentState.factions, currentState.map.nodes, currentState.map.currentId);
+        const worldSiegeChange = (isOpeningTurn || worldTickEvent) ? null : pickWorldSiegeChange(currentState.factions, currentState.map.nodes, currentState.map.currentId, turnIndex);
         agentSlipRef.current = isOpeningTurn ? null : pickAgentPlan(currentState.agents, currentState.npcs, turnIndex, { partyKeys: [...party], paranoia: currentState.paranoia });
         if (agentSlipRef.current) {
             // The hero's canary traps that come due, and any purge a jumpy faction runs.
@@ -52315,8 +52436,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             : worldSiegeChange
                 ? { ...combined.state, map: { ...combined.state.map, nodes: combined.state.map.nodes.map(n => n.id === worldSiegeChange.nodeId ? { ...n, status: worldSiegeChange.status, statusSince: worldSiegeChange.status ? turnIndex : null } : n) } }
                 : combined.state;
-        // The hero's faction pays in on a fixed cadence (see applyHeroFactionIncome).
-        const finalState = applyHeroFactionScouting(applyHeroFactionIncome(aliasHeroFormerNames(stateAfterWorld), turnIndex, npcRepsNow), turnIndex, npcRepsNow);
+        const finalState = aliasHeroFormerNames(stateAfterWorld);
         agentSlipRef.current = null;
         coverPlanRef.current = null;
         operativePlanRef.current = null;
@@ -52566,7 +52686,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const routeRiskCtx = {
             factionReputations,
             recentBattleNodeIds: new Set((gameState.worldEvents || []).slice(-WORLD_EVENT_RECENT_COUNT).map(e => e.locationId)),
-            allegiance: computeHeroAllegiance(gameState, factionReputations, npcReputations)
+            allegiance: computeHeroAllegiance(gameState, factionReputations)
         };
         const route = findMapRoute(gameState.map, gameState.map.currentId, node.id, routeRiskCtx);
         if (!route)
@@ -53946,11 +54066,27 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             ? (npcRecord ? npcRecord.name : raw.npcName.trim())
             : (typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : t('combatReinforcementAllyFallbackName'));
         const tier = !isNamedNpc && ENEMY_TIERS[raw.tier] ? raw.tier : 'average';
-        const rolled = rollEnemyStatsForTier(tier);
-        const ownGear = rollAllyOwnGear(tier, rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing);
+        // A creature ally (a dragon, a troll...) is rolled exactly like an enemy of that kind:
+        // no gear, natural weapon, 2x2 footprint for a behemoth, spells, fearless — see rollEnemyFromSpec.
+        const kind = !isNamedNpc && ENEMY_KINDS.includes(raw.kind) ? raw.kind : ENEMY_KIND_DEFAULT;
+        const isCreature = kind !== ENEMY_KIND_DEFAULT;
+        const species = isCreature ? resolveEnemySpecies(raw.species, kind, name) : null;
+        const rolled = rollEnemyStatsForTier(tier, isCreature ? kind : undefined);
+        const ownGear = isCreature ? rollEnemyInventory(tier, kind, [], '', name) : rollAllyOwnGear(tier, rolled.armorGear, name, raw.weaponDescription, raw.armorPiercing);
         const { armor, armorPools } = allyArmorFromLoadout(ownGear.equipment, ownGear.inventory, ownGear.itemRarities);
+        const allySpells = kind === 'behemoth' ? (() => {
+            const chosen = normalizeEnemySpells(raw.spells);
+            return chosen.length > 0 ? chosen : (species === 'dragon' ? DRAGON_SPELL_IDS.slice() : []);
+        })() : [];
         return {
             id, name,
+            ...(isCreature ? {
+                kind, tier, role: ENEMY_ROLES[raw.role] ? raw.role : 'melee',
+                damageResist: ENEMY_DAMAGE_RESIST_LEVELS.includes(raw.damageResist) ? raw.damageResist : ENEMY_DAMAGE_RESIST_DEFAULT,
+                fearless: raw.fearless === true || species === 'dragon',
+                ...(species === 'dragon' ? { species, portraitEmoji: DRAGON_PORTRAIT_EMOJI } : {}),
+                ...(allySpells.length > 0 ? { spells: allySpells } : {})
+            } : {}),
             stats: { strength: rolled.power, agility: rolled.precision, intelligence: 0, initiative: rolled.initiative },
             originalHealth: rolled.totalHp, originalMaxHealth: rolled.totalHp,
             parts: buildCombatantParts(rolled.totalHp, rolled.totalHp),
@@ -54083,7 +54219,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             abilityState: createAbilityFightState(),
             // Hidden per-fight environment (time / light / realm) — see
             // buildCombatEnvironment. Not rendered anywhere yet.
-            environment: buildCombatEnvironment(encounter, gameState.dayPhase),
+            environment: buildCombatEnvironment(encounter, gameState.dayPhase, gameState.weather),
             // "Связаны боем" pairings — see deriveLocksAfterAction/
             // getActiveLockPartner near isBodyDestroyed. Empty at the start of
             // every fight; grows the first time any two combatants trade blows.
@@ -54194,7 +54330,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             lastReinforcementSeq: 0,
             abilityState: createAbilityFightState(),
             // Same hidden environment as startCombat's — see buildCombatEnvironment.
-            environment: buildCombatEnvironment(encounter, gameState.dayPhase),
+            environment: buildCombatEnvironment(encounter, gameState.dayPhase, gameState.weather),
             locks: {}
         });
         setCombatModalOpen(true);
@@ -54808,7 +54944,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     function applyAllyMoraleShock(allies, sourceId, amount) {
         const sourcePos = sourceId ? (allies.find(a => a.id === sourceId) || {}).pos : null;
         return allies.map(a => {
-            if (a.id === sourceId || isAllyOut(a) || typeof a.morale !== 'number')
+            if (a.id === sourceId || a.fearless || isAllyOut(a) || typeof a.morale !== 'number')
                 return a;
             if (sourcePos && a.pos && chebyshevDistance(sourcePos, a.pos) > COMBAT_TUNING.moraleShockRadius)
                 return a;
@@ -55178,7 +55314,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     }
     function makeAllyActor(ally, mods, wear, eqOverride) {
         const load = getAllyLoadout(ally);
-        const weaponInfo = getWeaponInfoForLoadout(eqOverride || load.equipment, overlayGearWear(load.inventory, wear, load.itemRarities), t('combatUnarmedLabel'), load.itemRarities);
+        const weaponInfo = { ...getWeaponInfoForLoadout(eqOverride || load.equipment, overlayGearWear(load.inventory, wear, load.itemRarities), t('combatUnarmedLabel'), load.itemRarities) };
+        // A gearless creature ally (dragon, troll...) strikes with its natural weapon, same as the enemy kind.
+        const natural = ally.kind && ally.kind !== ENEMY_KIND_DEFAULT;
+        if (natural) {
+            weaponInfo.damage = naturalWeaponDamage(ally);
+            weaponInfo.label = ally.weaponDescription || weaponInfo.label;
+        }
         return { name: ally.name, parts: null, agility: ally.stats.agility, power: ally.stats.strength, weaponDamage: weaponInfo.damage, weaponLabel: weaponInfo.label, armorPiercing: weaponInfo.armorPiercing || 0, mods, isEnemy: false };
     }
     function makeAllyDefender(ally, mods, wear) {
@@ -55187,7 +55329,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const inv = overlayGearWear(load.inventory, wear, load.itemRarities);
         const availability = computeDefenseAvailability(eq, inv, load.itemRarities);
         const weaponInfo = getWeaponInfoForLoadout(eq, inv, t('combatUnarmedLabel'), load.itemRarities);
-        return { name: ally.name, parts: ally.parts, isEnemy: false, agility: ally.stats.agility, defenseAvailability: availability, physAbsorb: absorbPctFromDefense(computeTotalArmorDefense(eq, inv, load.itemRarities)), getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k, load.itemRarities), weaponDamage: weaponInfo.damage, armorPiercing: weaponInfo.armorPiercing || 0, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart, armorPools: { cur: (ally.armorPools && ally.armorPools.cur) || { body: 0, head: 0 } } };
+        return { name: ally.name, parts: ally.parts, isEnemy: false, fearless: !!ally.fearless, agility: ally.stats.agility, defenseAvailability: availability, physAbsorb: absorbPctFromDefense(computeTotalArmorDefense(eq, inv, load.itemRarities)), getDefenseForPart: (k) => getDefenseForPartOfLoadout(eq, inv, k, load.itemRarities), weaponDamage: weaponInfo.damage, armorPiercing: weaponInfo.armorPiercing || 0, mods, morale: typeof ally.morale === 'number' ? ally.morale : COMBAT_TUNING.moraleStart, armorPools: { cur: (ally.armorPools && ally.armorPools.cur) || { body: 0, head: 0 } } };
     }
     // powerMult (optional): a one-off multiplier for a single buffed swing —
     // see runAutoTurn's boss-tier "power surge" turn — layered on top of, not
@@ -56721,6 +56863,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         combatFxBusyRef.current = true;
         setCombatFxBusy(true);
         setCombat(p => (p ? { ...p, abilityFx: { ...script.fx, seq, at: Date.now() } } : p));
+        afxScheduleTicks(script, p => !!p.abilityFx && p.abilityFx.seq === seq, setCombat);
         setTimeout(() => {
             setCombat(p => {
                 if (!p || p.result || !p.abilityFx || p.abilityFx.seq !== seq)
@@ -56917,6 +57060,55 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             self: { type: side, id: unit.id, pos: unit.pos, tactic: unit.aiTactic, hpFraction: hpFractionOfParts(unit.parts), movedRound: unit.aiMovedRound, heldRound: unit.aiHeldRound }
         };
     }
+    // A dry shooter (empty magazines, no spare clips) first looks for a fallen
+    // enemy/companion that still holds unspent spare clips within reach: it walks
+    // up to the body (1 action per step, with the usual attacks of opportunity)
+    // and, once adjacent, takes ALL of that body's clips for 1 action. Returns the
+    // new state, or null when there is nothing worth scavenging (the caller then
+    // falls back to drawing a melee weapon). Same rules for enemies and allies.
+    function tryScavengeClips(state, side, unit) {
+        if (!unit.pos)
+            return null;
+        const ownerKey = side + ':' + unit.id;
+        const clips = state.gunClips || {};
+        let best = null, bestD = Infinity;
+        const consider = (key, fallen, name) => {
+            if (key === ownerKey || !fallen.pos || fallen.fled)
+                return;
+            const n = spareClipsLeft(clips, key);
+            if (n <= 0)
+                return;
+            const d = chebyshevDistance(unit.pos, fallen.pos);
+            if (d < bestD) {
+                bestD = d;
+                best = { key, n, pos: fallen.pos, name };
+            }
+        };
+        state.enemies.forEach(e => { if (isEnemyDown(e))
+            consider('enemy:' + e.id, e, e.enemyName); });
+        state.allies.forEach(a => { if (isAllyDown(a))
+            consider('ally:' + a.id, a, a.name); });
+        if (!best || bestD > SCAVENGE_MAX_DISTANCE)
+            return null;
+        const myName = side === 'enemy' ? unit.enemyName : unit.name;
+        if (bestD <= MELEE_ATTACK_MAX_DISTANCE) {
+            const text = myName + ' — ' + t('combatLogScavengeClipsText').replace('{n}', String(best.n)).replace('{name}', best.name);
+            return spendActions({ ...state, gunClips: { ...clips, [best.key]: 0, [ownerKey]: spareClipsLeft(clips, ownerKey) + best.n }, log: [...state.log, { text, kind: 'effect' }] }, 1);
+        }
+        const range = side === 'enemy' ? AI_MOVEMENT_RANGE : computeActorMovementRange({ type: 'ally', id: unit.id });
+        const step = chooseMoveStep(unit.pos, best.pos, state, { type: side, id: unit.id }, range);
+        if (!step)
+            return null;
+        const opp = attemptOpportunityAttacks(state, { type: side, id: unit.id, pos: unit.pos });
+        if (opp.terminal)
+            return { ...opp.state, ...opp.terminal };
+        if (opp.blocked)
+            return advanceTurn(opp.state);
+        const listKey = side === 'enemy' ? 'enemies' : 'allies';
+        const list = opp.state[listKey].map(u => u.id === unit.id ? { ...u, pos: step } : u);
+        const text = myName + ' — ' + t('combatLogScavengeMoveText').replace('{name}', best.name);
+        return spendActions({ ...opp.state, [listKey]: list, log: [...opp.state.log, { text, kind: 'defended' }] }, 1);
+    }
     // Carries out a step chosen by the tactical AI: whoever it walks away from
     // gets their free swing first (attack of opportunity), then it moves and
     // its turn ends. `move` is { pos, reasonKey }.
@@ -57087,7 +57279,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 // fresh every time it's their turn, so if morale has since climbed
                 // back above the threshold (a rally effect, a heal, whatever) they
                 // just skip this and fight normally below instead.
-                if (combatActionsLeft(prev) === ACTIONS_PER_TURN && typeof ally.morale === 'number' && ally.morale < COMBAT_TUNING.moraleFleeThreshold && prev.allies.some(isAllyDown)) {
+                if (combatActionsLeft(prev) === ACTIONS_PER_TURN && !ally.fearless && typeof ally.morale === 'number' && ally.morale < COMBAT_TUNING.moraleFleeThreshold && prev.allies.some(isAllyDown)) {
                     const fleeChance = moraleFleeAttemptChance(ally.morale);
                     const fleeSucceeded = Math.random() * 100 < fleeChance;
                     if (fleeSucceeded) {
@@ -57174,6 +57366,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         const dryMags = ensureGunMags(prev.gunMags, dryOwner, dryHands);
                         const dryClips = ensureSpareClips(prev.gunClips, dryOwner, 'ally');
                         if (isGunsDry(dryMags, dryClips, dryOwner, dryHands)) {
+                            const scavenged = tryScavengeClips({ ...prev, gunMags: dryMags, gunClips: dryClips, log }, 'ally', ally);
+                            if (scavenged)
+                                return scavenged;
                             const load = getAllyLoadout(ally);
                             const swapName = pickMeleeSidearmName(load.inventory, load.itemRarities, t('combatFallbackMeleeName'));
                             const eq = load.equipment || {};
@@ -57186,6 +57381,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     }
                 }
                 const aiGunFx = aiKit.gunFx;
+                // Allied spellcasting creature (a dragon): same spell logic an enemy dragon uses, aimed at the enemies.
+                if (ally.pos && Array.isArray(ally.spells) && ally.spells.length > 0 && combatActionsLeft(prev) === ACTIONS_PER_TURN && Math.random() < ENEMY_SPELL_CAST_CHANCE) {
+                    const plan = aiPlanEnemySpell(prev, ally, allySees, 'ally');
+                    if (plan) {
+                        const script = buildAbilityScript(plan.id, prev, plan.target, 1, undefined, ENEMY_SPELL_TIER_MULT[ally.tier] || 1, { type: 'ally', id: ally.id, pos: ally.pos });
+                        if (script) {
+                            const seq = afxNextSeq();
+                            return { ...prev, abilityFx: { ...script.fx, seq, at: Date.now() }, pendingEnemySpell: { seq, enemyId: ally.id, spellId: plan.id, script, casterType: 'ally' } };
+                        }
+                    }
+                }
                 // Tactical AI: roll this companion's personality the first time it
                 // acts (see AI_TACTIC_DEFS) and keep it for the rest of the fight.
                 let aiAlly = prev.allies.find(x => x.id === ally.id) || ally;
@@ -57205,7 +57411,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 // Melee companion with nobody in reach yet: flank / hunt / wait for
                 // the group instead of always walking at the nearest enemy.
-                if (!aiGunFx && aiAlly.pos && !prev.enemies.some(e => !isEnemyOut(e) && e.pos && chebyshevDistance(aiAlly.pos, e.pos) <= MELEE_ATTACK_MAX_DISTANCE)) {
+                if (!aiGunFx && aiAlly.pos && posSpan(aiAlly.pos) === UNIT_SPAN && !prev.enemies.some(e => !isEnemyOut(e) && e.pos && chebyshevDistance(aiAlly.pos, e.pos) <= MELEE_ATTACK_MAX_DISTANCE)) {
                     const meleeMove = aiChooseMeleeMove(buildAiTacticalCtx(prev, 'ally', aiAlly, computeActorMovementRange({ type: 'ally', id: ally.id })));
                     if (meleeMove) {
                         if (allyPinnedNow)
@@ -57405,6 +57611,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const dryMags = ensureGunMags(prev.gunMags, dryOwner, dryHands);
                 const dryClips = ensureSpareClips(prev.gunClips, dryOwner, 'enemy');
                 if (isGunsDry(dryMags, dryClips, dryOwner, dryHands)) {
+                    const scavenged = tryScavengeClips({ ...prev, gunMags: dryMags, gunClips: dryClips, log }, 'enemy', enemy);
+                    if (scavenged)
+                        return scavenged;
                     // Same rule as for companions: 1 action to draw a one-handed melee weapon.
                     const swapName = pickMeleeSidearmName(enemy.inventory, enemy.itemRarities, t('combatFallbackMeleeName'));
                     const eqE = enemy.equipment;
@@ -57968,12 +58177,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const pend = combat.pendingEnemySpell;
         combatFxBusyRef.current = true;
         setCombatFxBusy(true);
+        const tickTimers = afxScheduleTicks(pend.script, p => !!p.pendingEnemySpell && p.pendingEnemySpell.seq === pend.seq, setCombat);
         const timer = setTimeout(() => {
             setCombat(p => {
                 if (!p || !p.pendingEnemySpell || p.pendingEnemySpell.seq !== pend.seq)
                     return p;
                 if (p.result)
                     return { ...p, pendingEnemySpell: null, abilityFx: null };
+                if (pend.casterType === 'ally') {
+                    const ares = afxCommitAllySpell(p, pend.script, pend.spellId, pend.enemyId, t);
+                    return ares.allDown ? { ...ares.combat, result: 'victory' } : spendActions(ares.combat, 2);
+                }
                 const res = afxCommitEnemySpell(p, pend.script, pend.spellId, pend.enemyId, t, heroName || t('combatYouLabel'));
                 if (res.result)
                     return { ...res.combat, result: res.result, killedBy: res.killedBy };
@@ -57982,7 +58196,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             combatFxBusyRef.current = false;
             setCombatFxBusy(false);
         }, pend.script.commitMs);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(timer); tickTimers.forEach(clearTimeout); };
     }, [pendingEnemySpellSeq]);
     // Drives every non-hero turn forward on a short delay (so a multi-enemy
     // round reads as a sequence of blows rather than jumping straight to the
@@ -58397,7 +58611,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         }
         if (Object.keys(bondToasts).length > 0)
             pushReputationToasts(bondToasts, false);
-        const nextState = { ...gameState, health: newHealth, effects: newEffects, inventory: finalInventory, confiscatedInventory: finalConfiscatedInventory, currency: nextCurrency, quests: nextQuests, level: nextLevel, xp: nextXp, npcs: nextNpcs, talentPoints: nextTalentPoints, companionBonds: bondOutcome.bonds };
+        // The story carries on in the weather the fight ended on (unless it was an editor-pinned/ranged test fight).
+        const endWeather = combat.environment && !combat.environment.weatherRange && !combat.environment.indoors && combat.environment.realm === 'material' && COMBAT_WEATHERS.includes(combat.environment.weather) ? combat.environment.weather : gameState.weather;
+        const nextState = { ...gameState, weather: endWeather, health: newHealth, effects: newEffects, inventory: finalInventory, confiscatedInventory: finalConfiscatedInventory, currency: nextCurrency, quests: nextQuests, level: nextLevel, xp: nextXp, npcs: nextNpcs, talentPoints: nextTalentPoints, companionBonds: bondOutcome.bonds };
         const summaryTag = buildCombatSummaryTag(combat, failedQuests, bondOutcome.applied);
         const sourceNarratorIndex = combat.sourceNarratorIndex;
         // Computed and applied BEFORE saveGame (rather than after, as this used
@@ -60618,7 +60834,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         exportModalOpen && (React.createElement(ExportModal, { exportText: exportText, generating: exportGenerating, copyFeedback: copyFeedback, onCopy: copyExportText, onDownload: downloadExportText, onClose: () => setExportModalOpen(false), t: t })),
         settingsOpen && (React.createElement(SettingsModal, { uiLang: uiLang, onSetLanguage: setLanguage, stateDeltaMode: stateDeltaMode, onSetStateDeltaMode: setStateDeltaMode, soundVolume: soundVolume, onSetSoundVolume: setSoundVolume, apiKey: geminiApiKey, onSetApiKey: setApiKey, model: geminiModel, onSetModel: setModel, onRestartClick: () => { setSettingsOpen(false); setRestartConfirmOpen(true); }, onClose: () => setSettingsOpen(false), t: t })),
         cloudModalOpen && (React.createElement(CloudModal, { cloudUser: cloudUser, cloudAuthMode: cloudAuthMode, onSetAuthMode: setCloudAuthMode, cloudEmail: cloudEmail, onSetEmail: setCloudEmail, cloudPassword: cloudPassword, onSetPassword: setCloudPassword, cloudAuthLoading: cloudAuthLoading, cloudAuthError: cloudAuthError, cloudAuthNotice: cloudAuthNotice, onSignInEmail: signInWithEmail, onSignUpEmail: signUpWithEmail, onSignInGoogle: signInWithGoogle, onSignOut: signOutCloud, onDeleteAccount: requestDeleteAccount, cloudAccountDeleting: cloudAccountDeleting, cloudSaves: cloudSaves, cloudSavesLoading: cloudSavesLoading, cloudActionSlot: cloudActionSlot, cloudActionError: cloudActionError, onSaveSlot: requestSaveToCloudSlot, onLoadSlot: requestLoadFromCloudSlot, onDeleteSlot: requestDeleteCloudSlot, cloudConfirm: cloudConfirm, onConfirmCloudAction: confirmCloudAction, onCancelCloudAction: cancelCloudAction, onClose: () => setCloudModalOpen(false), t: t })),
-        mapModalOpen && (React.createElement(MapModal, { allegiance: computeHeroAllegiance(viewedState, viewedFactionReputations, viewedNpcReputations), map: viewedState.map, npcs: viewedState.npcs, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, onUpdateNodeMeta: isLatestTurn ? updateMapNodeMeta : undefined, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
+        mapModalOpen && (React.createElement(MapModal, { allegiance: computeHeroAllegiance(viewedState, viewedFactionReputations), map: viewedState.map, npcs: viewedState.npcs, quests: viewedState.quests, factionReputations: viewedFactionReputations, worldEvents: viewedState.worldEvents, dayPhase: viewedState.dayPhase, onClose: () => setMapModalOpen(false), onRequestTravel: isLatestTurn ? requestMapTravel : undefined, onCancelTravel: cancelMapTravel, onDismissArrow: dismissMapArrow, onUpdateNodeMeta: isLatestTurn ? updateMapNodeMeta : undefined, pendingMapTravel: isLatestTurn ? pendingMapTravel : null, previousLayoutPositions: mapLayoutPositionsRef.current, t: t })),
         questJournalOpen && (React.createElement(QuestJournalModal, { quests: viewedState.quests, onClose: () => setQuestJournalOpen(false), t: t })),
         societyModalOpen && (React.createElement(SocietyModal, { gameState: viewedState, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, factionActions: heroFactionActions, onClose: () => setSocietyModalOpen(false), t: t })),
         giftTargetNpc && (React.createElement(GiftItemModal, { npcName: giftTargetNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, skipGiftConfirm: skipGiftConfirm, onConfirm: confirmGiftBundle, onCancel: () => setGiftTargetNpc(null), t: t })),
