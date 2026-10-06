@@ -44245,10 +44245,10 @@ function DevHeroTab({ api }) {
         strength: String(gs.stats.strength), agility: String(gs.stats.agility), intelligence: String(gs.stats.intelligence), initiative: String(gs.stats.initiative),
         level: String(gs.level)
     });
-    const [xp, setXp] = useState('200');
-    const [gold, setGold] = useState('100');
-    const [points, setPoints] = useState('3');
-    const [fx, setFx] = useState({ kind: 'bleed', severity: 'moderate', label: '', turns: '', partKey: '' });
+    const [xp, setXp] = useDevDraft('hero.xp', '200');
+    const [gold, setGold] = useDevDraft('hero.gold', '100');
+    const [points, setPoints] = useDevDraft('hero.points', '3');
+    const [fx, setFx] = useDevDraft('hero.fx', { kind: 'bleed', severity: 'moderate', label: '', turns: '', partKey: '' });
     const set = (k, val) => setV(p => ({ ...p, [k]: val }));
     const setF = (k, val) => setFx(p => ({ ...p, [k]: val }));
     const patch = fn => { api.setGameState(s => fn(s)); api.commit(); };
@@ -44403,8 +44403,8 @@ function DevHeroTab({ api }) {
 function DevItemsTab({ api }) {
     const gs = api.gameState;
     const lang = api.uiLang;
-    const [f, setFState] = useState({ name: '', slot: 'weapon', rarity: 'rare', qty: '1', weight: '', twoHanded: false, shield: false, dur: '', questId: '', target: 'hero', equip: false, price: '' });
-    const [setRarity, setSetRarity] = useState('unique');
+    const [f, setFState] = useDevDraft('items.f', { name: '', slot: 'weapon', rarity: 'rare', qty: '1', weight: '', twoHanded: false, shield: false, dur: '', questId: '', target: 'hero', equip: false, price: '' });
+    const [setRarity, setSetRarity] = useDevDraft('items.setRarity', 'unique');
     const set = (k, val) => setFState(p => ({ ...p, [k]: val }));
     const npcs = (gs.npcs || []).filter(n => n && typeof n.name === 'string');
     const nameByKey = {};
@@ -44541,7 +44541,7 @@ function DevNpcTab({ api }) {
     const gs = api.gameState;
     const lang = api.uiLang;
     const currentNode = (gs.map.nodes || []).find(n => n.id === gs.map.currentId) || null;
-    const [f, setFState] = useState({ name: '', role: '', faction: '', note: '', rep: '10', present: true, party: false, merchant: false, purse: '300', stock: '6', hp: '50', stat: '10' });
+    const [f, setFState] = useDevDraft('npc.f', { name: '', role: '', faction: '', note: '', rep: '10', present: true, party: false, merchant: false, purse: '300', stock: '6', hp: '50', stat: '10' });
     const set = (k, val) => setFState(p => ({ ...p, [k]: val }));
     const profile = f.role.trim() ? inferNpcMerchantProfile(f.role) : null;
     const npcs = (gs.npcs || []).filter(n => n && typeof n.name === 'string');
@@ -44683,8 +44683,8 @@ function DevNpcTab({ api }) {
 // -- Quests ------------------------------------------------------------------
 function DevQuestsTab({ api }) {
     const gs = api.gameState;
-    const [f, setFState] = useState({ title: '', giver: '', reward: '', description: '', stages: '', npcs: '' });
-    const [newStage, setNewStage] = useState({});
+    const [f, setFState] = useDevDraft('quests.f', { title: '', giver: '', reward: '', description: '', stages: '', npcs: '' });
+    const [newStage, setNewStage] = useDevDraft('quests.newStage', {});
     const set = (k, val) => setFState(p => ({ ...p, [k]: val }));
     const patchQuests = fn => { api.setGameState(s => ({ ...s, quests: fn(s.quests) })); api.commit(); };
     function create() {
@@ -44761,8 +44761,8 @@ function DevWorldTab({ api }) {
     const gs = api.gameState;
     const map = gs.map;
     const [time, setTime] = useState(gs.time || '');
-    const [node, setNode] = useState({ name: '', kind: 'settlement', direction: 'E', connect: true, discovered: true, danger: false, faction: '', description: '' });
-    const [faction, setFaction] = useState({ name: '', note: '' });
+    const [node, setNode] = useDevDraft('world.node', { name: '', kind: 'settlement', direction: 'E', connect: true, discovered: true, danger: false, faction: '', description: '' });
+    const [faction, setFaction] = useDevDraft('world.faction', { name: '', note: '' });
     const setN = (k, val) => setNode(p => ({ ...p, [k]: val }));
     const patchState = fn => { api.setGameState(s => fn(s)); api.commit(); };
     function applyTime(text, phase) {
@@ -44869,28 +44869,73 @@ function DevWorldTab({ api }) {
                 React.createElement(DevBtn, { onClick: addFaction }, "\uFF0B")))));
 }
 // -- Combat & scenes ---------------------------------------------------------
+// ---- combat editor draft ----------------------------------------------------
+// The DEV page forms (combat editor, items, NPC, quests, world, hero tools) used to live in plain useState inside
+// DevCombatTab, so it was wiped every time the tab unmounted: switching DEV tabs, closing the panel, or «Сразу в бой»
+// (which closes the panel). Now every field is mirrored into this module-level draft (survives unmounts) and
+// debounced into window.storage (survives a page reload). Only the «Сбросить эту страницу» button clears it, and only for the page you are on.
+const DEV_COMBAT_DRAFT_KEY = 'grimoire-rpg-dev-combat-draft';
+const devCombatDraft = {};
+let devCombatDraftSaveTimer = null;
+function devCombatDraftSave() {
+    if (typeof window === 'undefined' || !window.storage)
+        return;
+    clearTimeout(devCombatDraftSaveTimer);
+    devCombatDraftSaveTimer = setTimeout(() => {
+        try {
+            Promise.resolve(window.storage.set(DEV_COMBAT_DRAFT_KEY, JSON.stringify(devCombatDraft), false)).catch(() => { });
+        }
+        catch (e) { /* storage unavailable: the in-memory draft still works */ }
+    }, 400);
+}
+async function devCombatDraftLoad() {
+    if (typeof window === 'undefined' || !window.storage)
+        return;
+    try {
+        const r = await window.storage.get(DEV_COMBAT_DRAFT_KEY, false);
+        const saved = r && r.value ? JSON.parse(r.value) : null;
+        if (saved && typeof saved === 'object') {
+            Object.keys(saved).forEach(k => { if (!(k in devCombatDraft))
+                devCombatDraft[k] = saved[k]; });
+        }
+    }
+    catch (e) { /* no saved draft yet (a missing key throws) or unreadable: start from defaults */ }
+}
+// Forgets the saved fields of ONE DEV page (keys are prefixed with the page id: 'combat.', 'items.', ...).
+function devDraftClear(prefix) {
+    Object.keys(devCombatDraft).forEach(k => { if (k.indexOf(prefix + '.') === 0)
+        delete devCombatDraft[k]; });
+    devCombatDraftSave();
+}
+// Drop-in for useState: starts from the saved draft value when there is one and writes every change back to it.
+function useDevDraft(name, initial) {
+    const [value, setValue] = useState(() => (name in devCombatDraft ? devCombatDraft[name] : (typeof initial === 'function' ? initial() : initial)));
+    useEffect(() => { devCombatDraft[name] = value; devCombatDraftSave(); }, [value]);
+    return [value, setValue];
+}
 function DevCombatTab({ api }) {
     const gs = api.gameState;
     const lang = api.uiLang;
     const newRow = () => ({ name: devL(lang, 'Бандит', 'Bandit'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: devL(lang, 'Ржавый меч', 'Rusty sword'), desc: '', count: '1', fearless: false, species: '' });
-    const [rows, setRows] = useState([newRow()]);
-    const [ambush, setAmbush] = useState(false);
-    const [devWeather, setDevWeather] = useState('none');
-    const [devWeatherTo, setDevWeatherTo] = useState('same');
-    const [devWeatherMode, setDevWeatherMode] = useState('range');
-    const [devWeatherEvery, setDevWeatherEvery] = useState(false);
-    const [devIndoors, setDevIndoors] = useState(false);
-    const [wave, setWave] = useState({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: '', count: '2', species: '' });
-    const [sceneText, setSceneText] = useState('');
-    const [io, setIo] = useState({ name: '', slot: 'weapon', rarity: 'rare', cost: '', twoHanded: false, shield: false, mode: 'multi' });
-    const [qo, setQo] = useState({ title: '', giver: '', reward: '', description: '', negotiable: true });
-    const [to, setTo] = useState({ label: '', kind: 'landmark' });
-    const [ro, setRo] = useState({ questId: '', reward: '' });
+    const [rows, setRows] = useDevDraft('combat.rows', () => [newRow()]);
+    const [ambush, setAmbush] = useDevDraft('combat.ambush', false);
+    const [devWeather, setDevWeather] = useDevDraft('combat.weather', 'none');
+    const [devWeatherTo, setDevWeatherTo] = useDevDraft('combat.weatherTo', 'same');
+    const [devWeatherMode, setDevWeatherMode] = useDevDraft('combat.weatherMode', 'range');
+    const [devWeatherEvery, setDevWeatherEvery] = useDevDraft('combat.weatherEvery', false);
+    const [devIndoors, setDevIndoors] = useDevDraft('combat.indoors', false);
+    const newWave = () => ({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: '', count: '2', species: '' });
+    const [wave, setWave] = useDevDraft('combat.wave', newWave);
+    const [sceneText, setSceneText] = useDevDraft('combat.sceneText', '');
+    const [io, setIo] = useDevDraft('combat.io', { name: '', slot: 'weapon', rarity: 'rare', cost: '', twoHanded: false, shield: false, mode: 'multi' });
+    const [qo, setQo] = useDevDraft('combat.qo', { title: '', giver: '', reward: '', description: '', negotiable: true });
+    const [to, setTo] = useDevDraft('combat.to', { label: '', kind: 'landmark' });
+    const [ro, setRo] = useDevDraft('combat.ro', { questId: '', reward: '' });
     const setRow = (i, k, val) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
     const setW = (k, val) => setWave(p => ({ ...p, [k]: val }));
     const totalEnemies = rows.filter(r => r.side !== 'ally').reduce((sum, r) => sum + devClamp(r.count, 1, MAX_COMBAT_ENEMIES, 1), 0);
     const totalAllies = rows.filter(r => r.side === 'ally').reduce((sum, r) => sum + devClamp(r.count, 1, MAX_COMBATANTS_PER_SIDE, 1), 0);
-    const [presetSide, setPresetSide] = useState('enemy');
+    const [presetSide, setPresetSide] = useDevDraft('combat.presetSide', 'enemy');
     const activeQuests = gs.quests.filter(q => q.status === 'active');
     const PRESETS = [
         { label: '3 слабых бандита', rows: [{ name: 'Бандит', tier: 'weak', role: 'melee', weapon: 'Дубина', count: '3' }] },
@@ -45040,7 +45085,7 @@ function DevCombatTab({ api }) {
             React.createElement(DevRow, null,
                 React.createElement(DevBtn, { kind: "primary", onClick: () => post(true) }, "\u2694 \u0421\u0440\u0430\u0437\u0443 \u0432 \u0431\u043E\u0439"),
                 React.createElement(DevBtn, { onClick: () => post(false) }, "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u0446\u0435\u043D\u0443 \u0441 \u043A\u043D\u043E\u043F\u043A\u043E\u0439 \u00AB\u0412 \u0431\u043E\u0439\u00BB")),
-            React.createElement("p", { className: "dev-hint" }, "\u0426\u0435\u043B\u0438 \u0431\u043E\u044F (\u043E\u0431\u044A\u0435\u043A\u0442\u0438\u0432\u044B) \u043F\u0430\u043D\u0435\u043B\u044C \u043D\u0435 \u0437\u0430\u0434\u0430\u0451\u0442 \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u00AB\u043F\u043E\u0431\u0435\u0434\u0438\u0442\u044C \u0432\u0441\u0435\u0445\u00BB. \u0418\u0441\u0445\u043E\u0434 \u043F\u043E\u0440\u0430\u0436\u0435\u043D\u0438\u044F (\u043F\u043B\u0435\u043D/\u0441\u043C\u0435\u0440\u0442\u044C) \u0438 \u0432\u043E\u0441\u043A\u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u043D\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u0432\u043E \u0432\u043A\u043B\u0430\u0434\u043A\u0435 \u00AB\u0421\u0438\u0441\u0442\u0435\u043C\u0430\u00BB.")),
+            React.createElement("p", { className: "dev-hint" }, "\u0421\u043E\u0441\u0442\u0430\u0432 \u0431\u043E\u044F, \u043F\u043E\u0433\u043E\u0434\u0430 \u0438 \u043F\u043E\u0434\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u0435 \u0437\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u044E\u0442\u0441\u044F \u043C\u0435\u0436\u0434\u0443 \u0431\u043E\u044F\u043C\u0438 \u0438 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u043A\u0430\u043C\u0438 \u2014 \u043E\u0447\u0438\u0449\u0430\u0435\u0442 \u0438\u0445 \u0442\u043E\u043B\u044C\u043A\u043E \u00AB\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u044D\u0442\u0443 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443\u00BB \u0432\u0432\u0435\u0440\u0445\u0443. \u0426\u0435\u043B\u0438 \u0431\u043E\u044F (\u043E\u0431\u044A\u0435\u043A\u0442\u0438\u0432\u044B) \u043F\u0430\u043D\u0435\u043B\u044C \u043D\u0435 \u0437\u0430\u0434\u0430\u0451\u0442 \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u00AB\u043F\u043E\u0431\u0435\u0434\u0438\u0442\u044C \u0432\u0441\u0435\u0445\u00BB. \u0418\u0441\u0445\u043E\u0434 \u043F\u043E\u0440\u0430\u0436\u0435\u043D\u0438\u044F (\u043F\u043B\u0435\u043D/\u0441\u043C\u0435\u0440\u0442\u044C) \u0438 \u0432\u043E\u0441\u043A\u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u043D\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u0432\u043E \u0432\u043A\u043B\u0430\u0434\u043A\u0435 \u00AB\u0421\u0438\u0441\u0442\u0435\u043C\u0430\u00BB.")),
         React.createElement(DevSection, { title: "\u0421\u0446\u0435\u043D\u0430 \u0440\u0430\u0441\u0441\u043A\u0430\u0437\u0447\u0438\u043A\u0430" },
             React.createElement(DevRow, null,
                 React.createElement(DevField, { label: "\u0422\u0435\u043A\u0441\u0442", grow: true },
@@ -45117,6 +45162,12 @@ const DEV_TABS = [
 ];
 function DevPanel({ api }) {
     const [tab, setTab] = useState(api.initialTab || 'hero');
+    // The saved combat-editor draft is read once; DevCombatTab mounts only after it has been merged in.
+    const [draftReady, setDraftReady] = useState(false);
+    const [pageNonce, setPageNonce] = useState({}); // per-page counter: bumping it remounts that page with default fields
+    function resetPage() { devDraftClear(tab); setPageNonce(n => ({ ...n, [tab]: (n[tab] || 0) + 1 })); api.flash('Страница сброшена'); }
+    useEffect(() => { let alive = true; devCombatDraftLoad().then(() => { if (alive)
+        setDraftReady(true); }); return () => { alive = false; }; }, []);
     if (!api.open) {
         return (React.createElement(React.Fragment, null,
             React.createElement("style", null, DEV_PANEL_STYLES),
@@ -45132,13 +45183,16 @@ function DevPanel({ api }) {
                 React.createElement(DevBtn, { small: true, onClick: api.onClose }, "\u2715 \u0417\u0430\u043A\u0440\u044B\u0442\u044C")),
             React.createElement("div", { className: "dev-tabs" }, DEV_TABS.map(entry => (React.createElement("button", { key: entry[0], type: "button", className: 'dev-tab' + (tab === entry[0] ? ' dev-tab-active' : ''), onClick: () => setTab(entry[0]) }, entry[1])))),
             React.createElement("div", { className: "dev-body" },
-                tab === 'hero' && React.createElement(DevHeroTab, { api: api }),
-                tab === 'items' && React.createElement(DevItemsTab, { api: api }),
-                tab === 'npc' && React.createElement(DevNpcTab, { api: api }),
-                tab === 'quests' && React.createElement(DevQuestsTab, { api: api }),
-                tab === 'world' && React.createElement(DevWorldTab, { api: api }),
-                tab === 'combat' && React.createElement(DevCombatTab, { api: api }),
-                tab === 'system' && React.createElement(DevSystemTab, { api: api })))));
+                tab !== 'system' && (React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' } },
+                    React.createElement(DevBtn, { small: true, kind: "danger", onClick: resetPage }, "\u21BA \u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u044D\u0442\u0443 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443"))),
+                !draftReady && tab !== 'system' ? null : React.createElement(React.Fragment, { key: tab + ':' + (pageNonce[tab] || 0) },
+                    tab === 'hero' && React.createElement(DevHeroTab, { api: api }),
+                    tab === 'items' && React.createElement(DevItemsTab, { api: api }),
+                    tab === 'npc' && React.createElement(DevNpcTab, { api: api }),
+                    tab === 'quests' && React.createElement(DevQuestsTab, { api: api }),
+                    tab === 'world' && React.createElement(DevWorldTab, { api: api }),
+                    tab === 'combat' && React.createElement(DevCombatTab, { api: api }),
+                    tab === 'system' && React.createElement(DevSystemTab, { api: api }))))));
 }
 const DEV_PANEL_STYLES = `
   .dev-fab { position: fixed; left: 0.75rem; bottom: 0.75rem; z-index: 45; width: 2.6rem; height: 2.6rem; border-radius: 50%; border: 1px solid var(--amber-700); background: var(--stone-900); color: var(--amber-400); font-size: 1.15rem; cursor: pointer; opacity: 0.85; }
