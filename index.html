@@ -29154,22 +29154,163 @@ function footprintCells(pos) {
 const FOG_VISION_RANGE = 8; // small cells (4 character widths); identical for everyone for now. The two opening columns are 10 cells apart, so nobody sees the other side at the start.
 const FOG_FLARE_RADIUS = 9; // small cells a flare keeps lit
 const FOG_FLARE_MAX_RANGE = 20; // how far from the shooter a flare can be aimed
-// Drifting mist banks laid over the fog (x/y/rx/ry as fractions of the field's size,
-// dx/dy = sway in px, dur/delay in seconds). Fixed so the mist looks the same on every render.
-const FOG_WISPS = [
-    { x: 0.10, y: 0.22, rx: 0.26, ry: 0.20, dx: 70, dy: 18, dur: 23, delay: -4 },
-    { x: 0.38, y: 0.12, rx: 0.30, ry: 0.17, dx: -80, dy: 22, dur: 29, delay: -11 },
-    { x: 0.70, y: 0.26, rx: 0.28, ry: 0.22, dx: 65, dy: -20, dur: 26, delay: -7 },
-    { x: 0.92, y: 0.10, rx: 0.22, ry: 0.18, dx: -55, dy: 26, dur: 21, delay: -15 },
-    { x: 0.22, y: 0.55, rx: 0.32, ry: 0.22, dx: -75, dy: -16, dur: 31, delay: -2 },
-    { x: 0.55, y: 0.48, rx: 0.27, ry: 0.19, dx: 90, dy: 14, dur: 24, delay: -19 },
-    { x: 0.85, y: 0.60, rx: 0.30, ry: 0.23, dx: -60, dy: -24, dur: 28, delay: -9 },
-    { x: 0.08, y: 0.88, rx: 0.25, ry: 0.18, dx: 72, dy: -14, dur: 22, delay: -13 },
-    { x: 0.42, y: 0.85, rx: 0.31, ry: 0.20, dx: -85, dy: 20, dur: 33, delay: -5 },
-    { x: 0.76, y: 0.90, rx: 0.27, ry: 0.19, dx: 68, dy: -18, dur: 25, delay: -17 },
-];
+// How long (real seconds) a flare keeps shining yellow before it has burned out; its lit
+// area stays visible until the owner's next turn regardless (see fogExpireFlares).
+const FOG_FLARE_BURN_SECONDS = 11;
+// The fog is ONE small canvas (FOG_PPC pixels per grid cell) stretched over the field with
+// CSS: panning/zooming the camera then just moves a ready-made texture. Every pixel gets its own
+// smooth fade value (a distance field), so the rim has no visible steps or layers even when zoomed in;
+// the bilinear upscale of the canvas keeps it smooth. (A big SVG mask + blur filter that was redrawn
+// every frame made camera drags stutter.)
+const FOG_PPC_GL = 8; // canvas pixels per grid cell when the fog is drawn by the GPU (WebGL)
+const FOG_PPC_JS = 5; // ... when it has to be painted by JavaScript (no WebGL): far fewer pixels
+const FOG_FPS_GL = 30;
+const FOG_FPS_JS = 20;
+const FOG_FEATHER = 1.7; // cells: the fade runs from (rim - FOG_FEATHER) to (rim + FOG_FEATHER)
+const FOG_RIM_BINS = 96;
+const FOG_FOG_ALPHA = 0.84;
 // Firearms whose owners carry flares: SMG/rifle ("автоматчик"), energy rifle, railgun.
 const FOG_FLARE_GUN_FX = ['smg', 'energyRifle', 'railSingle'];
+// Radius of a clearing's rim in direction a (radians) at time t: the nominal radius r swelling and
+// shrinking in rolling billows (two waves that roll in opposite directions, plus scalloped puffs).
+function fogRimRadius(r, a, t, seed) {
+    const wave = (dir, sd) => Math.sin(a * 2 + dir * t * 0.32 + sd) * 0.050
+        + Math.sin(a * 3 - dir * t * 0.47 + sd * 1.7) * 0.040
+        + Math.sin(a * 5 + dir * t * 0.62 + sd * 2.3) * 0.030
+        + (Math.abs(Math.sin(a * 4 + dir * t * 0.75 + sd * 0.8)) - 0.6) * 0.075;
+    return r * (1 + (wave(1, seed) + wave(-1, seed + 3.3)) * 0.85);
+}
+// Paints the whole fog into `img` (an ImageData over the fog canvas). `srcs` = [{x, y, r}] in grid
+// cells relative to the field's corner. cov[] is reused between frames (Float32Array, one per pixel).
+// This is the no-WebGL fallback; the same maths runs on the GPU in FOG_GL_FRAG.
+function fogPaint(img, cov, w, h, srcs, t, ppc) {
+    cov.fill(0);
+    const rim = new Float32Array(FOG_RIM_BINS + 1);
+    for (let si = 0; si < srcs.length; si++) {
+        const sr = srcs[si];
+        let rmin = 1e9, rmax = 0;
+        for (let i = 0; i <= FOG_RIM_BINS; i++) {
+            const a = -Math.PI + (i / FOG_RIM_BINS) * Math.PI * 2;
+            const v = fogRimRadius(sr.r, a, t, si * 1.3) * ppc;
+            rim[i] = v;
+            if (v < rmin)
+                rmin = v;
+            if (v > rmax)
+                rmax = v;
+        }
+        const f = FOG_FEATHER * ppc, cx = sr.x * ppc, cy = sr.y * ppc;
+        const inner = Math.max(0, rmin - f), inner2 = inner * inner, outer = rmax + f, outer2 = outer * outer;
+        const x0 = Math.max(0, Math.floor(cx - outer)), x1 = Math.min(w - 1, Math.ceil(cx + outer));
+        const y0 = Math.max(0, Math.floor(cy - outer)), y1 = Math.min(h - 1, Math.ceil(cy + outer));
+        const k = FOG_RIM_BINS / (Math.PI * 2);
+        for (let y = y0; y <= y1; y++) {
+            const dy = y + 0.5 - cy, row = y * w;
+            for (let x = x0; x <= x1; x++) {
+                const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+                if (d2 >= outer2)
+                    continue;
+                let c;
+                if (d2 <= inner2)
+                    c = 1;
+                else {
+                    const fa = (Math.atan2(dy, dx) + Math.PI) * k, bi = fa | 0, fr = fa - bi;
+                    const rr = rim[bi] * (1 - fr) + rim[bi + 1] * fr;
+                    c = (rr + f - Math.sqrt(d2)) / (2 * f);
+                    if (c <= 0)
+                        continue;
+                    if (c > 1)
+                        c = 1;
+                    c = c * c * (3 - 2 * c);
+                }
+                if (c > cov[row + x])
+                    cov[row + x] = c;
+            }
+        }
+    }
+    const px32 = new Uint32Array(img.data.buffer);
+    const aMax = FOG_FOG_ALPHA * 255;
+    for (let i = 0; i < cov.length; i++)
+        px32[i] = (((aMax * (1 - cov[i])) + 0.5) << 24 | (9 << 16) | (5 << 8) | 3) >>> 0;
+}
+// ---- GPU version of the fog (same maths as fogRimRadius/fogPaint) ----
+const FOG_GL_MAX_SRC = 16;
+const FOG_GL_VERT = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
+const FOG_GL_FRAG = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+    'uniform vec2 uRes; uniform float uPpc; uniform float uT; uniform int uN; uniform vec3 uSrc[' + FOG_GL_MAX_SRC + '];',
+    'float wave(float a, float t, float dir, float sd) {',
+    '  return sin(a * 2.0 + dir * t * 0.32 + sd) * 0.050',
+    '       + sin(a * 3.0 - dir * t * 0.47 + sd * 1.7) * 0.040',
+    '       + sin(a * 5.0 + dir * t * 0.62 + sd * 2.3) * 0.030',
+    '       + (abs(sin(a * 4.0 + dir * t * 0.75 + sd * 0.8)) - 0.6) * 0.075;',
+    '}',
+    'void main() {',
+    '  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
+    '  float cov = 0.0;',
+    '  float f = ' + FOG_FEATHER.toFixed(3) + ' * uPpc;',
+    '  for (int i = 0; i < ' + FOG_GL_MAX_SRC + '; i++) {',
+    '    if (i >= uN) break;',
+    '    vec2 d = p - uSrc[i].xy;',
+    '    float dl = length(d);',
+    '    if (dl > (uSrc[i].z * 1.3 + 2.0 * ' + FOG_FEATHER.toFixed(3) + ') * uPpc) continue;', // outside even at the widest billow
+    '    if (dl < (uSrc[i].z * 0.7 - ' + FOG_FEATHER.toFixed(3) + ') * uPpc) { cov = 1.0; break; }', // inside even at the narrowest billow
+    '    float a = atan(d.y, d.x);',
+    '    float sd = float(i) * 1.3;',
+    '    float rr = uSrc[i].z * (1.0 + (wave(a, uT, 1.0, sd) + wave(a, uT, -1.0, sd + 3.3)) * 0.85) * uPpc;',
+    '    float c = clamp((rr + f - dl) / (2.0 * f), 0.0, 1.0);',
+    '    cov = max(cov, c * c * (3.0 - 2.0 * c));',
+    '  }',
+    '  float al = ' + FOG_FOG_ALPHA.toFixed(3) + ' * (1.0 - cov);',
+    '  gl_FragColor = vec4(vec3(3.0, 5.0, 9.0) / 255.0 * al, al);',
+    '}',
+].join('\n');
+function fogGlBuild(gl) {
+    const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; };
+    const vs = sh(gl.VERTEX_SHADER, FOG_GL_VERT), fs = sh(gl.FRAGMENT_SHADER, FOG_GL_FRAG);
+    if (!vs || !fs)
+        return null;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+        return null;
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    return { prog, buf, uRes: gl.getUniformLocation(prog, 'uRes'), uPpc: gl.getUniformLocation(prog, 'uPpc'), uT: gl.getUniformLocation(prog, 'uT'), uN: gl.getUniformLocation(prog, 'uN'), uSrc: gl.getUniformLocation(prog, 'uSrc') };
+}
+let fogGlSupported = null; // probed once on a throw-away canvas
+function fogProbeGl() {
+    if (fogGlSupported !== null)
+        return fogGlSupported;
+    fogGlSupported = false;
+    try {
+        const cv = document.createElement('canvas');
+        const gl = cv.getContext('webgl');
+        if (gl) {
+            // A software "GPU" (SwiftShader, llvmpipe, ...) is slower than the plain JavaScript painter.
+            const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+            const renderer = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+            fogGlSupported = !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer) && !!fogGlBuild(gl);
+            const ext = gl.getExtension('WEBGL_lose_context');
+            if (ext)
+                ext.loseContext();
+        }
+    }
+    catch (e) {
+        fogGlSupported = false;
+    }
+    return fogGlSupported;
+}
 // Hook for the per-character vision range that is coming later: callers
 // already hand over the combatant, so only this function has to learn about
 // stats/gear.
@@ -29179,13 +29320,27 @@ function fogSideOfAlly(a) { return a && a.playerControlled ? 'party' : 'ally'; }
 function fogCenterOf(pos) { const sp = posSpan(pos); return { x: pos.x + sp / 2, y: pos.y + sp / 2 }; }
 function fogOrderKey(entry) { return !entry ? '' : (entry.type === 'hero' ? 'hero:hero' : entry.type + ':' + entry.id); }
 // Circles {key,x,y,r,kind} (small-cell coordinates) lighting up `side`'s view.
+// Snowfall cuts how far everybody sees (party, allies and enemies alike, so it stays fair): light snow does
+// nothing, heavy snow a little, a blizzard clearly more. Flares keep their own radius. The fog circles shrink
+// and grow smoothly as the weather shifts from round to round (the fog loop in CombatModal eases each radius).
+const WEATHER_VISION_FACTOR = { none: 1, lightSnow: 1, heavySnow: 0.9, blizzard: 0.75 };
+function fogWeatherFactor(combat) {
+    const w = combat && combat.environment && combat.environment.weather;
+    return WEATHER_VISION_FACTOR[w] || 1;
+}
+function fogUnitActive(u) { return !!u && !!u.pos && !u.fled && !isBodyDestroyed(u.parts); }
+function fogSideOfAlly(a) { return a && a.playerControlled ? 'party' : 'ally'; }
+function fogCenterOf(pos) { const sp = posSpan(pos); return { x: pos.x + sp / 2, y: pos.y + sp / 2 }; }
+function fogOrderKey(entry) { return !entry ? '' : (entry.type === 'hero' ? 'hero:hero' : entry.type + ':' + entry.id); }
+// Circles {key,x,y,r,kind} (small-cell coordinates) lighting up `side`'s view.
 function fogSources(combat, side) {
     const out = [];
     if (!combat)
         return out;
+    const wf = fogWeatherFactor(combat);
     const add = (key, unit, pos, kind) => {
         const c = fogCenterOf(pos);
-        out.push({ key, x: c.x, y: c.y, r: fogVisionRangeOf(unit), kind });
+        out.push({ key, x: c.x, y: c.y, r: fogVisionRangeOf(unit) * wf, kind });
     };
     if (side === 'party' && combat.heroPos)
         add('hero:hero', null, combat.heroPos, 'unit');
@@ -39307,6 +39462,95 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     const aimCasterPos = isAllyPlayerTurn ? currentAlly.pos : combat.heroPos;
     const partyFogSources = fogOn ? fogSources(combat, 'party') : [];
     const partySees = pos => !fogOn || fogPosVisible(partyFogSources, pos);
+    // The fog canvas is redrawn ~30 times a second (rim billows), on the GPU when WebGL is there
+    // (fogProbeGl), by JavaScript at a lower resolution when not. Positions are eased so a walking
+    // unit's clearing glides instead of jumping.
+    const fogCanvasRef = useRef(null);
+    const fogSrcRef = useRef([]);
+    fogSrcRef.current = partyFogSources;
+    useLayoutEffect(() => {
+        const cv = fogCanvasRef.current;
+        if (!fogOn || !cv)
+            return undefined;
+        const reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const cellsW = GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1, cellsH = GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1;
+        const useGl = fogProbeGl();
+        const ppc = useGl ? FOG_PPC_GL : FOG_PPC_JS;
+        const frameMs = 1000 / (useGl ? FOG_FPS_GL : FOG_FPS_JS);
+        cv.width = cellsW * ppc;
+        cv.height = cellsH * ppc;
+        const t0 = performance.now();
+        const eased = {};
+        const srcArr = new Float32Array(FOG_GL_MAX_SRC * 3);
+        let raf = 0, last = -1e9, lastNow = t0, gl = null, g = null, ctx = null, img = null, cov = null, glLost = false;
+        const initGl = () => {
+            gl = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false });
+            g = gl ? fogGlBuild(gl) : null;
+            if (gl)
+                gl.viewport(0, 0, cv.width, cv.height);
+        };
+        if (useGl)
+            initGl();
+        else {
+            ctx = cv.getContext('2d');
+            img = ctx.createImageData(cv.width, cv.height);
+            cov = new Float32Array(cv.width * cv.height);
+        }
+        const onLost = (e) => { e.preventDefault(); glLost = true; };
+        const onRestored = () => { glLost = false; initGl(); };
+        if (useGl) {
+            cv.addEventListener('webglcontextlost', onLost);
+            cv.addEventListener('webglcontextrestored', onRestored);
+        }
+        const draw = (now) => {
+            raf = requestAnimationFrame(draw);
+            if (now - last < frameMs - 2)
+                return;
+            const dt = Math.min(0.25, (now - lastNow) / 1000);
+            lastNow = now;
+            last = now;
+            const k = 1 - Math.exp(-dt * 10);
+            const srcs = fogSrcRef.current.map(sr => {
+                const tx = sr.x - GRID_RENDER_MIN_X, ty = sr.y - GRID_RENDER_MIN_Y;
+                const p = eased[sr.key] || (eased[sr.key] = { x: tx, y: ty });
+                p.x += (tx - p.x) * k;
+                p.y += (ty - p.y) * k;
+                if (p.r === undefined)
+                    p.r = sr.r;
+                p.r += (sr.r - p.r) * (1 - Math.exp(-dt * 3)); // weather changes the radius: glide, ~1 s
+                return { x: p.x, y: p.y, r: p.r };
+            });
+            const t = reduce ? 0 : (now - t0) / 1000;
+            if (useGl) {
+                if (!gl || !g || glLost)
+                    return;
+                const n = Math.min(FOG_GL_MAX_SRC, srcs.length);
+                for (let i = 0; i < n; i++) {
+                    srcArr[i * 3] = srcs[i].x * ppc;
+                    srcArr[i * 3 + 1] = srcs[i].y * ppc;
+                    srcArr[i * 3 + 2] = srcs[i].r;
+                }
+                gl.uniform2f(g.uRes, cv.width, cv.height);
+                gl.uniform1f(g.uPpc, ppc);
+                gl.uniform1f(g.uT, t);
+                gl.uniform1i(g.uN, n);
+                gl.uniform3fv(g.uSrc, srcArr);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            }
+            else {
+                fogPaint(img, cov, cv.width, cv.height, srcs, t, ppc);
+                ctx.putImageData(img, 0, 0);
+            }
+        };
+        raf = requestAnimationFrame(draw);
+        return () => {
+            cancelAnimationFrame(raf);
+            if (useGl) {
+                cv.removeEventListener('webglcontextlost', onLost);
+                cv.removeEventListener('webglcontextrestored', onRestored);
+            }
+        };
+    }, [fogOn]);
     // ---- Grid: pan (drag the field around), pinch/wheel/button zoom — always
     // anchored to a specific viewport point (the pinch midpoint, the cursor,
     // or the viewport's own center for the +/- buttons) so the spot you're
@@ -40953,32 +41197,11 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
                                     React.createElement(CombatPortrait, { suppressed: !!combat.heroSuppressed, name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", side: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), firearm: heroFirearm, t: t })))),
-                        fogOn && (() => {
-                            const fogW = (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX;
-                            const fogH = (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX;
-                            const px = (v, min) => (v - min) * GRID_CELL_PX;
-                            return (React.createElement("svg", { className: "combat-fog", width: fogW, height: fogH, viewBox: '0 0 ' + fogW + ' ' + fogH, "aria-hidden": "true" },
-                                React.createElement("defs", null,
-                                    React.createElement("radialGradient", { id: "grim-fog-hole" },
-                                        React.createElement("stop", { offset: "0%", stopColor: "#000", stopOpacity: "1" }),
-                                        React.createElement("stop", { offset: "78%", stopColor: "#000", stopOpacity: "1" }),
-                                        React.createElement("stop", { offset: "100%", stopColor: "#000", stopOpacity: "0" })),
-                                    React.createElement("radialGradient", { id: "grim-fog-mist" },
-                                        React.createElement("stop", { offset: "0%", stopColor: "#a9bdd6", stopOpacity: "0.55" }),
-                                        React.createElement("stop", { offset: "55%", stopColor: "#8aa0bd", stopOpacity: "0.22" }),
-                                        React.createElement("stop", { offset: "100%", stopColor: "#8aa0bd", stopOpacity: "0" })),
-                                    React.createElement("radialGradient", { id: "grim-flare-glow" },
-                                        React.createElement("stop", { offset: "0%", stopColor: "#ffd98a", stopOpacity: "0.30" }),
-                                        React.createElement("stop", { offset: "60%", stopColor: "#ffb347", stopOpacity: "0.12" }),
-                                        React.createElement("stop", { offset: "100%", stopColor: "#ff9a2e", stopOpacity: "0" })),
-                                    React.createElement("mask", { id: "grim-fog-mask", maskUnits: "userSpaceOnUse", x: "0", y: "0", width: fogW, height: fogH },
-                                        React.createElement("rect", { x: "0", y: "0", width: fogW, height: fogH, fill: "#fff" }),
-                                        partyFogSources.map((sr, si) => (React.createElement("circle", { key: sr.key, className: "combat-fog-hole", style: { animationDelay: (-(si % 5) * 1.3) + 's' }, cx: px(sr.x, GRID_RENDER_MIN_X), cy: px(sr.y, GRID_RENDER_MIN_Y), r: sr.r * GRID_CELL_PX, fill: "url(#grim-fog-hole)" }))))),
-                                React.createElement("g", { mask: "url(#grim-fog-mask)" },
-                                    React.createElement("rect", { className: "combat-fog-base", x: "0", y: "0", width: fogW, height: fogH, fill: "rgba(3, 5, 9, 0.84)" }),
-                                    FOG_WISPS.map((w, wi) => (React.createElement("ellipse", { key: wi, className: "combat-fog-wisp", cx: w.x * fogW, cy: w.y * fogH, rx: w.rx * fogW, ry: w.ry * fogH, fill: "url(#grim-fog-mist)", style: { '--dx': w.dx + 'px', '--dy': w.dy + 'px', animationDuration: w.dur + 's', animationDelay: w.delay + 's' } })))),
-                                partyFogSources.filter(sr => sr.kind === 'flare').map(sr => (React.createElement("circle", { key: 'glow' + sr.key, className: "combat-fog-flare-glow", cx: px(sr.x, GRID_RENDER_MIN_X), cy: px(sr.y, GRID_RENDER_MIN_Y), r: sr.r * GRID_CELL_PX, fill: "url(#grim-flare-glow)" })))));
-                        })(),
+                        fogOn && (React.createElement("canvas", { ref: fogCanvasRef, className: "combat-fog", style: { width: (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX, height: (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX }, "aria-hidden": "true" })),
+                        fogOn && partyFogSources.filter(sr => sr.kind === 'flare').map(sr => (React.createElement("div", { key: 'glow' + sr.key, className: "combat-fog-flare-glow", style: {
+                                left: (sr.x - GRID_RENDER_MIN_X - sr.r) * GRID_CELL_PX, top: (sr.y - GRID_RENDER_MIN_Y - sr.r) * GRID_CELL_PX,
+                                width: sr.r * 2 * GRID_CELL_PX, height: sr.r * 2 * GRID_CELL_PX, animationDuration: FOG_FLARE_BURN_SECONDS + 's',
+                            } }))),
                         React.createElement("style", null, AFX_CSS + AFX_UI_CSS),
                         aim && (() => {
                             const shape = afxShapeFor(aim.id, combat, aim.cell, aimCasterPos);
@@ -57180,7 +57403,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         }
         const withGoal = (st) => ({ ...st, [listKey]: st[listKey].map(u => u.id === unit.id ? { ...u, fogGoal: goal } : u) });
         if (canFlare) {
-            const selfSees = foes.some(p => { const c = fogCenterOf(p); return Math.hypot(c.x - here.x, c.y - here.y) <= fogVisionRangeOf(unit); });
+            const selfSees = foes.some(p => { const c = fogCenterOf(p); return Math.hypot(c.x - here.x, c.y - here.y) <= fogVisionRangeOf(unit) * fogWeatherFactor(state); });
             const chance = !sideSeesFoe ? 1 : (selfSees ? FOG_AI_FLARE_CHANCE_SIGHTED : FOG_AI_FLARE_CHANCE_BLIND);
             if (Math.random() < chance) {
                 // Aim: toward the nearest opponent when the side already has a lead on
@@ -61436,27 +61659,28 @@ const APP_STYLES = `
   .combat-grid-token-fogged * { pointer-events: none !important; }
   .combat-fog { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; }
   .combat-flare-preview { position: absolute; box-sizing: border-box; border: 2px dashed rgba(255, 196, 90, 0.85); background: rgba(255, 196, 90, 0.10); border-radius: 50%; pointer-events: none; z-index: 4; }
-  .combat-fog-hole, .combat-fog-flare-glow { transition: cx 0.35s ease, cy 0.35s ease; }
-  /* Swaying fog: the base layer slowly breathes, mist banks drift back and forth
-     (each at its own pace, see FOG_WISPS) and the edges of every clearing swell a little. */
-  .combat-fog-base { animation: combat-fog-breathe 9s ease-in-out infinite; }
-  .combat-fog-wisp {
-    transform-box: fill-box; transform-origin: center; will-change: transform, opacity;
-    animation: combat-fog-sway 24s ease-in-out infinite alternate;
+  /* A flare shines yellow only while it burns: flash, steady glow, sputtering, out. The area it
+     lit stays visible after that (that is the fog mask, not this glow). */
+  .combat-fog-flare-glow {
+    position: absolute; z-index: 3; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(255, 217, 138, 0.30) 0%, rgba(255, 190, 90, 0.20) 35%, rgba(255, 170, 60, 0.08) 70%, rgba(255, 154, 46, 0) 100%);
+    will-change: transform, opacity;
+    opacity: 0; animation: combat-flare-burn 11s linear forwards;
   }
-  .combat-fog-hole { transform-box: fill-box; transform-origin: center; animation: combat-fog-hole-breathe 6.5s ease-in-out infinite; }
-  @keyframes combat-fog-breathe { 0%, 100% { opacity: 0.90; } 50% { opacity: 1; } }
-  @keyframes combat-fog-sway {
-    0%   { transform: translate(calc(var(--dx) * -1), calc(var(--dy) * -1)) scale(0.94) rotate(-4deg); opacity: 0.30; }
-    50%  { opacity: 0.75; }
-    100% { transform: translate(var(--dx), var(--dy)) scale(1.14) rotate(4deg); opacity: 0.38; }
+  @keyframes combat-flare-burn {
+    0%   { opacity: 0;    transform: scale(0.6); }
+    4%   { opacity: 1;    transform: scale(1.08); }
+    14%  { opacity: 0.92; transform: scale(1); }
+    34%  { opacity: 1;    transform: scale(1.03); }
+    52%  { opacity: 0.78; transform: scale(0.97); }
+    62%  { opacity: 0.9;  transform: scale(0.98); }
+    70%  { opacity: 0.5;  transform: scale(0.94); }
+    76%  { opacity: 0.68; transform: scale(0.95); }
+    84%  { opacity: 0.28; transform: scale(0.9); }
+    89%  { opacity: 0.4;  transform: scale(0.9); }
+    95%  { opacity: 0.1;  transform: scale(0.86); }
+    100% { opacity: 0;    transform: scale(0.84); }
   }
-  @keyframes combat-fog-hole-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
-  @media (prefers-reduced-motion: reduce) {
-    .combat-fog-base, .combat-fog-wisp, .combat-fog-hole, .combat-fog-flare-glow { animation: none; }
-  }
-  .combat-fog-flare-glow { animation: combat-fog-flare-flicker 1.6s ease-in-out infinite; }
-  @keyframes combat-fog-flare-flicker { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
   /* The card's own box is fixed (see combat-portrait below) — scaling the
      whole thing down uniformly (COMBAT_CARD_GRID_SCALE, computed from that
      fixed box against GRID_CELL_PX) is what actually makes it fit inside
