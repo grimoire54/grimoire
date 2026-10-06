@@ -17631,6 +17631,14 @@ const TRANSLATIONS = {
         playerLabel: 'Ты',
         directorLabel: '📝 Указание',
         thinkingIndicator: 'мастер пишет',
+        genTimerRequests: 'запросов к Gemini: {n}',
+        genTimerRetries: 'повторов: {n}',
+        genTimerLastStatus: 'последний ответ: HTTP {s}',
+        genTimerRetryIn: 'повтор через {s} с',
+        genTimerNoReply: 'последний запрос: нет ответа',
+        genTimerFallback: 'запасная модель: {m}',
+        timeoutError: 'Google не ответил вовремя. Попробуй ещё раз или смени модель в настройках.',
+        genTimerSlow: 'Отвечает долго: Google перегружен или у ключа кончился лимит. Подробности в консоли браузера (F12).',
         secretsMenuLabel: '👁 Скрытая информация',
         equipmentMenuLabel: 'Снаряжение',
         talentsMenuLabel: 'Таланты',
@@ -18629,6 +18637,14 @@ const TRANSLATIONS = {
         playerLabel: 'You',
         directorLabel: '📝 Note',
         thinkingIndicator: 'the game master is writing',
+        genTimerRequests: 'Gemini requests: {n}',
+        genTimerRetries: 'retries: {n}',
+        genTimerLastStatus: 'last reply: HTTP {s}',
+        genTimerRetryIn: 'retrying in {s}s',
+        genTimerNoReply: 'last request: no reply',
+        genTimerFallback: 'backup model: {m}',
+        timeoutError: 'Google did not answer in time. Try again or switch the model in settings.',
+        genTimerSlow: 'Taking a while: Google is overloaded or the key has hit its limit. See the browser console (F12) for details.',
         secretsMenuLabel: '👁 Hidden information',
         equipmentMenuLabel: 'Equipment',
         talentsMenuLabel: 'Talents',
@@ -23365,7 +23381,7 @@ function buildCombatEnvironment(encounter, dayPhase, storyWeather) {
     const light = encounter && COMBAT_LIGHT_LEVELS.includes(encounter.lighting)
         ? encounter.lighting
         : (time === 'night' ? 'dark' : 'lit');
-    // indoors: roofed/enclosed place. weather ('none' | 'lightSnow' | 'heavySnow' | 'blizzard', see
+    // indoors: roofed/enclosed place. weather ('none' | 'lightSnow' | 'heavySnow' | 'blizzard' | 'lightMist' | 'heavyMist' | 'denseMist', see
     // COMBAT_WEATHERS) only ever exists outdoors in the ordinary world, so it is forced to 'none' otherwise.
     const indoors = !!(encounter && encounter.indoors === true);
     const wantWeather = encounter && COMBAT_WEATHERS.includes(encounter.weather) && encounter.weather !== 'none' ? encounter.weather : (COMBAT_WEATHERS.includes(storyWeather) ? storyWeather : 'none');
@@ -23375,8 +23391,8 @@ function buildCombatEnvironment(encounter, dayPhase, storyWeather) {
     // it up to max. min === max pins it. null = the default (free drift over every gradation, see rollWeatherShift).
     let weatherRange = null, weatherNow = weather;
     const wr = encounter && encounter.weatherRange;
-    if (wr && !indoors && realm === 'material' && WEATHER_ORDER.includes(wr.min) && WEATHER_ORDER.includes(wr.max)
-        && WEATHER_ORDER.indexOf(wr.min) <= WEATHER_ORDER.indexOf(wr.max)) {
+    if (wr && !indoors && realm === 'material' && weatherChain(wr.min).includes(wr.min) && weatherChain(wr.min).includes(wr.max)
+        && weatherChain(wr.min).indexOf(wr.min) <= weatherChain(wr.min).indexOf(wr.max)) {
         weatherRange = { min: wr.min, max: wr.max, mode: wr.mode === 'escalate' ? 'escalate' : 'range' };
         weatherNow = wr.min;
     }
@@ -23394,8 +23410,9 @@ function rollWeatherShift(env) {
     if (!env || !env.weather || env.weather === 'none')
         return env;
     const r = env.weatherRange;
-    const lo = r ? WEATHER_ORDER.indexOf(r.min) : 0, hi = r ? WEATHER_ORDER.indexOf(r.max) : WEATHER_ORDER.length - 1;
-    const cur = WEATHER_ORDER.indexOf(env.weather);
+    const chain = weatherChain(env.weather); // the shift stays inside its own family (snow or mist)
+    const lo = r ? chain.indexOf(r.min) : 0, hi = r ? chain.indexOf(r.max) : chain.length - 1;
+    const cur = chain.indexOf(env.weather);
     const chance = env.weatherEveryTurn ? 1 : WEATHER_SHIFT_CHANCE;
     if (cur < 0 || lo >= hi || Math.random() >= chance)
         return env;
@@ -23406,7 +23423,7 @@ function rollWeatherShift(env) {
         moves.push(cur - 1);
     if (moves.length === 0)
         return env;
-    return { ...env, weather: WEATHER_ORDER[moves[Math.floor(Math.random() * moves.length)]] };
+    return { ...env, weather: chain[moves[Math.floor(Math.random() * moves.length)]] };
 }
 // The flat list of active environment tags, e.g. ['night', 'dark', 'material', 'outdoors', 'blizzard'].
 // Effects can test membership instead of poking at the three axes directly.
@@ -29157,6 +29174,17 @@ const FOG_FLARE_MAX_RANGE = 20; // how far from the shooter a flare can be aimed
 // How long (real seconds) a flare keeps shining yellow before it has burned out; its lit
 // area stays visible until the owner's next turn regardless (see fogExpireFlares).
 const FOG_FLARE_BURN_SECONDS = 11;
+// The lit area is tied to the flare's own ANIMATION (flareFxRun), not to the combat state: it holds until the
+// flare has burned out (launch flight + FOG_FLARE_DUR_S after ignition) and then shrinks away over the last
+// FOG_FLARE_FADE_S seconds - even if a new round started (fogExpireFlares) while the flare was still burning.
+const FOG_FLARE_DUR_S = 8;
+const FOG_FLARE_FADE_S = 2.2;
+function fogFlareLaunchS(lenPx) { return Math.max(0.35, Math.min(2.5, lenPx / 520)); }
+// 1 while the flare burns, easing to 0 over its last FOG_FLARE_FADE_S seconds.
+function fogFlareFactor(ageS, totalS) {
+    const f = Math.max(0, Math.min(1, (totalS - ageS) / FOG_FLARE_FADE_S));
+    return f * f * (3 - 2 * f);
+}
 // The fog is ONE small canvas (FOG_PPC pixels per grid cell) stretched over the field with
 // CSS: panning/zooming the camera then just moves a ready-made texture. Every pixel gets its own
 // smooth fade value (a distance field), so the rim has no visible steps or layers even when zoomed in;
@@ -29323,7 +29351,7 @@ function fogOrderKey(entry) { return !entry ? '' : (entry.type === 'hero' ? 'her
 // Snowfall cuts how far everybody sees (party, allies and enemies alike, so it stays fair): light snow does
 // nothing, heavy snow a little, a blizzard clearly more. Flares keep their own radius. The fog circles shrink
 // and grow smoothly as the weather shifts from round to round (the fog loop in CombatModal eases each radius).
-const WEATHER_VISION_FACTOR = { none: 1, lightSnow: 1, heavySnow: 0.9, blizzard: 0.75 };
+const WEATHER_VISION_FACTOR = { none: 1, lightSnow: 1, heavySnow: 0.9, blizzard: 0.75, lightMist: 0.92, heavyMist: 0.7, denseMist: 0.45 };
 function fogWeatherFactor(combat) {
     const w = combat && combat.environment && combat.environment.weather;
     return WEATHER_VISION_FACTOR[w] || 1;
@@ -29381,7 +29409,14 @@ function fogClampFlareCell(fromPos, cell) {
 // next turn begins (fogExpireFlares), however long the animation took.
 function fogAddFlare(combat, ownerKey, side, cell) {
     const flares = (combat.flares || []).filter(f => f.ownerKey !== ownerKey);
-    flares.push({ id: ownerKey + '@' + combat.round + '#' + ((combat.lastAction && combat.lastAction.seq) || 0), ownerKey, side, x: cell.x + 0.5, y: cell.y + 0.5, r: FOG_FLARE_RADIUS, round: combat.round });
+    // How long the shell flies before it ignites (matches flareFxRun) - the visual light timing starts from it.
+    let launchS = 1;
+    const la = combat.lastAction;
+    if (la && la.fromPos) {
+        const o = fogCenterOf(la.fromPos);
+        launchS = fogFlareLaunchS(Math.hypot(cell.x + 0.5 - o.x, cell.y + 0.5 - o.y) * GRID_CELL_PX);
+    }
+    flares.push({ launchS, id: ownerKey + '@' + combat.round + '#' + ((combat.lastAction && combat.lastAction.seq) || 0), ownerKey, side, x: cell.x + 0.5, y: cell.y + 0.5, r: FOG_FLARE_RADIUS, round: combat.round });
     return { ...combat, flares };
 }
 // Called right after the turn pointer moves: a flare goes out when its owner's
@@ -32124,6 +32159,15 @@ const COMBAT_OUTCOME_LEXICON_RE = /убит|убива|убь[её]шь|мерт
 function lexicalCombatOutcomeSuspicion(text) {
     return COMBAT_OUTCOME_LEXICON_RE.test(text || '');
 }
+// Cheap pre-check that lets the combat audit (one model call per turn) be
+// skipped on turns that contain no violence vocabulary at all — neither in
+// the narration nor in the hero's action — and no leaked bracket/label notes.
+// Deliberately broad (stems, ru + en): a false positive only costs the same
+// audit call as before; a false negative would let a fight resolve in prose.
+const COMBAT_TOPIC_RE = /удар|бей|бью|бь[её]т|бить|атак|бой|боя|бою|боем|боё|драк|схват|сраж|напад|убий|убь|убит|убив|смерт|мертв|мёртв|кров|ран[аеиуыо]|ранен|оруж|меч|клинок|клинк|кинжал|нож|топор|копь|стрел|выстрел|пистолет|ружь|пул[яиь]|взрыв|гранат|бомб|заруб|режу|реж[еу]т|перереж|зареж|коло[тч]|задуш|душит|пытк|казн|дуэл|клык|когт|укус|кус[аю]|добив|добь|прикон|наносит|нанос|сбив|пинок|пинаю|швырн|\b(?:fight|fought|attack|strike|struck|stab|shoot|shot|kill|slay|slash|blood|wound|sword|blade|dagger|knife|axe|spear|arrow|gun|pistol|rifle|bullet|explo|bomb|duel|choke|strangle|punch|kick|bite|claw|fang|hit|smash|crush|battle|combat|murder|execut|tortur|ambush|weapon)|COMBAT RESULT|ENGINE NOTE|DIRECTOR NOTE|\[[A-ZА-Я]/i;
+function mightContainCombat(...texts) {
+    return COMBAT_TOPIC_RE.test(texts.filter(Boolean).join(' '));
+}
 // Appended to the narrator's system prompt when a draft was rejected.
 const COMBAT_INTEGRITY_CORRECTION = `=== MANDATORY CORRECTION — YOUR PREVIOUS DRAFT OF THIS TURN WAS REJECTED ===
 The rejected draft resolved a fight in prose (a blow landing, a wound, a death, a fall, a surrender, a victory or defeat, or a run of exchanged blows), or leaked one of the private bracketed notes. That is forbidden: every fight the hero takes part in is resolved ONLY by the game's combat engine, after you stop writing.
@@ -32578,6 +32622,255 @@ function InlineSelect({ label, value, options, onChange }) {
                 React.createElement("div", { className: "inline-select-dropdown" }, options.map(opt => (React.createElement("button", { key: opt.value, type: "button", className: 'inline-select-option' + (opt.value === value ? ' inline-select-option-active' : ''), onClick: () => { onChange(opt.value); setOpen(false); } }, opt.label)))))))));
 }
 // ---- Turn narrative widgets ----
+// ---- GEMINI MODEL REGISTRY — fallback chain + automatic discovery of new models ----
+// The chain is built from Google's own ListModels answer, so a newly released
+// Flash model is picked up by itself and a retired one drops out. SEED_* is
+// only the list used until the first successful discovery (or when offline).
+// Pro models are left out on purpose: they are not on the free tier any more.
+const MODEL_LIST_STORAGE_KEY = 'grimoire-rpg-gemini-model-list';
+const MODEL_BLOCKED_STORAGE_KEY = 'grimoire-rpg-gemini-model-blocked';
+const MODEL_LIST_MAX_AGE_MS = 24 * 3600 * 1000;
+const SEED_FALLBACK_MODELS = [
+    'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash',
+    'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview',
+    'gemini-2.5-flash', 'gemini-2.5-flash-lite'
+];
+// Plain text-capable Flash / Flash-Lite ids from 2.5 up: no image/tts/live/audio variants, no dated snapshots, no 2.0 (its output limit is lower than this game asks for).
+function parseGeminiModelId(id) {
+    const m = /^gemini-(\d+)(?:\.(\d+))?-flash(-lite)?(-preview)?$/.exec(id || '');
+    if (!m)
+        return null;
+    const version = parseInt(m[1], 10) * 100 + parseInt(m[2] || '0', 10);
+    if (version < 205)
+        return null;
+    return { version, lite: !!m[3], preview: !!m[4] };
+}
+function sortGeminiModelIds(ids) {
+    return Array.from(new Set(ids)).filter(id => parseGeminiModelId(id)).sort((a, b) => {
+        const pa = parseGeminiModelId(a), pb = parseGeminiModelId(b);
+        return (pb.version - pa.version) || (pa.lite - pb.lite) || (pa.preview - pb.preview);
+    });
+}
+const modelRegistry = {
+    discovered: [], // ids from ListModels, best first
+    blocked: {}, // id -> epoch ms until which the model is skipped (quota hit, overload, retired)
+    fp: '', // fingerprint of the API key all of this state belongs to
+    loadPromise: null,
+    refreshingFp: '',
+    listLoadedAt: 0,
+    chain() { return this.discovered.length > 0 ? this.discovered : SEED_FALLBACK_MODELS; },
+    isBlocked(id) { return (this.blocked[id] || 0) > Date.now(); },
+    block(id, ms) {
+        if (!id)
+            return;
+        this.blocked[id] = Date.now() + ms;
+        this.persistBlocked();
+    },
+    next(current, tried) {
+        for (const id of this.chain()) {
+            if (id === current || (tried && tried.has(id)) || this.isBlocked(id))
+                continue;
+            return id;
+        }
+        return '';
+    },
+    // The requested model, unless it is blocked right now — then the best free one.
+    // If everything is blocked the request goes ahead on the requested model anyway.
+    pickStart(model) {
+        if (!this.isBlocked(model))
+            return model;
+        return this.next(model, null) || model;
+    },
+    // Google resets daily quotas at midnight Pacific time (07:00/08:00 UTC); 08:00 UTC is a safe upper bound.
+    msUntilQuotaReset() {
+        const now = new Date();
+        let t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 8, 0, 0);
+        if (t <= now.getTime())
+            t += 24 * 3600 * 1000;
+        return t - now.getTime();
+    },
+    setDiscovered(ids) {
+        const sorted = sortGeminiModelIds(ids);
+        if (sorted.length === 0)
+            return;
+        const before = this.discovered.length > 0 ? this.discovered : SEED_FALLBACK_MODELS;
+        const added = sorted.filter(id => before.indexOf(id) === -1);
+        if (added.length > 0)
+            console.info('[Grimoire RPG] new Gemini models found and added to the fallback chain: ' + added.join(', '));
+        this.discovered = sorted;
+        this.listLoadedAt = Date.now();
+        console.info('[Grimoire RPG] Gemini fallback chain: ' + sorted.join(' > '));
+        if (typeof window !== 'undefined' && window.storage) {
+            try {
+                Promise.resolve(window.storage.set(MODEL_LIST_STORAGE_KEY, JSON.stringify({ fp: this.fp, at: this.listLoadedAt, ids: sorted }), false)).catch(() => { });
+            }
+            catch (e) { /* storage unavailable */ }
+        }
+    },
+    persistBlocked() {
+        if (typeof window === 'undefined' || !window.storage)
+            return;
+        const keep = {};
+        const horizon = Date.now() + 5 * 60 * 1000;
+        for (const id of Object.keys(this.blocked))
+            if (this.blocked[id] > horizon)
+                keep[id] = this.blocked[id];
+        try {
+            Promise.resolve(window.storage.set(MODEL_BLOCKED_STORAGE_KEY, JSON.stringify({ fp: this.fp, until: keep }), false)).catch(() => { });
+        }
+        catch (e) { /* storage unavailable */ }
+    },
+    // Quotas, blocked models and the list of available models all belong to one API key.
+    // Called with the key in use: the first time (or after the key was replaced) it throws
+    // away everything learned under the previous key and restores only what was saved for this one.
+    useKey(apiKey) {
+        const fp = keyFingerprint(apiKey);
+        if (fp === this.fp)
+            return this.loadPromise || Promise.resolve();
+        const hadKey = !!this.fp;
+        this.fp = fp;
+        this.blocked = {};
+        this.discovered = [];
+        this.listLoadedAt = 0;
+        if (hadKey) {
+            console.info('[Grimoire RPG] API key changed: model chain and blocked models reset');
+            this.persistBlocked();
+        }
+        this.loadPromise = this.loadFor(fp);
+        return this.loadPromise;
+    },
+    async loadFor(fp) {
+        if (typeof window === 'undefined' || !window.storage)
+            return;
+        try {
+            const r = await window.storage.get(MODEL_LIST_STORAGE_KEY, false);
+            const d = r && r.value ? JSON.parse(r.value) : null;
+            if (d && d.fp === fp && Array.isArray(d.ids) && this.fp === fp) {
+                const ids = sortGeminiModelIds(d.ids.filter(x => typeof x === 'string'));
+                if (ids.length > 0) {
+                    this.discovered = ids;
+                    this.listLoadedAt = Number(d.at) || 0;
+                }
+            }
+        }
+        catch (e) { /* nothing cached yet */ }
+        try {
+            const r = await window.storage.get(MODEL_BLOCKED_STORAGE_KEY, false);
+            const d = r && r.value ? JSON.parse(r.value) : null;
+            if (d && d.fp === fp && d.until && typeof d.until === 'object' && this.fp === fp) {
+                for (const id of Object.keys(d.until))
+                    if (Number(d.until[id]) > Date.now() && parseGeminiModelId(id))
+                        this.blocked[id] = Number(d.until[id]);
+            }
+        }
+        catch (e) { /* nothing cached yet */ }
+    }
+};
+// One-way fingerprint of the key (the key itself is never written into the model cache).
+function keyFingerprint(apiKey) {
+    const k = String(apiKey || '');
+    let h = 5381;
+    for (let i = 0; i < k.length; i++)
+        h = ((h << 5) + h + k.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36) + '.' + k.length;
+}
+// Asks Google which models this key can call (GET /v1beta/models — it does not use generation quota)
+// and rebuilds the fallback chain from the answer. Cached for 24 h; force = true skips the cache.
+async function refreshModelList(apiKey, force) {
+    if (!apiKey)
+        return;
+    const fp = keyFingerprint(apiKey);
+    if (modelRegistry.refreshingFp === fp)
+        return;
+    await modelRegistry.useKey(apiKey);
+    if (!force && modelRegistry.listLoadedAt && Date.now() - modelRegistry.listLoadedAt < MODEL_LIST_MAX_AGE_MS)
+        return;
+    modelRegistry.refreshingFp = fp;
+    try {
+        const ids = [];
+        let pageToken = '';
+        for (let page = 0; page < 5; page++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15000);
+            let res;
+            try {
+                res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''), {
+                    headers: { 'x-goog-api-key': apiKey },
+                    signal: controller.signal
+                });
+            }
+            finally {
+                clearTimeout(timer);
+            }
+            if (!res.ok)
+                return;
+            const data = await res.json();
+            for (const m of (data && data.models) || []) {
+                const id = String(m.name || '').replace(/^models\//, '');
+                const methods = m.supportedGenerationMethods;
+                if (parseGeminiModelId(id) && (!Array.isArray(methods) || methods.indexOf('generateContent') !== -1))
+                    ids.push(id);
+            }
+            pageToken = data && data.nextPageToken;
+            if (!pageToken)
+                break;
+        }
+        // The key may have been replaced while the request was in flight — then this answer is stale.
+        if (modelRegistry.fp === fp)
+            modelRegistry.setDiscovered(ids);
+    }
+    catch (e) {
+        /* offline or bad key: keep whatever chain we already have */
+    }
+    finally {
+        if (modelRegistry.refreshingFp === fp)
+            modelRegistry.refreshingFp = '';
+    }
+}
+// ---- GENERATION TIMER — live "is anything happening?" indicator ----
+// geminiFetch (inside App) reports every request, retry and HTTP status here;
+// GenerationTimer reads it once a second while the game master is writing.
+const genProgress = {
+    startedAt: 0, requests: 0, retries: 0, lastStatus: null, retryAt: 0,
+    active: false, // true only while a game-master turn is running
+    fallbackModel: '', // set once this turn has switched to the backup model
+    reset() { this.startedAt = Date.now(); this.requests = 0; this.retries = 0; this.lastStatus = null; this.retryAt = 0; this.active = true; this.fallbackModel = ''; },
+    finish() { this.active = false; this.retryAt = 0; }
+};
+function formatElapsed(ms) {
+    const sec = Math.max(0, Math.floor(ms / 1000));
+    return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+}
+function GenerationTimer({ t }) {
+    const [, setTick] = useState(0);
+    const mountedAt = useRef(Date.now()).current;
+    useEffect(() => {
+        const id = setInterval(() => setTick(n => n + 1), 1000);
+        return () => clearInterval(id);
+    }, []);
+    const tracked = genProgress.startedAt >= mountedAt - 1500;
+    const start = tracked ? genProgress.startedAt : mountedAt;
+    const now = Date.now();
+    const elapsed = now - start;
+    const retryIn = tracked && genProgress.retryAt > now ? Math.ceil((genProgress.retryAt - now) / 1000) : 0;
+    const parts = [];
+    if (tracked && genProgress.requests > 0)
+        parts.push(t('genTimerRequests').replace('{n}', genProgress.requests));
+    if (tracked && genProgress.retries > 0)
+        parts.push(t('genTimerRetries').replace('{n}', genProgress.retries));
+    if (tracked && genProgress.lastStatus && genProgress.lastStatus !== 200) {
+        parts.push(typeof genProgress.lastStatus === 'number' ? t('genTimerLastStatus').replace('{s}', genProgress.lastStatus) : t('genTimerNoReply'));
+    }
+    if (tracked && genProgress.fallbackModel)
+        parts.push(t('genTimerFallback').replace('{m}', genProgress.fallbackModel));
+    if (retryIn > 0)
+        parts.push(t('genTimerRetryIn').replace('{s}', retryIn));
+    return (React.createElement(React.Fragment, null,
+        React.createElement("span", { className: "gen-timer" }, formatElapsed(elapsed)),
+        (parts.length > 0 || elapsed > 60000) && (React.createElement("div", { className: "gen-timer-detail" },
+            parts.join(' · '),
+            elapsed > 60000 && React.createElement("div", null, t('genTimerSlow'))))));
+}
 function ActionBlock({ actions, t, editable, onEdit }) {
     // Combat's auto-continue (see endCombatAndClose) injects a text-less
     // action purely to carry the fight's outcome tag to the model — it was
@@ -36353,7 +36646,7 @@ function flareFxRun(layer, start, end) {
         bx = 1;
         by = 0;
     }
-    const amp = Math.min(34, len * .12), LAUNCH = Math.max(.35, Math.min(2.5, len / 520)), DUR = 8, RMAX = 270, seed = Math.random() * 100;
+    const amp = Math.min(34, len * .12), LAUNCH = fogFlareLaunchS(len), DUR = FOG_FLARE_DUR_S, RMAX = 270, seed = Math.random() * 100;
     const vx = fxRnd(-4, 8), vy = fxRnd(8, 14);
     let fl = null, lx = start.x, ly = start.y, glow = null;
     const glows = [];
@@ -36387,7 +36680,7 @@ function flareFxRun(layer, start, end) {
             fl.x += fl.vx * dt;
             fl.y += fl.vy * dt;
             fl.vx += fxRnd(-1, 1) * dt * 6;
-            const k = fl.t / DUR, endF = Math.max(0, Math.min(1, (DUR - fl.t) / 2.2));
+            const k = fl.t / DUR, endF = Math.max(0, Math.min(1, (DUR - fl.t) / FOG_FLARE_FADE_S));
             fl.b = Math.min(1, fl.t / .25) * endF;
             fl.R = (RMAX - 100 * k) * (.35 + .65 * Math.min(1, fl.t / .35)) * (.4 + .6 * endF);
             fl.sc = 1.8 - 1 * k;
@@ -38964,8 +39257,13 @@ function getAbilityStatus(id, fightState, round) {
 //    Settings sound volume, and it dips for a moment while the wind turns.
 //    A missing file simply means silence for that level.
 //  * Rain is deliberately not implemented yet.
-const COMBAT_WEATHERS = ['none', 'lightSnow', 'heavySnow', 'blizzard'];
-const WEATHER_ORDER = ['lightSnow', 'heavySnow', 'blizzard']; // gradations from weakest to strongest
+//  * Mist / fog is a second family (MIST_ORDER, createCombatMist below). CombatWeatherLayer mounts the right engine.
+const SNOW_ORDER = ['lightSnow', 'heavySnow', 'blizzard']; // snowfall gradations from weakest to strongest
+const MIST_ORDER = ['lightMist', 'heavyMist', 'denseMist']; // mist / fog gradations from weakest to strongest
+const COMBAT_WEATHERS = ['none', ...SNOW_ORDER, ...MIST_ORDER];
+const WEATHER_ORDER = SNOW_ORDER; // kept for old call sites; use weatherChain() to get the chain a level belongs to
+function isMistWeather(w) { return MIST_ORDER.includes(w); }
+function weatherChain(w) { return isMistWeather(w) ? MIST_ORDER : SNOW_ORDER; } // snow and mist never drift into each other
 const WEATHER_LEVELS = {
     none: { snow: 0, wind: 0, gust: 0, haze: 0, tint: 0, speed: 1 },
     lightSnow: { snow: .16, wind: 12, gust: 8, haze: 0, tint: .06, speed: .8 },
@@ -39389,25 +39687,217 @@ function createCombatWeather(canvas, getCam, initialLevel) {
         }
     };
 }
+// ============================================================================
+// COMBAT WEATHER — mist / fog (picture only, no sound yet)
+// ============================================================================
+// Three gradations (MIST_ORDER): lightMist -> heavyMist -> denseMist. Same contract as createCombatWeather
+// (setLevel / soundLoaded / flipWind / destroy, field coordinates, shared combatWind), so CombatWeatherLayer
+// can mount either. NB: the FOG_* names in this file already mean the fog of WAR, so the weather is MIST_*.
+//  * Every cloud is a handful of soft lobes. Each lobe wanders inside the cloud on its own slow path and
+//    breathes in size, so the silhouette keeps changing (stretches, splits, gathers) instead of just sliding.
+//    Sprites never rotate or swap. Each cloud has its own speed and heading; the wind only nudges the field.
+//  * Three layers: low (flat, hugs the ground), mid (volumetric), high (huge faint haze). Plus a veil that
+//    is a little denser towards the bottom of the screen and a vignette that whitens the edges.
+//  * Vision: see WEATHER_VISION_FACTOR (the fog-of-war circles shrink in the mist).
+const MIST_LEVELS = {
+    none: { mist: 0, veil: 0, vig: 0, wind: 0, speed: 1 },
+    lightMist: { mist: .36, veil: .04, vig: .10, wind: 7, speed: .8 },
+    heavyMist: { mist: .72, veil: .15, vig: .30, wind: 15, speed: 1 },
+    denseMist: { mist: 1, veil: .30, vig: .56, wind: 9, speed: 1.2 }
+};
+const MIST_KEYS = ['mist', 'veil', 'vig', 'wind', 'speed'];
+let mistSprites = null;
+function getMistSprites() {
+    if (mistSprites)
+        return mistSprites;
+    const rn = (a, b) => a + Math.random() * (b - a);
+    // opacity profile (1 - t^2)^k: fades out with zero slope and curvature at the edge, so no visible rings/lines when scaled up
+    const soft = (g, x, y, r, peak, pw) => {
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        for (let i = 0; i <= 20; i++) {
+            const t = i / 20;
+            gr.addColorStop(t, 'rgba(224,230,236,' + (peak * Math.pow(1 - t * t, pw)).toFixed(4) + ')');
+        }
+        return gr;
+    };
+    mistSprites = Array.from({ length: 4 }, () => {
+        const S = 256, c = document.createElement('canvas');
+        c.width = c.height = S;
+        const g = c.getContext('2d');
+        for (let i = 0; i < 5; i++) {
+            const a = rn(0, 6.283), d = rn(0, S * .14);
+            g.fillStyle = soft(g, S / 2 + Math.cos(a) * d, S / 2 + Math.sin(a) * d, S * rn(.28, .5), .5, 3);
+            g.fillRect(0, 0, S, S);
+        }
+        g.globalCompositeOperation = 'destination-in';
+        g.fillStyle = soft(g, S / 2, S / 2, S / 2, 1, 2);
+        g.fillRect(0, 0, S, S);
+        return c;
+    });
+    return mistSprites;
+}
+function createCombatMist(canvas, getCam, initialLevel) {
+    const cx = canvas.getContext('2d'), spr = getMistSprites();
+    const rnd = (a, b) => a + Math.random() * (b - a), sg = () => (Math.random() < .5 ? -1 : 1);
+    const worldW = (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX, worldH = (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX;
+    const area = worldW * worldH / (1100 * 650);
+    const mkCloud = (R, nl, aL, asp, vMin, vMax) => {
+        const c = { x: rnd(0, worldW), y: rnd(0, worldH), R, th: Math.random(), v: rnd(vMin, vMax), vx: rnd(-6, 6), vy: rnd(-3, 3), a: aL, lobes: [] };
+        for (let i = 0; i < nl; i++)
+            c.lobes.push({
+                s: (Math.random() * spr.length) | 0, r: R * rnd(.35, .6), ar: rnd(asp, 1),
+                ax: R * rnd(.15, .55), bx: R * rnd(.05, .3), ay: R * rnd(.1, .4) * asp, by: R * rnd(.03, .2) * asp,
+                w1: rnd(.04, .12) * sg(), w2: rnd(.08, .2) * sg(), w3: rnd(.04, .12) * sg(), w4: rnd(.08, .2) * sg(),
+                p1: rnd(0, 6.28), p2: rnd(0, 6.28), p3: rnd(0, 6.28), p4: rnd(0, 6.28), pw: rnd(.04, .1), pr: rnd(0, 6.28)
+            });
+        return c;
+    };
+    const low = [], mid = [], high = [];
+    for (let i = 0, n = Math.round(9 * area); i < n; i++)
+        low.push(mkCloud(rnd(280, 460), 6, .17, .6, .3, 1.8));
+    for (let i = 0, n = Math.round(11 * area); i < n; i++)
+        mid.push(mkCloud(rnd(220, 380), 5, .14, .85, .4, 2.2));
+    for (let i = 0, n = Math.round(2.5 * area); i < n; i++)
+        high.push(mkCloud(rnd(550, 900), 4, .06, .7, .8, 2.4));
+    const cur = { ...MIST_LEVELS.none };
+    let target = MIST_LEVELS[initialLevel] || MIST_LEVELS.none;
+    if (MIST_LEVELS[initialLevel])
+        cur.wind = target.wind;
+    let t = 0, dt = 0, dir = Math.random() < .5 ? -1 : 1, dirT = dir, nextFlip = rnd(20, 40), W = 0, H = 0, DPR = 1, raf = 0, last = performance.now(), dead = false;
+    function resize(cam) {
+        const w = Math.max(1, Math.round(cam.w)), h = Math.max(1, Math.round(cam.h)), d = Math.min(2, window.devicePixelRatio || 1);
+        if (w !== W || h !== H || d !== DPR) {
+            W = w;
+            H = h;
+            DPR = d;
+            canvas.width = Math.round(W * DPR);
+            canvas.height = Math.round(H * DPR);
+        }
+    }
+    function drawList(list, view, wind, dens, windK) {
+        const sp = cur.speed * .6;
+        for (const c of list) {
+            c.x += ((wind + 4 * dir * cur.speed) * c.v * windK + c.vx * sp) * dt;
+            c.y += c.vy * sp * dt; // own speed and heading per cloud
+            const E = c.R * 1.7;
+            if (c.x > worldW + E)
+                c.x -= worldW + 2 * E;
+            else if (c.x < -E)
+                c.x += worldW + 2 * E;
+            if (c.y > worldH + E)
+                c.y -= worldH + 2 * E;
+            else if (c.y < -E)
+                c.y += worldH + 2 * E;
+            const fade = Math.min(1, (dens - c.th) * 5);
+            if (fade <= 0)
+                continue;
+            if (c.x + E < view.x0 || c.x - E > view.x1 || c.y + E < view.y0 || c.y - E > view.y1)
+                continue;
+            const base = c.a * fade * (.6 + .4 * cur.mist);
+            for (const l of c.lobes) {
+                const x = c.x + l.ax * Math.sin(l.w1 * t + l.p1) + l.bx * Math.sin(l.w2 * t + l.p2), y = c.y + l.ay * Math.sin(l.w3 * t + l.p3) + l.by * Math.sin(l.w4 * t + l.p4);
+                const r = l.r * (1 + .28 * Math.sin(l.pw * t + l.pr));
+                cx.globalAlpha = Math.min(1, base * (.8 + .2 * Math.sin(l.pw * 1.3 * t + l.pr * 2)));
+                cx.drawImage(spr[l.s], x - r, y - r * l.ar, 2 * r, 2 * r * l.ar);
+            }
+        }
+        cx.globalAlpha = 1;
+    }
+    function frame(now) {
+        if (dead)
+            return;
+        raf = requestAnimationFrame(frame);
+        dt = Math.min(.05, Math.max(0, (now - last) / 1000));
+        last = now;
+        const cam = getCam() || { pan: { x: 0, y: 0 }, zoom: 1, w: 0, h: 0 };
+        resize(cam);
+        const k = 1 - Math.exp(-dt / 1.2);
+        MIST_KEYS.forEach(key => { cur[key] += (target[key] - cur[key]) * k; });
+        t += dt;
+        if (t >= nextFlip && cur.mist > .05) {
+            dirT = -dirT;
+            nextFlip = t + rnd(20, 45);
+        } // the mist turns rarer and softer than snow
+        dir += Math.max(-dt / 5, Math.min(dt / 5, dirT - dir));
+        const wind = dir * cur.wind;
+        combatWind.x = wind;
+        combatWind.dir = dir;
+        combatWind.strength = Math.min(1, Math.abs(wind) / 600);
+        combatWind.active = true;
+        cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        cx.clearRect(0, 0, W, H);
+        if (cur.mist < .002 && cur.veil < .002)
+            return;
+        const zoom = cam.zoom, pan = cam.pan;
+        const mx0 = Math.max(0, pan.x), my0 = Math.max(0, pan.y), mx1 = Math.min(W, pan.x + worldW * zoom), my1 = Math.min(H, pan.y + worldH * zoom);
+        if (mx1 <= mx0 || my1 <= my0)
+            return;
+        cx.save();
+        cx.beginPath();
+        cx.rect(mx0, my0, mx1 - mx0, my1 - my0);
+        cx.clip(); // the mist ends exactly at the edge of the board
+        const vl = cur.veil * (.86 + .14 * Math.sin(t * .23));
+        if (vl > .002) {
+            const sgr = cx.createLinearGradient(0, 0, 0, H);
+            sgr.addColorStop(0, 'rgba(208,215,222,' + (vl * .65) + ')');
+            sgr.addColorStop(1, 'rgba(196,204,212,' + (vl * 1.1) + ')');
+            cx.fillStyle = sgr;
+            cx.fillRect(0, 0, W, H);
+        }
+        cx.setTransform(DPR * zoom, 0, 0, DPR * zoom, DPR * pan.x, DPR * pan.y);
+        const view = { x0: -pan.x / zoom, y0: -pan.y / zoom, x1: (W - pan.x) / zoom, y1: (H - pan.y) / zoom };
+        drawList(low, view, wind, cur.mist, 1);
+        drawList(mid, view, wind, cur.mist, 1.3);
+        drawList(high, view, wind, cur.mist * .85, 1.6);
+        cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        if (cur.vig > .002) {
+            const v = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .16, W / 2, H / 2, Math.max(W, H) * .72);
+            v.addColorStop(0, 'rgba(200,208,216,0)');
+            v.addColorStop(1, 'rgba(200,208,216,' + cur.vig + ')');
+            cx.fillStyle = v;
+            cx.fillRect(0, 0, W, H);
+        }
+        cx.restore();
+    }
+    raf = requestAnimationFrame(frame);
+    return {
+        setLevel(name) { target = MIST_LEVELS[name] || MIST_LEVELS.none; },
+        soundLoaded() { return []; },
+        flipWind() { dirT = -dirT; nextFlip = t + rnd(20, 45); },
+        destroy() {
+            dead = true;
+            cancelAnimationFrame(raf);
+            combatWind.x = 0;
+            combatWind.strength = 0;
+            combatWind.active = false;
+            try {
+                cx.setTransform(1, 0, 0, 1, 0, 0);
+                cx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            catch (e) { /* ignore */ }
+        }
+    };
+}
 // Mounted by CombatModal inside the battlefield viewport (above the board, below the zoom buttons).
 // weather: combat.environment.weather. Renders nothing when there is none.
 function CombatWeatherLayer({ weather, camRef }) {
     const canvasRef = useRef(null);
     const engineRef = useRef(null);
     const active = !!weather && weather !== 'none';
+    const mist = isMistWeather(weather); // snow and mist are two engines; the engine is rebuilt only when the family changes
     useEffect(() => {
         if (!active || !canvasRef.current)
             return undefined;
-        const eng = createCombatWeather(canvasRef.current, () => camRef.current, weather);
+        const eng = (mist ? createCombatMist : createCombatWeather)(canvasRef.current, () => camRef.current, weather);
         engineRef.current = eng;
         return () => { eng.destroy(); engineRef.current = null; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [active]);
+    }, [active, mist]);
     useEffect(() => { if (engineRef.current)
         engineRef.current.setLevel(weather); }, [weather]);
     if (!active)
         return null;
-    return React.createElement("canvas", { ref: canvasRef, className: "combat-weather-canvas", "aria-hidden": "true" });
+    return React.createElement("canvas", { key: mist ? 'mist' : 'snow', ref: canvasRef, className: "combat-weather-canvas", "aria-hidden": "true" });
 }
 function CombatModal({ combat, heroName, inventory, itemRarities, introActive, fxBusy, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onReload, reloadInfo, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {}, heroFirearm = false, allyFirearms = {} }) {
     // The hero portrait's two armor bars — cur/max straight off combat state
@@ -39460,8 +39950,42 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     // A player-controlled party member armed with an SMG/rifle, energy rifle or railgun can launch flares too.
     const allyFlareCapable = isAllyPlayerTurn && FOG_FLARE_GUN_FX.includes(allyFirearms[currentAlly.name.trim().toLowerCase()]);
     const aimCasterPos = isAllyPlayerTurn ? currentAlly.pos : combat.heroPos;
-    const partyFogSources = fogOn ? fogSources(combat, 'party') : [];
-    const partySees = pos => !fogOn || fogPosVisible(partyFogSources, pos);
+    // Flares keep lighting the field for as long as their animation plays, even after the combat state has already
+    // dropped them (a new round started): flareVisRef remembers each flare from the moment it first showed up.
+    const flareVisRef = useRef({});
+    const [, setFogTick] = useState(0);
+    const fogNowMs = performance.now();
+    const baseFogSources = fogOn ? fogSources(combat, 'party') : [];
+    const flareVis = flareVisRef.current;
+    const stateFlareKeys = new Set(baseFogSources.filter(sr => sr.kind === 'flare').map(sr => sr.key));
+    if (!fogOn) {
+        Object.keys(flareVis).forEach(k => { delete flareVis[k]; });
+    }
+    else {
+        baseFogSources.forEach(sr => {
+            if (sr.kind !== 'flare' || flareVis[sr.key])
+                return;
+            const f = (combat.flares || []).find(x => 'flare:' + x.id === sr.key);
+            flareVis[sr.key] = { x: sr.x, y: sr.y, r: sr.r, t0: fogNowMs, total: ((f && f.launchS) || 1) + FOG_FLARE_DUR_S };
+        });
+        Object.keys(flareVis).forEach(k => { if (!stateFlareKeys.has(k) && fogNowMs - flareVis[k].t0 >= flareVis[k].total * 1000)
+            delete flareVis[k]; });
+    }
+    const partyFogSources = !fogOn ? [] : [
+        ...baseFogSources.map(sr => (sr.kind === 'flare' && flareVis[sr.key]) ? { ...sr, t0: flareVis[sr.key].t0, total: flareVis[sr.key].total } : sr),
+        ...Object.keys(flareVis).filter(k => !stateFlareKeys.has(k)).map(k => ({ key: k, kind: 'flare', ...flareVis[k] })),
+    ];
+    // What the player sees right now: a flare's radius is scaled down over its last seconds (see fogFlareFactor).
+    const partyFogNow = partyFogSources.map(sr => (sr.kind === 'flare' && sr.t0 !== undefined) ? { ...sr, r: sr.r * fogFlareFactor((fogNowMs - sr.t0) / 1000, sr.total) } : sr);
+    const partySees = pos => !fogOn || fogPosVisible(partyFogNow, pos);
+    // While a flare is still burning, re-render a few times a second so the tokens it lit fade out together with it.
+    const flareVisLive = Object.keys(flareVis).filter(k => fogNowMs - flareVis[k].t0 < flareVis[k].total * 1000 + 300).join('|');
+    useEffect(() => {
+        if (!flareVisLive)
+            return undefined;
+        const id = setInterval(() => setFogTick(n => n + 1), 250);
+        return () => clearInterval(id);
+    }, [flareVisLive]);
     // The fog canvas is redrawn ~30 times a second (rim billows), on the GPU when WebGL is there
     // (fogProbeGl), by JavaScript at a lower resolution when not. Positions are eased so a walking
     // unit's clearing glides instead of jumping.
@@ -39515,11 +40039,19 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                 const p = eased[sr.key] || (eased[sr.key] = { x: tx, y: ty });
                 p.x += (tx - p.x) * k;
                 p.y += (ty - p.y) * k;
+                if (sr.kind === 'flare' && sr.t0 !== undefined) {
+                    // A flare's light follows its animation: full while it burns, shrinking away with its last seconds.
+                    const rr = sr.r * fogFlareFactor((now - sr.t0) / 1000, sr.total);
+                    if (rr < 0.05)
+                        return null;
+                    p.r = rr;
+                    return { x: p.x, y: p.y, r: rr };
+                }
                 if (p.r === undefined)
                     p.r = sr.r;
                 p.r += (sr.r - p.r) * (1 - Math.exp(-dt * 3)); // weather changes the radius: glide, ~1 s
                 return { x: p.x, y: p.y, r: p.r };
-            });
+            }).filter(Boolean);
             const t = reduce ? 0 : (now - t0) / 1000;
             if (useGl) {
                 if (!gl || !g || glLost)
@@ -39572,7 +40104,25 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
     // Live camera for effects that fire from timers (shake / gunshot volume).
     const camRef = useRef(null);
-    camRef.current = { pan, zoom, w: viewportSize.w, h: viewportSize.h };
+    // The camera is moved IMPERATIVELY while the player drags / pinches / scrolls: the world's transform is written
+    // straight to the DOM node (worldRef) and only mirrored into React state a moment after the gesture settles.
+    // Updating state on every pointer-move re-rendered this whole (huge) modal - every card, cover block and the fog -
+    // 60 times a second, which is what made cover cards and some characters flicker/lag during pans and zooms.
+    const liveCamRef = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
+    const worldRef = useRef(null);
+    const camSyncTimer = useRef(0);
+    camRef.current = { pan: liveCamRef.current.pan, zoom: liveCamRef.current.zoom, w: viewportSize.w, h: viewportSize.h };
+    function applyCam(nextPan, nextZoom, syncNow) {
+        liveCamRef.current = { pan: nextPan, zoom: nextZoom };
+        if (camRef.current)
+            camRef.current = { ...camRef.current, pan: nextPan, zoom: nextZoom };
+        const el = worldRef.current;
+        if (el)
+            el.style.transform = 'translate(' + nextPan.x + 'px, ' + nextPan.y + 'px) scale(' + nextZoom + ')';
+        clearTimeout(camSyncTimer.current);
+        camSyncTimer.current = setTimeout(() => { const c = liveCamRef.current; setPan(c.pan); setZoom(c.zoom); }, syncNow ? 0 : 160);
+    }
+    useEffect(() => () => clearTimeout(camSyncTimer.current), []);
     // 0..1 loudness / shake strength of an event at the given world-pixel
     // points (shooter + impact, averaged) as seen by the current camera:
     // falls off with the distance from the screen centre across AND up/down
@@ -39849,8 +40399,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
         const fitZoom = Math.min(1, Math.max(0.5, viewportSize.w / ((START_GAP + 2 * UNIT_SPAN) * GRID_CELL_PX)));
         const worldX = unitCenterPx(GRID_CENTER_X, GRID_RENDER_MIN_X);
         const worldY = unitCenterPx(GRID_CENTER_Y, GRID_RENDER_MIN_Y);
-        setZoom(fitZoom);
-        setPan({ x: viewportSize.w / 2 - worldX * fitZoom, y: viewportSize.h / 2 - worldY * fitZoom });
+        applyCam({ x: viewportSize.w / 2 - worldX * fitZoom, y: viewportSize.h / 2 - worldY * fitZoom }, fitZoom, true);
         hasCenteredRef.current = true;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewportSize.w, viewportSize.h]);
@@ -39869,10 +40418,10 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     // just recompute a fresh anchor every single frame.
     function zoomAroundPoint(nextZoomRaw, localX, localY) {
         const nextZoom = Math.min(2.2, Math.max(COMBAT_MIN_ZOOM, nextZoomRaw));
-        const worldX = (localX - pan.x) / zoom;
-        const worldY = (localY - pan.y) / zoom;
-        setZoom(nextZoom);
-        setPan({ x: localX - worldX * nextZoom, y: localY - worldY * nextZoom });
+        const lc = liveCamRef.current;
+        const worldX = (localX - lc.pan.x) / lc.zoom;
+        const worldY = (localY - lc.pan.y) / lc.zoom;
+        applyCam({ x: localX - worldX * nextZoom, y: localY - worldY * nextZoom }, nextZoom);
     }
     function onGridPointerDown(e) {
         // No pointer capture yet: capturing right on press re-targets the click to
@@ -39894,9 +40443,9 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
             // with it instead of re-centering on the original spot each time.
             pinchRef.current = {
                 initialDist: Math.max(1, pointerDist(pts[0], pts[1])),
-                initialZoom: zoom,
-                anchorWorldX: (midX - pan.x) / zoom,
-                anchorWorldY: (midY - pan.y) / zoom
+                initialZoom: liveCamRef.current.zoom,
+                anchorWorldX: (midX - liveCamRef.current.pan.x) / liveCamRef.current.zoom,
+                anchorWorldY: (midY - liveCamRef.current.pan.y) / liveCamRef.current.zoom
             };
             panStateRef.current.dragging = false;
         }
@@ -39905,8 +40454,8 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
             panStateRef.current.moved = false;
             panStateRef.current.startX = e.clientX;
             panStateRef.current.startY = e.clientY;
-            panStateRef.current.startPanX = pan.x;
-            panStateRef.current.startPanY = pan.y;
+            panStateRef.current.startPanX = liveCamRef.current.pan.x;
+            panStateRef.current.startPanY = liveCamRef.current.pan.y;
         }
     }
     function onGridPointerMove(e) {
@@ -39918,8 +40467,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
             const rect = viewportRef.current ? viewportRef.current.getBoundingClientRect() : { left: 0, top: 0 };
             const midX = (pts[0].x + pts[1].x) / 2 - rect.left;
             const midY = (pts[0].y + pts[1].y) / 2 - rect.top;
-            setZoom(nextZoom);
-            setPan({ x: midX - pinchRef.current.anchorWorldX * nextZoom, y: midY - pinchRef.current.anchorWorldY * nextZoom });
+            applyCam({ x: midX - pinchRef.current.anchorWorldX * nextZoom, y: midY - pinchRef.current.anchorWorldY * nextZoom }, nextZoom);
             return;
         }
         if (!panStateRef.current.dragging)
@@ -39935,7 +40483,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
             }
             panStateRef.current.moved = true;
         }
-        setPan({ x: panStateRef.current.startPanX + dx, y: panStateRef.current.startPanY + dy });
+        applyCam({ x: panStateRef.current.startPanX + dx, y: panStateRef.current.startPanY + dy }, liveCamRef.current.zoom);
     }
     function onGridPointerUp(e) {
         const wasSingle = activePointersRef.current.size === 1;
@@ -39953,7 +40501,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     function onGridWheel(e) {
         e.preventDefault();
         const rect = viewportRef.current ? viewportRef.current.getBoundingClientRect() : { left: 0, top: 0 };
-        zoomAroundPoint(zoom - e.deltaY * 0.0012, e.clientX - rect.left, e.clientY - rect.top);
+        zoomAroundPoint(liveCamRef.current.zoom - e.deltaY * 0.0012, e.clientX - rect.left, e.clientY - rect.top);
     }
     // A tap that turned into a drag shouldn't also trigger the thing under
     // the pointer where the drag ended — every cell/token onClick below goes
@@ -41116,9 +41664,9 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                 React.createElement("div", { className: 'combat-grid-viewport' + (planningMove ? ' combat-grid-viewport-planning' : ''), ref: viewportRef, onPointerDown: onGridPointerDown, onPointerMove: onGridPointerMove, onPointerUp: onGridPointerUp, onPointerCancel: onGridPointerUp, onWheel: onGridWheel },
                     React.createElement("div", { className: "combat-grid-zoom-controls" },
                         React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", title: isFs ? t('combatExitFullscreenLabel') : t('combatFullscreenLabel'), "aria-label": isFs ? t('combatExitFullscreenLabel') : t('combatFullscreenLabel'), onClick: toggleFullscreen }, isFs ? '✕' : '⛶'),
-                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(zoom + 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "+"),
-                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(zoom - 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "\u2212")),
-                    React.createElement("div", { className: "combat-grid-world", style: {
+                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(liveCamRef.current.zoom + 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "+"),
+                        React.createElement("button", { type: "button", className: "btn btn-ghost combat-grid-zoom-btn", onClick: () => zoomAroundPoint(liveCamRef.current.zoom - 0.2, viewportSize.w / 2, viewportSize.h / 2) }, "\u2212")),
+                    React.createElement("div", { ref: worldRef, className: "combat-grid-world", style: {
                             width: (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX,
                             height: (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX,
                             backgroundSize: GRID_CELL_PX + 'px ' + GRID_CELL_PX + 'px',
@@ -41200,7 +41748,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                         fogOn && (React.createElement("canvas", { ref: fogCanvasRef, className: "combat-fog", style: { width: (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX, height: (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX }, "aria-hidden": "true" })),
                         fogOn && partyFogSources.filter(sr => sr.kind === 'flare').map(sr => (React.createElement("div", { key: 'glow' + sr.key, className: "combat-fog-flare-glow", style: {
                                 left: (sr.x - GRID_RENDER_MIN_X - sr.r) * GRID_CELL_PX, top: (sr.y - GRID_RENDER_MIN_Y - sr.r) * GRID_CELL_PX,
-                                width: sr.r * 2 * GRID_CELL_PX, height: sr.r * 2 * GRID_CELL_PX, animationDuration: FOG_FLARE_BURN_SECONDS + 's',
+                                width: sr.r * 2 * GRID_CELL_PX, height: sr.r * 2 * GRID_CELL_PX, animationDuration: (sr.total || FOG_FLARE_BURN_SECONDS) + 's',
                             } }))),
                         React.createElement("style", null, AFX_CSS + AFX_UI_CSS),
                         aim && (() => {
@@ -44120,7 +44668,8 @@ function devWeatherFields(env) {
     const out = { indoors: !!env.indoors };
     if (!env.from || env.from === 'none')
         return { ...out, weather: 'none' };
-    const i = WEATHER_ORDER.indexOf(env.from), j = env.to && env.to !== 'same' ? WEATHER_ORDER.indexOf(env.to) : i;
+    const chain = weatherChain(env.from); // «до» from the other family is ignored (j < 0 -> pinned to «от»)
+    const i = chain.indexOf(env.from), j = env.to && env.to !== 'same' ? chain.indexOf(env.to) : i;
     if (i < 0)
         return { ...out, weather: 'none' };
     const lo = Math.min(i, j < 0 ? i : j), hi = Math.max(i, j < 0 ? i : j);
@@ -44128,10 +44677,10 @@ function devWeatherFields(env) {
         out.weatherEveryTurn = true;
     // «every turn» with a single level («то же») opens the whole scale from that level instead of pinning it.
     if (lo === hi && env.everyTurn)
-        return { ...out, weather: WEATHER_ORDER[lo] };
+        return { ...out, weather: chain[lo] };
     if (lo === hi)
-        return { ...out, weather: WEATHER_ORDER[lo], weatherRange: { min: WEATHER_ORDER[lo], max: WEATHER_ORDER[lo], mode: 'range' } }; // pinned: never changes
-    return { ...out, weather: WEATHER_ORDER[lo], weatherRange: { min: WEATHER_ORDER[lo], max: WEATHER_ORDER[hi], mode: env.mode === 'escalate' ? 'escalate' : 'range' } };
+        return { ...out, weather: chain[lo], weatherRange: { min: chain[lo], max: chain[lo], mode: 'range' } }; // pinned: never changes
+    return { ...out, weather: chain[lo], weatherRange: { min: chain[lo], max: chain[hi], mode: env.mode === 'escalate' ? 'escalate' : 'range' } };
 }
 function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel, env) {
     const fallbackName = devL(lang, 'Противник', 'Enemy');
@@ -44809,7 +45358,7 @@ function DevWorldTab({ api }) {
                 React.createElement(DevBtn, { onClick: () => applyTime(time) }, "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C")),
             React.createElement(DevRow, null,
                 React.createElement(DevBtn, { onClick: newMorning }, "\uD83C\uDF05 \u041D\u043E\u0432\u043E\u0435 \u0443\u0442\u0440\u043E (\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0442\u043E\u0432\u0430\u0440\u044B)")),
-            React.createElement(DevRow, null, [['none', 'Без осадков'], ['lightSnow', 'Слабый снег'], ['heavySnow', 'Сильный снег'], ['blizzard', 'Буря']].map(([k, l]) => (React.createElement("button", { key: k, type: "button", className: "dev-chip", style: (gs.weather || 'none') === k ? { outline: '2px solid currentColor' } : undefined, onClick: () => patchState(s => ({ ...s, weather: k })) }, l))))),
+            React.createElement(DevRow, null, [['none', 'Без осадков'], ['lightSnow', 'Слабый снег'], ['heavySnow', 'Сильный снег'], ['blizzard', 'Буря'], ['lightMist', 'Лёгкая дымка'], ['heavyMist', 'Густой туман'], ['denseMist', 'Мгла']].map(([k, l]) => (React.createElement("button", { key: k, type: "button", className: "dev-chip", style: (gs.weather || 'none') === k ? { outline: '2px solid currentColor' } : undefined, onClick: () => patchState(s => ({ ...s, weather: k })) }, l))))),
         React.createElement(DevSection, { title: 'Карта (' + map.nodes.length + ') · сейчас: ' + (current ? current.name : '—') },
             map.nodes.map(n => (React.createElement("div", { className: "dev-item", key: n.id },
                 React.createElement("div", { className: "dev-item-main" },
@@ -45050,9 +45599,9 @@ function DevCombatTab({ api }) {
                 React.createElement(DevCheck, { checked: ambush, onChange: setAmbush }, "\u0437\u0430\u0441\u0430\u0434\u0430 (\u0442\u0438\u0445\u0430\u044F \u0430\u0442\u0430\u043A\u0430; \u0442\u043E\u043B\u044C\u043A\u043E 1 \u0432\u0440\u0430\u0433)")),
             React.createElement(DevRow, null,
                 React.createElement(DevField, { label: "\u041F\u043E\u0433\u043E\u0434\u0430 (\u043E\u0442)" },
-                    React.createElement(DevSelect, { value: devWeather, onChange: setDevWeather, options: [['none', 'нет'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря']] })),
+                    React.createElement(DevSelect, { value: devWeather, onChange: setDevWeather, options: [['none', 'нет'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря'], ['lightMist', 'лёгкая дымка'], ['heavyMist', 'густой туман'], ['denseMist', 'мгла']] })),
                 devWeather !== 'none' && (React.createElement(DevField, { label: "\u0434\u043E" },
-                    React.createElement(DevSelect, { value: devWeatherTo, onChange: setDevWeatherTo, options: [['same', 'то же (без изменений)'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря']] }))),
+                    React.createElement(DevSelect, { value: devWeatherTo, onChange: setDevWeatherTo, options: [['same', 'то же (без изменений)'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря'], ['lightMist', 'лёгкая дымка'], ['heavyMist', 'густой туман'], ['denseMist', 'мгла']] }))),
                 devWeather !== 'none' && devWeatherTo !== 'same' && devWeatherTo !== devWeather && (React.createElement(DevField, { label: "\u0445\u043E\u0434" },
                     React.createElement(DevSelect, { value: devWeatherMode, onChange: setDevWeatherMode, options: [['range', 'колеблется в диапазоне'], ['escalate', 'только нарастает']] }))),
                 devWeather !== 'none' && (React.createElement(DevCheck, { checked: devWeatherEvery, onChange: setDevWeatherEvery }, "\u043C\u0435\u043D\u044F\u0442\u044C \u043F\u043E\u0433\u043E\u0434\u0443 \u043A\u0430\u0436\u0434\u044B\u0439 \u0445\u043E\u0434 (\u0438\u043D\u0430\u0447\u0435 \u2014 \u0448\u0430\u043D\u0441 50 %)")),
@@ -47039,6 +47588,18 @@ function App() {
     const [soundVolume, setSoundVolumeState] = useState(SOUND_VOLUME_MAX);
     const [geminiApiKey, setGeminiApiKey] = useState('');
     const [geminiModel, setGeminiModel] = useState(DEFAULT_GEMINI_MODEL);
+    // Fallback chain: restore the cached model list / blocked models, then ask Google which models exist now.
+    useEffect(() => {
+        if (!geminiApiKey)
+            return undefined;
+        let cancelled = false;
+        (async () => {
+            await modelRegistry.useKey(geminiApiKey);
+            if (!cancelled)
+                await refreshModelList(geminiApiKey, false);
+        })();
+        return () => { cancelled = true; };
+    }, [geminiApiKey]);
     const [cloudUser, setCloudUser] = useState(null);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
     const [cloudAuthMode, setCloudAuthMode] = useState('signin');
@@ -48363,8 +48924,34 @@ function App() {
     // between attempts. A DAILY quota hit (quota id contains "PerDay") can't
     // clear within minutes, so that one is returned immediately instead of
     // making the player wait two minutes for nothing.
-    const GEMINI_RETRY_WINDOW_MS = 120000;
+    const GEMINI_RETRY_WINDOW_MS = 60000; // was 2 min: long silent retry loops burned the key
+    const GEMINI_FETCH_TIMEOUT_MS = 120000; // non-streaming call: wait for the whole answer
+    const GEMINI_STREAM_FIRST_BYTE_MS = 60000; // streaming call: until the response starts
+    const GEMINI_STREAM_STALL_MS = 45000; // streaming call: max silence between chunks
+    const GEMINI_TURN_RETRY_CAP = 10; // transport retries one turn may spend in total
+    const GEMINI_SWITCH_AFTER_FAILURES = 2; // failures on one model before moving to the next one
+    const GEMINI_MAX_MODELS_PER_CALL = 4; // models one request may try before giving up
     const GEMINI_RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
+    // Next model of the fallback chain (see modelRegistry) — each model has its
+    // own quota and its own load, so switching helps with 503, 429 and 404.
+    function fallbackModelFor(model) {
+        return modelRegistry.next(model, null) || (model === DEFAULT_GEMINI_MODEL ? 'gemini-3.8-flash' : DEFAULT_GEMINI_MODEL);
+    }
+    function modelOfUrl(url) {
+        const m = /\/models\/([^/:]+):/.exec(url);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+    function swapModelInUrl(url, model) {
+        return url.replace(/\/models\/[^/:]+:/, '/models/' + encodeURIComponent(model) + ':');
+    }
+    // Google says how long to wait: a Retry-After header or RetryInfo.retryDelay ("23s") in the body.
+    function parseRetryDelayMs(response, bodyText) {
+        const h = response && response.headers && response.headers.get ? response.headers.get('retry-after') : null;
+        if (h && !isNaN(Number(h)))
+            return Number(h) * 1000;
+        const m = /"retryDelay"\s*:\s*"([\d.]+)s"/.exec(bodyText || '');
+        return m ? Math.ceil(parseFloat(m[1]) * 1000) : 0;
+    }
     // Diagnostics for the "model overloaded" screen: which request failed, with what HTTP status and how big it was.
     // The player-facing text hides Google's raw answer, so without this a persistent 503 can't be traced to a call.
     const geminiDiagRef = { current: null };
@@ -48377,34 +48964,119 @@ function App() {
             stageHint = JSON.parse(init.body).systemInstruction.parts[0].text.replace(/\s+/g, ' ').trim().slice(0, 60);
         }
         catch (e) { /* not a standard request */ }
+        const streaming = url.indexOf('streamGenerateContent') !== -1;
+        const timeoutMs = streaming ? GEMINI_STREAM_FIRST_BYTE_MS : GEMINI_FETCH_TIMEOUT_MS;
+        const apiKeyHeader = init && init.headers ? init.headers['x-goog-api-key'] : '';
+        // A replaced API key starts everything over: blocked models, quotas and the model list belong to the old key.
+        if (apiKeyHeader && modelRegistry.fp !== keyFingerprint(apiKeyHeader))
+            await modelRegistry.useKey(apiKeyHeader);
+        // Keep the model list fresh in the background (cached for 24 h, never blocks the request).
+        refreshModelList(apiKeyHeader, false);
+        let curModel = modelOfUrl(url);
+        const triedModels = new Set([curModel]);
+        let usedFallback = false;
+        // Start on a model that is not known to be rate-limited or retired right now.
+        const startModel = modelRegistry.pickStart(curModel);
+        if (startModel !== curModel) {
+            curModel = startModel;
+            url = swapModelInUrl(url, curModel);
+            triedModels.add(curModel);
+            usedFallback = true;
+            if (genProgress.active)
+                genProgress.fallbackModel = curModel;
+        }
+        // Block the model that just failed for blockMs and move on to the next one of the chain.
+        const switchToFallback = blockMs => {
+            modelRegistry.block(curModel, blockMs);
+            if (triedModels.size >= GEMINI_MAX_MODELS_PER_CALL)
+                return false;
+            const next = modelRegistry.next(curModel, triedModels);
+            if (!next)
+                return false;
+            console.warn('[Grimoire RPG] model ' + curModel + ' failed, switching to ' + next);
+            triedModels.add(next);
+            curModel = next;
+            url = swapModelInUrl(url, next);
+            usedFallback = true;
+            if (genProgress.active)
+                genProgress.fallbackModel = next;
+            return true;
+        };
+        let failures = 0;
         while (true) {
             let response = null;
             let netError = null;
+            let timedOut = false;
+            genProgress.requests++;
+            genProgress.retryAt = 0;
+            const controller = new AbortController();
+            const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
             try {
-                response = await fetch(url, init);
+                response = await fetch(url, { ...init, signal: controller.signal });
             }
             catch (e) {
                 netError = e;
             }
-            geminiDiagRef.current = { status: response ? response.status : 'network', stage: stageHint, chars: bodyChars };
+            finally {
+                clearTimeout(timer);
+            }
+            if (timedOut && !response) {
+                netError = new Error('Gemini request timed out after ' + Math.round(timeoutMs / 1000) + 's');
+                netError.code = 'timeout';
+            }
+            const statusLabel = response ? response.status : (timedOut ? 'timeout' : 'network');
+            genProgress.lastStatus = statusLabel;
+            geminiDiagRef.current = { status: statusLabel, stage: stageHint, chars: bodyChars };
+            if (response && response.status === 404) {
+                // Model retired or renamed: re-read the model list and move on.
+                refreshModelList(apiKeyHeader, true);
+                if (switchToFallback(6 * 3600 * 1000))
+                    continue;
+                return response;
+            }
+            if (response && response.status === 400 && usedFallback) {
+                // The backup model rejected this request's settings: don't use it again today.
+                if (switchToFallback(24 * 3600 * 1000))
+                    continue;
+                return response;
+            }
+            let retryAfterMs = 0;
+            let dailyQuota = false;
             if (response) {
                 if (!GEMINI_RETRYABLE_STATUSES.includes(response.status))
                     return response;
-                if (response.status === 429) {
-                    try {
-                        const body = await response.clone().text();
-                        if (body.indexOf('PerDay') !== -1)
-                            return response;
-                    }
-                    catch (e) { /* unreadable body — treat as a normal 429 */ }
+                let bodyText = '';
+                try {
+                    bodyText = await response.clone().text();
                 }
+                catch (e) { /* unreadable body — treat as a normal failure */ }
+                if (response.status === 429 && bodyText.indexOf('PerDay') !== -1)
+                    dailyQuota = true;
+                retryAfterMs = parseRetryDelayMs(response, bodyText);
             }
-            if (Date.now() + delay >= deadline) {
+            // A DAILY quota can't clear within minutes — but every other model has its own quota.
+            if (dailyQuota) {
+                if (switchToFallback(modelRegistry.msUntilQuotaReset()))
+                    continue;
+                return response;
+            }
+            failures++;
+            let switched = false;
+            if ((failures >= GEMINI_SWITCH_AFTER_FAILURES || retryAfterMs >= 20000) && (response || timedOut)) {
+                switched = switchToFallback(120000);
+                if (switched)
+                    failures = 0;
+            }
+            const wait = switched ? 500 : (retryAfterMs ? Math.min(retryAfterMs + 500, 30000) : delay);
+            const turnBudgetSpent = genProgress.active && genProgress.retries >= GEMINI_TURN_RETRY_CAP;
+            if (turnBudgetSpent || Date.now() + wait >= deadline) {
                 if (response)
                     return response;
                 throw netError;
             }
-            await new Promise(resolve => setTimeout(resolve, delay));
+            genProgress.retries++;
+            genProgress.retryAt = Date.now() + wait;
+            await new Promise(resolve => setTimeout(resolve, wait));
             delay = Math.min(delay * 1.5, 10000);
         }
     }
@@ -48448,7 +49120,7 @@ function App() {
     function describeError(e, prefixKey) {
         if (e.code === 'rate_limit') {
             // Suggest a model other than the one already selected (the old text always named the default, even when it was in use).
-            const altModel = geminiModel === DEFAULT_GEMINI_MODEL ? 'gemini-3.8-flash' : DEFAULT_GEMINI_MODEL;
+            const altModel = fallbackModelFor(geminiModel);
             if (e.overloaded)
                 return t('overloadedError').replace('{model}', altModel) + diagSuffix(e);
             // Real quota hit (RESOURCE_EXHAUSTED) — show only the short translated
@@ -48457,6 +49129,8 @@ function App() {
         }
         if (e.code === 'auth')
             return t('authError');
+        if (e.code === 'timeout')
+            return t('timeoutError');
         return t(prefixKey) + e.message;
     }
     // Shared by both callGemini and callGeminiStreaming. maxOutputTokens is now
@@ -48597,14 +49271,28 @@ function App() {
         // at all, which the retry below ignored). Both now count as a truncation
         // that gets continued from where the text stopped.
         let streamBroke = false;
+        let stalled = false;
         while (true) {
             let chunkResult;
+            let stallTimer;
             try {
-                chunkResult = await reader.read();
+                chunkResult = await Promise.race([
+                    reader.read(),
+                    new Promise((_, reject) => { stallTimer = setTimeout(() => reject(new Error('stream stalled')), GEMINI_STREAM_STALL_MS); })
+                ]);
             }
             catch (e) {
                 streamBroke = true;
+                if (e && e.message === 'stream stalled')
+                    stalled = true;
+                try {
+                    reader.cancel();
+                }
+                catch (e2) { /* already closed */ }
                 break;
+            }
+            finally {
+                clearTimeout(stallTimer);
             }
             const { done, value } = chunkResult;
             if (done)
@@ -48675,7 +49363,7 @@ function App() {
         // produced partial text instead.
         if (finishReason && finishReason !== 'STOP' && retriesLeft > 0 && fullText) {
             try {
-                const continuation = await callGeminiStreaming(system, [...messages, { role: 'assistant', content: fullText }, { role: 'user', content: 'Continue exactly where you left off — do not repeat any part of what you already wrote, do not restart, no commentary. Resume mid-sentence if that\'s where you stopped, and write only the rest of the scene.' }], chunk => onChunk(fullText + chunk), retriesLeft - 1);
+                const continuation = await callGeminiStreaming(system, [...messages, { role: 'assistant', content: fullText }, { role: 'user', content: 'Continue exactly where you left off — do not repeat any part of what you already wrote, do not restart, no commentary. Resume mid-sentence if that\'s where you stopped, and write only the rest of the scene.' }], chunk => onChunk(fullText + chunk), stalled ? Math.min(retriesLeft - 1, 2) : retriesLeft - 1);
                 return fullText + continuation;
             }
             catch (e) {
@@ -49025,7 +49713,7 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         // normalizeGameState) rather than gated like the rules around it.
         const weatherRuleNum = ++ruleNum;
         const curWeather = COMBAT_WEATHERS.includes(state.weather) ? state.weather : 'none';
-        const weatherRule = `\n${weatherRuleNum}. WEATHER — the current OUTDOOR weather in the story is: ${({ none: 'NONE (no snowfall; ordinary weather for the setting and season)', lightSnow: 'LIGHT SNOWFALL (a few flakes drifting down, a light wind)', heavySnow: 'HEAVY SNOWFALL (thick snow, poor visibility, snowdrifts building, a steady wind)', blizzard: 'BLIZZARD (a howling snowstorm, near-whiteout, biting wind, hard to see or hear anything)' })[curWeather]}. When the hero is OUTDOORS, let this weather show naturally in the prose (what they see, feel and hear, how it slows travel or hides things) and never contradict it. Indoors, underground or in another dimension the weather simply does not apply — do not describe snow falling inside. The weather changes ONLY when the story gives a reason: time passing, a long journey to another region or climate, a storm building or easing, magic. Such a change must be shown in the narration itself (never announced as a game term) and in steps — light to heavy to blizzard and back — not by jumping from none to a blizzard in one turn unless the story calls for something sudden. Do not invent snow in a setting or season where it makes no sense. Any fight that starts outdoors takes place in this same weather.`;
+        const weatherRule = `\n${weatherRuleNum}. WEATHER — the current OUTDOOR weather in the story is: ${({ none: 'NONE (no snowfall and no fog; ordinary weather for the setting and season)', lightSnow: 'LIGHT SNOWFALL (a few flakes drifting down, a light wind)', heavySnow: 'HEAVY SNOWFALL (thick snow, poor visibility, snowdrifts building, a steady wind)', blizzard: 'BLIZZARD (a howling snowstorm, near-whiteout, biting wind, hard to see or hear anything)', lightMist: 'LIGHT MIST (a thin haze lying low over the ground, the air still, distant shapes slightly soft)', heavyMist: 'HEAVY FOG (thick fog, short visibility, sounds muffled, shapes blur beyond a few steps)', denseMist: 'DENSE FOG (an impenetrable murk, you can barely see your own hand, everything gray and muffled)' })[curWeather]}. When the hero is OUTDOORS, let this weather show naturally in the prose (what they see, feel and hear, how it slows travel or hides things) and never contradict it. Indoors, underground or in another dimension the weather simply does not apply — do not describe snow falling inside. The weather changes ONLY when the story gives a reason: time passing, a long journey to another region or climate, a storm building or easing, magic. Such a change must be shown in the narration itself (never announced as a game term) and in steps — light to heavy to blizzard and back (or light mist to heavy fog to dense fog and back; snow and fog do not turn into each other directly) — not by jumping from none to a blizzard in one turn unless the story calls for something sudden. Do not invent snow or fog in a setting or season where it makes no sense. Any fight that starts outdoors takes place in this same weather.`;
         const dayPhaseRuleNum = ++ruleNum;
         const isNight = state.dayPhase === 'night';
         const dayPhaseRule = `\n${dayPhaseRuleNum}. TIME OF DAY — it is currently ${isNight ? 'NIGHT' : 'DAY'} in the story: ${isNight
@@ -49307,7 +49995,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no te
 {"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "weather": "none", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"current": "name of where the hero is right now", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "secretsText": "hidden information text (REQUIRED, never empty)", "newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
-"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard" — the OUTDOOR weather at the hero's location as it stands at the END of this scene, taken ONLY from what the scene shows or states. Keep the previous value (see CURRENT GAME STATE) unless the scene itself shows a change or the hero moved somewhere with different weather; weather described in the narration always wins. Being indoors does not change this value (it is the weather outside).
+"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard", "lightMist", "heavyMist", "denseMist" — the OUTDOOR weather at the hero's location as it stands at the END of this scene, taken ONLY from what the scene shows or states. Keep the previous value (see CURRENT GAME STATE) unless the scene itself shows a change or the hero moved somewhere with different weather; weather described in the narration always wins. Being indoors does not change this value (it is the weather outside). "lightMist" is a thin low haze, "heavyMist" a thick fog with short visibility, "denseMist" an impenetrable murk; snow and fog are different weathers, pick the one the scene shows.
 "time" is ONLY the current in-story date/time of day, stated as plainly and briefly as possible (e.g. "Evening, third day since departure"). It must contain nothing but the date/time itself — no reasoning, no metaphors, no sensory or atmospheric description, no commentary on what is happening. Advance it plausibly based on what happened in the scene; it should change at least subtly turn to turn unless the scene explicitly covers no time passing.
 "health" is an integer from 1 to 1000 representing the hero's CURRENT physical condition right now — how banged up, exhausted, or healed-up they are THIS turn — and must never exceed "maxHealth" (below). Calibrate against this anchor: an ordinary healthy adult sits around 50 — treat that as the normal baseline, not a low score. 1 is at death's door. Values climb above 50 only for genuinely superior physical condition (a seasoned soldier, a battle-hardened veteran, a powerful monster), reaching into the hundreds solely for truly exceptional beings, with 1000 reserved for an actual deity or equivalent cosmic-tier being. Adjust it plausibly, relative to that baseline, based on injury, healing, exhaustion, etc. — it moves scene to scene, dropping with harm and rising back up toward "maxHealth" with rest, healing, or recovery, but never past it.
 "maxHealth" is an integer from 1 to 1000 representing the hero's overall physical CAPACITY at their best — the ceiling "health" recovers toward, not their condition in this exact moment. Use the exact same 1-1000 scale and baseline-50 calibration as "health" above, but treat it like "stats" below: a lasting trait, not a momentary reading. Do NOT lower it for a temporary injury, a hard fight, or ordinary exhaustion — that's what dragging "health" below it is for. Change "maxHealth" only for a real, lasting reason: significant training or conditioning over time, a permanent crippling injury, a major magical or physical transformation, or similar genuine long-term growth or decline established by the story. On the large majority of turns, simply repeat the value already tracked in the state above unchanged.
@@ -49354,7 +50042,7 @@ If a fight is starting: "combat": {"combat": true, "enemies": [{"enemyName": "sh
 "lighting" is exactly one of "lit" or "dark" — how well lit the exact place of the fight is, judged from the scene itself, NOT from the hour: "lit" for open daylight, a lamp-, torch- or fire-lit room, a bright hall, a lantern-carrying party; "dark" for night with no light source, an unlit cellar or cave, a lightless corridor, a snuffed-out room, thick smoke or magical darkness. A torch-lit cellar at night is "lit"; a deep cave at noon is "dark". Default to "lit" when the scene gives no reason to think otherwise.
 "realm" is exactly one of "material" or "other" — "material" (the overwhelming default) for the ordinary world; "other" only when the fight takes place outside it: open space, another dimension or plane, a pocket reality, the astral or spirit world, or any setting the story explicitly treats as not belonging to the normal world.
 "indoors" is true when the fight takes place inside a building, cave, tunnel, ship, tent or any other roofed or enclosed place, and false (the default) in the open air.
-"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard" — the snowfall actually happening at the place of the fight right now; it MUST match the CURRENT WEATHER given in the rules (the story weather) unless the scene itself shows it changing, taken ONLY from the scene itself: "lightSnow" for a few flakes or a light snowfall, "heavySnow" for a thick, heavy snowfall, "blizzard" for a snowstorm or whiteout with howling wind. Never invent weather the story has not shown; "none" is the default, and it must always be "none" when "indoors" is true or when "realm" is "other".
+"weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard", "lightMist", "heavyMist", "denseMist" — the snowfall or fog actually happening at the place of the fight right now; it MUST match the CURRENT WEATHER given in the rules (the story weather) unless the scene itself shows it changing, taken ONLY from the scene itself: "lightSnow" for a few flakes or a light snowfall, "heavySnow" for a thick, heavy snowfall, "blizzard" for a snowstorm or whiteout with howling wind, "lightMist" for a thin low haze, "heavyMist" for a thick fog with short visibility, "denseMist" for an impenetrable murk where almost nothing can be seen. Never invent weather the story has not shown; "none" is the default, and it must always be "none" when "indoors" is true or when "realm" is "other".
 "noRetreat" is an optional top-level flag (default false): true when the hero has no way to simply back off and return to where they came from before the fight — they were ambushed, surrounded, cornered, trapped, or the enemies are already upon them, blocking the way, or the fight is part of a scene the hero cannot walk away from. False (or omitted) when the opponents are still some way off or have not yet engaged, so the hero could plausibly turn around and withdraw without a fight.
 "objective" is optional and describes what actually needs to happen for THIS fight to count as won, beyond the default of simply defeating every listed opponent — include it only when the scene itself gives the fight a distinct goal (reinforcements are close, someone else here needs shielding, there is something to grab and escape with rather than a fight to win outright, or the opposition is so far beyond the hero that surviving at all is the only real goal), and otherwise omit the field entirely (or send null) for an ordinary fight where victory just means beating the enemies. When present, "objective" is an object: "type" is exactly one of "surviveTurns" (the hero only needs to hold on for a stretch — a rescue, reinforcements, a collapsing structure, a fuse burning down), "protect" (someone else already in this fight must not go down, whether or not every enemy ends up beaten), "retreat" (the real goal is grabbing something and getting out, not winning the fight outright), or "survive" (the opposition is too much to beat — getting out alive at all is the whole goal); never send "defeatAll" as a type, that is simply what leaving the field out already means. "label" is a short phrase in ${narrativeLanguage}, written the way it would read on a battle-objective banner (e.g. "Продержаться 4 хода — подкрепление на подходе", "Защитить Мерина", "Grab the chest and get out"), and MUST be included whenever "objective" itself is. "turnsRequired" is a small positive integer (2–6 is typical), ONLY for "surviveTurns" — how many full combat rounds the hero has to last. "protectName" is ONLY for "protect" — the exact name of the specific companion (an actual, currently-present party member, never a bystander who is not part of the fight) who must survive.
 "reinforcements" is an optional array (default empty) of additional combatants who arrive mid-fight rather than at the start — the mechanism for a fight that grows beyond the initial clash. This should stay a minority of fights, not the norm, but don't let it collapse to never: over the course of a campaign it should genuinely fire from time to time, not sit empty for dozens of fights running. Actively look for a reason to use it rather than only reaching for it when the scene has already spelled one out in so many words — a bandit camp, a guard post, a den, or any lair-like location plausibly has more than just whoever's in the opening clash within earshot; a cry of alarm, sounds of fighting, or simply the fight running long enough to draw attention are all legitimate, ordinary triggers, not special narrative setups. Reserve it for moments that make sense given the location and situation: a patrol that will come running, a messenger who slipped away to raise the alarm, a stronghold where guards are everywhere, a desperate last stand where allies might reach the hero in time. There's no cap on how many waves a single fight can have — let a large-scale battle escalate for as long as the scene supports it. Each entry has: "id" (short, lowercase, unique slug), "label" (short name for the arriving group, in ${narrativeLanguage}, e.g. "Стража у ворот", "Меррик и его люди"), "side" (exactly "enemy" or "ally"), "trigger" (exactly one of {"type": "turn", "value": 3} — if the fight reaches round 3; {"type": "enemyDeaths", "value": 2} — once 2 enemies are dead; {"type": "allyDeaths", "value": 1} — once 1 ally has gone down; {"type": "heroHpBelow", "value": 20} — once the hero's HP drops below 20%), and "combatants" (1 or more entries, with no upper cap; for "enemy" each is shaped exactly like an "enemies" entry above — "enemyName"/"weaponDescription"/"armorPiercing"/"tier"/"role"/"kind"/"damageResist"/"fearless"/"bodyParts"; for "ally" each is EITHER {"npcName": "exact name"} binding to an already-tracked companion who MUST already exist in "npcs" above with "presentNow": true, OR an anonymous unit shaped like an enemy entry but without "fearless"/"bodyParts" — {"name": "...", "weaponDescription": "...", "armorPiercing": false, "tier": "...", "role": "..."}). Enemy reinforcement tier should usually be AT OR BELOW the fight's own opening tier — they add pressure, not punish the player for winning; a "legendary" reinforcement to a "weak" fight is almost always wrong. An ally reinforcement MUST already be established in the story before this fight — a tracked companion physically present, or an anonymous group the scene has already foreshadowed (a patrol met earlier, a faction the hero has helped) — never conjure allies from nowhere. If a reinforcement is meant to save the hero, its trigger must fire before HP would actually reach zero — even then the rescue is only narrated, not mechanically guaranteed. There is no cap on the total number of enemies across the whole fight (opening roster plus every wave) — a proper siege, battle, or last stand should field as many opponents as the scene actually calls for.\n\"presentAllies\" is an optional array (default empty) of already-tracked, currently-present companions who are ACTIVELY FIGHTING ALONGSIDE THE HERO from the very first round of THIS fight — distinct from \"reinforcements\", which is for someone arriving mid-fight, and from the hero's own recruited party (who are already added to combat automatically and never need to be listed here). Use it whenever the scene's own prose has a specific named character — someone already in \"npcs\" above with \"presentNow\": true, but not already a recruited party member — throwing a punch, swinging a weapon, or otherwise actively fighting on the hero's side in the very scene that just triggered this combat: a hired guide, a fellow prisoner who grabbed a blade, a local guard who joins in, a quest-giver defending themselves alongside the hero. If the scene's own text has such a character fighting, they MUST appear here — never leave a character the prose just showed swinging a weapon out of combat entirely. Do not invent one who wasn't actually shown fighting, and do not include anyone already covered by the hero's recruited party. Each entry is {"npcName": "exact tracked name"}, with no fixed cap.${itemOffersSection}
@@ -52351,6 +53039,10 @@ Examples: "лазган" -> energyRifle; "плазменный пистолет"
                 if (e && e.code === 'auth')
                     throw e;
                 lastError = e;
+                // Rate limit / timeout: the transport layer already retried and switched
+                // models — more full attempts only burn quota. Stop after 3.
+                if (e && (e.code === 'rate_limit' || e.code === 'timeout') && attempt >= 3)
+                    break;
                 console.warn('[Grimoire RPG] generateStateAndEvents attempt ' + attempt + '/' + STATE_AND_EVENTS_MAX_ATTEMPTS + ' failed (' + ((e && e.code) || 'error') + '): ' + (e && e.message) + (attempt < STATE_AND_EVENTS_MAX_ATTEMPTS ? ' — retrying...' : ' — giving up, falling back.'));
                 if (attempt < STATE_AND_EVENTS_MAX_ATTEMPTS) {
                     const delay = 900 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 400);
@@ -52526,6 +53218,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // then starts in the engine regardless of how the state model reads what is
     // left. Never set for the aftermath turn, where the fight already happened.
     async function guardNarrativeCombatIntegrity(narrative, ctx) {
+        // Peaceful turn: nothing violent in the scene, the action, or a pending
+        // fight/aftermath — nothing for the audit to catch, so skip its request.
+        if (!ctx.aftermathNote && !(ctx.precedingNarrator && ctx.precedingNarrator.combatEncounter) && !mightContainCombat(narrative, ctx.actionText)) {
+            console.info('[Grimoire RPG] combat audit skipped: no violence vocabulary in this turn');
+            return { narrative, forceCombat: null };
+        }
         let text = narrative;
         let enemiesSeen = [];
         const audit = candidate => candidate.trim()
@@ -52619,6 +53317,15 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // secrets/pendingSecrets round trip (buildSecretsSystemPrompt/
     // generateSecrets, since removed).
     async function callGameMaster(historyMessages, currentState, isOpeningTurn) {
+        genProgress.reset();
+        try {
+            return await callGameMasterInner(historyMessages, currentState, isOpeningTurn);
+        }
+        finally {
+            genProgress.finish();
+        }
+    }
+    async function callGameMasterInner(historyMessages, currentState, isOpeningTurn) {
         usageAccumulatorRef.current = { output: 0 };
         // buildTurns(historyMessages).length is how many complete turns already
         // precede this one, so +1 is this turn's own 1-based index. historyMessages
@@ -60975,7 +61682,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                                 React.createElement("span", { className: "thinking-dots" },
                                     React.createElement("span", null, "."),
                                     React.createElement("span", null, "."),
-                                    React.createElement("span", null, "."))),
+                                    React.createElement("span", null, ".")),
+                                React.createElement(GenerationTimer, { t: t })),
                             streamingText && (React.createElement("p", { className: "narrative-text" },
                                 streamingText,
                                 React.createElement("span", { className: "streaming-cursor" }, "\u258B"))))) : (React.createElement(React.Fragment, null,
@@ -62582,6 +63290,9 @@ const APP_STYLES = `
   .edit-btn:hover { color: var(--amber-500); }
   .narrator-edit-btn { margin-top: 0.15rem; }
   .thinking { display: flex; align-items: center; gap: 0.3rem; color: var(--amber-500); font-family: var(--font-mono); font-size: 0.9rem; }
+  .gen-timer { margin-left: 0.6rem; color: var(--amber-300); font-variant-numeric: tabular-nums; }
+  .gen-timer-detail { flex-basis: 100%; color: var(--amber-700); font-size: 0.75rem; line-height: 1.35; }
+  .thinking:has(.gen-timer-detail) { flex-wrap: wrap; }
   .thinking-sticky { position: sticky; top: 0; z-index: 5; background: var(--stone-950); padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
   .thinking-text { animation: grim-thinking-glow 1.3s ease-in-out infinite; }
   @keyframes grim-thinking-glow { 0%, 100% { color: var(--amber-700); } 50% { color: var(--amber-300); } }
