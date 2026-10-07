@@ -17651,6 +17651,10 @@ const TRANSLATIONS = {
         timeoutError: 'Google не ответил вовремя. Попробуй ещё раз или смени модель в настройках.',
         genTimerSlow: 'Отвечает долго: модель может долго «думать», либо Google перегружен, либо у ключа кончился лимит.',
         genTimerModel: 'модель: {m}',
+        genStageAction: 'проверка действия',
+        genStageNarrative: 'пишу сцену',
+        genStageAudit: 'проверка боя',
+        genStageState: 'обновляю состояние мира',
         secretsMenuLabel: '👁 Скрытая информация',
         equipmentMenuLabel: 'Снаряжение',
         talentsMenuLabel: 'Таланты',
@@ -18676,6 +18680,10 @@ const TRANSLATIONS = {
         timeoutError: 'Google did not answer in time. Try again or switch the model in settings.',
         genTimerSlow: 'Taking a while: the model may be thinking for a long time, Google may be overloaded, or the key may have hit its limit.',
         genTimerModel: 'model: {m}',
+        genStageAction: 'checking the action',
+        genStageNarrative: 'writing the scene',
+        genStageAudit: 'checking combat',
+        genStageState: 'updating the world state',
         secretsMenuLabel: '👁 Hidden information',
         equipmentMenuLabel: 'Equipment',
         talentsMenuLabel: 'Talents',
@@ -32307,7 +32315,7 @@ const ACTION_CHECK_OUTCOME_GUIDANCE = {
 // (or a leaked note) for a moment before the audit can reject it. Off by
 // default: the text appears only once it has passed the audit. Flip to true
 // to trade that guarantee back for the typewriter effect.
-const STREAM_NARRATIVE_LIVE = false;
+const STREAM_NARRATIVE_LIVE = true;
 // How many times a rejected narration is regenerated before it is trimmed.
 const COMBAT_AUDIT_MAX_RETRIES = 2;
 const COMBAT_AUDIT_MAX_TRIM_PASSES = 3;
@@ -33181,10 +33189,15 @@ const genProgress = {
         let p = this.done;
         const st = this.stage;
         if (st && !this.doneStages[st]) {
-            let f = 1 - Math.exp(-(Date.now() - this.stageStartedAt) / progressStats.ms[st]);
-            if (st === 'narrative')
-                f = this.narrativeChars > 0 ? this.narrativeChars / progressStats.narrativeChars : Math.min(f, 0.4);
-            p += (PROGRESS_STAGE_WEIGHTS[st] || 0) * Math.min(f, 0.95);
+            let f;
+            if (st === 'narrative' && this.narrativeChars > 0) {
+                f = Math.min(0.95, this.narrativeChars / progressStats.narrativeChars); // real data: characters streamed
+            }
+            else {
+                // Pure guess from elapsed time: capped well below the end, so a stalled call never sits at "98%".
+                f = Math.min(st === 'narrative' ? 0.4 : 0.8, 1 - Math.exp(-(Date.now() - this.stageStartedAt) / progressStats.ms[st]));
+            }
+            p += (PROGRESS_STAGE_WEIGHTS[st] || 0) * f;
         }
         const shown = Math.min(99, Math.floor(p));
         if (shown > this.maxPercent)
@@ -33209,6 +33222,9 @@ function GenerationTimer({ t }) {
     const elapsed = now - start;
     const retryIn = tracked && genProgress.retryAt > now ? Math.ceil((genProgress.retryAt - now) / 1000) : 0;
     const parts = [];
+    const stageKeys = { action: 'genStageAction', narrative: 'genStageNarrative', audit: 'genStageAudit', state: 'genStageState' };
+    if (tracked && stageKeys[genProgress.stage])
+        parts.push(t(stageKeys[genProgress.stage]));
     if (tracked && genProgress.requests > 0)
         parts.push(t('genTimerRequests').replace('{n}', genProgress.requests));
     if (tracked && genProgress.retries > 0)
@@ -49665,7 +49681,14 @@ function App() {
     ];
     // No game-side cap on thinking: the model decides how much to reason, and the full output ceiling stays available.
     const GEMINI_GENERATION_CONFIG = { maxOutputTokens: 65536 };
-    async function callGemini(system, messages, retriesLeft) {
+    // The scene-to-state extraction is a big structured-JSON job, not storytelling: let the model
+    // reason for a bounded amount only. With no cap it can "think" for minutes before the first byte.
+    const STATE_EVENTS_THINKING_BUDGET = 1024;
+    function generationConfigFor(options) {
+        const budget = options && options.thinkingBudget;
+        return typeof budget === 'number' ? { ...GEMINI_GENERATION_CONFIG, thinkingConfig: { thinkingBudget: budget } } : GEMINI_GENERATION_CONFIG;
+    }
+    async function callGemini(system, messages, retriesLeft, options) {
         if (devOfflineActive())
             throw new Error('DEV: offline mode — model calls are disabled');
         if (retriesLeft === undefined)
@@ -49677,10 +49700,15 @@ function App() {
                 systemInstruction: { parts: [{ text: system }] },
                 contents: toGeminiContents(messages),
                 safetySettings: GEMINI_SAFETY_SETTINGS,
-                generationConfig: GEMINI_GENERATION_CONFIG
+                generationConfig: generationConfigFor(options)
             })
         });
         const data = await response.json();
+        if (!response.ok && response.status === 400 && options && typeof options.thinkingBudget === 'number' && /think/i.test(JSON.stringify(data))) {
+            // This model doesn't accept a thinking budget: repeat the call without the limit.
+            console.warn('[Grimoire RPG] model rejected the thinking limit, retrying without it');
+            return callGemini(system, messages, retriesLeft);
+        }
         if (!response.ok)
             throwApiError(data);
         if (data.usageMetadata) {
@@ -49718,7 +49746,7 @@ function App() {
         // — not just MAX_TOKENS — a chance to complete.
         if (candidate && candidate.finishReason && candidate.finishReason !== 'STOP' && retriesLeft > 0 && text) {
             try {
-                const continuation = await callGemini(system, [...messages, { role: 'assistant', content: text }, { role: 'user', content: 'Continue exactly where you left off — do not repeat any part of what you already wrote, do not restart, no commentary. Resume mid-token if that\'s where you stopped, and output only the rest of the same response.' }], retriesLeft - 1);
+                const continuation = await callGemini(system, [...messages, { role: 'assistant', content: text }, { role: 'user', content: 'Continue exactly where you left off — do not repeat any part of what you already wrote, do not restart, no commentary. Resume mid-token if that\'s where you stopped, and output only the rest of the same response.' }], retriesLeft - 1, options);
                 return text + continuation;
             }
             catch (e) {
@@ -52133,7 +52161,7 @@ ${chunkText}`;
         if (retryNote) {
             engineNotes.push('[ENGINE NOTE — RETRY]: ' + retryNote);
         }
-        const raw = await callGemini(buildStateAndEventsSystemPrompt(currentState, stateDeltaMode), [{ role: 'user', content: (engineNotes.length > 0 ? engineNotes.join('\n\n') + '\n\n' : '') + 'Scene:\n\n' + narrativeText }]);
+        const raw = await callGemini(buildStateAndEventsSystemPrompt(currentState, stateDeltaMode), [{ role: 'user', content: (engineNotes.length > 0 ? engineNotes.join('\n\n') + '\n\n' : '') + 'Scene:\n\n' + narrativeText }], undefined, { thinkingBudget: STATE_EVENTS_THINKING_BUDGET });
         const parsed = extractJsonObject(raw);
         if (!parsed) {
             console.error('[Grimoire RPG] state/events response was not parsable JSON. Raw response was:', raw);
