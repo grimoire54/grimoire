@@ -17517,7 +17517,18 @@ const TRANSLATIONS = {
         // -- Repair kit --
         itemSlotRepairKit: 'Ремонтные наборы',
         itemTypeRepairKit: 'Ремонтный набор',
+        itemSlotAmmo: 'Боеприпасы',
+        itemTypeAmmo: 'Боеприпасы',
+        gunAmmoName_pistol: 'Боеприпасы (пистолет)',
+        gunAmmoName_smg: 'Боеприпасы (автомат)',
+        gunAmmoName_rifle: 'Боеприпасы (винтовка)',
+        gunAmmoName_energy: 'Боеприпасы (энергооружие)',
+        gunAmmoName_rail: 'Боеприпасы (рельсотрон)',
         itemRepairKitChargeLabel: 'Заряд',
+        repairAllWornButton: 'Починить всё снаряжение',
+        repairAllWornNoKits: 'В инвентаре нет ремонтных наборов.',
+        repairAllWornReport: 'Починено вещей: {n}, использовано наборов: {k}.',
+        repairAllWornLeft: ' Наборов не хватило, осталось повреждённых: {m}.',
         repairKitNoTargetsHint: 'Нечего чинить — вся экипировка целая.',
         repairKitPickBanner: 'Выберите предмет для ремонта:',
         inventoryOwnerPrevAria: 'Предыдущий инвентарь',
@@ -17901,6 +17912,13 @@ const TRANSLATIONS = {
         itemTypeWeaponTwoHanded: 'Двуручное оружие',
         itemTypeWeaponRanged: 'Стрелковое оружие',
         itemTypeWeaponPistol: 'Пистолет',
+        itemTypeWeaponGun_pistol: 'Пистолет',
+        itemTypeWeaponGun_smg: 'Автомат',
+        itemTypeWeaponGun_rifle: 'Винтовка',
+        itemTypeWeaponGun_energy: 'Энергетическое оружие',
+        itemTypeWeaponGun_rail: 'Рельсотрон',
+        itemTypeWeaponBow: 'Лук',
+        itemTypeWeaponCrossbow: 'Арбалет',
         itemTypeShield: 'Щит',
         itemTypeArmor: 'Доспех',
         itemTypeHelmet: 'Головной убор',
@@ -18094,8 +18112,8 @@ const TRANSLATIONS = {
         combatCoverPartialLabel: 'Частичное укрытие',
         combatSkipTurnButtonLabel: 'Завершить ход',
         combatReloadButtonLabel: 'Перезарядить',
-        combatReloadNoClipsHint: 'в инвентаре нет обойм',
-        combatReloadClipsLeft: 'обойм: {n}',
+        combatReloadNoClipsHint: 'в инвентаре нет подходящих боеприпасов',
+        combatReloadClipsLeft: 'боеприпасов: {n}',
         combatLogReloadText: 'перезаряжает оружие',
         combatLogGunEmptyText: 'магазин пуст — нужна перезарядка',
         combatLogOutOfAmmoText: 'патроны закончились — оружие бесполезно',
@@ -18117,7 +18135,7 @@ const TRANSLATIONS = {
         combatItemCuredSuffix: 'недуги сняты: {n}',
         combatFledTitle: 'Побег',
         combatFledText: 'Тебе удалось вырваться из боя. Урон и потери учтены в состоянии героя.',
-        lootIntroText: 'Можно осмотреть побеждённого противника и забрать часть того, что при нём было.',
+        lootIntroText: 'Можно осмотреть побеждённого противника и забрать часть того, что при нём было. Отметьте ✓ то, что хотите взять — всё остальное останется на теле.',
         lootLoadingText: 'осмотр трофеев',
         lootCurrencyFoundLabel: 'Найдено при нём',
         lootCurrencyToastLabel: 'Найдено в бою',
@@ -18523,7 +18541,18 @@ const TRANSLATIONS = {
         // -- Repair kit --
         itemSlotRepairKit: 'Repair kits',
         itemTypeRepairKit: 'Repair kit',
+        itemSlotAmmo: 'Ammunition',
+        itemTypeAmmo: 'Ammunition',
+        gunAmmoName_pistol: 'Ammo (pistol)',
+        gunAmmoName_smg: 'Ammo (SMG)',
+        gunAmmoName_rifle: 'Ammo (rifle)',
+        gunAmmoName_energy: 'Ammo (energy weapon)',
+        gunAmmoName_rail: 'Ammo (railgun)',
         itemRepairKitChargeLabel: 'Charge',
+        repairAllWornButton: 'Repair all worn gear',
+        repairAllWornNoKits: 'No repair kits in the inventory.',
+        repairAllWornReport: 'Items repaired: {n}, kits used: {k}.',
+        repairAllWornLeft: ' Not enough kits — still damaged: {m}.',
         repairKitNoTargetsHint: 'Nothing to repair — all your gear is intact.',
         repairKitPickBanner: 'Pick an item to repair:',
         inventoryOwnerPrevAria: 'Previous inventory',
@@ -18907,6 +18936,13 @@ const TRANSLATIONS = {
         itemTypeWeaponTwoHanded: 'Two-handed weapon',
         itemTypeWeaponRanged: 'Ranged weapon',
         itemTypeWeaponPistol: 'Pistol',
+        itemTypeWeaponGun_pistol: 'Pistol',
+        itemTypeWeaponGun_smg: 'SMG',
+        itemTypeWeaponGun_rifle: 'Rifle',
+        itemTypeWeaponGun_energy: 'Energy weapon',
+        itemTypeWeaponGun_rail: 'Railgun',
+        itemTypeWeaponBow: 'Bow',
+        itemTypeWeaponCrossbow: 'Crossbow',
         itemTypeShield: 'Shield',
         itemTypeArmor: 'Armor',
         itemTypeHelmet: 'Headgear',
@@ -19093,8 +19129,8 @@ const TRANSLATIONS = {
         combatCoverPartialLabel: 'Partial cover',
         combatSkipTurnButtonLabel: 'End turn',
         combatReloadButtonLabel: 'Reload',
-        combatReloadNoClipsHint: 'no clips in the inventory',
-        combatReloadClipsLeft: 'clips: {n}',
+        combatReloadNoClipsHint: 'no matching ammo in the inventory',
+        combatReloadClipsLeft: 'ammo: {n}',
         combatLogReloadText: 'reloads',
         combatLogGunEmptyText: 'the magazine is empty — reload needed',
         combatLogOutOfAmmoText: 'out of ammo — the weapon is useless',
@@ -19116,7 +19152,7 @@ const TRANSLATIONS = {
         combatItemCuredSuffix: 'ailments cured: {n}',
         combatFledTitle: 'Escape',
         combatFledText: "You managed to break away from the fight. Damage and losses are reflected in the hero's condition.",
-        lootIntroText: "You can search the defeated enemy and take some of what they were carrying.",
+        lootIntroText: "You can search the defeated enemy and take some of what they were carrying. Tick ✓ what you want to take — everything else is left behind.",
         lootLoadingText: 'examining the spoils',
         lootCurrencyFoundLabel: 'Found on them',
         lootCurrencyToastLabel: 'Found in battle',
@@ -20356,7 +20392,7 @@ function abilityFrequencyLabel(def, t) {
 // own "questId" (see normalizeInventoryItem/isActiveQuestItem below), so a
 // weapon or a piece of armor can be a quest item at the same time as being
 // a perfectly normal, equippable weapon or armor.
-const EQUIPMENT_SLOT_TYPES = ['weapon', 'armor', 'helmet', 'amulet', 'gloves', 'boots', 'ring', 'cloak', 'backpack', 'consumable', 'repairKit', 'none'];
+const EQUIPMENT_SLOT_TYPES = ['weapon', 'armor', 'helmet', 'amulet', 'gloves', 'boots', 'ring', 'cloak', 'backpack', 'consumable', 'repairKit', 'ammo', 'none'];
 // Generic, filter/sort-facing label per item slot type — deliberately
 // separate from EQUIPMENT_SLOT_CONFIG's labelKeys, which name a specific
 // equip SLOT ("Weapon (right hand)") rather than the item TYPE ("Weapons")
@@ -20365,7 +20401,7 @@ const ITEM_SLOT_LABEL_KEYS = {
     weapon: 'itemSlotWeapon', armor: 'itemSlotArmor', helmet: 'itemSlotHelmet',
     amulet: 'itemSlotAmulet', gloves: 'itemSlotGloves', boots: 'itemSlotBoots',
     ring: 'itemSlotRing', cloak: 'itemSlotCloak', backpack: 'itemSlotBackpack',
-    consumable: 'itemSlotConsumable', repairKit: 'itemSlotRepairKit', none: 'itemSlotNone'
+    consumable: 'itemSlotConsumable', repairKit: 'itemSlotRepairKit', ammo: 'itemSlotAmmo', none: 'itemSlotNone'
 };
 // Accepts either the current {name, slot, twoHanded, questId} shape or a
 // bare string (an older save, or a state reply that skipped the object
@@ -20380,7 +20416,7 @@ function normalizeInventoryItem(raw) {
     if (!raw || typeof raw !== 'object' || typeof raw.name !== 'string' || !raw.name.trim())
         return null;
     // A spare magazine is never equipment, whatever slot the model guessed.
-    const slot = isGunClipName(raw.name) ? 'none' : (EQUIPMENT_SLOT_TYPES.includes(raw.slot) ? raw.slot : 'none');
+    const slot = isGunClipName(raw.name) ? 'ammo' : (EQUIPMENT_SLOT_TYPES.includes(raw.slot) ? raw.slot : 'none');
     const questId = typeof raw.questId === 'string' && raw.questId.trim() ? raw.questId.trim() : null;
     // "shield" is the model's own explicit tag (more reliable than guessing
     // from the name — see isShieldItemName) when present; a legacy save or a
@@ -23592,7 +23628,7 @@ function inferEquipSlotFromItemName(name) {
     if (typeof name !== 'string' || !name.trim())
         return 'none';
     if (isGunClipName(name))
-        return 'none';
+        return 'ammo';
     // The model already identified this name as a weapon (see the weapon class registry).
     if (getRegisteredWeaponClass(name))
         return 'weapon';
@@ -23922,17 +23958,113 @@ function isValidGunMag(m) {
 // it's the gun ("обойма для пистолета" is a clip, "пистолет с обоймой" a gun).
 const GUN_CLIP_TOKEN_PATTERNS = [/^обойм/, /^магазин/, /^clip/, /^magazine/, /^энергоячейк/, /^energycell/];
 const GUN_NOUN_TOKEN_PATTERN = /^(пистолет|револьвер|винтовк|карабин|ружь|дробовик|пулем|автомат(?!ическ|ичн)|pistol|revolver|rifle|carbine|shotgun|smg|handgun)/;
+const GUN_AMMO_WORD_PATTERNS = [/^боеприпас/, /^патрон/, /^ammo$/, /^ammunition/, /^cartridge/];
+const GUN_AMMO_CLASSES = ['pistol', 'smg', 'rifle', 'energy', 'rail'];
+const AUTOMAT_TOKEN_PATTERN = /^автомат(?!ическ|ичн)/;
+// Which kind of firearm a list of name tokens speaks of (null = none of them).
+function classifyFirearmTokens(tokens) {
+    const has = pats => tokens.some(tok => pats.some(re => re.test(tok)));
+    if (has([/^рельс/, /^railgun/, /^rail$/, /^гаусс/]))
+        return 'rail';
+    if (has(ENERGY_RIFLE_TOKEN_PATTERNS) || has(ENERGY_ADJECTIVE_TOKEN_PATTERNS) || has([/^энергоячейк/, /^energycell/]))
+        return 'energy';
+    if (has(SUBMACHINE_GUN_TOKEN_PATTERNS) || has([AUTOMAT_TOKEN_PATTERN]))
+        return 'smg';
+    if (has(LONG_GUN_TOKEN_PATTERNS))
+        return 'rifle';
+    if (has(HANDGUN_TOKEN_PATTERNS))
+        return 'pistol';
+    return null;
+}
+// A firearm's ammunition type: 'pistol' | 'smg' | 'rifle' | 'energy' | 'rail'
+// (null = not a firearm). Each type of gun has ammunition of its own (see
+// FIREARM AMMUNITION below).
+function getGunAmmoClass(name) {
+    const fx = getGunFxIdFromName(name);
+    if (!fx)
+        return null;
+    if (/^rail/.test(fx))
+        return 'rail';
+    if (/^energy/.test(fx))
+        return 'energy';
+    if (fx === 'pistol' || fx === 'dualPistols')
+        return 'pistol';
+    const reg = getRegisteredWeaponClass(name);
+    if (reg === 'longgun')
+        return 'rifle';
+    if (reg === 'smg')
+        return 'smg';
+    const tokens = narrativeItemNameTokens(name);
+    const hasLong = tokens.some(tok => LONG_GUN_TOKEN_PATTERNS.some(re => re.test(tok)));
+    const hasSmg = tokens.some(tok => SUBMACHINE_GUN_TOKEN_PATTERNS.some(re => re.test(tok)) || AUTOMAT_TOKEN_PATTERN.test(tok));
+    return hasLong && !hasSmg ? 'rifle' : 'smg';
+}
 function isGunClipName(name) {
     if (typeof name !== 'string' || !name.trim())
         return false;
     const tokens = narrativeItemNameTokens(name);
     const idx = tokens.findIndex(tok => GUN_CLIP_TOKEN_PATTERNS.some(re => re.test(tok)));
-    if (idx < 0)
+    if (idx >= 0)
+        return !tokens.slice(0, idx).some(tok => GUN_NOUN_TOKEN_PATTERN.test(tok));
+    // "Боеприпасы (автомат)" / "Ammo (SMG)": an ammo word only counts as firearm
+    // ammunition when it also names the kind of gun (arrows and bolts never do).
+    const aIdx = tokens.findIndex(tok => GUN_AMMO_WORD_PATTERNS.some(re => re.test(tok)));
+    if (aIdx < 0)
         return false;
-    return !tokens.slice(0, idx).some(tok => GUN_NOUN_TOKEN_PATTERN.test(tok));
+    if (tokens.slice(0, aIdx).some(tok => GUN_NOUN_TOKEN_PATTERN.test(tok)))
+        return false;
+    return classifyFirearmTokens(tokens.slice(aIdx + 1)) !== null;
+}
+// ---- FIREARM AMMUNITION ----
+// Firearm ammunition is its own item type (slot "ammo"), one kind per type of
+// gun: "Боеприпасы (пистолет)", "(автомат)", "(винтовка)", "(энергооружие)",
+// "(рельсотрон)". A reload spends ammunition of the TYPE the gun uses. An old
+// save's plain "Обойма" names no type — it stays a universal clip that fits any
+// gun until it is used up.
+function getGunAmmoItemClass(name) {
+    if (typeof name !== 'string')
+        return null;
+    const tokens = narrativeItemNameTokens(name);
+    const idx = tokens.findIndex(tok => GUN_AMMO_WORD_PATTERNS.some(re => re.test(tok)) || GUN_CLIP_TOKEN_PATTERNS.some(re => re.test(tok)));
+    if (idx < 0)
+        return null;
+    return classifyFirearmTokens(tokens.slice(idx + 1));
 }
 function isGunClipItem(item) {
     return !!item && item.slot !== 'weapon' && isGunClipName(item.name);
+}
+function ammoItemFitsGun(item, gunName) {
+    const cls = getGunAmmoItemClass(item.name);
+    return cls === null || cls === getGunAmmoClass(gunName);
+}
+// How many ammo items in the inventory fit at least one of these guns ([{ name }]).
+function countAmmoForHands(inventoryList, hands) {
+    return (inventoryList || []).filter(it => isGunClipItem(it) && hands.some(h => ammoItemFitsGun(it, h.name))).length;
+}
+// One ammo item per gun reloaded, of the gun's own type (a typeless old clip
+// only when no matching one is left). Returns { hands, idxs }: the guns that
+// got ammunition and the inventory indices to spend. Never mutates input.
+function pickAmmoForHands(inventoryList, hands) {
+    const used = new Set();
+    const out = { hands: [], idxs: [] };
+    const find = (pred) => (inventoryList || []).findIndex((it, i) => !used.has(i) && isGunClipItem(it) && pred(getGunAmmoItemClass(it.name)));
+    for (const h of hands) {
+        const cls = getGunAmmoClass(h.name);
+        let i = find(c => c === cls);
+        if (i < 0)
+            i = find(c => c === null);
+        if (i < 0)
+            continue;
+        used.add(i);
+        out.hands.push(h);
+        out.idxs.push(i);
+    }
+    return out;
+}
+// The ammunition type an enemy's gun uses.
+function getEnemyAmmoClass(enemy) {
+    const byFx = { pistol: 'pistol', dualPistols: 'pistol', smg: 'smg', smgSuppress: 'smg', energyRifle: 'energy', energySuppress: 'energy', railSingle: 'rail', railTriple: 'rail', railSuppress: 'rail' };
+    return getGunAmmoClass(enemy && enemy.weaponDescription) || getGunAmmoClass(enemy && enemy.enemyName) || byFx[getEnemyGunFxId(enemy)] || 'smg';
 }
 // Firearms in a loadout's hands: [{ handKey, name, item }]. resolvedHands is
 // the result of resolveEquippedItems (optional — without it item is null).
@@ -24955,7 +25087,7 @@ const TRADE_OFF_SPECIALTY_SELL_PENALTY = 0.6;
 function computeSellMultiplier(itemSlot, merchantProfile) {
     if (!merchantProfile || !merchantProfile.specialization)
         return 1;
-    if (itemSlot === 'consumable' || itemSlot === 'repairKit' || itemSlot === 'none')
+    if (itemSlot === 'consumable' || itemSlot === 'repairKit' || itemSlot === 'ammo' || itemSlot === 'none')
         return 1;
     const group = TRADE_SPECIALIZATION_SLOT_GROUPS[merchantProfile.specialization] || [];
     return group.includes(itemSlot) ? TRADE_SPECIALTY_SELL_BONUS : TRADE_OFF_SPECIALTY_SELL_PENALTY;
@@ -25079,7 +25211,8 @@ const WEIGHT_CATEGORY_BASE = {
     amulet: { light: 0.08, medium: 0.1, heavy: 0.13 },
     ring: { light: 0.06, medium: 0.08, heavy: 0.11 },
     consumable: { light: 0.2, medium: 0.3, heavy: 0.5 },
-    repairKit: { light: 0.5, medium: 1.0, heavy: 2.0 }
+    repairKit: { light: 0.5, medium: 1.0, heavy: 2.0 },
+    ammo: { light: 0.2, medium: 0.3, heavy: 0.5 }
 };
 // ---- LEGACY FALLBACK — keyword-inferred weight, used only when an item
 // has no "weightCategory" of its own (see the header comment above) ----
@@ -25142,7 +25275,7 @@ function classifyArmorWeightBase(name, tokens) {
 // variants worth telling apart even without a full classifier of their own.
 const FLAT_SLOT_BASE_WEIGHT = {
     helmet: 1.0, gloves: 0.35, boots: 0.85, amulet: 0.1, ring: 0.08,
-    cloak: 0.8, backpack: 1.2, consumable: 0.3, repairKit: 1.0, none: 0.5
+    cloak: 0.8, backpack: 1.2, consumable: 0.3, repairKit: 1.0, ammo: 0.3, none: 0.5
 };
 const HELMET_LIGHT_KEYWORDS = ['шапк', 'капюшон', 'cap', 'hood']; // cloth/leather headwear
 const GLOVE_HEAVY_KEYWORDS = ['латн', 'наруч', 'gauntlet', 'vambrace']; // metal hand armor
@@ -25298,8 +25431,8 @@ function computeCarryCapacity(strength, equipment, itemRarities) {
 // capped at 1000 either way (see useConsumable) so nothing overheals past
 // the hero's actual limit.
 const HEAL_RANGE_BY_RARITY = {
-    junk: [1, 2], common: [5, 10], uncommon: [10, 15], rare: [15, 25],
-    unique: [32, 50], mythic: [60, 100]
+    junk: [2, 4], common: [10, 20], uncommon: [20, 30], rare: [30, 50],
+    unique: [64, 100], mythic: [120, 200]
 };
 function rollHealAmount(rarity) {
     const [min, max] = HEAL_RANGE_BY_RARITY[rarity] || HEAL_RANGE_BY_RARITY.common;
@@ -27112,6 +27245,9 @@ function getInventoryItemIcon(item) {
     // is added to INVENTORY_SLOT_IMAGE (then this line can simply go).
     if (item.slot === 'repairKit')
         return { emoji: '🧰' };
+    // Firearm ammunition has no artwork yet either.
+    if (item.slot === 'ammo')
+        return { emoji: '📦' };
     const image = INVENTORY_SLOT_IMAGE[item.slot];
     if (image)
         return { image };
@@ -28347,7 +28483,7 @@ function repairItemFully(item) {
 // that piece needs — a nearly-intact item takes a sliver, a wrecked one can
 // drain the kit, and if the kit runs dry first the piece is only partly fixed.
 // The kit is used up (removed) once its charge hits zero.
-const REPAIR_KIT_CHARGE_BY_RARITY = { junk: 25, common: 50, uncommon: 75, rare: 110, unique: 190, mythic: 350 };
+const REPAIR_KIT_CHARGE_BY_RARITY = { junk: 75, common: 150, uncommon: 225, rare: 330, unique: 570, mythic: 1050 };
 // { cur, max, ratio, broken: false } (DurabilityBar-shaped) for a repair kit,
 // null for anything else.
 function getRepairKitCharge(item, rarityKey) {
@@ -28395,6 +28531,97 @@ function useRepairKitOn(kitItem, kitRarity, targetItem, targetRarity) {
         target: applyRepairUnits(targetItem, targetRarity, spend),
         kit: remaining <= 0.005 ? null : { ...kitItem, charge: remaining }
     };
+}
+// ---- REPAIR ALL WORN GEAR (after a fight) ----
+// Inventory indices of the copies a { slot: name } equipment map actually wears
+// (same copy-picking rule as resolveEquippedItems).
+function wornInventoryIndices(equipmentObj, inventoryList) {
+    const out = [];
+    if (!equipmentObj || !Array.isArray(inventoryList))
+        return out;
+    const used = new Set();
+    const keys = EQUIP_SLOT_ORDER.concat(Object.keys(equipmentObj).filter(k => !EQUIP_SLOT_ORDER.includes(k)));
+    for (const key of keys) {
+        const name = equipmentObj[key];
+        if (!name)
+            continue;
+        const i = inventoryList.findIndex((it, idx) => it && it.name === name && !used.has(idx));
+        if (i >= 0) {
+            used.add(i);
+            out.push(i);
+        }
+    }
+    return out;
+}
+// Every worn piece of the hero's and the party's gear: [{ owner: null | partyKey, idx }].
+function listWornGearTargets(equipmentObj, inventoryList, partyKeys, partyInvs, partyEquip) {
+    const targets = wornInventoryIndices(equipmentObj, inventoryList).map(idx => ({ owner: null, idx }));
+    for (const key of (partyKeys || [])) {
+        const inv = (partyInvs || {})[key];
+        if (!Array.isArray(inv))
+            continue;
+        wornInventoryIndices((partyEquip || {})[key], inv).forEach(idx => targets.push({ owner: key, idx }));
+    }
+    return targets;
+}
+function countDamagedWornGear({ inventory, equipment, party, partyInventories, partyEquipment, itemRarities }) {
+    return listWornGearTargets(equipment, inventory, party, partyInventories, partyEquipment).filter(t => {
+        const it = (t.owner === null ? inventory : partyInventories[t.owner])[t.idx];
+        return isItemRepairable(it, findItemRarity(it.name, itemRarities));
+    }).length;
+}
+// Repairs everything the hero and the party wear, most damaged piece first,
+// spending the repair kits in the hero's bag (a kit is used up once its charge
+// runs dry, and the next one takes over). Never mutates input. Returns
+// { inventory, partyInventories, repaired, kitsUsed, damagedLeft }.
+function repairAllWornGear({ inventory, equipment, party, partyInventories, partyEquipment, itemRarities }) {
+    const heroInv = inventory.slice();
+    const partyInvs = { ...partyInventories };
+    for (const key of (party || []))
+        if (Array.isArray(partyInvs[key]))
+            partyInvs[key] = partyInvs[key].slice();
+    const invOf = owner => (owner === null ? heroInv : partyInvs[owner]);
+    const rarityOf = it => findItemRarity(it.name, itemRarities);
+    const targets = listWornGearTargets(equipment, heroInv, party, partyInvs, partyEquipment)
+        .filter(t => isItemRepairable(invOf(t.owner)[t.idx], rarityOf(invOf(t.owner)[t.idx])));
+    const ratio = t => { const it = invOf(t.owner)[t.idx]; const info = getItemDurability(it, rarityOf(it)); return info && info.max > 0 ? info.cur / info.max : 1; };
+    targets.sort((a, b) => ratio(a) - ratio(b));
+    const kits = new Map();
+    heroInv.forEach((it, i) => { if (it && it.slot === 'repairKit')
+        kits.set(i, it); });
+    const totalKits = kits.size;
+    let repaired = 0;
+    for (const t of targets) {
+        const list = invOf(t.owner);
+        let item = list[t.idx];
+        const before = item;
+        while (isItemRepairable(item, rarityOf(item))) {
+            const kitIdx = [...kits.keys()].find(i => kits.get(i));
+            if (kitIdx === undefined)
+                break;
+            const res = useRepairKitOn(kits.get(kitIdx), rarityOf(kits.get(kitIdx)), item, rarityOf(item));
+            item = res.target;
+            kits.set(kitIdx, res.kit);
+        }
+        if (item !== before) {
+            list[t.idx] = item;
+            repaired += 1;
+        }
+    }
+    // kits that were only partly used keep their reduced charge; empty ones are gone
+    const finalInventory = [];
+    heroInv.forEach((it, i) => {
+        if (kits.has(i)) {
+            const k = kits.get(i);
+            if (k)
+                finalInventory.push(k);
+        }
+        else
+            finalInventory.push(it);
+    });
+    const kitsUsed = [...kits.values()].filter(k => !k).length;
+    const left = targets.filter(t => { const it = invOf(t.owner)[t.idx]; return isItemRepairable(it, rarityOf(it)); }).length;
+    return { inventory: finalInventory, partyInventories: partyInvs, repaired, kitsUsed, damagedLeft: left, totalKits };
 }
 // Who fixes what: a smith handles weapons/shields/body armor, a tailor
 // cloaks, a jeweler rings and amulets. Guessed from the NPC's freeform role
@@ -28662,7 +28889,7 @@ const ITEM_TYPE_LABEL_KEYS = {
     armor: 'itemTypeArmor', helmet: 'itemTypeHelmet', amulet: 'itemTypeAmulet',
     gloves: 'itemTypeGloves', boots: 'itemTypeBoots', ring: 'itemTypeRing',
     cloak: 'itemTypeCloak', backpack: 'itemTypeBackpack', consumable: 'itemTypeConsumable',
-    repairKit: 'itemTypeRepairKit', none: 'itemTypeMisc'
+    repairKit: 'itemTypeRepairKit', ammo: 'itemTypeAmmo', none: 'itemTypeMisc'
 };
 // Weight-class half of the same line — see ARMOR_WEIGHT_CLASS_DEFENSE_MULT
 // far above for what light/medium/heavy actually do mechanically. Always
@@ -28677,8 +28904,20 @@ function itemTypeLabel(item, t) {
         const isShield = item.shield === true || (item.shield === undefined && isShieldItemName(item.name));
         if (isShield)
             return t('itemTypeShield');
+        // A firearm's type line names its own kind of gun: pistol, SMG, rifle...
+        const gunClass = getGunAmmoClass(item.name);
+        // A two-handed gun/bow keeps its "2р" mark on the type line (the generic
+        // "Двуручное оружие" label that used to say so no longer applies to them).
+        const twoHandMark = item.twoHanded ? ' — ' + t('weaponTwoHandedTag') : '';
+        if (gunClass)
+            return t('itemTypeWeaponGun_' + gunClass) + twoHandMark;
+        // Bows and crossbows name their own kind too.
+        if (isBowWeaponName(item.name)) {
+            const isCrossbow = narrativeItemNameTokens(item.name).some(tok => /^арбалет/.test(tok) || /^самострел/.test(tok) || /^crossbow/.test(tok) || /^cross(bows?)?$/.test(tok));
+            return t(isCrossbow ? 'itemTypeWeaponCrossbow' : 'itemTypeWeaponBow') + twoHandMark;
+        }
         if (isRangedWeaponItem(item))
-            return t('itemTypeWeaponRanged');
+            return t('itemTypeWeaponRanged') + twoHandMark;
         // A pistol is its own weapon type (it only plays one-handed).
         if (isHandgunWeaponItem(item))
             return t('itemTypeWeaponPistol');
@@ -29195,55 +29434,71 @@ const FOG_PPC_JS = 5; // ... when it has to be painted by JavaScript (no WebGL):
 const FOG_FPS_GL = 30;
 const FOG_FPS_JS = 20;
 const FOG_FEATHER = 1.7; // cells: the fade runs from (rim - FOG_FEATHER) to (rim + FOG_FEATHER)
-const FOG_RIM_BINS = 96;
-const FOG_FOG_ALPHA = 0.84;
+const FOG_BILLOW = 1.0; // cells: how far the rim swells/shrinks in its billows (keep the noise gentle: if its slope gets steeper than the feather, thin wisps/"tails" appear)
+// Colour of the unexplored fog follows the setting of the fight (combat.environment): daylight outdoors
+// = light grey haze, night = black, indoors = mostly dark (a bit warmer when torch-lit), another realm =
+// deep violet-black; snow lightens/cools it a little. [r, g, b, alpha]; the draw loop eases the colour
+// when the weather shifts from round to round.
+const FOG_STYLE_DAY = [172, 178, 186, 0.80];
+const FOG_STYLE_NIGHT = [2, 3, 6, 0.90];
+const FOG_STYLE_NIGHT_LIT = [10, 12, 20, 0.86]; // night, but the spot itself is lit (street lamp, camp fire)
+const FOG_STYLE_DARK_PLACE = [14, 15, 18, 0.88]; // a cave at noon, a gloomy overcast spot
+const FOG_STYLE_INDOORS = [3, 4, 7, 0.90];
+const FOG_STYLE_INDOORS_LIT = [16, 12, 10, 0.86]; // torch-lit hall: still dark, a hint of warmth
+const FOG_STYLE_OTHER_REALM = [12, 8, 26, 0.88];
+const FOG_SNOW_TINT = { none: 0, lightSnow: 0.12, heavySnow: 0.25, blizzard: 0.40 };
+function fogStyleFor(combat) {
+    const env = (combat && combat.environment) || DEFAULT_COMBAT_ENVIRONMENT;
+    let base;
+    if (env.realm === 'other')
+        base = FOG_STYLE_OTHER_REALM;
+    else if (env.indoors)
+        base = env.light === 'lit' ? FOG_STYLE_INDOORS_LIT : FOG_STYLE_INDOORS;
+    else if (env.time === 'night')
+        base = env.light === 'lit' ? FOG_STYLE_NIGHT_LIT : FOG_STYLE_NIGHT;
+    else
+        base = env.light === 'dark' ? FOG_STYLE_DARK_PLACE : FOG_STYLE_DAY;
+    const snow = env.indoors || env.realm === 'other' ? 0 : (FOG_SNOW_TINT[env.weather] || 0);
+    if (!snow)
+        return { r: base[0], g: base[1], b: base[2], a: base[3] };
+    // snowy air: pale blue-white by day, a faint cold blue at night
+    const tint = env.time === 'night' ? [30, 38, 54] : [206, 214, 226];
+    return { r: base[0] + (tint[0] - base[0]) * snow, g: base[1] + (tint[1] - base[1]) * snow, b: base[2] + (tint[2] - base[2]) * snow, a: Math.min(0.94, base[3] + snow * 0.06) };
+}
 // Firearms whose owners carry flares: SMG/rifle ("автоматчик"), energy rifle, railgun.
 const FOG_FLARE_GUN_FX = ['smg', 'energyRifle', 'railSingle'];
-// Radius of a clearing's rim in direction a (radians) at time t: the nominal radius r swelling and
-// shrinking in rolling billows (two waves that roll in opposite directions, plus scalloped puffs).
-function fogRimRadius(r, a, t, seed) {
-    const wave = (dir, sd) => Math.sin(a * 2 + dir * t * 0.32 + sd) * 0.050
-        + Math.sin(a * 3 - dir * t * 0.47 + sd * 1.7) * 0.040
-        + Math.sin(a * 5 + dir * t * 0.62 + sd * 2.3) * 0.030
-        + (Math.abs(Math.sin(a * 4 + dir * t * 0.75 + sd * 0.8)) - 0.6) * 0.075;
-    return r * (1 + (wave(1, seed) + wave(-1, seed + 3.3)) * 0.85);
+// The rim's billows come from ONE smooth, slowly moving noise field over the whole battlefield
+// (p = position in grid cells, t = seconds, result in -1..1) that nudges every clearing's edge in/out
+// by up to FOG_BILLOW cells. Because the field is shared, neighbouring clearings bulge the same way and
+// merge into one soft cloud edge (per-clearing waves left sharp spikes where two clearings met).
+function fogNoise(x, y, t) {
+    const big = 0.6 * Math.sin(0.5 * x + 0.3 * t + 0.6 * Math.sin(0.45 * y - 0.25 * t))
+        + 0.4 * Math.sin(0.6 * y - 0.35 * t + 0.6 * Math.sin(0.5 * x + 0.2 * t));
+    return 0.8 * big + 0.2 * Math.sin(1.4 * x + 0.8 * y + 0.6 * t);
 }
 // Paints the whole fog into `img` (an ImageData over the fog canvas). `srcs` = [{x, y, r}] in grid
 // cells relative to the field's corner. cov[] is reused between frames (Float32Array, one per pixel).
 // This is the no-WebGL fallback; the same maths runs on the GPU in FOG_GL_FRAG.
-function fogPaint(img, cov, w, h, srcs, t, ppc) {
+function fogPaint(img, cov, w, h, srcs, t, ppc, col) {
     cov.fill(0);
-    const rim = new Float32Array(FOG_RIM_BINS + 1);
+    const f = FOG_FEATHER; // cells
     for (let si = 0; si < srcs.length; si++) {
         const sr = srcs[si];
-        let rmin = 1e9, rmax = 0;
-        for (let i = 0; i <= FOG_RIM_BINS; i++) {
-            const a = -Math.PI + (i / FOG_RIM_BINS) * Math.PI * 2;
-            const v = fogRimRadius(sr.r, a, t, si * 1.3) * ppc;
-            rim[i] = v;
-            if (v < rmin)
-                rmin = v;
-            if (v > rmax)
-                rmax = v;
-        }
-        const f = FOG_FEATHER * ppc, cx = sr.x * ppc, cy = sr.y * ppc;
-        const inner = Math.max(0, rmin - f), inner2 = inner * inner, outer = rmax + f, outer2 = outer * outer;
-        const x0 = Math.max(0, Math.floor(cx - outer)), x1 = Math.min(w - 1, Math.ceil(cx + outer));
-        const y0 = Math.max(0, Math.floor(cy - outer)), y1 = Math.min(h - 1, Math.ceil(cy + outer));
-        const k = FOG_RIM_BINS / (Math.PI * 2);
+        const inner = Math.max(0, sr.r - FOG_BILLOW - f), inner2 = inner * inner, outer = sr.r + FOG_BILLOW + f, outer2 = outer * outer;
+        const cx = sr.x, cy = sr.y; // cells
+        const x0 = Math.max(0, Math.floor((cx - outer) * ppc)), x1 = Math.min(w - 1, Math.ceil((cx + outer) * ppc));
+        const y0 = Math.max(0, Math.floor((cy - outer) * ppc)), y1 = Math.min(h - 1, Math.ceil((cy + outer) * ppc));
         for (let y = y0; y <= y1; y++) {
-            const dy = y + 0.5 - cy, row = y * w;
+            const wy = (y + 0.5) / ppc, dy = wy - cy, row = y * w;
             for (let x = x0; x <= x1; x++) {
-                const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+                const wx = (x + 0.5) / ppc, dx = wx - cx, d2 = dx * dx + dy * dy;
                 if (d2 >= outer2)
                     continue;
                 let c;
                 if (d2 <= inner2)
                     c = 1;
                 else {
-                    const fa = (Math.atan2(dy, dx) + Math.PI) * k, bi = fa | 0, fr = fa - bi;
-                    const rr = rim[bi] * (1 - fr) + rim[bi + 1] * fr;
-                    c = (rr + f - Math.sqrt(d2)) / (2 * f);
+                    c = (sr.r + FOG_BILLOW * fogNoise(wx, wy, t) + f - Math.sqrt(d2)) / (2 * f);
                     if (c <= 0)
                         continue;
                     if (c > 1)
@@ -29256,11 +29511,11 @@ function fogPaint(img, cov, w, h, srcs, t, ppc) {
         }
     }
     const px32 = new Uint32Array(img.data.buffer);
-    const aMax = FOG_FOG_ALPHA * 255;
+    const aMax = col.a * 255, rgb = ((Math.round(col.b) << 16) | (Math.round(col.g) << 8) | Math.round(col.r));
     for (let i = 0; i < cov.length; i++)
-        px32[i] = (((aMax * (1 - cov[i])) + 0.5) << 24 | (9 << 16) | (5 << 8) | 3) >>> 0;
+        px32[i] = (((aMax * (1 - cov[i])) + 0.5) << 24 | rgb) >>> 0;
 }
-// ---- GPU version of the fog (same maths as fogRimRadius/fogPaint) ----
+// ---- GPU version of the fog (same maths as fogNoise/fogPaint) ----
 const FOG_GL_MAX_SRC = 16;
 const FOG_GL_VERT = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
 const FOG_GL_FRAG = [
@@ -29269,31 +29524,30 @@ const FOG_GL_FRAG = [
     '#else',
     'precision mediump float;',
     '#endif',
-    'uniform vec2 uRes; uniform float uPpc; uniform float uT; uniform int uN; uniform vec3 uSrc[' + FOG_GL_MAX_SRC + '];',
-    'float wave(float a, float t, float dir, float sd) {',
-    '  return sin(a * 2.0 + dir * t * 0.32 + sd) * 0.050',
-    '       + sin(a * 3.0 - dir * t * 0.47 + sd * 1.7) * 0.040',
-    '       + sin(a * 5.0 + dir * t * 0.62 + sd * 2.3) * 0.030',
-    '       + (abs(sin(a * 4.0 + dir * t * 0.75 + sd * 0.8)) - 0.6) * 0.075;',
+    'uniform vec2 uRes; uniform float uPpc; uniform float uT; uniform int uN; uniform vec3 uSrc[' + FOG_GL_MAX_SRC + ']; uniform vec4 uFog;',
+    'float fogNoise(vec2 p, float t) {',
+    '  float big = 0.6 * sin(0.5 * p.x + 0.3 * t + 0.6 * sin(0.45 * p.y - 0.25 * t))',
+    '            + 0.4 * sin(0.6 * p.y - 0.35 * t + 0.6 * sin(0.5 * p.x + 0.2 * t));',
+    '  return 0.8 * big + 0.2 * sin(1.4 * p.x + 0.8 * p.y + 0.6 * t);',
     '}',
     'void main() {',
     '  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
+    '  vec2 wp = p / uPpc;',
+    '  float n = fogNoise(wp, uT);',
     '  float cov = 0.0;',
-    '  float f = ' + FOG_FEATHER.toFixed(3) + ' * uPpc;',
+    '  float f = ' + FOG_FEATHER.toFixed(3) + ';',
+    '  float bil = ' + FOG_BILLOW.toFixed(3) + ';',
     '  for (int i = 0; i < ' + FOG_GL_MAX_SRC + '; i++) {',
     '    if (i >= uN) break;',
-    '    vec2 d = p - uSrc[i].xy;',
-    '    float dl = length(d);',
-    '    if (dl > (uSrc[i].z * 1.3 + 2.0 * ' + FOG_FEATHER.toFixed(3) + ') * uPpc) continue;', // outside even at the widest billow
-    '    if (dl < (uSrc[i].z * 0.7 - ' + FOG_FEATHER.toFixed(3) + ') * uPpc) { cov = 1.0; break; }', // inside even at the narrowest billow
-    '    float a = atan(d.y, d.x);',
-    '    float sd = float(i) * 1.3;',
-    '    float rr = uSrc[i].z * (1.0 + (wave(a, uT, 1.0, sd) + wave(a, uT, -1.0, sd + 3.3)) * 0.85) * uPpc;',
-    '    float c = clamp((rr + f - dl) / (2.0 * f), 0.0, 1.0);',
+    '    float r = uSrc[i].z;',
+    '    float dl = length(p - uSrc[i].xy) / uPpc;',
+    '    if (dl > r + bil + f) continue;', // outside even at the widest billow
+    '    if (dl < r - bil - f) { cov = 1.0; break; }', // inside even at the narrowest billow
+    '    float c = clamp((r + bil * n + f - dl) / (2.0 * f), 0.0, 1.0);',
     '    cov = max(cov, c * c * (3.0 - 2.0 * c));',
     '  }',
-    '  float al = ' + FOG_FOG_ALPHA.toFixed(3) + ' * (1.0 - cov);',
-    '  gl_FragColor = vec4(vec3(3.0, 5.0, 9.0) / 255.0 * al, al);',
+    '  float al = uFog.a * (1.0 - cov);',
+    '  gl_FragColor = vec4(uFog.rgb * al, al);',
     '}',
 ].join('\n');
 function fogGlBuild(gl) {
@@ -29314,7 +29568,7 @@ function fogGlBuild(gl) {
     const aPos = gl.getAttribLocation(prog, 'aPos');
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-    return { prog, buf, uRes: gl.getUniformLocation(prog, 'uRes'), uPpc: gl.getUniformLocation(prog, 'uPpc'), uT: gl.getUniformLocation(prog, 'uT'), uN: gl.getUniformLocation(prog, 'uN'), uSrc: gl.getUniformLocation(prog, 'uSrc') };
+    return { prog, buf, uRes: gl.getUniformLocation(prog, 'uRes'), uPpc: gl.getUniformLocation(prog, 'uPpc'), uT: gl.getUniformLocation(prog, 'uT'), uN: gl.getUniformLocation(prog, 'uN'), uSrc: gl.getUniformLocation(prog, 'uSrc'), uFog: gl.getUniformLocation(prog, 'uFog') };
 }
 let fogGlSupported = null; // probed once on a throw-away canvas
 function fogProbeGl() {
@@ -32512,7 +32766,7 @@ function groupInventoryByName(inventory) {
     const groups = [];
     const indexByName = new Map();
     inventory.forEach((item, i) => {
-        const stackable = item.slot === 'consumable' || item.slot === 'repairKit' || item.slot === 'none';
+        const stackable = item.slot === 'consumable' || item.slot === 'repairKit' || item.slot === 'ammo' || item.slot === 'none';
         // A partly-used repair kit (see item.charge) never folds into a fresh one
         // of the same name — each charge level is its own stack.
         const stackKey = (item.slot === 'repairKit' ? item.name + '|' + (Number.isFinite(item.charge) ? item.charge : 'full') : item.name) + (item.gifted ? '|gift' : '');
@@ -34924,7 +35178,7 @@ function TradeModal({ npcName, gameState, npcInventories, npcCurrencies, itemRar
     // this NPC a moment ago, never their own gear to begin with.
     const npcInventory = npcInventories[npcKey] || [];
     const allNpcGroups = groupInventoryByName(npcInventory);
-    const isSellableSlot = (slot) => slot === 'consumable' || slot === 'repairKit' || slot === 'none';
+    const isSellableSlot = (slot) => slot === 'consumable' || slot === 'repairKit' || slot === 'ammo' || slot === 'none';
     const isPurchasable = (item) => merchantProfile || isSellableSlot(item.slot) || typeof item.buybackPrice === 'number' || typeof item.askingPrice === 'number';
     const npcGroups = allNpcGroups.filter(g => isPurchasable(g.item));
     // Only a confirmed merchant's shelf restocks at all (every morning — see
@@ -35305,7 +35559,7 @@ function StatCmp({ cmp }) {
 function findWornForCompare(equipment, inventory, item) {
     if (!item || !equipment || !Array.isArray(inventory))
         return null;
-    if (item.slot === 'none' || item.slot === 'consumable' || item.slot === 'repairKit')
+    if (item.slot === 'none' || item.slot === 'consumable' || item.slot === 'repairKit' || item.slot === 'ammo')
         return null;
     const resolvedWorn = resolveEquippedItems(equipment, inventory);
     const fam = EQUIPMENT_SLOT_CONFIG.find(sl => !sl.spacer && sl.matchSlot === item.slot && resolvedWorn[sl.key]);
@@ -35417,7 +35671,7 @@ function ItemDetailModalContent({ itemIndex, emptySlotKey, hideDropButton, gameS
     const isConsumable = !isEmptyDisplay && displayItem.slot === 'consumable';
     const isRepairKit = !isEmptyDisplay && displayItem.slot === 'repairKit';
     const isBackpack = !isEmptyDisplay && displayItem.slot === 'backpack';
-    const isEquippable = !isEmptyDisplay && displayItem.slot !== 'none' && displayItem.slot !== 'consumable' && displayItem.slot !== 'repairKit';
+    const isEquippable = !isEmptyDisplay && displayItem.slot !== 'none' && displayItem.slot !== 'consumable' && displayItem.slot !== 'repairKit' && displayItem.slot !== 'ammo';
     const isQuestActive = !isEmptyDisplay && isActiveQuestItem(displayItem, gameState.quests);
     // The kit's remaining charge, and whether the hero has anything damaged to
     // use it on (Использовать is disabled otherwise).
@@ -36044,7 +36298,7 @@ function CombatLootPanel({ loot, onToggle, t }) {
                             " ",
                             item.durability <= 0 ? t('lootBrokenTag') : t('lootDamagedTag')))),
                     React.createElement("div", { className: "item-offer-choice" },
-                        React.createElement("button", { onClick: () => onToggle(item.id, true), className: 'item-choice-btn' + (resolution !== false ? ' item-choice-active-take' : ''), "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
+                        React.createElement("button", { onClick: () => onToggle(item.id, true), className: 'item-choice-btn' + (resolution === true ? ' item-choice-active-take' : ''), "aria-label": t('itemTakeAria'), type: "button" }, "\u2713"),
                         React.createElement("button", { onClick: () => onToggle(item.id, false), className: 'item-choice-btn' + (resolution === false ? ' item-choice-active-decline' : ''), "aria-label": t('itemDeclineAria'), type: "button" }, "\u2717"))));
             }))))));
 }
@@ -39251,8 +39505,9 @@ function getAbilityStatus(id, fightState, round) {
 //    turns round, calming down on the way through zero. Anything else that
 //    drifts on the battlefield (smoke from fire abilities, later) must read
 //    getCombatWind() so smoke and snow never blow in opposite directions.
-//  * The sound is three looping mp3 files (WEATHER_SOUND_URLS, in the usual
-//    sounds folder, one per level) played through the shared SFX audio context;
+//  * The sound is one looping mp3 per level (WEATHER_SOUND_URLS, in the usual
+//    sounds folder: snow_*.mp3, mist_*.mp3 and the very quiet weather_0_none.mp3
+//    bed for "no weather") played through the shared SFX audio context;
 //    nothing is embedded in this file. Levels cross-fade, the volume follows the
 //    Settings sound volume, and it dips for a moment while the wind turns.
 //    A missing file simply means silence for that level.
@@ -39276,7 +39531,11 @@ const WEATHER_AUDIO_GAIN = 1.0; // overall loudness of the ambience loops relati
 const WEATHER_SOUND_URLS = {
     lightSnow: SOUNDS_BASE + 'snow_1_light.mp3',
     heavySnow: SOUNDS_BASE + 'snow_2_heavy.mp3',
-    blizzard: SOUNDS_BASE + 'snow_3_blizzard.mp3'
+    blizzard: SOUNDS_BASE + 'snow_3_blizzard.mp3',
+    lightMist: SOUNDS_BASE + 'mist_1_light.mp3',
+    heavyMist: SOUNDS_BASE + 'mist_2_heavy.mp3',
+    denseMist: SOUNDS_BASE + 'mist_3_dense.mp3',
+    none: SOUNDS_BASE + 'weather_0_none.mp3' // very quiet calm bed, played when there is no weather (see createWeatherBedSound)
 };
 // Live shared wind. x: field pixels per second (signed, <0 blows left),
 // dir: -1..1 (0 while it turns), strength: 0..1. Zeroed when no weather runs.
@@ -39688,7 +39947,7 @@ function createCombatWeather(canvas, getCam, initialLevel) {
     };
 }
 // ============================================================================
-// COMBAT WEATHER — mist / fog (picture only, no sound yet)
+// COMBAT WEATHER — mist / fog (picture + sound: mist_1_light / mist_2_heavy / mist_3_dense.mp3)
 // ============================================================================
 // Three gradations (MIST_ORDER): lightMist -> heavyMist -> denseMist. Same contract as createCombatWeather
 // (setLevel / soundLoaded / flipWind / destroy, field coordinates, shared combatWind), so CombatWeatherLayer
@@ -39764,6 +40023,21 @@ function createCombatMist(canvas, getCam, initialLevel) {
     if (MIST_LEVELS[initialLevel])
         cur.wind = target.wind;
     let t = 0, dt = 0, dir = Math.random() < .5 ? -1 : 1, dirT = dir, nextFlip = rnd(20, 40), W = 0, H = 0, DPR = 1, raf = 0, last = performance.now(), dead = false;
+    // ---- sound (best effort: the shared SFX context, unlocked by the first tap) — same voices as the snow ----
+    let sound = null;
+    try {
+        const ctx = getSfxContext();
+        if (ctx) {
+            if (ctx.state !== 'running')
+                ctx.resume().catch(() => { });
+            sound = createWeatherSound(ctx);
+            sound.setLevel(initialLevel);
+        }
+    }
+    catch (e) {
+        sound = null;
+    }
+    function windLull() { return .68 + .32 * Math.pow(Math.abs(dir), 1.5); } // quiet spell while the wind turns
     function resize(cam) {
         const w = Math.max(1, Math.round(cam.w)), h = Math.max(1, Math.round(cam.h)), d = Math.min(2, window.devicePixelRatio || 1);
         if (w !== W || h !== H || d !== DPR) {
@@ -39824,6 +40098,8 @@ function createCombatMist(canvas, getCam, initialLevel) {
         combatWind.dir = dir;
         combatWind.strength = Math.min(1, Math.abs(wind) / 600);
         combatWind.active = true;
+        if (sound)
+            sound.update(windLull(), typeof document !== 'undefined' && document.hidden);
         cx.setTransform(DPR, 0, 0, DPR, 0, 0);
         cx.clearRect(0, 0, W, H);
         if (cur.mist < .002 && cur.veil < .002)
@@ -39861,12 +40137,15 @@ function createCombatMist(canvas, getCam, initialLevel) {
     }
     raf = requestAnimationFrame(frame);
     return {
-        setLevel(name) { target = MIST_LEVELS[name] || MIST_LEVELS.none; },
-        soundLoaded() { return []; },
+        setLevel(name) { target = MIST_LEVELS[name] || MIST_LEVELS.none; if (sound)
+            sound.setLevel(name); },
+        soundLoaded() { return sound ? sound.loaded() : []; },
         flipWind() { dirT = -dirT; nextFlip = t + rnd(20, 45); },
         destroy() {
             dead = true;
             cancelAnimationFrame(raf);
+            if (sound)
+                sound.stop();
             combatWind.x = 0;
             combatWind.strength = 0;
             combatWind.active = false;
@@ -39878,9 +40157,53 @@ function createCombatMist(canvas, getCam, initialLevel) {
         }
     };
 }
+// "No weather" still gets a very quiet calm bed (weather_0_none.mp3): sound only — no canvas, and combatWind is left
+// alone, so smoke keeps its old fixed drift. windy = outdoors: the bed dips while the wind turns; indoors it plays
+// evenly, with no wind. Remove the effect in CombatWeatherLayer to switch it off.
+function createWeatherBedSound(windy) {
+    let sound = null, timer = 0;
+    try {
+        const ctx = getSfxContext();
+        if (ctx) {
+            if (ctx.state !== 'running')
+                ctx.resume().catch(() => { });
+            sound = createWeatherSound(ctx);
+            sound.setLevel('none');
+        }
+    }
+    catch (e) {
+        sound = null;
+    }
+    if (sound) {
+        // No engine runs without weather, so outdoors the bed keeps its own wind that turns by the same rules as the snow's
+        // (a flip every 16-38 s, a turn takes ~8 s) and dips with the same windLull() while it turns.
+        const rnd = (a, b) => a + Math.random() * (b - a);
+        let dir = Math.random() < .5 ? -1 : 1, dirT = dir, t = 0, nextFlip = rnd(16, 38), last = performance.now();
+        const tick = () => {
+            let lull = 1; // indoors: no wind, no dips
+            if (windy) {
+                const now = performance.now(), dt = Math.min(1, (now - last) / 1000);
+                last = now;
+                t += dt;
+                if (t >= nextFlip) {
+                    dirT = -dirT;
+                    nextFlip = t + rnd(16, 38);
+                }
+                dir += Math.max(-dt / 4, Math.min(dt / 4, dirT - dir));
+                lull = .68 + .32 * Math.pow(Math.abs(dir), 1.5);
+            }
+            sound.update(lull, typeof document !== 'undefined' && document.hidden);
+        };
+        tick();
+        timer = setInterval(tick, 250);
+    }
+    return { destroy() { if (timer)
+            clearInterval(timer); if (sound)
+            sound.stop(); } };
+}
 // Mounted by CombatModal inside the battlefield viewport (above the board, below the zoom buttons).
-// weather: combat.environment.weather. Renders nothing when there is none.
-function CombatWeatherLayer({ weather, camRef }) {
+// weather: combat.environment.weather. Draws nothing when there is none (only the quiet calm bed plays).
+function CombatWeatherLayer({ weather, camRef, calmBed = true, indoors = false }) {
     const canvasRef = useRef(null);
     const engineRef = useRef(null);
     const active = !!weather && weather !== 'none';
@@ -39895,11 +40218,17 @@ function CombatWeatherLayer({ weather, camRef }) {
     }, [active, mist]);
     useEffect(() => { if (engineRef.current)
         engineRef.current.setLevel(weather); }, [weather]);
+    useEffect(() => {
+        if (active || !calmBed)
+            return undefined;
+        const bed = createWeatherBedSound(!indoors);
+        return () => bed.destroy();
+    }, [active, calmBed, indoors]);
     if (!active)
         return null;
     return React.createElement("canvas", { key: mist ? 'mist' : 'snow', ref: canvasRef, className: "combat-weather-canvas", "aria-hidden": "true" });
 }
-function CombatModal({ combat, heroName, inventory, itemRarities, introActive, fxBusy, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onReload, reloadInfo, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {}, heroFirearm = false, allyFirearms = {} }) {
+function CombatModal({ combat, heroName, inventory, itemRarities, introActive, fxBusy, abilities, onAttack, onMove, movementRange, onLeave, onSkipTurn, onReload, reloadInfo, repairAllInfo, onRepairAll, onUseItem, onUseAbility, onToggleLoot, onClose, captivityChecking, t, heroWeaponType, allyWeaponTypes = {}, heroBow = false, allyBows = {}, heroFirearm = false, allyFirearms = {} }) {
     // The hero portrait's two armor bars — cur/max straight off combat state
     // (see startCombat/attemptStealthKill for where these are rolled, and
     // resolveOneAttack for where cur drains as hits land).
@@ -39992,6 +40321,8 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
     const fogCanvasRef = useRef(null);
     const fogSrcRef = useRef([]);
     fogSrcRef.current = partyFogSources;
+    const fogStyleRef = useRef(null);
+    fogStyleRef.current = fogStyleFor(combat);
     useLayoutEffect(() => {
         const cv = fogCanvasRef.current;
         if (!fogOn || !cv)
@@ -40005,6 +40336,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
         cv.height = cellsH * ppc;
         const t0 = performance.now();
         const eased = {};
+        const col = { ...fogStyleRef.current }; // current fog colour; eased toward the setting's colour
         const srcArr = new Float32Array(FOG_GL_MAX_SRC * 3);
         let raf = 0, last = -1e9, lastNow = t0, gl = null, g = null, ctx = null, img = null, cov = null, glLost = false;
         const initGl = () => {
@@ -40052,6 +40384,11 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                 p.r += (sr.r - p.r) * (1 - Math.exp(-dt * 3)); // weather changes the radius: glide, ~1 s
                 return { x: p.x, y: p.y, r: p.r };
             }).filter(Boolean);
+            const tgt = fogStyleRef.current, kc = 1 - Math.exp(-dt * 2.5);
+            col.r += (tgt.r - col.r) * kc;
+            col.g += (tgt.g - col.g) * kc;
+            col.b += (tgt.b - col.b) * kc;
+            col.a += (tgt.a - col.a) * kc;
             const t = reduce ? 0 : (now - t0) / 1000;
             if (useGl) {
                 if (!gl || !g || glLost)
@@ -40067,10 +40404,11 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                 gl.uniform1f(g.uT, t);
                 gl.uniform1i(g.uN, n);
                 gl.uniform3fv(g.uSrc, srcArr);
+                gl.uniform4f(g.uFog, col.r / 255, col.g / 255, col.b / 255, col.a);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
             else {
-                fogPaint(img, cov, cv.width, cv.height, srcs, t, ppc);
+                fogPaint(img, cov, cv.width, cv.height, srcs, t, ppc, col);
                 ctx.putImageData(img, 0, 0);
             }
         };
@@ -41767,7 +42105,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                                 React.createElement("div", { className: "afx-aim-catcher", onPointerDown: () => { aimArmedRef.current = true; } })));
                         })(),
                         React.createElement("div", { className: "afx-host", ref: setAfxHost }))),
-                React.createElement(CombatWeatherLayer, { weather: combat.environment && combat.environment.weather, camRef: camRef }),
+                React.createElement(CombatWeatherLayer, { weather: combat.environment && combat.environment.weather, calmBed: !(combat.environment && combat.environment.realm && combat.environment.realm !== 'material'), indoors: !!(combat.environment && combat.environment.indoors), camRef: camRef }),
                 !combat.result && (React.createElement(React.Fragment, null,
                     React.createElement("div", { className: "combat-field-ui" },
                         React.createElement("div", { className: "combat-fieldlog" },
@@ -41820,6 +42158,14 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                 React.createElement("h3", { className: resultCopy.className }, t(resultCopy.titleKey)),
                 React.createElement("p", { className: "hint-text hint-text-block" }, t(resultCopy.textKey)),
                 showLoot && React.createElement(CombatLootPanel, { loot: combat.loot, onToggle: onToggleLoot, t: t }),
+                repairAllInfo && (React.createElement("div", { className: "combat-repair-all" },
+                    React.createElement("button", { onClick: onRepairAll, className: "btn btn-ghost", type: "button", disabled: repairAllInfo.kits === 0 || repairAllInfo.damaged === 0 || captivityChecking },
+                        "\uD83D\uDD27 ",
+                        t('repairAllWornButton')),
+                    repairAllInfo.kits === 0 && React.createElement("p", { className: "hint-text" }, t('repairAllWornNoKits')))),
+                combat.repairAllReport && (React.createElement("p", { className: "hint-text hint-text-block" },
+                    t('repairAllWornReport').replace('{n}', String(combat.repairAllReport.repaired)).replace('{k}', String(combat.repairAllReport.kitsUsed)),
+                    combat.repairAllReport.damagedLeft > 0 ? t('repairAllWornLeft').replace('{m}', String(combat.repairAllReport.damagedLeft)) : '')),
                 React.createElement("div", { className: "modal-actions" },
                     React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button", disabled: captivityChecking }, captivityChecking ? t('deathCheckingButton') : (lootReadyWithItems ? t('lootContinueButton') : t('closeButton')))))))));
 }
@@ -44364,7 +44710,7 @@ function EditConfirmModal({ withLoss, dontShowAgain, onDontShowAgainChange, onCo
 const DEV_MODE_KEY = 'grimoire-rpg-dev-mode';
 const DEV_RARITY_LABELS = { junk: 'Хлам', common: 'Обычный', uncommon: 'Необычный', rare: 'Редкий', unique: 'Уникальный', mythic: 'Мифический' };
 const DEV_RARITY_TAGS = { junk: ['хлам', 'junk'], common: ['обыч.', 'common'], uncommon: ['необыч.', 'uncommon'], rare: ['редк.', 'rare'], unique: ['уник.', 'unique'], mythic: ['миф.', 'mythic'] };
-const DEV_SLOT_LABELS = { weapon: 'Оружие', armor: 'Броня', helmet: 'Шлем', amulet: 'Амулет', gloves: 'Перчатки', boots: 'Сапоги', ring: 'Кольцо', cloak: 'Плащ', backpack: 'Рюкзак', consumable: 'Расходник', repairKit: 'Ремкомплект', none: 'Прочее' };
+const DEV_SLOT_LABELS = { weapon: 'Оружие', armor: 'Броня', helmet: 'Шлем', amulet: 'Амулет', gloves: 'Перчатки', boots: 'Сапоги', ring: 'Кольцо', cloak: 'Плащ', backpack: 'Рюкзак', consumable: 'Расходник', repairKit: 'Ремкомплект', ammo: 'Боеприпасы', none: 'Прочее' };
 const DEV_TIER_LABELS = { weak: 'слабый', average: 'средний', strong: 'сильный', exceptional: 'исключит.', legendary: 'легендарный' };
 const DEV_ROLE_LABELS = { melee: 'ближний бой', ranged: 'стрелок', caster: 'маг', tank: 'танк' };
 // Enemy "kind" (see ENEMY_KINDS) — deliberately NOT named DEV_KIND_LABELS,
@@ -44404,7 +44750,11 @@ const DEV_CONSUMABLE_SET = [
     { ru: 'Зелье лечения', en: 'Healing potion', slot: 'consumable', qty: 3 },
     { ru: 'Ремонтный набор', en: 'Repair kit', slot: 'repairKit', qty: 1 },
     // Spare magazines for the hero's firearms (see FIREARM MAGAZINES).
-    { ru: 'Обойма', en: 'Ammo clip', slot: 'none', qty: 5 }
+    { ru: 'Боеприпасы (пистолет)', en: 'Ammo (pistol)', slot: 'ammo', qty: 5 },
+    { ru: 'Боеприпасы (автомат)', en: 'Ammo (SMG)', slot: 'ammo', qty: 5 },
+    { ru: 'Боеприпасы (винтовка)', en: 'Ammo (rifle)', slot: 'ammo', qty: 5 },
+    { ru: 'Боеприпасы (энергооружие)', en: 'Ammo (energy weapon)', slot: 'ammo', qty: 5 },
+    { ru: 'Боеприпасы (рельсотрон)', en: 'Ammo (railgun)', slot: 'ammo', qty: 5 }
 ];
 function devL(lang, ru, en) { return lang === 'en' ? en : ru; }
 function devKey(name) { return typeof name === 'string' ? name.trim().toLowerCase() : ''; }
@@ -49938,7 +50288,7 @@ Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings
         const itemOffersSection = `
 
 === EVENT: ITEM OFFERS ===
-"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "currency", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. A stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — presented as something the hero can still accept or decline right now (a reward being handed over, a bribe, a prize, a wager's payout) is "slot": "currency" instead of a physical slot, no matter how the scene wraps it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to give it a physical slot. A "currency" entry takes "amount" — a SEPARATE, positive integer, the exact stated sum — in place of the physical fields below (twoHanded/shield/weightCategory/questId/cost never apply to it); "label" on it is optional, a short flavor phrase for the offer row (e.g. "a heavy jingling purse of septims"), not a container name to itemize. A container with no stated sum inside it, handed over as a keepable object in its own right (an empty purse, an ordinary belt pouch offered as gear), is a normal item instead, tagged "backpack" like any other worn container, not "currency". Money that changes hands with no choice left to make at all — already paid, already found and pocketed — is never an itemOffers entry, "currency"-slotted or otherwise: that belongs in "currencyChange" below instead, exactly as before. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "label" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "armorPiercing" is a separate true/false field, also only for "slot": "weapon" items — true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille); omit or set false for an ordinary sword, axe, or spear even if sharp or heavy — this has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so only set it true when the item is genuinely, specifically that kind of weapon, never as a default. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; a plain ring is "light" for a ring even though that's still just a few grams — judge each item relative to typical examples of its own slot, not against other slots). "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for a SERVICE they personally provide, right now, as an open choice the hero still has to accept or decline (an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a toll, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Never set "cost" for a merchant or vendor's ordinary goods for sale — their general stock/wares — even if an exact price was stated in dialogue; buying that kind of goods happens only through a separate trade-window interface the player controls directly, so an item like that belongs in neither "itemOffers" nor "inventory" here, no matter how the scene described it. Omit "cost" entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`;
+"itemOffers" detects takeable items offered to the hero in THIS scene (a found object, something a character offers, a choice between alternatives like several weapons or garments) — extract them as structured data, or an empty list if none. "selectionMode" is "single" if the items in that group are alternatives where the hero can take at most one; "multi" if each item can be independently taken or left (including a single standalone item). Group items together only if presented as a related set (offered by the same character at the same moment, or explicit alternatives to each other) — unrelated items get separate groups. "id"/"groupId": short, lowercase, ascii, unique slugs. Every item needs a "slot", classifying its actual physical type: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "currency", or "none" for anything else. A shield is also "weapon" — it occupies a hand like any one-handed weapon, just for defense instead of damage. "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack) — a separate slot from "cloak", the hero can wear both at once; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, arrows or bolts (firearm ammunition has its own slot, "ammo"), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. A stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — presented as something the hero can still accept or decline right now (a reward being handed over, a bribe, a prize, a wager's payout) is "slot": "currency" instead of a physical slot, no matter how the scene wraps it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to give it a physical slot. A "currency" entry takes "amount" — a SEPARATE, positive integer, the exact stated sum — in place of the physical fields below (twoHanded/shield/weightCategory/questId/cost never apply to it); "label" on it is optional, a short flavor phrase for the offer row (e.g. "a heavy jingling purse of septims"), not a container name to itemize. A container with no stated sum inside it, handed over as a keepable object in its own right (an empty purse, an ordinary belt pouch offered as gear), is a normal item instead, tagged "backpack" like any other worn container, not "currency". Money that changes hands with no choice left to make at all — already paid, already found and pocketed — is never an itemOffers entry, "currency"-slotted or otherwise: that belongs in "currencyChange" below instead, exactly as before. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "label" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "twoHanded" is true only for a weapon needing both hands — omit or false otherwise, omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed. "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield, which defends rather than deals damage; omit or set false for every other weapon. "armorPiercing" is a separate true/false field, also only for "slot": "weapon" items — true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille); omit or set false for an ordinary sword, axe, or spear even if sharp or heavy — this has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so only set it true when the item is genuinely, specifically that kind of weapon, never as a default. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; a plain ring is "light" for a ring even though that's still just a few grams — judge each item relative to typical examples of its own slot, not against other slots). "questId" is a SEPARATE, optional field that can be combined with ANY slot — a sword being offered can be both "slot": "weapon" and, at the same time, the very item a quest demands. Set it to one of the active quest ids above ONLY when this specific item is plainly what that quest's objective demands (a document, token, or artifact it asks for), never just anything valuable or interesting on its own; omit it otherwise. "cost" is a SEPARATE, optional positive integer — set it ONLY when a character is charging the hero for a SERVICE they personally provide, right now, as an open choice the hero still has to accept or decline (an innkeeper naming a price for a room or a meal, a ferryman naming a fare, a toll, a bribe demanded before something is handed over) — the exact number the scene's dialogue stated. Never set "cost" for a merchant or vendor's ordinary goods for sale — their general stock/wares — even if an exact price was stated in dialogue; buying that kind of goods happens only through a separate trade-window interface the player controls directly, so an item like that belongs in neither "itemOffers" nor "inventory" here, no matter how the scene described it. Omit "cost" entirely for anything free (a find, a gift, a quest reward, a wage already earned). The app itself deducts this amount from the hero's currency ONLY if the offer is actually accepted — never also apply it yourself through "currencyChange" below, that would charge the hero twice.`;
         // STATE DELTA MODE — an alternative to restating "inventory"/"npcs"/
         // "factions" in full every turn (see mergeNpcEntry and the block above
         // it, much further below, for the apply/reconciliation side of this).
@@ -50004,7 +50354,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no te
 "stats" has exactly four integers from 1 to 100: "strength", "agility", "intelligence", "initiative" — the hero's innate physical and mental attributes. "initiative" is how quickly the hero reacts and acts first when a fight breaks out (reflexes, alertness, quickness to seize the first opening), distinct from "agility" (which governs precision, dodging, and fine control once already acting). Calibration is DIFFERENT from health/psyche: an ordinary person's physical/mental attributes are NOT around 50 — they're modest, generally no higher than about 10, unless the world/hero description above explicitly establishes the hero as unusually strong, agile, quick-reacting, or intelligent (only then can that specific attribute run meaningfully higher, scaled to how exceptional the description implies). Never default to 50 for these four out of habit. These represent lasting capability, not momentary condition, so change them rarely and only for a real reason (significant training, a crippling injury, a transformative event) — never fluctuate them scene to scene the way health/psyche do.
 "effects" is a list of the hero's current ongoing conditions — injuries, illnesses, poisons, curses, or similar lingering effects. Each entry is an object with "kind", "label", and "severity". "kind" MUST be exactly one of: "bleed" (an open, still-bleeding wound), "poison" (venom, toxin, or poisoning of any kind), "fracture" (a broken bone, crippled limb, or similarly serious injury that impairs movement or combat), "concussion" (a head injury or dazing blow), "exhaustion" (fatigue, starvation, dehydration, or being run ragged), "curse" (a supernatural affliction with no physical cause), "adrenaline" (a genuine combat-high, battle-fury, or similar temporary edge — this is the one entry on the list that HELPS the hero rather than hindering them), or "other" for any real bodily/mental condition that doesn't fit one of those (a rash, a phobia, a broken heart) — "other" is tracked for flavor only and carries no mechanical weight, so don't force a condition into a more specific kind just to make it "count". "label" is a short descriptive phrase, exactly like before (e.g. "deep gash on the left arm", "mild poisoning", "cursed with rotten luck"). "severity" is exactly one of "mild", "moderate", "severe", reflecting how serious the condition currently is — omit "severity" for "other". This field is STRICTLY limited to states of the hero's own body or mind — something a healer, priest, or physician could diagnose or treat. It is NEVER a place for plot state, situational facts, or story flags, no matter how much they might "affect" the hero going forward — do NOT put things like: a guard or NPC noticing/being suspicious of the hero, being watched or followed, an action being logged/recorded/tracked by some system, a need to stay still or quiet, an alarm or alert being raised, a secret being at risk of discovery, or any other note about what's happening in the world or what the hero should do next. That kind of information belongs in the narrative prose itself (and, if it meaningfully advances one, in "quests"/"progress" below) — never in this list. If in doubt whether something is a bodily/mental condition or a plot fact, leave it OUT of "effects". Add a new entry when the scene introduces a genuine condition, and remove an entry once the scene resolves or heals it. When an already-tracked condition (see CURRENT GAME STATE above, which shows its stored "kind" and "label") is still ongoing and unresolved, re-list it with that SAME "kind" and "label" rather than rephrasing it — the game uses that pairing to recognize it as the same condition continuing rather than a brand-new one starting over. This is separate from the health/psyche numbers — those track overall condition, this tracks what specifically is currently afflicting the hero's body or mind. Leave it as an empty list when nothing is currently afflicting the hero.
 Nothing else belongs in "stats" — no other attributes, skills, or invented characteristics.
-Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded", "shield", and "armorPiercing". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, ammunition (arrows, bolts, cartridges), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. Money itself is never an item, under any slot including "none": a stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — always belongs in "currencyChange" instead, never here, no matter how the scene phrases or contains it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to itemize it here. The one exception is a container plainly handed over as a keepable object with no stated sum inside it (an empty purse, an ordinary belt pouch offered as gear) — that can still be reported here as an ordinary item, tagged "backpack" like any other worn container. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. Ammunition for firearms is tracked by the game as separate items: ONE spare magazine/clip is ONE item with slot "none" and a plain short name ("Обойма" / "Ammo clip" or the plain equivalent in the narrative language — never a weapon, and never named after a specific gun); when the hero finds, buys or is handed firearm ammunition, report that many separate clip items. A firearm itself never needs an ammo field — the game tracks each gun's own magazine. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon. "armorPiercing" is a separate true/false field, also only for weapon-slot items — true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille); omit or set false for an ordinary sword, axe, or spear even if sharp or heavy — this has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so only set it true when the item is genuinely, specifically that kind of weapon, never as a default. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; judge each item relative to typical examples of its own slot, never against other slots).
+Each "inventory" entry has a "name", a "slot", an optional "questId", and (for weapons only) "twoHanded", "shield", and "armorPiercing". "slot" classifies the item's actual physical type and must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", "ammo", or "none" for anything else (an ordinary document, key, or valuable that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon" — it occupies a hand exactly like a blade or firearm does, just for defense instead of damage. "cloak" is an outer garment worn over the shoulders/back (a cape, mantle); "backpack" is specifically a worn container for carrying more (a bag, satchel, pack) — the hero can wear a cloak and a backpack at once, they are separate slots; "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, oil, arrows or bolts (firearm ammunition has its own slot, "ammo"), a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. Money itself is never an item, under any slot including "none": a stated sum of the setting's own currency — coins, gold, septims, credits, or whatever tender the setting uses — always belongs in "currencyChange" instead, never here, no matter how the scene phrases or contains it (a coin, a handful of change, a purse, pouch, sack, or chest of it) — the container is flavor for how the money arrived, never a reason to itemize it here. The one exception is a container plainly handed over as a keepable object with no stated sum inside it (an empty purse, an ordinary belt pouch offered as gear) — that can still be reported here as an ordinary item, tagged "backpack" like any other worn container. "ring" also covers hand/wrist jewelry — a bracelet, bangle, or cuff, not just a literal ring — since there's no separate wrist slot; "amulet" is strictly neck-worn (a pendant, necklace, talisman, medallion, charm, or locket) and must never be used for a bracelet or anything worn elsewhere on the body. More generally, the "name" you give an item must describe the same physical object as the "slot" you assign it — never write a name for a bracelet, belt, or scarf while tagging it "amulet", "armor", or "cloak"; if a concept doesn't fit any slot the way it's worded, rephrase it to fit one that actually applies rather than forcing a mismatch. "questId" is a SEPARATE field from "slot" and can be combined with ANY slot — a sword can be both "slot": "weapon" and, at the same time, a quest item. Set it to one of the active quest ids above ONLY when this specific item is what that quest actually asks for right now — a letter to deliver, a relic to retrieve, a token to present — never merely an item that relates to the story in passing; omit "questId" once that quest is no longer active (completed or failed), even if the hero is still carrying the item. "twoHanded" is true only for a weapon that needs both hands (greatsword, longbow, staff, etc.) — omit or set false for a one-handed weapon, and omit entirely for non-weapon items. In settings with firearms: a handgun/pistol is one-handed; a rifle, shotgun, submachine gun, or other long gun is two-handed. Ammunition for firearms is tracked by the game as separate items: ONE spare magazine/clip is ONE item with slot "ammo" (its own item type) and a name of the form "Боеприпасы (<gun type>)" / "Ammo (<gun type>)" (or the equivalent in the narrative language) where <gun type> is exactly one of: пистолет / pistol, автомат / SMG, винтовка / rifle, энергооружие / energy weapon, рельсотрон / railgun — the type of firearm that ammunition fits, never a weapon and never named after a specific gun model; each type of gun has ammunition of its own and a gun can only be reloaded with its own type. When the hero finds, buys or is handed firearm ammunition, report that many separate ammo items. Ammunition for bows and crossbows (arrows, bolts) is not firearm ammunition and stays slot "none". A firearm itself never needs an ammo field — the game tracks each gun's own magazine. A shield is always one-handed. "shield" is a separate true/false field, also only for weapon-slot items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon. "armorPiercing" is a separate true/false field, also only for weapon-slot items — true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille); omit or set false for an ordinary sword, axe, or spear even if sharp or heavy — this has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so only set it true when the item is genuinely, specifically that kind of weapon, never as a default. "weightCategory" is exactly one of "light", "medium", or "heavy" — a coarse, honest judgment of how much this specific item would actually weigh for its slot (a dagger is "light" for a weapon, a greatsword is "heavy" for one; judge each item relative to typical examples of its own slot, never against other slots).
 ${inventoryReportingRule}
 "currencyChange" reports ONLY what changed THIS turn for the hero's universal in-game currency — one field that exists identically in every setting regardless of genre (the narrative prose can call it gold, credits, shells, or whatever fits the world, but the tracked value underneath is always this same single field). "amount" is a signed integer: positive for a gain, negative for a loss, 0 (or omit the whole field) if nothing changed. This is a DELTA for the scene just played, NEVER the running total — the app adds it to what the hero already has, so restating the full sum is not just unnecessary but wrong. Only set a nonzero amount when the scene explicitly and concretely shows currency changing hands with a specific stated quantity, ALREADY settled and done — a payment received, a price paid, money found and picked up (the container it's wrapped in — a purse, pouch, sack — is just flavor for how it arrived, not a reason by itself to treat it differently), a bribe or toll, winnings or a loss from a wager, an outright theft — PROVIDED there's no real choice left about it. If the scene instead leaves the hero free to accept or decline the sum right now, that's a "currency"-slotted "itemOffers" entry instead (see above), never this field. Never estimate, round to a "plausible" figure, or invent an amount the scene didn't actually state; if the scene only vaguely gestures at wealth or poverty with no concrete number, leave this at 0. Do NOT use this field for a price a character has just named as something the hero can still accept or decline (an innkeeper's rate, a fare, a demanded bribe not yet handed over) — that belongs in a priced "itemOffers" entry instead (see its "cost" field above), so the app only ever charges the hero once they actually confirm. Also never use this field for a merchant or vendor buying or selling their ordinary goods, in either direction, even if the scene described it as already completed — that transaction is never resolved through state here, only through a separate trade-window interface, so it should never produce a "currencyChange" (or an "inventory" change) of its own. "reason" is a short, dry phrase for what happened (e.g. "found on the road", "paid the ferryman"), omitted along with the rest of the field when amount is 0.
 "npcs" lists ONLY named characters who matter to the ongoing story — people the hero has met, spoken with, or who otherwise play an ongoing role (allies, quest givers, recurring figures, named rivals). Each entry has a "name", a short "note" on who they are or their relationship to the hero, and an "inventory" — a short list of item names for what they carry, wear, or are ever shown using (a weapon, a piece of armor, a distinctive belonging). Each entry also has "presentNow": true only if this character is physically there with the hero, face to face, in the scene that was JUST played — set it false (or simply omit it) if they are elsewhere, merely mentioned, remembered, or reached at a distance, or otherwise absent from this specific turn even though they remain a tracked character; judge this fresh from the scene just played alone every time, never carried over from an earlier turn, so a character who was present last turn but doesn't reappear in this one is NOT presentNow. Each entry also has "location" — the name of the place this character is currently at, reusing an exact known location name from the map context above where possible, or the literal string "with the hero" if they are actively travelling alongside the hero right now (a companion, someone being escorted, someone giving active chase). A character is anchored to their last known "location" by default — carry it forward unchanged turn after turn, the same as inventory below — and change it ONLY when the scene itself clearly shows this character actually leaving for, or arriving at, somewhere else; never update it just because the hero moved on without them, and never drift it back to match wherever the hero happens to be. "presentNow" must stay consistent with this: it can only be true when "location" equals the hero's own current location this turn, or is "with the hero" — a character cannot be physically present with the hero while anchored to a different place. THE FIRST TIME a character is added to this list, invent a plausible, modest starting inventory fitting their role and the scene (a guard has a sidearm, a trader has wares and a knife, a beggar has nothing worth naming) — this becomes that character's FIXED belongings from now on; an empty list is fine for someone genuinely established as having nothing. That starting inventory is held to the same mandatory-gear floor used for the hero's own opening kit and for party members: unless this character is established as destitute, stripped of belongings, or otherwise plainly without possessions (a beggar, a prisoner, and the like — the existing case where an empty list is fine), give them their own one "armor"-slot item, one "boots"-slot item, AND one weapon, ordinary and modest, fitting who they are, alongside any other role-specific gear that suits them — these three count as real equipment slots, not the "ordinary clothing" that's otherwise skipped as flavor below, so don't omit them by default the way incidental clothing is waved off. If the scene's own prose has already shown this character carrying, wielding, or wearing a specific weapon — even mentioned only in passing (slung over a shoulder, tucked in a belt, resting nearby) rather than actually drawn or used — record that exact weapon here; only invent a generic one if the prose gave no weapon at all. On every later turn this character appears in, return their inventory EXACTLY as already established (it is in the current game state above) UNLESS the scene itself explicitly shows them gaining something (found, given, looted, bought) or losing something (dropped, stolen, destroyed, handed over) — only then update the list to reflect that specific change. For a character clearly acting as a merchant, vendor, or shopkeeper in the scene — someone running a shop, stall, or trade of their own — every item they specifically name or point to as something they have for sale counts as them gaining it into this same inventory the moment the scene first shows it, whether or not the hero actually buys it that turn; list it under the same name the dialogue used, alongside anything else already established for them — but always as a single item in the singular grammatical form (e.g. "a leather helmet"/"кожаный шлем"), even if the dialogue phrased it as a plural category of stock ("leather helmets"/"кожаные шлемы" as a general kind of goods on offer); if the dialogue is clear the merchant is offering more than one distinct copy of the same item, add that many separate singular entries rather than one plural-named entry. If the scene's dialogue also gave an exact price for that item, report it as an object instead of a plain string — {"name": "item name", "cost": N} using the precise number spoken — and that becomes exactly what the trade window charges for it later, verbatim, with no rounding, markup, or recomputation of any kind; only do this when a specific number was genuinely spoken aloud for that item in the scene, never a guess or a rough figure, and leave it as a plain string with no "cost" for anything mentioned without one. This "cost" is unrelated to the "cost" field on a priced "itemOffers" entry above — that one is for a service the hero can still accept or decline right now; this one is a price attached to a merchant's ordinary stock, purely for the separate trade window to charge later. This is the only way such an item ever reaches the separate trade window the hero buys from later — buying or selling it is never itself resolved through "itemOffers", "currencyChange", or anywhere else in this state (see the "cost" field notes above), only tracked here as part of what this character has. This only applies to what the character is themselves offering to sell — never to something of the HERO's that a character merely expresses interest in buying; that stays out of this list entirely, and out of the rest of this state too, no matter how the scene describes the offer. A character must never produce, use, or lose an item that isn't already in their stored inventory, and must never conjure a new item out of nowhere — if the story needs them to have something new, that has to be shown happening on-scene first. If a character already tracked under a placeholder — a role or description like "the carter", "the guard captain" — has their real name revealed for the first time in this scene, rename that SAME entry to the real name (never add a second entry for the same person) and set "previousName" to exactly the old placeholder label as it appears in the state above; omit "previousName" every other turn, including every later turn about this now-named character. Keep each list short and skip mundane items with no narrative weight (ordinary clothing, pocket lint). Do NOT include monsters, beasts, or any anonymous combat opponent here, even if the scene names its species or gives it a description — a creature that exists only to be fought or fled from, with no ongoing role in the story beyond that encounter, is not an NPC and never belongs in this list, no matter how vividly it's described. Each entry also has an optional "faction" — the group this character visibly belongs to or serves (a legion, guild, cult, house, gang), reusing an exact known faction name from the list below where possible; omit it for a character who isn't meaningfully affiliated with anyone. Once set, carry it forward the same as inventory — leave it alone unless the scene itself shows a change of allegiance. Each entry also has an optional "role" — their profession or position in 1-3 words (blacksmith, captain of the guard, innkeeper, hedge witch, trader) — set once the scene has actually established one, INCLUDING when it's established simply by showing the character running, owning, or working a business with an obvious trade of its own (standing behind the counter of a named shop, tending a smithy's forge, keeping a tavern's bar, calling out prices at a market stall), even if no line of dialogue ever spells their job out in so many words — a shopkeeper is still a shopkeeper whether the narration says so outright or simply shows them selling from behind their own counter, and the same goes for a blacksmith shown working their own forge or an innkeeper shown running their own inn. Otherwise omit it for a character with no clear profession or title, and never invent one with nothing in the scene to support it. Once set, carry it forward unchanged the same as "faction" — update it only if the character's actual station changes on-scene (a promotion, a firing, a coronation), never to rephrase the same role in different words. Each entry also has an optional "factionLeader": true — set it only once the story has clearly established this specific character as the acknowledged head of their own tracked "faction" (a warlord commanding a war band, a guild's master, a cult's high priest, a don running a syndicate), never for an ordinary member, deputy, or lieutenant who merely answers to someone else; only meaningful together with "faction", so never set it for a character with no faction of their own. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" below — restate "factionLeader": false explicitly only if the story itself later shows this specific character actually losing that position (deposed, stepped down, replaced by someone else), the same way "dead": false is reserved for an actual depicted resurrection. Each entry also has an optional "unyielding": true — set it only for a character the story establishes as genuinely pivotal and immovable: the acknowledged ruler of a land, the head of a major faction, or another figure of similarly high standing whose position makes it simply implausible that they would ever drop everything to wander off with the hero as a traveling companion. This must stay RARE — most named characters, including most who have "faction" or even "factionLeader" set, should NOT have this flag; reserve it for the small handful of top-tier figures in the whole story where recruiting them would break plausibility outright. This is a narrative refusal, not a reputation gate: it applies no matter how high the hero's standing with this character climbs, and no matter how warm the relationship between them becomes — a beloved, trusted, even close ally can still be "unyielding" if their station makes leaving unthinkable. Once set, it stays true automatically on every later turn even if omitted, exactly like "factionLeader" above — restate "unyielding": false explicitly only if the story itself later shows this specific character genuinely giving up that position or standing (abdication, downfall, retirement from power) such that traveling with the hero becomes plausible. Each entry also has an optional "dead": true — set it ONLY the turn the scene itself actually shows this specific named character dying on-scene (killed, executed, confirmed slain), never for someone merely badly hurt, unconscious, captured, or missing, and never on a rumor or secondhand report of a death that wasn't actually shown on-scene. Once true, it stays true automatically on every later turn even if omitted — exactly like "location" above — so there is no need to keep restating it; the one case worth restating explicitly is "dead": false, and only if the story itself later depicts a genuine resurrection or revival for that character. Leave the field out entirely for every character who has never died. Each entry also has an optional "enemy": true — set it AS SOON AS the story establishes this specific character as the hero's ADVERSARY: someone the hero is hunting, or was sent to stop, capture, kill, or take something back from by force (a bandit chief, a raider, a cultist, an assassin, a hostile warlord); someone who has attacked, ambushed, or openly threatened the hero; or someone the story has placed on the opposing side of an ongoing fight, chase, siege, or feud — whatever their state right now (fighting, fleeing, hiding, wounded, trapped, begging), and whatever the hero has done to them so far. An enemy can never be shopped with or handed a gift — this flag is exactly what shuts trading, repair, gifts, and recruitment off in the game, and the game also drops that character's standing with the hero straight to hostile the moment it first appears, so DO NOT withhold it just because the hero hasn't yet met, fought, or insulted them face to face if the story has already clearly cast them as the hero's opponent (a quest target named as a criminal or bandit leader counts). Do NOT set it for someone merely rude, suspicious, greedy, a business rival, or who simply refuses a request or drives a hard bargain — reserve it for someone actually working against the hero's life, freedom, or goals. Once set, it stays true automatically on every later turn even if omitted, exactly like "dead" — restate "enemy": false explicitly ONLY when the scene itself shows a genuine reconciliation or change of side (a surrender the hero accepts and the character truly yields, a truce, a pardon, an alliance, or the cause of the hostility ending — a curse, infection, possession or mind control that made them attack is lifted, shared with the hero, or has the two of them travelling on together as friends again); being wounded, captured, cornered, or defeated does NOT clear it. Check EVERY tracked character who appears in this scene against this definition, including ones already in the list from earlier turns whom the story has since revealed to be an adversary: if the CURRENT GAME STATE above does not show "enemy": true on someone who clearly qualifies, set it NOW (as an "npcUpdate" entry when npcs are reported that way). Each entry also has an optional "incapacitated": true — set it while a character is physically unable to talk business, hand over, or take anything: unconscious, asleep, paralysed, bound and gagged, caught fast in a web, snare, cage, or under rubble, or mortally wounded and barely conscious. It is NOT for someone who is merely wounded, tired, imprisoned but able to talk, or afraid. It stays true automatically on later turns even if omitted; restate "incapacitated": false explicitly the turn the scene shows them freed, awake, or otherwise able to act again. It is independent of "enemy" — a helpless character can be an enemy (a bandit chief tangled in a spider's web is both) or a friend. ${npcsReportingRule}
@@ -52257,7 +52607,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no text before or af
 
 Rules:
 - "id": short, lowercase, ascii, unique slug.
-- Every item needs a "slot", classified immediately: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (a small valuable, trinket, or document). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". "consumable" is strictly something that heals when used (food, medicine, a healing potion) — a torch, ammunition, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. A shield is also "weapon". "ring" also covers bracelets, bangles, and cuffs (there's no separate wrist slot); "amulet" is neck-worn only (pendant, necklace, talisman, medallion) and must never label a bracelet. The "label" must describe the same physical object as the slot chosen — never mismatch them (e.g. a bracelet tagged "amulet").
+- Every item needs a "slot", classified immediately: exactly one of "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", "ammo", or "none" for anything else (a small valuable, trinket, or document). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". "consumable" is strictly something that heals when used (food, medicine, a healing potion) — a torch, ammunition, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it. A shield is also "weapon". "ring" also covers bracelets, bangles, and cuffs (there's no separate wrist slot); "amulet" is neck-worn only (pendant, necklace, talisman, medallion) and must never label a bracelet. The "label" must describe the same physical object as the slot chosen — never mismatch them (e.g. a bracelet tagged "amulet").
 - "twoHanded" is true only for a weapon needing both hands — omit or set false otherwise, and omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed; a shield is always one-handed.
 - "armorPiercing" is true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille) — omit or set false for an ordinary sword, axe, or spear even if sharp or heavy, and omit entirely for non-weapon items. This has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so set it true only when the item genuinely, specifically is that kind of weapon, never as a default.
 - "shield" is a separate true/false field, also only for "slot": "weapon" items — true for a shield (buckler, kite shield, riot shield, or similar), which defends rather than deals damage; omit or set false for every other weapon.
@@ -52388,7 +52738,7 @@ Respond with ONLY valid JSON and nothing else (no markdown, no text before or af
 {"items": [{"name": "copied verbatim from input", "slot": "weapon", "twoHanded": false, "shield": false, "armorPiercing": false, "weaponClass": "melee", "weightCategory": "medium"}]}
 
 Rules:
-- "slot" must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", or "none" for anything else (an ordinary document, key, valuable, or keepsake that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon". "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack). "ring" also covers hand/wrist jewelry (bracelet, bangle, cuff); "amulet" is strictly neck-worn (pendant, necklace, talisman, medallion, charm, locket) and must never be used for a bracelet. "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, ammunition, a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it.
+- "slot" must be exactly one of: "weapon", "armor", "helmet", "amulet", "gloves", "boots", "ring", "cloak", "backpack", "consumable", "repairKit", "ammo", or "none" for anything else (an ordinary document, key, valuable, or keepsake that's neither worn nor used up). "repairKit" is a repair kit — a bundled set of tools and materials (sharpening stones, patches, thread, oil, solder) that restores durability to worn gear when used; a single loose tool or an ordinary object stays "none". A shield is also "weapon". "cloak" is an outer garment (cape, mantle); "backpack" is a worn container (bag, satchel, pack). "ring" also covers hand/wrist jewelry (bracelet, bangle, cuff); "amulet" is strictly neck-worn (pendant, necklace, talisman, medallion, charm, locket) and must never be used for a bracelet. "consumable" is strictly something that heals when used — food, medicine, or a healing potion/tincture, nothing else; a torch, ammunition, a non-healing scroll, or any other single-use item that doesn't restore health is "none" instead, until a dedicated slot exists for it.
 - "twoHanded" is true only for a weapon needing both hands — omit or set false otherwise, and omit entirely for non-weapon items. A handgun/pistol is one-handed; a rifle, shotgun, or other long gun is two-handed.
 - "armorPiercing" is true ONLY for a weapon specifically built to defeat armor rather than just cut or bludgeon (a war pick, warhammer, poleaxe, bodkin-tipped arrow/bolt, rondel dagger, mace, or similar with a spike/point/crushing head meant to punch through plate or maille) — omit or set false for an ordinary sword, axe, or spear even if sharp or heavy, and omit entirely for non-weapon items. This has real mechanical weight (it lets the wielder's hits bypass a defender's armor entirely), so set it true only when the item genuinely, specifically is that kind of weapon, never as a default.
 - "weaponClass" is only for "slot": "weapon" items (omit for everything else) and is exactly one of: "melee" (any hand-held weapon or shield, including thrown knives), "bow" (bow, crossbow, sling-like draw weapons), "handgun" (one-handed pistol/revolver, including energy/laser/plasma pistols and blasters held in one hand), "longgun" (two-handed bullet firearm: rifle, shotgun, musket, sniper rifle), "smg" (automatic weapon: submachine gun, machine gun, assault rifle), "energyRifle" (two-handed laser/plasma/energy long gun — e.g. a lasgun, laser rifle, plasma rifle, blaster rifle), "railgun" (railgun, coilgun, gauss rifle). Judge by what the item MEANS, including invented or genre-specific names in any language (a "lasgun"/"лазган" is a laser rifle = "energyRifle"). A ranged class always implies "twoHanded": true; "handgun" is one-handed.
@@ -54257,6 +54607,48 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, nextPartyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
         setRepairKitIndex(null);
     }
+    // After a fight: the gear as it stands right now = the saved inventories with
+    // the fight's not-yet-folded wear laid over them (see overlayGearWear).
+    function getPostFightGear(c) {
+        const heroInv = overlayGearWear(gameState.inventory, c.gearWear, itemRarities);
+        const partyInvs = { ...partyInventories };
+        for (const key of (party || [])) {
+            if (Array.isArray(partyInvs[key]))
+                partyInvs[key] = overlayGearWear(partyInvs[key], (c.allyGearWear || {})[key], itemRarities);
+        }
+        return { inventory: heroInv, equipment, party, partyInventories: partyInvs, partyEquipment, itemRarities };
+    }
+    // What CombatModal's "repair all" button needs: how much worn gear is damaged
+    // and how many repair kits the hero carries. null = no button (no result yet, or death).
+    function getRepairAllInfo(c) {
+        if (!c || !c.result || c.result === 'death')
+            return null;
+        const gear = getPostFightGear(c);
+        return {
+            damaged: countDamagedWornGear(gear),
+            kits: gear.inventory.filter(it => it && it.slot === 'repairKit').length
+        };
+    }
+    // One tap: repairs everything the hero and the party wear out of the hero's
+    // repair kits, folds the fight's wear into the inventories first so nothing
+    // is lost, and clears it so closing the fight doesn't wear the gear twice.
+    function repairAllAfterCombat() {
+        if (!combat || !combat.result || combat.result === 'death' || combatClosingRef.current)
+            return;
+        const res = repairAllWornGear(getPostFightGear(combat));
+        if (res.repaired === 0)
+            return;
+        setPartyInventories(res.partyInventories);
+        const nextState = { ...gameState, inventory: res.inventory };
+        setGameState(nextState);
+        setCombat(prev => prev ? {
+            ...prev,
+            gearWear: {},
+            allyGearWear: Object.fromEntries(Object.entries(prev.allyGearWear || {}).filter(([k]) => k.startsWith('own:'))),
+            repairAllReport: { repaired: res.repaired, kitsUsed: res.kitsUsed, damagedLeft: res.damagedLeft }
+        } : prev);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, res.partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+    }
     function useConsumable(index) {
         if (blockedWhileTurnRuns())
             return;
@@ -55346,7 +55738,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         return;
                     const n = (Math.random() < 0.6 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0);
                     for (let k = 0; k < n; k++)
-                        items.push({ id: e.id + '_clip_' + k, label: t('gunClipItemName'), slot: 'none', twoHanded: false, shield: false, rarity: 'common' });
+                        items.push({ id: e.id + '_clip_' + k, label: t('gunAmmoName_' + getEnemyAmmoClass(e)), slot: 'ammo', twoHanded: false, shield: false, rarity: 'common' });
                 });
             }
             catch (e) {
@@ -55373,15 +55765,15 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return { ...prev, loot: { ...prev.loot, resolutions: { ...prev.loot.resolutions, [itemId]: takeValue } } };
         });
     }
-    // Everything the player did NOT explicitly leave behind (✗) in the loot
-    // panel, read once at the moment combat closes — see endCombatAndClose.
-    // An item with no choice made (undefined) is taken automatically, same as
-    // an explicit ✓; only an explicit ✗ (false) leaves it on the body.
+    // Only what the player explicitly confirmed with ✓ in the loot panel, read
+    // once at the moment combat closes — see endCombatAndClose. Nothing is taken
+    // automatically: an item with no choice made (undefined) stays on the body
+    // and vanishes, exactly like an explicit ✗ (false).
     function collectTakenLoot(finalCombat) {
         if (!finalCombat.loot || finalCombat.loot.status !== 'ready')
             return [];
         const resolutions = finalCombat.loot.resolutions || {};
-        return finalCombat.loot.items.filter(it => resolutions[it.id] !== false);
+        return finalCombat.loot.items.filter(it => resolutions[it.id] === true);
     }
     // What the hero is actually swinging right now: equipped weapon(s) by
     // rarity tier (see WEAPON_DAMAGE_BY_RARITY), doubled for a two-handed
@@ -57763,11 +58155,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const mags = c.gunMags || {};
         const known = kit.hands.map(h => mags[gunMagKey(kit.ownerKey, h.handKey)]).filter(isValidGunMag);
         // The hero reloads from inventory clip items; a companion from its own finite pool (see SPARE CLIPS).
-        const clips = kit.free ? spareClipsLeft(ensureSpareClips(c.gunClips, kit.ownerKey, 'ally'), kit.ownerKey) : gameState.inventory.filter(isGunClipItem).length;
+        const needyHands = kit.hands.filter(h => { const m = mags[gunMagKey(kit.ownerKey, h.handKey)]; return isValidGunMag(m) && m.cur < m.max; });
+        const clips = kit.free ? spareClipsLeft(ensureSpareClips(c.gunClips, kit.ownerKey, 'ally'), kit.ownerKey) : countAmmoForHands(gameState.inventory, kit.hands);
         return {
             label: known.map(m => m.cur + '/' + m.max).join(' · '),
             empty: known.length > 0 && known.every(m => m.cur <= 0),
-            canReload: known.some(m => m.cur < m.max) && clips > 0,
+            canReload: needyHands.length > 0 && (kit.free ? clips > 0 : pickAmmoForHands(gameState.inventory, needyHands).hands.length > 0),
             noClips: clips === 0,
             clips
         };
@@ -57777,11 +58170,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     function reloadInCombat() {
         if (combatIntroActive || combatFxBusyRef.current)
             return;
-        const clipIdxs = [];
-        gameState.inventory.forEach((it, i) => { if (isGunClipItem(it))
-            clipIdxs.push(i); });
         let reloaded = false;
-        let spentClips = 0;
+        let spentIdxs = [];
         setCombat(prev => {
             if (!prev || prev.result || combatActionsLeft(prev) < 1)
                 return prev;
@@ -57794,16 +58184,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 .sort((a, b) => mags[gunMagKey(kit.ownerKey, a.handKey)].cur - mags[gunMagKey(kit.ownerKey, b.handKey)].cur);
             // A companion's whole reload costs one clip from its own pool (see SPARE CLIPS).
             const allyClips = kit.free ? ensureSpareClips(prev.gunClips, kit.ownerKey, 'ally') : null;
-            const take = kit.free ? (spareClipsLeft(allyClips, kit.ownerKey) > 0 ? needy : []) : needy.slice(0, clipIdxs.length);
+            const heroPick = kit.free ? null : pickAmmoForHands(gameState.inventory, needy);
+            const take = kit.free ? (spareClipsLeft(allyClips, kit.ownerKey) > 0 ? needy : []) : heroPick.hands;
             if (take.length === 0)
                 return prev;
             reloaded = true;
-            spentClips = kit.free ? 0 : take.length;
+            spentIdxs = heroPick ? heroPick.idxs : [];
             return spendActions({ ...prev, gunMags: refillGunMags(mags, kit.ownerKey, take), ...(kit.free ? { gunClips: takeSpareClip(allyClips, kit.ownerKey) } : {}), log: [...prev.log, { text: kit.name + ' — ' + t('combatLogReloadText'), kind: 'effect' }] }, 1);
         });
-        if (!reloaded || spentClips <= 0)
+        if (!reloaded || spentIdxs.length <= 0)
             return;
-        const drop = new Set(clipIdxs.slice(0, spentClips));
+        const drop = new Set(spentIdxs);
         const nextState = { ...gameState, inventory: gameState.inventory.filter((_, i) => !drop.has(i)) };
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
@@ -61777,7 +62168,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const k = a.name.trim().toLowerCase();
                 const l = getAllyLoadout(a);
                 return [k, getLoadoutWeaponType(l.equipment, l.inventory)];
-            })), introActive: combatIntroActive, fxBusy: combatFxBusy, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, onReload: reloadInCombat, reloadInfo: getReloadInfo(combat), movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
+            })), introActive: combatIntroActive, fxBusy: combatFxBusy, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, onReload: reloadInCombat, reloadInfo: getReloadInfo(combat), repairAllInfo: getRepairAllInfo(combat), onRepairAll: repairAllAfterCombat, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
         talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, onLearn: isLatestTurn ? learnTalent : undefined, onToggleTrait: isLatestTurn ? toggleWorldTrait : undefined, onClose: () => setTalentTreeModalOpen(false), t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: viewedState, itemRarities: viewedItemRarities, equipment: viewedEquipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, party: viewedParty, partyInventories: partyInventories, partyEquipment: partyEquipment, repairKitName: isLatestTurn && repairKitIndex !== null && gameState.inventory[repairKitIndex] && gameState.inventory[repairKitIndex].slot === 'repairKit' ? gameState.inventory[repairKitIndex].name : null, onApplyRepairKit: isLatestTurn ? applyRepairKitToIndex : undefined, onCancelRepairKit: cancelRepairKit, onClose: () => { setInventoryModalOpen(false); setRepairKitIndex(null); }, t: t })),
@@ -63233,6 +63624,7 @@ const APP_STYLES = `
   .combat-result-fled { color: var(--amber-400); font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 0.5rem; }
   .loot-panel { text-align: left; }
   .loot-status-text { text-align: center; }
+  .combat-repair-all { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; margin: 0.6rem 0; }
   .loot-item-damage-tag { color: var(--stone-500); font-style: italic; }
   .death-card { max-width: 26rem; }
   .death-modal-actions { flex-wrap: wrap; }
