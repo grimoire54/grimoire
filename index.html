@@ -49482,13 +49482,16 @@ function App() {
     // clear within minutes, so that one is returned immediately instead of
     // making the player wait two minutes for nothing.
     const GEMINI_RETRY_WINDOW_MS = 60000; // was 2 min: long silent retry loops burned the key
-    const GEMINI_FETCH_TIMEOUT_MS = 180000; // non-streaming call: wait for the whole answer (thinking is uncapped, so be generous)
-    const GEMINI_STREAM_FIRST_BYTE_MS = 120000; // streaming call: until the response starts (nothing arrives while the model thinks)
+    const GEMINI_FETCH_TIMEOUT_MS = 75000; // non-streaming call: wait for the whole answer (was 180 s — nobody waits 3 minutes)
+    const GEMINI_STREAM_FIRST_BYTE_MS = 60000; // streaming call: until the response starts (was 120 s)
     const GEMINI_STREAM_STALL_MS = 60000; // streaming call: max silence between chunks
     const GEMINI_TURN_RETRY_CAP = 10; // transport retries one turn may spend in total
     const GEMINI_SWITCH_AFTER_FAILURES = 2; // failures on one model before moving to the next one
     const GEMINI_MAX_MODELS_PER_CALL = 4; // models one request may try before giving up
     const GEMINI_RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
+    // Profile for OPTIONAL hidden calls (e.g. the action check): no hidden thinking, tiny output,
+    // ONE request, short timeout, no retries and no model switching. If it fails, the caller just skips it.
+    const GEMINI_FAST_OPTIONS = { thinkingBudget: 0, maxOutputTokens: 512, fetchLimits: { single: true, timeoutMs: 10000 } };
     // When every model of the key has used up its daily quota, requests are not sent at all —
     // except one probe per interval (a 429 costs no quota, and the probe notices a raised limit or a new billing plan).
     const GEMINI_QUOTA_PROBE_INTERVAL_MS = 10 * 60 * 1000;
@@ -49515,7 +49518,7 @@ function App() {
     // Diagnostics for the "model overloaded" screen: which request failed, with what HTTP status and how big it was.
     // The player-facing text hides Google's raw answer, so without this a persistent 503 can't be traced to a call.
     const geminiDiagRef = { current: null };
-    async function geminiFetch(url, init) {
+    async function geminiFetch(url, init, limits) {
         const deadline = Date.now() + GEMINI_RETRY_WINDOW_MS;
         let delay = 2000;
         const bodyChars = init && typeof init.body === 'string' ? init.body.length : 0;
@@ -49525,7 +49528,7 @@ function App() {
         }
         catch (e) { /* not a standard request */ }
         const streaming = url.indexOf('streamGenerateContent') !== -1;
-        const timeoutMs = streaming ? GEMINI_STREAM_FIRST_BYTE_MS : GEMINI_FETCH_TIMEOUT_MS;
+        const timeoutMs = (limits && limits.timeoutMs) || (streaming ? GEMINI_STREAM_FIRST_BYTE_MS : GEMINI_FETCH_TIMEOUT_MS);
         const apiKeyHeader = init && init.headers ? init.headers['x-goog-api-key'] : '';
         // A replaced API key starts everything over: blocked models, quotas and the model list belong to the old key.
         if (apiKeyHeader && modelRegistry.fp !== keyFingerprint(apiKeyHeader))
@@ -49600,6 +49603,21 @@ function App() {
             const statusLabel = response ? response.status : (timedOut ? 'timeout' : 'network');
             genProgress.lastStatus = statusLabel;
             geminiDiagRef.current = { status: statusLabel, stage: stageHint, chars: bodyChars };
+            if (limits && limits.single) {
+                // Optional call: one attempt only, whatever happens. The caller handles failure itself.
+                // But a DAILY-quota 429 is still recorded, so later requests skip this model instead of re-asking it.
+                if (response && response.status === 429) {
+                    try {
+                        const bt = await response.clone().text();
+                        if (/PerDay|per day|daily/i.test(bt))
+                            modelRegistry.block(curModel, modelRegistry.msUntilQuotaReset(), true);
+                    }
+                    catch (e) { /* unreadable body */ }
+                }
+                if (response)
+                    return response;
+                throw netError;
+            }
             if (timedOut && !response) {
                 // Silent for the whole timeout: stuck or overloaded. Block the model briefly and
                 // try the next one once, rather than repeating the same request against it.
@@ -49752,9 +49770,16 @@ function App() {
     // The scene-to-state extraction is a big structured-JSON job, not storytelling: let the model
     // reason for a bounded amount only. With no cap it can "think" for minutes before the first byte.
     const STATE_EVENTS_THINKING_BUDGET = 1024;
+    // Narration: cap hidden reasoning (~1.5 pages) so the first words appear in seconds, not after minutes of silent "thinking".
+    const NARRATIVE_THINKING_BUDGET = 1024;
     function generationConfigFor(options) {
         const budget = options && options.thinkingBudget;
-        return typeof budget === 'number' ? { ...GEMINI_GENERATION_CONFIG, thinkingConfig: { thinkingBudget: budget } } : GEMINI_GENERATION_CONFIG;
+        const cfg = { ...GEMINI_GENERATION_CONFIG };
+        if (options && typeof options.maxOutputTokens === 'number')
+            cfg.maxOutputTokens = options.maxOutputTokens;
+        if (typeof budget === 'number')
+            cfg.thinkingConfig = { thinkingBudget: budget };
+        return cfg;
     }
     async function callGemini(system, messages, retriesLeft, options) {
         if (devOfflineActive())
@@ -49770,12 +49795,12 @@ function App() {
                 safetySettings: GEMINI_SAFETY_SETTINGS,
                 generationConfig: generationConfigFor(options)
             })
-        });
+        }, options && options.fetchLimits);
         const data = await response.json();
         if (!response.ok && response.status === 400 && options && typeof options.thinkingBudget === 'number' && /think/i.test(JSON.stringify(data))) {
             // This model doesn't accept a thinking budget: repeat the call without the limit.
             console.warn('[Grimoire RPG] model rejected the thinking limit, retrying without it');
-            return callGemini(system, messages, retriesLeft);
+            return callGemini(system, messages, retriesLeft, { ...options, thinkingBudget: undefined });
         }
         if (!response.ok)
             throwApiError(data);
@@ -49839,7 +49864,7 @@ function App() {
                 systemInstruction: { parts: [{ text: system }] },
                 contents: toGeminiContents(messages),
                 safetySettings: GEMINI_SAFETY_SETTINGS,
-                generationConfig: GEMINI_GENERATION_CONFIG
+                generationConfig: generationConfigFor({ thinkingBudget: NARRATIVE_THINKING_BUDGET })
             })
         });
         if (!response.ok) {
@@ -50941,7 +50966,7 @@ Rules:
                 throw e;
             // streaming unsupported or failed for some other reason — fall back to a normal call below
         }
-        const text = await callGemini(system, apiMessages);
+        const text = await callGemini(system, apiMessages, undefined, { thinkingBudget: NARRATIVE_THINKING_BUDGET });
         if (!text)
             throw new Error(t('fallbackNarrative'));
         return text;
@@ -53727,7 +53752,8 @@ If one is: {"check": true, "stat": "agility", "difficulty": "moderate", "stealth
         if (isTriviallySafeAction(actionText))
             return null;
         try {
-            const raw = await withRateLimitRetry(() => callGemini(buildActionCheckSystemPrompt(currentState, actionText, precedingNarrator), [{ role: 'user', content: 'Judge this action now, following the rules exactly.' }]));
+            // Optional layer: fast profile, single attempt (see GEMINI_FAST_OPTIONS). On any failure → no check this turn.
+            const raw = await callGemini(buildActionCheckSystemPrompt(currentState, actionText, precedingNarrator), [{ role: 'user', content: 'Judge this action now, following the rules exactly.' }], 0, GEMINI_FAST_OPTIONS);
             const parsed = extractJsonObject(raw);
             if (!parsed || !parsed.check)
                 return null;
