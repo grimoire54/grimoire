@@ -17649,7 +17649,8 @@ const TRANSLATIONS = {
         genTimerNoReply: 'последний запрос: нет ответа',
         genTimerFallback: 'запасная модель: {m}',
         timeoutError: 'Google не ответил вовремя. Попробуй ещё раз или смени модель в настройках.',
-        genTimerSlow: 'Отвечает долго: Google перегружен или у ключа кончился лимит. Подробности в консоли браузера (F12).',
+        genTimerSlow: 'Отвечает долго: модель может долго «думать», либо Google перегружен, либо у ключа кончился лимит.',
+        genTimerModel: 'модель: {m}',
         secretsMenuLabel: '👁 Скрытая информация',
         equipmentMenuLabel: 'Снаряжение',
         talentsMenuLabel: 'Таланты',
@@ -18673,7 +18674,8 @@ const TRANSLATIONS = {
         genTimerNoReply: 'last request: no reply',
         genTimerFallback: 'backup model: {m}',
         timeoutError: 'Google did not answer in time. Try again or switch the model in settings.',
-        genTimerSlow: 'Taking a while: Google is overloaded or the key has hit its limit. See the browser console (F12) for details.',
+        genTimerSlow: 'Taking a while: the model may be thinking for a long time, Google may be overloaded, or the key may have hit its limit.',
+        genTimerModel: 'model: {m}',
         secretsMenuLabel: '👁 Hidden information',
         equipmentMenuLabel: 'Equipment',
         talentsMenuLabel: 'Talents',
@@ -23413,7 +23415,9 @@ const DEFAULT_COMBAT_ENVIRONMENT = { time: 'day', light: 'lit', realm: 'material
 // night -> dark. dayPhase is the story's current phase.
 function buildCombatEnvironment(encounter, dayPhase, storyWeather) {
     const realm = encounter && COMBAT_REALMS.includes(encounter.realm) ? encounter.realm : 'material';
-    const time = realm === 'other' ? null : (dayPhase === 'night' ? 'night' : 'day');
+    // encounter.devTime ('day' | 'night') is set only by the DEV combat editor and overrides the story's phase for this fight.
+    const forcedTime = encounter && (encounter.devTime === 'day' || encounter.devTime === 'night') ? encounter.devTime : null;
+    const time = realm === 'other' ? null : (forcedTime || (dayPhase === 'night' ? 'night' : 'day'));
     const light = encounter && COMBAT_LIGHT_LEVELS.includes(encounter.lighting)
         ? encounter.lighting
         : (time === 'night' ? 'dark' : 'lit');
@@ -33081,15 +33085,112 @@ async function refreshModelList(apiKey, force) {
             modelRegistry.refreshingFp = '';
     }
 }
+// ---- TURN PROGRESS ESTIMATE ----
+// A turn is a pipeline of calls (action check -> narrative -> combat audit -> state/events).
+// Google does not say how far along a call is, so the percentage is an ESTIMATE: finished
+// stages count their full weight; inside the running stage it is characters streamed so far
+// vs. the typical narrative length (or, for calls that return all at once, time spent vs. the
+// typical duration of that stage). Typical values are learnt from previous turns and kept
+// between sessions. The number never goes backwards and stays below 100 until the turn is done.
+const PROGRESS_STAGE_WEIGHTS = { action: 5, narrative: 55, audit: 5, state: 35 };
+const PROGRESS_STATS_STORAGE_KEY = 'grimoire-rpg-progress-stats';
+const progressStats = {
+    narrativeChars: 2500,
+    ms: { action: 6000, narrative: 40000, audit: 6000, state: 20000 },
+    loaded: false,
+    load() {
+        if (this.loaded)
+            return;
+        this.loaded = true;
+        if (typeof window === 'undefined' || !window.storage)
+            return;
+        try {
+            Promise.resolve(window.storage.get(PROGRESS_STATS_STORAGE_KEY, false)).then(r => {
+                const d = r && r.value ? JSON.parse(r.value) : null;
+                if (!d)
+                    return;
+                if (Number(d.narrativeChars) >= 500 && Number(d.narrativeChars) <= 12000)
+                    this.narrativeChars = Number(d.narrativeChars);
+                for (const k of Object.keys(this.ms))
+                    if (d.ms && Number(d.ms[k]) >= 1000 && Number(d.ms[k]) <= 180000)
+                        this.ms[k] = Number(d.ms[k]);
+            }).catch(() => { });
+        }
+        catch (e) { /* storage unavailable — defaults are fine */ }
+    },
+    save() {
+        if (typeof window === 'undefined' || !window.storage)
+            return;
+        try {
+            Promise.resolve(window.storage.set(PROGRESS_STATS_STORAGE_KEY, JSON.stringify({ narrativeChars: this.narrativeChars, ms: this.ms }), false)).catch(() => { });
+        }
+        catch (e) { /* storage unavailable */ }
+    }
+};
 // ---- GENERATION TIMER — live "is anything happening?" indicator ----
 // geminiFetch (inside App) reports every request, retry and HTTP status here;
 // GenerationTimer reads it once a second while the game master is writing.
 const genProgress = {
     startedAt: 0, requests: 0, retries: 0, lastStatus: null, retryAt: 0,
     active: false, // true only while a game-master turn is running
+    model: '', // model the latest request was sent to
+    stage: '', stageStartedAt: 0, doneStages: {}, done: 0, narrativeChars: 0, maxPercent: 0,
     fallbackModel: '', // set once this turn has switched to the backup model
-    reset() { this.startedAt = Date.now(); this.requests = 0; this.retries = 0; this.lastStatus = null; this.retryAt = 0; this.active = true; this.fallbackModel = ''; },
-    finish() { this.active = false; this.retryAt = 0; }
+    reset() {
+        this.startedAt = Date.now();
+        this.requests = 0;
+        this.retries = 0;
+        this.lastStatus = null;
+        this.retryAt = 0;
+        this.active = true;
+        this.fallbackModel = '';
+        this.model = '';
+        this.stage = '';
+        this.stageStartedAt = 0;
+        this.doneStages = {};
+        this.done = 0;
+        this.narrativeChars = 0;
+        this.maxPercent = 0;
+        progressStats.load();
+    },
+    finish() { this.active = false; this.retryAt = 0; progressStats.save(); },
+    beginStage(name) {
+        this.stage = name;
+        this.stageStartedAt = Date.now();
+        if (name === 'narrative')
+            this.narrativeChars = 0;
+    },
+    endStage(name, chars) {
+        if (this.stage === name) {
+            const dur = Date.now() - this.stageStartedAt;
+            if (dur > 300)
+                progressStats.ms[name] = Math.min(180000, Math.max(1000, Math.round(progressStats.ms[name] * 0.7 + dur * 0.3)));
+            this.stage = '';
+        }
+        if (name === 'narrative' && chars > 200)
+            progressStats.narrativeChars = Math.min(12000, Math.max(500, Math.round(progressStats.narrativeChars * 0.6 + chars * 0.4)));
+        this.skipStage(name);
+    },
+    skipStage(name) {
+        if (this.doneStages[name])
+            return;
+        this.doneStages[name] = true;
+        this.done += PROGRESS_STAGE_WEIGHTS[name] || 0;
+    },
+    percent() {
+        let p = this.done;
+        const st = this.stage;
+        if (st && !this.doneStages[st]) {
+            let f = 1 - Math.exp(-(Date.now() - this.stageStartedAt) / progressStats.ms[st]);
+            if (st === 'narrative')
+                f = this.narrativeChars > 0 ? this.narrativeChars / progressStats.narrativeChars : Math.min(f, 0.4);
+            p += (PROGRESS_STAGE_WEIGHTS[st] || 0) * Math.min(f, 0.95);
+        }
+        const shown = Math.min(99, Math.floor(p));
+        if (shown > this.maxPercent)
+            this.maxPercent = shown;
+        return this.maxPercent;
+    }
 };
 function formatElapsed(ms) {
     const sec = Math.max(0, Math.floor(ms / 1000));
@@ -33099,7 +33200,7 @@ function GenerationTimer({ t }) {
     const [, setTick] = useState(0);
     const mountedAt = useRef(Date.now()).current;
     useEffect(() => {
-        const id = setInterval(() => setTick(n => n + 1), 1000);
+        const id = setInterval(() => setTick(n => n + 1), 500);
         return () => clearInterval(id);
     }, []);
     const tracked = genProgress.startedAt >= mountedAt - 1500;
@@ -33117,10 +33218,20 @@ function GenerationTimer({ t }) {
     }
     if (tracked && genProgress.fallbackModel)
         parts.push(t('genTimerFallback').replace('{m}', genProgress.fallbackModel));
+    else if (tracked && genProgress.model)
+        parts.push(t('genTimerModel').replace('{m}', genProgress.model));
     if (retryIn > 0)
         parts.push(t('genTimerRetryIn').replace('{s}', retryIn));
+    const pct = tracked ? genProgress.percent() : 0;
     return (React.createElement(React.Fragment, null,
-        React.createElement("span", { className: "gen-timer" }, formatElapsed(elapsed)),
+        React.createElement("span", { className: "gen-timer" },
+            formatElapsed(elapsed),
+            tracked && React.createElement("span", { className: "gen-percent" },
+                " \u2248",
+                pct,
+                "%")),
+        tracked && React.createElement("div", { className: "gen-bar" },
+            React.createElement("div", { style: { width: pct + '%' } })),
         (parts.length > 0 || elapsed > 60000) && (React.createElement("div", { className: "gen-timer-detail" },
             parts.join(' · '),
             elapsed > 60000 && React.createElement("div", null, t('genTimerSlow'))))));
@@ -45032,6 +45143,17 @@ function devWeatherFields(env) {
         return { ...out, weather: chain[lo], weatherRange: { min: chain[lo], max: chain[lo], mode: 'range' } }; // pinned: never changes
     return { ...out, weather: chain[lo], weatherRange: { min: chain[lo], max: chain[hi], mode: env.mode === 'escalate' ? 'escalate' : 'range' } };
 }
+// Editor time of day / lighting -> encounter fields. env.time: 'story' (follow the story's phase) | 'day' | 'night';
+// env.light: 'auto' (derived from the time) | 'lit' | 'dark'. See buildCombatEnvironment.
+function devTimeFields(env) {
+    const out = {};
+    if (env.time === 'day' || env.time === 'night')
+        out.devTime = env.time;
+    if (env.light === 'lit' || env.light === 'dark')
+        out.lighting = env.light;
+    return out;
+}
+const WEATHER_CHIPS = [['none', 'нет'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря'], ['lightMist', 'лёгкая дымка'], ['heavyMist', 'густой туман'], ['denseMist', 'мгла']];
 function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel, env) {
     const fallbackName = devL(lang, 'Противник', 'Enemy');
     const enemies = [];
@@ -45071,7 +45193,7 @@ function devBuildEncounter(rows, ambush, wave, lang, unarmedLabel, env) {
             trigger: { type: wave.type, value: Math.max(1, Number(wave.value) || 1) }, combatants
         });
     }
-    return { enemies, reinforcements, ...(devAllies.length ? { devAllies } : {}), ambush: !!ambush && enemies.length === 1, objective: null, ...(env ? devWeatherFields(env) : {}) };
+    return { enemies, reinforcements, ...(devAllies.length ? { devAllies } : {}), ambush: !!ambush && enemies.length === 1, objective: null, ...(env ? devWeatherFields(env) : {}), ...(env ? devTimeFields(env) : {}) };
 }
 // ============================================================================
 // DevPanel UI
@@ -45823,6 +45945,8 @@ function DevCombatTab({ api }) {
     const [devWeatherMode, setDevWeatherMode] = useDevDraft('combat.weatherMode', 'range');
     const [devWeatherEvery, setDevWeatherEvery] = useDevDraft('combat.weatherEvery', false);
     const [devIndoors, setDevIndoors] = useDevDraft('combat.indoors', false);
+    const [devTime, setDevTime] = useDevDraft('combat.time', 'story');
+    const [devLight, setDevLight] = useDevDraft('combat.light', 'auto');
     const newWave = () => ({ on: false, side: 'enemy', type: 'turn', value: '3', name: devL(lang, 'Подкрепление', 'Reinforcement'), tier: 'average', role: 'melee', kind: 'humanoid', damageResist: 'none', weapon: '', count: '2', species: '' });
     const [wave, setWave] = useDevDraft('combat.wave', newWave);
     const [sceneText, setSceneText] = useDevDraft('combat.sceneText', '');
@@ -45852,7 +45976,7 @@ function DevCombatTab({ api }) {
         setAmbush(false);
     }
     function encounter() {
-        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'), { from: devWeather, to: devWeatherTo, mode: devWeatherMode, everyTurn: devWeatherEvery, indoors: devIndoors });
+        return devBuildEncounter(rows, ambush, wave, lang, api.t('combatUnarmedEnemyLabel'), { from: devWeather, to: devWeatherTo, mode: devWeatherMode, everyTurn: devWeatherEvery, indoors: devIndoors, time: devTime, light: devLight });
     }
     function post(fightNow) {
         const enc = encounter();
@@ -45947,15 +46071,32 @@ function DevCombatTab({ api }) {
             React.createElement(DevRow, null,
                 React.createElement(DevBtn, { small: true, onClick: () => setRows(rs => [...rs, newRow()]), disabled: rows.length >= MAX_COMBAT_ENEMIES }, "\uFF0B \u0415\u0449\u0451 \u0442\u0438\u043F \u0432\u0440\u0430\u0433\u0430"),
                 React.createElement(DevCheck, { checked: ambush, onChange: setAmbush }, "\u0437\u0430\u0441\u0430\u0434\u0430 (\u0442\u0438\u0445\u0430\u044F \u0430\u0442\u0430\u043A\u0430; \u0442\u043E\u043B\u044C\u043A\u043E 1 \u0432\u0440\u0430\u0433)")),
-            React.createElement(DevRow, null,
-                React.createElement(DevField, { label: "\u041F\u043E\u0433\u043E\u0434\u0430 (\u043E\u0442)" },
-                    React.createElement(DevSelect, { value: devWeather, onChange: setDevWeather, options: [['none', 'нет'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря'], ['lightMist', 'лёгкая дымка'], ['heavyMist', 'густой туман'], ['denseMist', 'мгла']] })),
-                devWeather !== 'none' && (React.createElement(DevField, { label: "\u0434\u043E" },
-                    React.createElement(DevSelect, { value: devWeatherTo, onChange: setDevWeatherTo, options: [['same', 'то же (без изменений)'], ['lightSnow', 'слабый снегопад'], ['heavySnow', 'сильный снегопад'], ['blizzard', 'буря'], ['lightMist', 'лёгкая дымка'], ['heavyMist', 'густой туман'], ['denseMist', 'мгла']] }))),
-                devWeather !== 'none' && devWeatherTo !== 'same' && devWeatherTo !== devWeather && (React.createElement(DevField, { label: "\u0445\u043E\u0434" },
-                    React.createElement(DevSelect, { value: devWeatherMode, onChange: setDevWeatherMode, options: [['range', 'колеблется в диапазоне'], ['escalate', 'только нарастает']] }))),
-                devWeather !== 'none' && (React.createElement(DevCheck, { checked: devWeatherEvery, onChange: setDevWeatherEvery }, "\u043C\u0435\u043D\u044F\u0442\u044C \u043F\u043E\u0433\u043E\u0434\u0443 \u043A\u0430\u0436\u0434\u044B\u0439 \u0445\u043E\u0434 (\u0438\u043D\u0430\u0447\u0435 \u2014 \u0448\u0430\u043D\u0441 50 %)")),
-                React.createElement(DevCheck, { checked: devIndoors, onChange: setDevIndoors }, "\u0432 \u043F\u043E\u043C\u0435\u0449\u0435\u043D\u0438\u0438 (\u043F\u043E\u0433\u043E\u0434\u044B \u043D\u0435\u0442)")),
+            React.createElement("div", { className: "dev-enemy" },
+                React.createElement("div", { className: "dev-item-name" }, "\uD83C\uDF0D \u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435 \u0431\u043E\u044F"),
+                React.createElement(DevRow, null,
+                    React.createElement("span", { className: "dev-item-sub" }, "\u0412\u0440\u0435\u043C\u044F \u0441\u0443\u0442\u043E\u043A:"),
+                    [['story', '📖 как в сюжете (' + (gs.dayPhase === 'night' ? '🌙 ночь' : '☀ день') + ')'], ['day', '☀ День'], ['night', '🌙 Ночь']].map(([k, l]) => (React.createElement("button", { key: k, type: "button", className: "dev-chip", style: devTime === k ? { outline: '2px solid currentColor' } : undefined, onClick: () => setDevTime(k) }, l)))),
+                React.createElement(DevRow, null,
+                    React.createElement("span", { className: "dev-item-sub" }, "\u041E\u0441\u0432\u0435\u0449\u0435\u043D\u0438\u0435:"),
+                    [['auto', '🔄 авто (по времени)'], ['lit', '💡 Светло'], ['dark', '🕶 Темно']].map(([k, l]) => (React.createElement("button", { key: k, type: "button", className: "dev-chip", style: devLight === k ? { outline: '2px solid currentColor' } : undefined, onClick: () => setDevLight(k) }, l)))),
+                React.createElement(DevRow, null,
+                    React.createElement(DevCheck, { checked: devIndoors, onChange: setDevIndoors }, "\uD83C\uDFE0 \u0432 \u043F\u043E\u043C\u0435\u0449\u0435\u043D\u0438\u0438 (\u043F\u043E\u0433\u043E\u0434\u044B \u043D\u0435\u0442)")),
+                React.createElement(DevRow, null,
+                    React.createElement("span", { className: "dev-item-sub" }, "\u041F\u043E\u0433\u043E\u0434\u0430:"),
+                    WEATHER_CHIPS.map(([k, l]) => (React.createElement("button", { key: k, type: "button", className: "dev-chip", style: devWeather === k ? { outline: '2px solid currentColor' } : undefined, onClick: () => setDevWeather(k) }, l)))),
+                devWeather !== 'none' && (React.createElement(DevRow, null,
+                    React.createElement(DevField, { label: "\u041F\u043E\u0433\u043E\u0434\u0430 \u0434\u043E (\u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D)" },
+                        React.createElement(DevSelect, { value: devWeatherTo, onChange: setDevWeatherTo, options: [['same', 'то же (без изменений)'], ...WEATHER_CHIPS.filter(c => c[0] !== 'none')] })),
+                    devWeatherTo !== 'same' && devWeatherTo !== devWeather && (React.createElement(DevField, { label: "\u0445\u043E\u0434" },
+                        React.createElement(DevSelect, { value: devWeatherMode, onChange: setDevWeatherMode, options: [['range', 'колеблется в диапазоне'], ['escalate', 'только нарастает']] }))),
+                    React.createElement(DevCheck, { checked: devWeatherEvery, onChange: setDevWeatherEvery }, "\u043C\u0435\u043D\u044F\u0442\u044C \u043F\u043E\u0433\u043E\u0434\u0443 \u043A\u0430\u0436\u0434\u044B\u0439 \u0445\u043E\u0434 (\u0438\u043D\u0430\u0447\u0435 \u2014 \u0448\u0430\u043D\u0441 50 %)"))),
+                React.createElement("div", { className: "dev-item-sub" },
+                    "\u0418\u0442\u043E\u0433: ",
+                    (devTime === 'story' ? (gs.dayPhase === 'night' ? 'ночь' : 'день') : (devTime === 'night' ? 'ночь' : 'день')),
+                    ", ",
+                    devLight === 'auto' ? ((devTime === 'story' ? gs.dayPhase === 'night' : devTime === 'night') ? 'темно' : 'светло') : (devLight === 'dark' ? 'темно' : 'светло'),
+                    ", ",
+                    devIndoors ? 'помещение' : (WEATHER_CHIPS.find(c => c[0] === devWeather) || [0, 'без погоды'])[1])),
             React.createElement(DevCheck, { checked: wave.on, onChange: x => setW('on', x) }, "\u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432\u043E\u043B\u043D\u0443 \u043F\u043E\u0434\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u044F"),
             wave.on && (React.createElement("div", { className: "dev-enemy" },
                 React.createElement(DevRow, null,
@@ -49275,9 +49416,9 @@ function App() {
     // clear within minutes, so that one is returned immediately instead of
     // making the player wait two minutes for nothing.
     const GEMINI_RETRY_WINDOW_MS = 60000; // was 2 min: long silent retry loops burned the key
-    const GEMINI_FETCH_TIMEOUT_MS = 120000; // non-streaming call: wait for the whole answer
-    const GEMINI_STREAM_FIRST_BYTE_MS = 60000; // streaming call: until the response starts
-    const GEMINI_STREAM_STALL_MS = 45000; // streaming call: max silence between chunks
+    const GEMINI_FETCH_TIMEOUT_MS = 180000; // non-streaming call: wait for the whole answer (thinking is uncapped, so be generous)
+    const GEMINI_STREAM_FIRST_BYTE_MS = 120000; // streaming call: until the response starts (nothing arrives while the model thinks)
+    const GEMINI_STREAM_STALL_MS = 60000; // streaming call: max silence between chunks
     const GEMINI_TURN_RETRY_CAP = 10; // transport retries one turn may spend in total
     const GEMINI_SWITCH_AFTER_FAILURES = 2; // failures on one model before moving to the next one
     const GEMINI_MAX_MODELS_PER_CALL = 4; // models one request may try before giving up
@@ -49353,12 +49494,14 @@ function App() {
             return true;
         };
         let failures = 0;
+        let timeoutSwitches = 0;
         while (true) {
             let response = null;
             let netError = null;
             let timedOut = false;
             genProgress.requests++;
             genProgress.retryAt = 0;
+            genProgress.model = curModel;
             const controller = new AbortController();
             const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
             try {
@@ -49377,6 +49520,14 @@ function App() {
             const statusLabel = response ? response.status : (timedOut ? 'timeout' : 'network');
             genProgress.lastStatus = statusLabel;
             geminiDiagRef.current = { status: statusLabel, stage: stageHint, chars: bodyChars };
+            if (timedOut && !response) {
+                // Silent for the whole timeout: stuck or overloaded. Block the model briefly and
+                // try the next one once, rather than repeating the same request against it.
+                timeoutSwitches++;
+                if (timeoutSwitches <= 1 && switchToFallback(120000))
+                    continue;
+                throw netError;
+            }
             if (response && response.status === 404) {
                 // Model retired or renamed: re-read the model list and move on.
                 refreshModelList(apiKeyHeader, true);
@@ -50681,7 +50832,11 @@ Rules:
             system = system + '\n\n' + correction;
         setStreamingText('');
         try {
-            const text = await callGeminiStreaming(system, apiMessages, STREAM_NARRATIVE_LIVE ? setStreamingText : () => { });
+            const text = await callGeminiStreaming(system, apiMessages, chunk => {
+                genProgress.narrativeChars = chunk.length;
+                if (STREAM_NARRATIVE_LIVE)
+                    setStreamingText(chunk);
+            });
             if (text)
                 return text;
         }
@@ -53695,7 +53850,19 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // and must never be double-rolled by this separate system.
         const combatStillPending = !!(precedingNarrator && precedingNarrator.combatEncounter && !precedingNarrator.combatResolved);
         const lastPlayerMessage = (isOpeningTurn || combatStillPending) ? null : [...historyMessages].reverse().find(m => m.role === 'player');
-        const actionCheck = lastPlayerMessage ? await generateActionCheck(lastPlayerMessage.text, currentState, precedingNarrator) : null;
+        let actionCheck = null;
+        if (lastPlayerMessage) {
+            genProgress.beginStage('action');
+            try {
+                actionCheck = await generateActionCheck(lastPlayerMessage.text, currentState, precedingNarrator);
+            }
+            finally {
+                genProgress.endStage('action');
+            }
+        }
+        else {
+            genProgress.skipStage('action');
+        }
         // Rolled from currentState — i.e. the world exactly as of the START of
         // this turn, before anything below can touch it — so a flip here can
         // never depend on (or collide with) whatever this same turn's own
@@ -53729,15 +53896,22 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         }
         const narrativeRequestCache = {};
         const regenerateNarrative = correction => generateNarrative(historyMessages, currentState, actionCheck, worldTickEvent, narrativeRequestCache, correction).then(stripLeakedMetaNotes);
-        const firstDraft = stripLeakedMetaNotes(await generateNarrative(historyMessages, currentState, actionCheck, worldTickEvent, narrativeRequestCache, ''));
+        genProgress.beginStage('narrative');
+        const rawDraft = await generateNarrative(historyMessages, currentState, actionCheck, worldTickEvent, narrativeRequestCache, '');
+        genProgress.endStage('narrative', rawDraft.length);
+        const firstDraft = stripLeakedMetaNotes(rawDraft);
+        genProgress.beginStage('audit');
         const integrity = await guardNarrativeCombatIntegrity(firstDraft, { actionText: heroActionText, precedingNarrator, aftermathNote, regenerate: regenerateNarrative });
+        genProgress.endStage('audit');
         const narrative = integrity.narrative;
         if (!narrative.trim())
             throw new Error(t('fallbackNarrative'));
+        genProgress.beginStage('state');
         const combined = await generateStateAndEventsWithRetry(narrative, currentState, precedingNarrator, isOpeningTurn, turnIndex, { aftermathNote, forceCombat: integrity.forceCombat }).catch(e => {
             console.error('[Grimoire RPG] generateStateAndEvents failed after ' + STATE_AND_EVENTS_MAX_ATTEMPTS + ' attempts, character sheet NOT updated this turn:', e);
             return EMPTY_STATE_AND_EVENTS_FALLBACK(currentState, precedingNarrator, isOpeningTurn);
         });
+        genProgress.endStage('state');
         // Last resort for the two things the player sees every turn: if the big
         // extraction failed completely, ask a tiny, cheap model call for just the
         // action suggestions and the hidden-information text, instead of showing
@@ -63684,7 +63858,10 @@ const APP_STYLES = `
   .thinking { display: flex; align-items: center; gap: 0.3rem; color: var(--amber-500); font-family: var(--font-mono); font-size: 0.9rem; }
   .gen-timer { margin-left: 0.6rem; color: var(--amber-300); font-variant-numeric: tabular-nums; }
   .gen-timer-detail { flex-basis: 100%; color: var(--amber-700); font-size: 0.75rem; line-height: 1.35; }
-  .thinking:has(.gen-timer-detail) { flex-wrap: wrap; }
+  .gen-percent { margin-left: 0.4rem; }
+  .gen-bar { flex-basis: 100%; height: 3px; margin-top: 0.4rem; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .gen-bar > div { height: 100%; background: var(--amber-300); transition: width 0.6s ease-out; }
+  .thinking:has(.gen-bar), .thinking:has(.gen-timer-detail) { flex-wrap: wrap; }
   .thinking-sticky { position: sticky; top: 0; z-index: 5; background: var(--stone-950); padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
   .thinking-text { animation: grim-thinking-glow 1.3s ease-in-out infinite; }
   @keyframes grim-thinking-glow { 0%, 100% { color: var(--amber-700); } 50% { color: var(--amber-300); } }
