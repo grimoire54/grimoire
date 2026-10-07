@@ -17629,6 +17629,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Дальше',
         sendFailedPrefix: 'Мастер игры не ответил: ',
         rateLimitError: 'У ключа закончились запросы к ИИ (лимит Gemini API) - он сбрасывается раз в 24 часа. Можно взять ключ от другого аккаунта или подождать до завтра.',
+        rateLimitResetAt: 'Квоты Google обновятся примерно в {time}.',
         overloadedError: 'Модель Gemini сейчас перегружена. Через несколько минут можно попробовать ещё раз. Если повторяется - в настройках можно выбрать другую модель, например {model}.',
         busyTurnNotice: 'Рассказчик ещё не закончил ход.',
         giftedItemNotice: 'Это подарок — обратно его не забрать.',
@@ -18658,6 +18659,7 @@ const TRANSLATIONS = {
         sendTurnButton: 'Next',
         sendFailedPrefix: "The game master didn't respond: ",
         rateLimitError: "This key is out of available AI requests for now (Gemini API limit) — it resets roughly once every 24 hours. Try again in a day, or use a different account with a different key.",
+        rateLimitResetAt: "Google's quotas reset at about {time}.",
         overloadedError: "The Gemini model is overloaded right now (not a problem with your key) — I already retried a few times. Wait a minute or two and try again; if it keeps happening, pick another model in Settings, e.g. {model}.",
         busyTurnNotice: "Wait for the narrator to finish this turn first.",
         giftedItemNotice: "That was a gift — it can't be taken back.",
@@ -32920,17 +32922,46 @@ function sortGeminiModelIds(ids) {
 const modelRegistry = {
     discovered: [], // ids from ListModels, best first
     blocked: {}, // id -> epoch ms until which the model is skipped (quota hit, overload, retired)
+    quotaUntil: {}, // id -> epoch ms: the subset of `blocked` caused by an exhausted DAILY quota
+    lastProbeAt: 0, // last time a request was let through although every model was quota-blocked
     fp: '', // fingerprint of the API key all of this state belongs to
     loadPromise: null,
     refreshingFp: '',
     listLoadedAt: 0,
     chain() { return this.discovered.length > 0 ? this.discovered : SEED_FALLBACK_MODELS; },
     isBlocked(id) { return (this.blocked[id] || 0) > Date.now(); },
-    block(id, ms) {
+    block(id, ms, quota) {
         if (!id)
             return;
         this.blocked[id] = Date.now() + ms;
+        if (quota)
+            this.quotaUntil[id] = this.blocked[id];
         this.persistBlocked();
+    },
+    // A model answered normally, so whatever blocked it (a limit that was raised, a billing plan, a stale entry) is over.
+    clearBlock(id) {
+        if (!id || !(this.blocked[id] || this.quotaUntil[id]))
+            return;
+        delete this.blocked[id];
+        delete this.quotaUntil[id];
+        this.persistBlocked();
+    },
+    // Non-zero only when EVERY model this request could use has an exhausted daily quota:
+    // the epoch ms at which the first of them comes back. extraModel = the model picked in Settings (it may be outside the chain).
+    allQuotaBlockedUntil(extraModel) {
+        const now = Date.now();
+        const ids = new Set(this.chain());
+        if (extraModel)
+            ids.add(extraModel);
+        let soonest = Infinity;
+        for (const id of ids) {
+            const until = this.quotaUntil[id] || 0;
+            if (until <= now)
+                return 0;
+            if (until < soonest)
+                soonest = until;
+        }
+        return soonest === Infinity ? 0 : soonest;
     },
     next(current, tried) {
         for (const id of this.chain()) {
@@ -32947,8 +32978,16 @@ const modelRegistry = {
             return model;
         return this.next(model, null) || model;
     },
-    // Google resets daily quotas at midnight Pacific time (07:00/08:00 UTC); 08:00 UTC is a safe upper bound.
+    // Google resets daily quotas at midnight Pacific time. Computed from the real Pacific clock (DST included);
+    // if Intl is unavailable, 08:00 UTC is a safe upper bound.
     msUntilQuotaReset() {
+        try {
+            const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date());
+            const get = type => parseInt((parts.find(x => x.type === type) || {}).value, 10) || 0;
+            const elapsed = ((get('hour') % 24) * 3600 + get('minute') * 60 + get('second')) * 1000;
+            return 24 * 3600 * 1000 - elapsed + 60000;
+        }
+        catch (e) { /* fall through to the UTC bound */ }
         const now = new Date();
         let t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 8, 0, 0);
         if (t <= now.getTime())
@@ -32977,12 +33016,16 @@ const modelRegistry = {
         if (typeof window === 'undefined' || !window.storage)
             return;
         const keep = {};
+        const keepQuota = {};
         const horizon = Date.now() + 5 * 60 * 1000;
         for (const id of Object.keys(this.blocked))
             if (this.blocked[id] > horizon)
                 keep[id] = this.blocked[id];
+        for (const id of Object.keys(this.quotaUntil))
+            if (this.quotaUntil[id] > horizon)
+                keepQuota[id] = this.quotaUntil[id];
         try {
-            Promise.resolve(window.storage.set(MODEL_BLOCKED_STORAGE_KEY, JSON.stringify({ fp: this.fp, until: keep }), false)).catch(() => { });
+            Promise.resolve(window.storage.set(MODEL_BLOCKED_STORAGE_KEY, JSON.stringify({ fp: this.fp, until: keep, quota: keepQuota }), false)).catch(() => { });
         }
         catch (e) { /* storage unavailable */ }
     },
@@ -32996,6 +33039,8 @@ const modelRegistry = {
         const hadKey = !!this.fp;
         this.fp = fp;
         this.blocked = {};
+        this.quotaUntil = {};
+        this.lastProbeAt = 0;
         this.discovered = [];
         this.listLoadedAt = 0;
         if (hadKey) {
@@ -33027,6 +33072,11 @@ const modelRegistry = {
                 for (const id of Object.keys(d.until))
                     if (Number(d.until[id]) > Date.now() && parseGeminiModelId(id))
                         this.blocked[id] = Number(d.until[id]);
+                if (d.quota && typeof d.quota === 'object') {
+                    for (const id of Object.keys(d.quota))
+                        if (Number(d.quota[id]) > Date.now() && this.blocked[id])
+                            this.quotaUntil[id] = Number(d.quota[id]);
+                }
             }
         }
         catch (e) { /* nothing cached yet */ }
@@ -49439,6 +49489,9 @@ function App() {
     const GEMINI_SWITCH_AFTER_FAILURES = 2; // failures on one model before moving to the next one
     const GEMINI_MAX_MODELS_PER_CALL = 4; // models one request may try before giving up
     const GEMINI_RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
+    // When every model of the key has used up its daily quota, requests are not sent at all —
+    // except one probe per interval (a 429 costs no quota, and the probe notices a raised limit or a new billing plan).
+    const GEMINI_QUOTA_PROBE_INTERVAL_MS = 10 * 60 * 1000;
     // Next model of the fallback chain (see modelRegistry) — each model has its
     // own quota and its own load, so switching helps with 503, 429 and 404.
     function fallbackModelFor(model) {
@@ -49480,6 +49533,17 @@ function App() {
         // Keep the model list fresh in the background (cached for 24 h, never blocks the request).
         refreshModelList(apiKeyHeader, false);
         let curModel = modelOfUrl(url);
+        // Every model of this key is out of daily quota: don't even send the request (only a rare probe goes through).
+        if (modelRegistry.allQuotaBlockedUntil(curModel) > 0) {
+            if (Date.now() - modelRegistry.lastProbeAt >= GEMINI_QUOTA_PROBE_INTERVAL_MS) {
+                modelRegistry.lastProbeAt = Date.now();
+            }
+            else {
+                genProgress.lastStatus = 429;
+                geminiDiagRef.current = { status: 429, stage: stageHint, chars: bodyChars };
+                return new Response(JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Daily quota is already used up on every model of this key; request not sent.' } }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+            }
+        }
         const triedModels = new Set([curModel]);
         let usedFallback = false;
         // Start on a model that is not known to be rate-limited or retired right now.
@@ -49493,8 +49557,8 @@ function App() {
                 genProgress.fallbackModel = curModel;
         }
         // Block the model that just failed for blockMs and move on to the next one of the chain.
-        const switchToFallback = blockMs => {
-            modelRegistry.block(curModel, blockMs);
+        const switchToFallback = (blockMs, quota) => {
+            modelRegistry.block(curModel, blockMs, quota);
             if (triedModels.size >= GEMINI_MAX_MODELS_PER_CALL)
                 return false;
             const next = modelRegistry.next(curModel, triedModels);
@@ -49560,6 +49624,8 @@ function App() {
             let retryAfterMs = 0;
             let dailyQuota = false;
             if (response) {
+                if (response.ok)
+                    modelRegistry.clearBlock(curModel);
                 if (!GEMINI_RETRYABLE_STATUSES.includes(response.status))
                     return response;
                 let bodyText = '';
@@ -49567,13 +49633,13 @@ function App() {
                     bodyText = await response.clone().text();
                 }
                 catch (e) { /* unreadable body — treat as a normal failure */ }
-                if (response.status === 429 && bodyText.indexOf('PerDay') !== -1)
+                if (response.status === 429 && /PerDay|per day|daily/i.test(bodyText))
                     dailyQuota = true;
                 retryAfterMs = parseRetryDelayMs(response, bodyText);
             }
             // A DAILY quota can't clear within minutes — but every other model has its own quota.
             if (dailyQuota) {
-                if (switchToFallback(modelRegistry.msUntilQuotaReset()))
+                if (switchToFallback(modelRegistry.msUntilQuotaReset(), true))
                     continue;
                 return response;
             }
@@ -49642,7 +49708,9 @@ function App() {
                 return t('overloadedError').replace('{model}', altModel) + diagSuffix(e);
             // Real quota hit (RESOURCE_EXHAUSTED) — show only the short translated
             // explanation, not Google's raw text.
-            return t('rateLimitError') + diagSuffix(e);
+            const resetAt = modelRegistry.allQuotaBlockedUntil(geminiModel);
+            const resetNote = resetAt ? ' ' + t('rateLimitResetAt').replace('{time}', new Date(resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '';
+            return t('rateLimitError') + resetNote + diagSuffix(e);
         }
         if (e.code === 'auth')
             return t('authError');
