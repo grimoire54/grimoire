@@ -33528,6 +33528,11 @@ function pickEnemyTargetPart(targetParts) {
 function isBodyDestroyed(parts) {
     return BODY_PARTS.every(p => !parts[p.key] || parts[p.key].disabled || parts[p.key].hp <= 0);
 }
+// Module-level (not inside App) so CombatModal can use them too. An enemy that
+// fled or surrendered is "out" of the fight but not "down" (killed): loot, XP
+// and the defeat summary key off isEnemyDown alone.
+function isEnemyDown(enemy) { return isBodyDestroyed(enemy.parts); }
+function isEnemyOut(enemy) { return !!enemy.fled || isEnemyDown(enemy); }
 // ==============================================================================
 // MERCY, YIELDING AND PRISONERS (non-lethal outcomes of a fight)
 // ------------------------------------------------------------------------
@@ -60181,7 +60186,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // which both still care whether they were actually beaten unconscious
     // (isAllyDown) or just ran off under their own power.
     function isAllyOut(ally) { return !!ally.fled || isAllyDown(ally); }
-    function isEnemyDown(enemy) { return isBodyDestroyed(enemy.parts); }
     // "Down" (dead) is deliberately kept separate from "out of the fight" — a
     // broken enemy that fled or surrendered (see the morale system further
     // down: rollMoraleBreak/applyMoraleShockToGroup) leaves combat alive, so
@@ -60190,7 +60194,6 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // loot/XP/the "defeated" narrative summary, which all still key off
     // isEnemyDown alone (see the victory-loot effect and
     // buildCombatSummaryTag).
-    function isEnemyOut(enemy) { return !!enemy.fled || isEnemyDown(enemy); }
     // A successful parry's riposte (see resolveOneAttack's riposteDamage) is a
     // free counter-hit on the enemy that just attacked — it always connects
     // (the parry already succeeded, so there's no separate hit-chance roll
