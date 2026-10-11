@@ -17795,6 +17795,7 @@ const TRANSLATIONS = {
         mapLegendToggle: 'Обозначения',
         mapEmptyText: 'Карта заполнится, как только история начнёт называть места.',
         mapLocationCharactersLabel: 'Персонажи здесь',
+        mapInsideLabel: 'Внутри',
         mapFogLabel: 'Неисследовано',
         mapKindSettlement: 'Поселение',
         mapKindWilderness: 'Дикая местность',
@@ -19054,6 +19055,7 @@ const TRANSLATIONS = {
         mapLegendToggle: 'Legend',
         mapEmptyText: 'The map fills in as the story starts naming places.',
         mapLocationCharactersLabel: 'Characters here',
+        mapInsideLabel: 'Inside',
         mapFogLabel: 'Unexplored',
         mapKindSettlement: 'Settlement',
         mapKindWilderness: 'Wilderness',
@@ -21699,6 +21701,12 @@ function mergeDuplicateMapNode(keep, dup) {
         keep.status = dup.status;
         keep.statusSince = dup.statusSince;
     }
+    if (dup.structureKnown && !keep.structureKnown) {
+        keep.parentId = dup.parentId || null;
+        keep.structureKnown = true;
+    }
+    else if (!keep.parentId && dup.parentId)
+        keep.parentId = dup.parentId;
     (dup.connections || []).forEach(c => { if (!keep.connections.includes(c))
         keep.connections.push(c); });
 }
@@ -21775,6 +21783,10 @@ function healMapDuplicates(map) {
             const r = remap(n.floorRootId);
             n.floorRootId = keptIds.has(r) ? r : null;
         }
+        if (n.parentId) {
+            const p = remap(n.parentId);
+            n.parentId = (p !== n.id && keptIds.has(p)) ? p : null;
+        }
     }
     // A node is only the root of a stack of floors while something is still
     // stacked on it — merging the phantom "floors" away can leave a stale flag.
@@ -21840,7 +21852,9 @@ function applyMapHealToState(state, heal) {
 function healStateMap(state) {
     if (!state || typeof state !== 'object' || !state.map)
         return state;
-    return applyMapHealToState(state, healMapDuplicates(state.map));
+    const healed = applyMapHealToState(state, healMapDuplicates(state.map));
+    const repaired = repairMapTopology(healed.map);
+    return repaired === healed.map ? healed : { ...healed, map: repaired };
 }
 // What the model is allowed to see of the map: names only. No ids (see rule 1
 // above), no grid coordinates, no layer numbers, no floor bookkeeping, no
@@ -21865,6 +21879,9 @@ function buildMapPromptView(map) {
         currentLocation: current ? current.name : null,
         nodes: nodes.map(n => {
             const out = { name: n.name, kind: n.kind, discovered: !!n.discovered };
+            const container = n.parentId ? byId.get(n.parentId) : null;
+            if (container)
+                out.inside = container.name;
             const links = (Array.isArray(n.connections) ? n.connections : []).map(nameOf).filter(Boolean);
             if (links.length)
                 out.connectsTo = links;
@@ -21894,6 +21911,34 @@ function findFreeGridCell(fromGx, fromGy, direction, occupied, startStep = 1) {
             return { gx, gy };
     }
     return { gx: fromGx + vec[0] * lastStep, gy: fromGy + vec[1] * lastStep };
+}
+function mapNameSeed(name) {
+    let h = 5381;
+    const s = String(name || '');
+    for (let i = 0; i < s.length; i += 1)
+        h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h;
+}
+// Where a new place goes beside `anchor`. With a heading it walks outward
+// along it (findFreeGridCell). Without one — the model gave none, or a place
+// is being put inside a container — it takes the first free cell of the
+// nearest ring around the anchor, starting from a direction derived from the
+// place's own name rather than always due east, so the contents of one
+// container gather AROUND it instead of lining up on one side. Deterministic.
+function placeMapNodeNear(anchor, direction, occupied, startStep, seedName) {
+    const first = Math.max(1, startStep || 1);
+    if (MAP_DIRECTION_VECTORS[direction])
+        return findFreeGridCell(anchor.gx, anchor.gy, direction, occupied, first);
+    const offset = mapNameSeed(seedName) % MAP_DIRECTIONS.length;
+    for (let radius = first; radius <= first + 11; radius += 1) {
+        for (let k = 0; k < MAP_DIRECTIONS.length; k += 1) {
+            const vec = MAP_DIRECTION_VECTORS[MAP_DIRECTIONS[(offset + k) % MAP_DIRECTIONS.length]];
+            const gx = anchor.gx + vec[0] * radius, gy = anchor.gy + vec[1] * radius;
+            if (!occupied.has(`${gx},${gy}`))
+                return { gx, gy };
+        }
+    }
+    return findFreeGridCell(anchor.gx, anchor.gy, 'E', occupied, first);
 }
 function normalizeMapNode(raw) {
     if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || !raw.id.trim())
@@ -21979,6 +22024,17 @@ function normalizeMapNode(raw) {
         floorAnchorId: typeof raw.floorAnchorId === 'string' && raw.floorAnchorId.trim() ? raw.floorAnchorId.trim() : null,
         // Other names this same place has been known by (see healMapDuplicates).
         aliases: Array.isArray(raw.aliases) ? raw.aliases.filter(a => typeof a === 'string' && a.trim()).map(a => a.trim().slice(0, 80)).slice(-MAP_NODE_ALIASES_MAX) : [],
+        // The id of the node that physically CONTAINS this one — the building a
+        // room is part of, the settlement a building stands in, the vessel a
+        // compartment belongs to — or null for a place that stands on its own
+        // out in the open. See WORLD STRUCTURE for what the map does with it
+        // (which roads can exist, where a new place may be put).
+        parentId: typeof raw.parentId === 'string' && raw.parentId.trim() ? raw.parentId.trim() : null,
+        // true once what contains this place (including "nothing") has actually
+        // been established — stated by the state model, or implied by how the
+        // place was created — as opposed to merely never having been asked about,
+        // which is what every node from a save written before this field is.
+        structureKnown: raw.structureKnown === true,
         // True only for a "far" (mentioned-but-unconnected, see reconcileMap's
         // upsert) node the player hasn't opened yet — drives the one-time white
         // off-screen arrow in MapModal, which clears the flag the moment the
@@ -22030,6 +22086,7 @@ function normalizeMapState(raw) {
         return { nodes: [], currentId: null, visitedEdges: [] };
     const nodes = Array.isArray(raw.nodes) ? raw.nodes.map(normalizeMapNode).filter(Boolean) : [];
     sanitizeMapGraph(nodes);
+    sanitizeMapStructure(nodes);
     const ids = new Set(nodes.map(n => n.id));
     return {
         nodes,
@@ -22038,6 +22095,277 @@ function normalizeMapState(raw) {
             ? raw.visitedEdges.filter(e => Array.isArray(e) && e.length === 2 && ids.has(e[0]) && ids.has(e[1]))
             : []
     };
+}
+// ============================================================================
+// WORLD STRUCTURE — what contains what, and which roads can honestly exist
+// ============================================================================
+//
+// The map used to know exactly one thing about how places relate: "the hero
+// walked from A to B, so A and B are joined by a road". Every new place was
+// therefore wired to whichever place the hero happened to be standing in and
+// dropped on the grid right beside it. A hero who left the main hall of a
+// palace for a watchtower out in the countryside got a road running from a
+// ROOM inside the palace straight to the tower, and the tower floated next to
+// that room — as if the world were arranged around the player instead of the
+// player moving through a world (see the bug report: «Главный зал Драконьего
+// Предела» ↔ «Западная сторожевая башня»).
+//
+// Two facts fix that in any setting, because both are true of every world:
+//   1. Places are NESTED. A room is part of a building, a building of a
+//      settlement, a compartment of a ship, a chamber of a dungeon. Every
+//      node may name the node that physically contains it (parentId), and
+//      that is the only thing the state model has to tell the game about the
+//      shape of the world — everything else below is derived.
+//   2. A road joins places at the SAME level: two things inside the same
+//      container, two things standing in the open, or a container and what is
+//      directly inside it (its way out). Nobody walks from a room to
+//      somewhere outside the building except by leaving the building first,
+//      and the settlement after that. A floor and the floor it is built on
+//      are joined by their stairs (floorAnchorId), which is its own kind of
+//      link and is left alone.
+//
+// normalizeMapTopology enforces (2) on every map the game produces, and it is
+// the ONE place that does: whichever path created a road (a move, a "nearby"
+// mention, an accepted trip, a trip picked on the map), a road between two
+// places that aren't at the same level is replaced by the road between their
+// representatives at the level where the two branches actually meet — a
+// room's road to the tower becomes the settlement's road to the tower — and
+// every leg of the journey the hero really made stays marked as walked.
+// Treats the usual spellings of "nothing" a model might put in place of a
+// real null ("none", "-", an empty string) as null.
+function isNoPlaceName(value) {
+    if (typeof value !== 'string')
+        return true;
+    const s = value.trim().toLowerCase();
+    return s === '' || s === 'null' || s === 'none' || s === 'n/a' || s === '-' || s === '—' || s === 'нет';
+}
+// [node, its container, that container's container, ...] — guarded against a
+// malformed save whose parents loop.
+function mapAncestorChain(byId, node) {
+    const chain = [];
+    const seen = new Set();
+    let cur = node;
+    while (cur && !seen.has(cur.id)) {
+        chain.push(cur);
+        seen.add(cur.id);
+        cur = cur.parentId ? byId.get(cur.parentId) : null;
+    }
+    return chain;
+}
+// Whether a road between a and b can honestly exist (rule 2 above).
+function mapEdgeIsValid(a, b) {
+    if (a.floorAnchorId === b.id || b.floorAnchorId === a.id)
+        return true;
+    if (a.id === b.parentId || b.id === a.parentId)
+        return true;
+    return (a.parentId || null) === (b.parentId || null);
+}
+// The honest version of a road between a and b that can't exist as it is:
+// the pair of places, one on each side, that DO sit at the same level — the
+// two children of the lowest container holding both branches, or that
+// container itself and its child when one of the two is inside the other, or
+// the two outermost places when the branches never meet. `route` is the whole
+// journey a -> ... -> a2 -> b2 -> ... -> b through the containers on the way.
+function mapLiftEdge(byId, a, b) {
+    const chainA = mapAncestorChain(byId, a);
+    const chainB = mapAncestorChain(byId, b);
+    const indexInB = new Map(chainB.map((n, i) => [n.id, i]));
+    let ia = -1, ib = -1;
+    for (let i = 0; i < chainA.length; i += 1) {
+        if (indexInB.has(chainA[i].id)) {
+            ia = i;
+            ib = indexInB.get(chainA[i].id);
+            break;
+        }
+    }
+    const upA = ia === -1 ? chainA.length - 1 : Math.max(ia - 1, 0);
+    const upB = ib === -1 ? chainB.length - 1 : Math.max(ib - 1, 0);
+    return {
+        a2: chainA[upA],
+        b2: chainB[upB],
+        route: [...chainA.slice(0, upA + 1), ...chainB.slice(0, upB + 1).reverse()]
+    };
+}
+// The place on node's own branch that sits at the level whose container is
+// parentId (node itself when it is already there, the container itself when
+// node IS the container), or null when node's branch has nothing at that level.
+function mapLiftToLevel(byId, node, parentId) {
+    const want = parentId || null;
+    for (const c of mapAncestorChain(byId, node)) {
+        if ((c.parentId || null) === want)
+            return c;
+        if (c.id === want)
+            return c;
+    }
+    return null;
+}
+// Refuses a container that would put a place inside itself.
+function setMapNodeParent(byId, node, parent) {
+    if (!node)
+        return false;
+    if (!parent) {
+        node.parentId = null;
+        return true;
+    }
+    if (parent.id === node.id)
+        return false;
+    if (mapAncestorChain(byId, parent).some(n => n.id === node.id))
+        return false;
+    node.parentId = parent.id;
+    return true;
+}
+// A parent that doesn't exist, is the node itself, or closes a loop is
+// dropped (the node simply becomes a top-level place).
+function sanitizeMapStructure(nodes) {
+    const byId = new Map(nodes.map(n => [n.id, n]));
+    for (const n of nodes) {
+        if (n.parentId && (n.parentId === n.id || !byId.has(n.parentId)))
+            n.parentId = null;
+    }
+    for (const n of nodes) {
+        let cur = n.parentId ? byId.get(n.parentId) : null;
+        for (let steps = 0; cur && steps <= nodes.length; steps += 1) {
+            if (cur.id === n.id) {
+                n.parentId = null;
+                break;
+            }
+            cur = cur.parentId ? byId.get(cur.parentId) : null;
+        }
+    }
+    return nodes;
+}
+function mapLinkNodes(a, b) {
+    if (!a || !b || a.id === b.id)
+        return;
+    if (!a.connections.includes(b.id))
+        a.connections.push(b.id);
+    if (!b.connections.includes(a.id))
+        b.connections.push(a.id);
+}
+function markMapRouteWalked(route, visitedEdges) {
+    for (let i = 1; i < route.length; i += 1) {
+        const x = route[i - 1].id, y = route[i].id;
+        if (x === y)
+            continue;
+        if (!visitedEdges.some(([p, q]) => (p === x && q === y) || (p === y && q === x)))
+            visitedEdges.push([x, y]);
+    }
+}
+// Records that the hero went from `from` to `to`: the road between them when
+// that is a road that can exist, otherwise the road between the places at the
+// level where their branches meet — with every leg of the way marked walked.
+function walkMapRoute(byId, from, to, visitedEdges) {
+    if (!from || !to || from.id === to.id)
+        return;
+    if (mapEdgeIsValid(from, to)) {
+        mapLinkNodes(from, to);
+        markMapRouteWalked([from, to], visitedEdges);
+        return;
+    }
+    const { a2, b2, route } = mapLiftEdge(byId, from, to);
+    mapLinkNodes(a2, b2);
+    for (let i = 1; i < route.length; i += 1) {
+        if (mapEdgeIsValid(route[i - 1], route[i]))
+            mapLinkNodes(route[i - 1], route[i]);
+    }
+    markMapRouteWalked(route, visitedEdges);
+}
+// Same as walkMapRoute, without claiming anyone walked it — for a place the
+// scene merely says is within reach.
+function linkMapNodesLifted(byId, a, b) {
+    if (!a || !b || a.id === b.id)
+        return;
+    if (mapEdgeIsValid(a, b)) {
+        mapLinkNodes(a, b);
+        return;
+    }
+    const { a2, b2 } = mapLiftEdge(byId, a, b);
+    mapLinkNodes(a2, b2);
+}
+// Makes every road on the map one that can honestly exist, then gives every
+// contained place its way out. Mutates `nodes` and `visitedEdges` in place
+// (callers pass their own copies) and returns whether anything changed.
+function normalizeMapTopology(nodes, visitedEdges) {
+    const byId = new Map(nodes.map(n => [n.id, n]));
+    const signature = () => nodes.map(n => `${n.id}:${n.parentId || ''}:${n.discovered ? 1 : 0}:${(n.connections || []).join(',')}`).join('|') + '#' + visitedEdges.length;
+    const before = signature();
+    sanitizeMapStructure(nodes);
+    const dropped = new Set();
+    const key = (x, y) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+    let again = true;
+    for (let pass = 0; again && pass < nodes.length * 2 + 4; pass += 1) {
+        again = false;
+        for (const a of nodes) {
+            for (const bId of [...a.connections]) {
+                const b = byId.get(bId);
+                if (!b || mapEdgeIsValid(a, b))
+                    continue;
+                const wasWalked = visitedEdges.some(([x, y]) => (x === a.id && y === b.id) || (x === b.id && y === a.id));
+                a.connections = a.connections.filter(id => id !== b.id);
+                b.connections = b.connections.filter(id => id !== a.id);
+                dropped.add(key(a.id, b.id));
+                const { a2, b2, route } = mapLiftEdge(byId, a, b);
+                mapLinkNodes(a2, b2);
+                if (wasWalked)
+                    markMapRouteWalked(route, visitedEdges);
+                again = true;
+            }
+        }
+    }
+    for (let i = visitedEdges.length - 1; i >= 0; i -= 1) {
+        const [x, y] = visitedEdges[i];
+        const a = byId.get(x), b = byId.get(y);
+        if (dropped.has(key(x, y)) && !(a && b && a.connections.includes(y)))
+            visitedEdges.splice(i, 1);
+    }
+    // A place inside a container always has the way out…
+    for (const n of nodes) {
+        if (n.parentId)
+            mapLinkNodes(n, byId.get(n.parentId));
+    }
+    // …and having been inside a place means knowing the place around it.
+    for (const n of nodes) {
+        if (!n.discovered)
+            continue;
+        for (const anc of mapAncestorChain(byId, n))
+            anc.discovered = true;
+    }
+    return signature() !== before;
+}
+// The map of a loaded state, repaired — the very same object when it was fine.
+function repairMapTopology(map) {
+    if (!map || !Array.isArray(map.nodes) || map.nodes.length === 0)
+        return map;
+    const nodes = map.nodes.map(n => ({ ...n, connections: [...(n.connections || [])] }));
+    const visitedEdges = (Array.isArray(map.visitedEdges) ? map.visitedEdges : []).map(e => [...e]);
+    return normalizeMapTopology(nodes, visitedEdges) ? { ...map, nodes, visitedEdges } : map;
+}
+// The places whose container the game doesn't know yet and would like the
+// state model to state, most relevant first: where the hero is (and what
+// contains it), what that place connects to, quest destinations, then
+// anything else the hero has actually seen. Bounded, and silent once a map
+// has fewer than two places (nothing to be inside of).
+function pickStructureAuditPlaces(map, limit) {
+    if (!map || !Array.isArray(map.nodes) || map.nodes.length < 2)
+        return [];
+    const byId = new Map(map.nodes.map(n => [n.id, n]));
+    const current = byId.get(map.currentId) || null;
+    const rank = new Map();
+    const bump = (id, r) => { if (id && byId.has(id) && !rank.has(id))
+        rank.set(id, r); };
+    if (current) {
+        bump(current.id, 0);
+        mapAncestorChain(byId, current).forEach(n => bump(n.id, 0));
+        (current.connections || []).forEach(id => bump(id, 1));
+    }
+    map.nodes.forEach(n => { if (n.questId)
+        bump(n.id, 2); });
+    map.nodes.forEach(n => { if (n.discovered)
+        bump(n.id, 3); });
+    return map.nodes
+        .filter(n => !n.structureKnown && rank.has(n.id))
+        .sort((a, b) => rank.get(a.id) - rank.get(b.id))
+        .slice(0, limit);
 }
 // Keeps every floor's grid position mechanically locked to the ONE
 // specific node it's a floor directly of (see floorAnchorId on
@@ -22134,6 +22462,11 @@ function repairBetweenNodeRoutes(nodes, visitedEdges) {
                     continue;
                 if (a.floorAnchorId || b.floorAnchorId)
                     continue;
+                // Only roads between places at the same level are "roads" in this
+                // sense — a way out of a building isn't spliced through whatever
+                // happens to lie between it and its container on the grid.
+                if ((a.parentId || null) !== (b.parentId || null))
+                    continue;
                 const abDist = dist(a, b);
                 if (abDist < 0.001)
                     continue;
@@ -22142,6 +22475,14 @@ function repairBetweenNodeRoutes(nodes, visitedEdges) {
                     if (c.id === a.id || c.id === b.id)
                         continue;
                     if ((c.layer || 0) !== (a.layer || 0) || c.floorAnchorId)
+                        continue;
+                    if ((c.parentId || null) !== (a.parentId || null))
+                        continue; // a waypoint on a road is a peer of both ends, not something inside one of them
+                    // …and a place the hero has only heard of (a quest objective spoken of
+                    // from afar, a rumoured destination) is not a stop on a road they
+                    // know: letting it splice in because it happens to be drawn near the
+                    // line would reroute a known road through somewhere unvisited.
+                    if (!c.discovered || c.arrowPending)
                         continue;
                     if (a.connections.includes(c.id) && b.connections.includes(c.id))
                         continue; // already spliced in
@@ -22229,6 +22570,87 @@ function reconcileMap(rawLocation, currentState) {
         return s;
     }
     const priorCurrent = prior.currentId ? nodes.find(n => n.id === prior.currentId) : null;
+    // ---- Where a place sits in the world (see WORLD STRUCTURE) ----
+    // What the state model said about a place's surroundings: "inside" (the
+    // known place that contains it; null for a place standing on its own;
+    // absent when it said nothing) and "nextTo" (the same-level neighbour it
+    // lies closest to).
+    const readStructure = src => ({
+        insideStated: !!src && (src.inside === null || (typeof src.inside === 'string' && src.inside.trim() !== '')),
+        inside: src && typeof src.inside === 'string' && !isNoPlaceName(src.inside) ? src.inside.trim() : null,
+        nextTo: src && typeof src.nextTo === 'string' && !isNoPlaceName(src.nextTo) ? src.nextTo.trim() : null
+    });
+    // A container the model names that isn't on the map yet is added (so the
+    // very first scene of a story, inside a room of a building of a town, can
+    // be described in full) — but never more than two per turn, and never as
+    // anything but a plain place: the model decides what is a container, the
+    // game never guesses one.
+    let containersMade = 0;
+    function ensureContainer(name, fromNode) {
+        const clean = String(name || '').trim().slice(0, 80);
+        if (!clean || containersMade >= 2)
+            return null;
+        containersMade += 1;
+        return upsert(clean, 'landmark', '', null, null, undefined, fromNode, null, undefined, null, false, null, { insideStated: false, inside: null, nextTo: null });
+    }
+    // States (or corrects) what contains an already-known place. The latest
+    // valid claim wins; a claim that would put a place inside itself is ignored.
+    function claimParent(node, insideName) {
+        let parent = null;
+        if (insideName) {
+            parent = byName(insideName, node.id) || ensureContainer(insideName, node);
+            if (!parent)
+                return;
+        }
+        if (!setMapNodeParent(new Map(nodes.map(n => [n.id, n])), node, parent))
+            return;
+        node.structureKnown = true;
+    }
+    // Decides where a brand-new place belongs: what contains it, and the
+    // same-level place it is put beside (and wired to) — in order of
+    // preference the neighbour the model named, the place the hero came from
+    // (lifted up to the level where the new place lives, so a hero leaving a
+    // room for somewhere outside the building is wired to the BUILDING's level,
+    // never to the room), and finally its container.
+    function planNewPlace(structure, fromNode, newName, far) {
+        const s = structure || {};
+        const preferId = fromNode ? fromNode.id : undefined;
+        // A place can't be inside itself: a report that names the very place being
+        // created as its own container said nothing about what contains it (and
+        // adding that "container" would create the place twice).
+        const selfContained = typeof s.inside === 'string' && !!newName && resolveMapPlace([{ id: '', name: newName }], s.inside) !== null;
+        const stated = s.insideStated === true && !selfContained;
+        let parent = null;
+        if (stated && s.inside)
+            parent = byName(s.inside, preferId) || ensureContainer(s.inside, fromNode);
+        const byId = new Map(nodes.map(n => [n.id, n]));
+        const nextTo = s.nextTo ? byName(s.nextTo, preferId) : null;
+        // Nothing said about what contains it: it shares the level of whatever
+        // it is put beside — the neighbour the model named or, for a place that is
+        // NOT remote, the place the hero is at. A remote place (a quest objective
+        // spoken of from afar, a rumoured destination) has no reason to share the
+        // hero's container: with no neighbour named it is taken to stand on its
+        // own until the model says otherwise, never "inside the building the hero
+        // happens to be in".
+        if (!stated) {
+            const beside = nextTo || (far ? null : fromNode);
+            parent = beside && beside.parentId ? (byId.get(beside.parentId) || null) : null;
+        }
+        const parentId = parent ? parent.id : null;
+        let anchor = nextTo ? mapLiftToLevel(byId, nextTo, parentId) : null;
+        // The model said where it lies: beside THAT place (byNeighbor).
+        const byNeighbor = !!anchor;
+        if (!anchor && fromNode)
+            anchor = mapLiftToLevel(byId, fromNode, parentId);
+        if (!anchor && parent)
+            anchor = parent;
+        // Placed in/at its container because nothing nearer was known (byContainer).
+        const byContainer = !byNeighbor && !!anchor && !!parent && anchor.id === parent.id;
+        // A container's own cells stay free for what's inside it: a neighbour of
+        // a settlement starts one ring further out.
+        const startStep = (anchor && !parent && nodes.some(n => n.parentId === anchor.id)) ? 2 : 1;
+        return { parent, stated, anchor, startStep, byNeighbor, byContainer };
+    }
     // "faction" is deliberately handled differently from "description": a
     // description is locked in on first mention (cheap, never re-litigated),
     // but a location's controlling faction can genuinely change hands over
@@ -22266,7 +22688,7 @@ function reconcileMap(rawLocation, currentState) {
     // or spawn a second, duplicate node right next to the original — so
     // this looks the node up by its OLD name instead and renames that SAME
     // node in place.
-    function upsert(name, kind, description, questId, stageId, direction, fromNode, faction, danger, verticalMove, far, previousName) {
+    function upsert(name, kind, description, questId, stageId, direction, fromNode, faction, danger, verticalMove, far, previousName, structure) {
         let existing = byName(name, fromNode && fromNode.id);
         if (!existing && typeof previousName === 'string' && previousName.trim()) {
             existing = byName(previousName);
@@ -22275,11 +22697,17 @@ function reconcileMap(rawLocation, currentState) {
         }
         if (existing) {
             applyPlaceFacets(existing, description, questId, stageId, faction, danger);
+            if (structure && structure.insideStated)
+                claimParent(existing, structure.inside);
             return existing;
         }
+        // Where this place sits among the places that already exist — what
+        // contains it and which same-level neighbour it lies beside — rather than
+        // "right next to wherever the hero was" (see WORLD STRUCTURE).
+        const plan = planNewPlace(structure, fromNode, name, far === true);
         const id = makeMapNodeId(existingIds);
         existingIds.add(id);
-        const anchor = fromNode || { gx: 0, gy: 0, layer: 0 };
+        const anchor = plan.anchor || { gx: 0, gy: 0, layer: 0 };
         const anchorLayer = anchor.layer || 0;
         const resolvedKind = MAP_NODE_KINDS.includes(kind) ? kind : 'landmark';
         // The model's own "verticalMove" is the primary signal for whether a
@@ -22351,9 +22779,24 @@ function reconcileMap(rawLocation, currentState) {
         // it reads as a real remove rather than just another nearby spot.
         const { gx, gy } = isVertical
             ? { gx: anchor.gx, gy: anchor.gy }
-            : (nodes.length === 0 && !fromNode) ? { gx: 0, gy: 0 } : findFreeGridCell(anchor.gx, anchor.gy, farDirection, occupiedCellsOnLayer(layer), far ? FAR_MAP_GRID_DISTANCE : 1);
+            : (nodes.length === 0 && !plan.anchor) ? { gx: 0, gy: 0 } : placeMapNodeNear(anchor, farDirection, occupiedCellsOnLayer(layer), (far && !plan.byNeighbor && !plan.byContainer) ? FAR_MAP_GRID_DISTANCE : plan.startStep, name);
         const node = { id, name: capitalizeMapNodeName(name), kind: resolvedKind, gx, gy, discovered: false, questId: questId || null, stageId: stageId || null, description: description || '', connections: [], faction: (typeof faction === 'string' && faction.trim()) ? faction.trim() : null, danger: danger === true, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId, floorAnchorId, arrowPending: far === true };
+        node.parentId = plan.parent ? plan.parent.id : null;
+        node.structureKnown = plan.stated;
         nodes.push(node);
+        // Wired in where it actually belongs: to what contains it, and to the
+        // same-level place it lies beside — not, as such a place used to be,
+        // to whatever the hero happened to be standing in. A far place is not a
+        // road out of here (see the matching note in the nearby loop below), but
+        // one that is inside a known container is still part of it.
+        if (plan.parent)
+            mapLinkNodes(node, plan.parent);
+        if (plan.anchor && !far) {
+            if (mapEdgeIsValid(node, plan.anchor))
+                mapLinkNodes(node, plan.anchor);
+            else
+                linkMapNodesLifted(new Map(nodes.map(n => [n.id, n])), node, plan.anchor);
+        }
         return node;
     }
     // ---- Where is the hero this turn? ----
@@ -22368,7 +22811,7 @@ function reconcileMap(rawLocation, currentState) {
     // report ("description", "faction", "danger", "questId"...) is read as
     // being about that place. Only the very first place of a story — nothing
     // to stay at yet — is created unconditionally.
-    const reportCurrent = () => upsert(rawCurrent, rawLocation.kind, rawLocation.description, rawLocation.questId, rawLocation.stageId, rawLocation.directionFromPrevious, priorCurrent, rawLocation.faction, rawLocation.danger, rawLocation.verticalMove, false, rawLocation.previousName);
+    const reportCurrent = () => upsert(rawCurrent, rawLocation.kind, rawLocation.description, rawLocation.questId, rawLocation.stageId, rawLocation.directionFromPrevious, priorCurrent, rawLocation.faction, rawLocation.danger, rawLocation.verticalMove, false, rawLocation.previousName, readStructure(rawLocation));
     const namedPlace = rawCurrent
         ? (byName(rawCurrent, priorCurrent && priorCurrent.id) || (typeof rawLocation.previousName === 'string' && rawLocation.previousName.trim() ? byName(rawLocation.previousName) : null))
         : null;
@@ -22383,6 +22826,9 @@ function reconcileMap(rawLocation, currentState) {
     }
     else {
         applyPlaceFacets(priorCurrent, rawLocation.description, rawLocation.questId, rawLocation.stageId, rawLocation.faction, rawLocation.danger);
+        const stayStructure = readStructure(rawLocation);
+        if (stayStructure.insideStated)
+            claimParent(priorCurrent, stayStructure.inside);
         currentNode = priorCurrent;
     }
     currentNode.discovered = true;
@@ -22395,34 +22841,46 @@ function reconcileMap(rawLocation, currentState) {
     // standing on.
     currentNode.arrowPending = false;
     const visitedEdges = prior.visitedEdges.map(e => [...e]);
-    if (priorCurrent && priorCurrent.id !== currentNode.id) {
-        if (!priorCurrent.connections.includes(currentNode.id))
-            priorCurrent.connections.push(currentNode.id);
-        if (!currentNode.connections.includes(priorCurrent.id))
-            currentNode.connections.push(priorCurrent.id);
-        const alreadyWalked = visitedEdges.some(([a, b]) => (a === priorCurrent.id && b === currentNode.id) || (a === currentNode.id && b === priorCurrent.id));
-        if (!alreadyWalked)
-            visitedEdges.push([priorCurrent.id, currentNode.id]);
-    }
+    // The hero's journey from the place they were to the place they are: a road
+    // between the two when they're at the same level, otherwise the road
+    // between the places at the level where their branches meet, every leg
+    // walked (see walkMapRoute) — never a door from a room straight to the
+    // other side of the settlement.
+    if (priorCurrent && priorCurrent.id !== currentNode.id)
+        walkMapRoute(new Map(nodes.map(n => [n.id, n])), priorCurrent, currentNode, visitedEdges);
     const nearby = Array.isArray(rawLocation.nearbyMentioned) ? rawLocation.nearbyMentioned : [];
     for (const spot of nearby) {
         if (!spot || typeof spot.name !== 'string' || !spot.name.trim())
             continue;
         const far = spot.far === true;
-        const node = upsert(spot.name, spot.kind, spot.description, spot.questId, spot.stageId, spot.direction, currentNode, spot.faction, spot.danger, spot.verticalMove, far, spot.previousName);
+        const spotStructure = readStructure(spot);
+        const node = upsert(spot.name, spot.kind, spot.description, spot.questId, spot.stageId, spot.direction, currentNode, spot.faction, spot.danger, spot.verticalMove, far, spot.previousName, spotStructure);
         // A far node is explicitly not reachable from here, so unlike a near
         // one it never gets an edge back to the current node — that keeps the
         // map from drawing a path to it and keeps its popup from offering it as
         // a one-tap trip (see openNodeIsAdjacent in MapModal, gated on exactly
         // this connection).
-        if (!far) {
-            if (!node.connections.includes(currentNode.id))
-                node.connections.push(currentNode.id);
-            if (!currentNode.connections.includes(node.id))
-                currentNode.connections.push(node.id);
+        // A neighbour the model named is where the place sits: it is reached
+        // through THAT place (the route-finder walks there), not by a road the
+        // scene never mentioned running out of wherever the hero happens to be.
+        if (!far && !spotStructure.nextTo && node.id !== currentNode.id)
+            linkMapNodesLifted(new Map(nodes.map(n => [n.id, n])), currentNode, node);
+    }
+    // Structure for places ALREADY on the map (the state model is asked for it
+    // — see "placeLinks" in the state prompt — for the places whose container
+    // is still unknown, and whenever the story shows a stated one was wrong).
+    if (Array.isArray(rawLocation.placeLinks)) {
+        for (const link of rawLocation.placeLinks.slice(0, 16)) {
+            if (!link || typeof link.place !== 'string')
+                continue;
+            const linked = byName(link.place);
+            const linkStructure = readStructure(link);
+            if (linked && linkStructure.insideStated)
+                claimParent(linked, linkStructure.inside);
         }
     }
     syncStackPositions(nodes);
+    normalizeMapTopology(nodes, visitedEdges);
     repairBetweenNodeRoutes(nodes, visitedEdges);
     sanitizeMapGraph(nodes);
     return { nodes, currentId: currentNode.id, visitedEdges };
@@ -22451,11 +22909,18 @@ function applyConfirmedTravel(mapState, precedingNarrator, isOpeningTurn) {
         const anchor = priorCurrent || { gx: 0, gy: 0, layer: 0 };
         const layer = anchor.layer || 0;
         const occupied = new Set(nodes.filter(n => (n.layer || 0) === layer).map(n => `${n.gx},${n.gy}`));
-        const { gx, gy } = nodes.length === 0 ? { gx: 0, gy: 0 } : findFreeGridCell(anchor.gx, anchor.gy, 'E', occupied);
+        // Nothing is known about where a trip's destination sits in the world
+        // (the state model's own report of the arrival, which carries that,
+        // didn't land on it) — it goes beside the place the hero set out from,
+        // assumed to be at the same level, and is flagged as not yet understood
+        // so the structure question is put to the model on a later turn.
+        const { gx, gy } = nodes.length === 0 ? { gx: 0, gy: 0 } : placeMapNodeNear(anchor, undefined, occupied, 1, offer.label);
         // No verticalMove concept here — a travel offer is always an ordinary
         // horizontal trip — so the destination simply inherits whatever stack
         // its anchor already belongs to, same as any horizontal upsert above.
         destination = { id: makeMapNodeId(existingIds), name: capitalizeMapNodeName(offer.label), kind: MAP_NODE_KINDS.includes(offer.kind) ? offer.kind : 'landmark', gx, gy, discovered: false, questId: null, stageId: null, description: '', connections: [], faction: null, danger: false, itemCapacity: rollMapNodeItemCapacity(), itemsFound: 0, layer, floorRootId: anchor.floorRootId || null, floorAnchorId: null, arrowPending: false };
+        destination.parentId = priorCurrent ? (priorCurrent.parentId || null) : null;
+        destination.structureKnown = false;
         nodes.push(destination);
     }
     destination.discovered = true;
@@ -22464,16 +22929,10 @@ function applyConfirmedTravel(mapState, precedingNarrator, isOpeningTurn) {
     // should never keep showing a "new place" arrow pointing at itself.
     destination.arrowPending = false;
     const visitedEdges = mapState.visitedEdges.map(e => [...e]);
-    if (priorCurrent && priorCurrent.id !== destination.id) {
-        if (!priorCurrent.connections.includes(destination.id))
-            priorCurrent.connections.push(destination.id);
-        if (!destination.connections.includes(priorCurrent.id))
-            destination.connections.push(priorCurrent.id);
-        const alreadyWalked = visitedEdges.some(([a, b]) => (a === priorCurrent.id && b === destination.id) || (a === destination.id && b === priorCurrent.id));
-        if (!alreadyWalked)
-            visitedEdges.push([priorCurrent.id, destination.id]);
-    }
+    if (priorCurrent && priorCurrent.id !== destination.id)
+        walkMapRoute(new Map(nodes.map(n => [n.id, n])), priorCurrent, destination, visitedEdges);
     syncStackPositions(nodes);
+    normalizeMapTopology(nodes, visitedEdges);
     repairBetweenNodeRoutes(nodes, visitedEdges);
     sanitizeMapGraph(nodes);
     return { nodes, currentId: destination.id, visitedEdges };
@@ -22541,6 +23000,11 @@ function applyPlayerChosenDestination(mapState, destinationId, originalCurrentId
         destination.arrowPending = false;
     }
     syncStackPositions(nodes);
+    // The off-road last stretch of a trip turns into a real road (see the
+    // comment above) — but only a road that can honestly exist: from a room to
+    // a place outside its building it becomes the road from the building's
+    // level (see normalizeMapTopology).
+    normalizeMapTopology(nodes, visitedEdges);
     repairBetweenNodeRoutes(nodes, visitedEdges);
     sanitizeMapGraph(nodes);
     return { nodes, currentId: destinationId, visitedEdges };
@@ -22564,8 +23028,15 @@ function applyPlayerChosenDestination(mapState, destinationId, originalCurrentId
 // more than a short hop between two neighboring streets, exactly as the
 // connections graph already implies just by how far apart two linked
 // nodes' cells happen to sit.
+// How much of a grid unit counts when both ends are inside the same
+// container (or one is the container): crossing a palace's halls or a
+// settlement's streets is not a day's journey just because the places sit a
+// cell apart on a map drawn at the scale of the whole countryside.
+const MAP_LOCAL_DISTANCE_FACTOR = 0.2;
 function mapNodeDistance(a, b) {
-    return Math.hypot((a.gx || 0) - (b.gx || 0), (a.gy || 0) - (b.gy || 0));
+    const d = Math.hypot((a.gx || 0) - (b.gx || 0), (a.gy || 0) - (b.gy || 0));
+    const local = (a.parentId && a.parentId === b.parentId) || a.id === b.parentId || b.id === a.parentId;
+    return local ? d * MAP_LOCAL_DISTANCE_FACTOR : d;
 }
 // Shortest known route from fromId to toId, walking only roads between
 // already-DISCOVERED nodes (an undiscovered node has no connections of
@@ -51387,6 +51858,7 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                         const serviceKinds = [...new Set((Array.isArray(npcs) ? npcs : [])
                                 .filter(npc => npc && typeof npc.location === 'string' && locationNamesMatch(npc.location, n.name))
                                 .flatMap(npcServiceKinds))];
+                        const insideNode = n.parentId ? map.nodes.find(m => m.id === n.parentId) : null;
                         const filterMatch = !mapFilter || (mapFilter === 'quest' ? !!quest : mapFilter === 'pins' ? !!(n.pin || n.note) : serviceKinds.includes(mapFilter));
                         const dimmed = !!mapFilter && !filterMatch;
                         return (React.createElement("div", { key: n.id, className: 'map-node' + (open ? ' map-node-open' : '') + (dimmed ? ' map-node-dimmed' : ''), style: { left: p.x, top: p.y }, role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => { setOpenNodeId(open ? null : n.id); if (n.arrowPending)
@@ -51433,6 +51905,11 @@ function MapModal({ map, npcs, quests, factionReputations, worldEvents, dayPhase
                                     ": ",
                                     n.faction),
                                 n.description && React.createElement("p", null, n.description),
+                                insideNode && insideNode.discovered && React.createElement("p", { className: "map-node-inside" },
+                                    "\u2302 ",
+                                    t('mapInsideLabel'),
+                                    ": ",
+                                    insideNode.name),
                                 quest && (React.createElement("div", { className: "map-node-quest-info" },
                                     React.createElement("p", { className: "map-node-quest-title" },
                                         "\uD83D\uDCD6 ",
@@ -57759,8 +58236,16 @@ ${knownSecrets}
             ? `\n\nHIDDEN PLANS/INTENTIONS ALREADY ON RECORD FROM AN EARLIER TURN'S HIDDEN INFORMATION (reference these ids in "pendingSecretUpdates" below — never invent a new id for one of these; a genuinely new plan goes in "newPendingSecrets" instead):\n${pendingSecrets.map(p => `- id "${p.id}": ${p.text}${p.trigger ? ` (TRIGGER: ${p.trigger})` : ''}`).join('\n')}`
             : '\n\nNOTHING IS CURRENTLY ON RECORD FROM EARLIER HIDDEN INFORMATION.';
         const mapNodes = state.map && state.map.nodes.length > 0 ? state.map.nodes : [];
+        const mapNodeById = new Map(mapNodes.map(n => [n.id, n]));
+        // Places whose container the game doesn't know yet — put to the model a
+        // few at a time, most relevant first, until they're answered (see
+        // pickStructureAuditPlaces and "placeLinks" in the location rules).
+        const structureAudit = pickStructureAuditPlaces(state.map, 8);
+        const structureAuditContext = structureAudit.length > 0
+            ? `\n\nSTRUCTURE NOT YET ESTABLISHED (answer in "location.placeLinks" below, for each of these known places that you can say with confidence what physically contains — give its "inside" as an exact name from the list above, or null if it stands on its own out in the open; skip any you are unsure of): ${structureAudit.map(n => `"${n.name}"`).join(', ')}`
+            : '';
         const mapContext = mapNodes.length > 0
-            ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character, as written between the quotation marks (never an id or a code, and never a numbered or suffixed variant of it); do not create a near-duplicate with slightly different wording — UNLESS this scene is genuinely the first time a place listed here under a placeholder/generic label gets its real proper name revealed, in which case see "previousName" under "location" below):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}`
+            ? `\n\nKNOWN LOCATIONS ON THE MAP SO FAR (for "location" and "travelOffer" below — if the hero is at, mentions, or is invited to one of these, reuse its name EXACTLY, character for character, as written between the quotation marks (never an id or a code, and never a numbered or suffixed variant of it); do not create a near-duplicate with slightly different wording — UNLESS this scene is genuinely the first time a place listed here under a placeholder/generic label gets its real proper name revealed, in which case see "previousName" under "location" below):\n${mapNodes.map(n => `- "${n.name}" (${n.kind}${mapNodeById.get(n.parentId) ? `, inside "${mapNodeById.get(n.parentId).name}"` : ''}${n.id === state.map.currentId ? ', hero is currently here' : ''})`).join('\n')}${structureAuditContext}`
             : '';
         // Every location's supply of findable items is capped client-side (see
         // MAP_NODE_ITEM_CAPACITY_RANGE/isMapNodeCleared) — only the CURRENT
@@ -57853,7 +58338,7 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.${stateContractNote}
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "weather": "none", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8, "charisma": 10}, "temperament": {"candor": 35, "wariness": 70, "pride": 55, "warmth": 40, "resolve": 60}, "values": {"order": 60, "mercy": 35, "honor": 55, "gain": 70, "kin": 65}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"moved": false, "current": "ONLY when moved is true: the name of the place the hero has just arrived at — omit it when moved is false", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "prisonersGone": [], ${secretsSchemaField}"newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "weather": "none", "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8, "charisma": 10}, "temperament": {"candor": 35, "wariness": 70, "pride": 55, "warmth": 40, "resolve": 60}, "values": {"order": 60, "mercy": 35, "honor": 55, "gain": 70, "kin": 65}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"moved": false, "current": "ONLY when moved is true: the name of the place the hero has just arrived at — omit it when moved is false", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "inside": "exact known name of the place that physically contains this one, or null if it stands on its own out in the open — new places only", "nextTo": "optional: exact known name of the same-level place this one lies closest to", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "inside": "exact known name of its container, or null if it stands on its own out in the open — new places only", "nextTo": "optional: exact known name of the same-level place it lies closest to", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}], "placeLinks": [{"place": "exact known name", "inside": "exact known name of its container, or null"}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "prisonersGone": [], ${secretsSchemaField}"newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard", "lightMist", "heavyMist", "denseMist", "lightRain", "heavyRain", "downpour" — the OUTDOOR weather at the hero's location as it stands at the END of this scene, taken ONLY from what the scene shows or states. Keep the previous value (see CURRENT GAME STATE) unless the scene itself shows a change or the hero moved somewhere with different weather; weather described in the narration always wins. Being indoors does not change this value (it is the weather outside). "lightMist" is a thin low haze, "heavyMist" a thick fog with short visibility, "denseMist" an impenetrable murk; "lightRain" is a drizzle or light rain, "heavyRain" a steady heavy rain, "downpour" a torrential rain with a thunderstorm; snow, fog and rain are different weathers, pick the one the scene shows.
@@ -57874,7 +58359,7 @@ Every character named above under CURRENT PARTY is a traveling companion, not ju
 This same entry is also where a quest GROWS (see questDepthRule) — a plain errand can skip all three of the following fields forever and that's the normal case, not a gap to fill. "npcs" names any character (already tracked in "npcs" above) who just became meaningfully tied to THIS quest's story specifically, beyond its own giver — include a name here only the first turn it's true for this quest, never restate one already listed above. "newStages" is for when the scene reveals a genuinely distinct next step, complication, or fresh thread within this quest — something concrete enough to track as its own objective, not just atmosphere or flavor. Give each a fresh "id" that doesn't collide with a stage id already listed above, a short evocative "title" the same way a quest's own title reads, and a dry one-sentence "description" the same way a quest's own description reads. A stage is tracked the moment it appears here — there's no separate accept step the way a whole new quest has, since it's simply the next part of a commitment the hero already made. "stageUpdates" is for a stage that ALREADY exists (its id already given above): "status" is set only when the scene clearly resolves that ONE stage — "completed" if its own objective was met, "failed" if it's now impossible or was abandoned, "moot" if the hero's own choice closed it off by committing to a different path within the same quest instead (a road not taken is not a failure — never use "failed" for that); "progress" works exactly like the quest-level field above, but scoped to this one stage. A stage resolving does NOT automatically resolve the quest itself, and a quest resolving does NOT require every stage to have resolved first — the quest's own top-level "status" above is always its own separate, deliberate call.
 "reputationHits" flags any named character (matching how they appear in "HERO'S STANDING WITH CHARACTERS..." or the npcs list above) that the hero insulted, threatened, mocked, acted with outright hostility toward, showed real unprompted kindness to, or helped in some meaningful way, IN THE SCENE JUST PLAYED. Each entry has "name" and "type": "insult" for verbal disrespect, mockery, or threats; "hostile" for actual violence, betrayal, sabotage, or an attack; "kindness" for a genuine, notable act of warmth, respect, or generosity that clearly goes beyond ordinary politeness (a real compliment that visibly moves them, comforting them through genuine distress, standing up for them at some cost to the hero); "help" for something substantial done in their favor — saving them from real danger, a costly sacrifice on their behalf, solving a serious problem for them outside of an active quest. Only include a character here if the scene just played genuinely shows the HERO doing this to THEM — never for a character who is simply unfriendly, refuses a request, or negotiates hard back at the hero, and never for the hero merely disagreeing or being blunt; likewise never for routine courtesy, a passing "thank you," or cooperating because the scene calls for it — "kindness" and "help" are for moments that clearly stand out, not everyday pleasantness. This is a rare event in both directions: leave the list empty on the large majority of turns where nothing like this happened.
 "factionReputationHits" is the same idea as "reputationHits" immediately above, but for a FACTION as a whole rather than one tracked person — reserve it for something the scene shows rising to the level of the group as an institution noticing and caring, not just the one individual on the receiving end. An insult traded with a single guard is a "reputationHits" entry for that guard, not automatically a hit against the whole legion he serves — only flag the faction too when the act is clearly directed at, done in the name of, or witnessed in a way that would credibly reach the faction as a whole (defying a direct order issued in the faction's name, sabotaging something that belongs to them collectively, publicly humiliating their authority, risking real danger to save several of their people at once, a notable public act of loyalty or generosity toward them as a group). Each entry has "faction" (exactly as tracked — name the most specific unit the act was actually aimed at; the game carries it on to the larger factions that unit belongs to by itself, far weaker the bigger they are, so never name a whole empire for what one squad or garrison experienced) and the same "type" values as above: "insult", "hostile", "kindness", "help" — plus, for a faction only, "honor" (the hero visibly upholds one of THAT faction's own "values" (recorded on its entry in the state above), in a way the group would notice and respect) and "dishonor" (the hero visibly violates one). Judge honor and dishonor strictly by the faction's OWN values, not by the hero's or the narrator's morals: what one people honors another may despise. Just as rare as "reputationHits", if not rarer — leave it empty on the large majority of turns.
-"location" tracks where the hero currently is, for a map the player can gradually explore. Settle "moved" FIRST; it is REQUIRED whenever "location" is present. Judge it against the place marked "hero is currently here" in the known list above: "moved" is true ONLY if the scene ends with the hero somewhere ELSE that the story treats as a separate stop — they arrived in another settlement, building, vehicle, vessel, facility, camp, region or site, passed into another room, hall or chamber of a larger site they are exploring, took stairs, a lift or a ramp to another floor or level, or were carried, led, teleported or otherwise taken elsewhere (this also covers a marker that is simply out of date: if the hero is plainly somewhere other than the marked place, answer true). "moved" is false in every other case, and false is the default: talking, fighting, searching, resting, waiting, looking around, moving about inside the place the hero is already in, the scene giving that place a new detail, a more specific name or a different wording, or merely discussing, planning or being invited to a trip not yet made (that belongs in "travelOffer" or "nearbyMentioned", never here). When unsure, answer false: a missed short move is repaired on the next scene, but a move that never happened litters the map for good. If no known-locations list appears above (the story's very first scene), answer true and give the starting place as "current". With "moved": false, leave "current" out (the other fields below still apply, and then describe the place the hero is already in), except in the one placeholder-rename case described next. With "moved": true, "current" is REQUIRED: the place the hero has now arrived at. Whenever you give "current": if it matches somewhere in the known list above, reuse that exact name (do not rename or rephrase it, and never write an id, a code or a numbered/suffixed variant of a known name) UNLESS this exact place was so far only tracked under a generic or placeholder label (a bare description like "the village" or "a small settlement", never yet its own proper name) and this scene is genuinely the first time its real name is learned — in that case report the real name as "current" and set "previousName" to exactly the old placeholder label as it appears in the known list above, so that SAME map entry is renamed rather than a second, duplicate entry being created for the same place (mirrors how a placeholder-tracked NPC above gets renamed rather than duplicated). Omit "previousName" every other turn, including every later turn about this now-named place, and never use it to rephrase or "improve" a name the place already properly had — only for a genuine first-time reveal of a name that wasn't known before. The same applies to any "nearbyMentioned" entry below, via its own "previousName". Only give a brand-new name with no "previousName" set if this is genuinely a place the story hasn't referenced in any form before. "kind" is exactly one of "settlement", "wilderness", "dungeon", "landmark". "description" is one short evocative sentence — include it ONLY the first time this name appears (it's cached after that, so repeating it later is wasted). "questId" links this place to one of the active quest ids above ONLY when the scene establishes it as that quest's actual objective or destination — omit otherwise. If that quest already has stages listed above, also set "stageId" to whichever of its stages this specific place actually serves, so the map only reveals this location once the story reaches that particular stage rather than the moment the quest itself began — leave "stageId" out if the quest has no stages yet, or if this place is the quest's overall destination rather than one specific stage's. "directionFromPrevious" is a rough compass heading (N, NE, E, SE, S, SW, W, or NW) from the hero's previous location to this one — needed only when "current" is a brand-new name. "nearbyMentioned" lists any OTHER named places the scene mentions as visible, nearby, or rumored but not currently occupied by the hero — each needs "name", "kind", "direction" (heading from the current location) and, first mention only, "description". This includes every distinct path or destination the scene actually presents from here as part of the setting, not only whichever one (if any) becomes this turn's "travelOffer" below — a fork described with two named directions means two "nearbyMentioned" entries, one per path, even when only one of them is also being offered as an immediate trip right now. Add "far": true on an entry for somewhere the scene places at a real remove — spoken of from afar, rumored, recalled from a character's own travels, or otherwise clearly not a path leading out from here — rather than an adjacent place actually reachable from the current location; omit "far" (or set it false) for anywhere genuinely nearby. "direction" may be left off a "far": true entry the scene gives no real sense of bearing for. Whenever this scene has a character name or clearly imply a specific place where a quest — new or already active — actually needs to be carried out, that place MUST be reported here (on "location" itself, with "moved": false, if the hero is already standing there, otherwise as an entry in "nearbyMentioned") with "questId" set to that quest's id, even if the hero's own position didn't change and nothing else about "location" would otherwise be worth reporting. Only omit "location" entirely on a turn where neither the hero's place changed nor any quest's destination was named. "faction" (on "current" and on each "nearbyMentioned" entry) is the name of whichever faction visibly controls or holds authority over that place — a garrison's banner, a guild's sign, whose law is enforced there — reusing an exact known faction name from the list below where possible; omit it for anywhere with no clear controlling faction (a lawless waystop, untouched wilderness). Once a place has a faction, it stays that faction's territory turn after turn — repeat the SAME value every time this place is reported as "current" (an omitted "faction" on a later turn leaves it unchanged, it does NOT clear it) and only give a genuinely different value the turn the story itself shows control actually changing hands (a conquest, a garrison driven out, a new authority moving in). "danger" (on "current" and on each "nearbyMentioned" entry) is true ONLY when this specific place currently has a genuine, known hostile threat sitting there right now — an enemy, monster, or hostile group the hero could plausibly end up fighting there — something the scene has actually established, never a vague sense that an area is generally unsafe. Set it to false the turn the story itself shows that specific threat resolved (defeated, fled, no longer there); omit it entirely on any turn that neither introduces nor resolves a threat at that place — like "faction", an omitted "danger" leaves the location's existing flag exactly as it was, it does NOT clear it. "verticalMove" (on "current" and on each "nearbyMentioned" entry) is "up" or "down", and ONLY applies the one time a place is first being created — set it when, and only when, this place is a different floor/level of the exact same structure the hero is moving from (for "current": the hero's previous location; for a "nearbyMentioned" entry: the hero's current location this turn) — climbing a stairwell to the floor above, descending into a cellar or basement below, and so on. Judge only the single, immediate step: is THIS specific place directly one level above, or directly one level below, wherever it connects from — never try to work out or state an absolute floor number yourself, the game tracks that. Leave "verticalMove" out entirely for any place reached by ordinary horizontal travel (use "directionFromPrevious"/"direction" for those instead, never both on the same place), and also leave it out for a place that already exists (reusing a known name) — its level was already fixed the first time it was created and never changes after.
+"location" tracks where the hero currently is, for a map the player can gradually explore. Settle "moved" FIRST; it is REQUIRED whenever "location" is present. Judge it against the place marked "hero is currently here" in the known list above: "moved" is true ONLY if the scene ends with the hero somewhere ELSE that the story treats as a separate stop — they arrived in another settlement, building, vehicle, vessel, facility, camp, region or site, passed into another room, hall or chamber of a larger site they are exploring, took stairs, a lift or a ramp to another floor or level, or were carried, led, teleported or otherwise taken elsewhere (this also covers a marker that is simply out of date: if the hero is plainly somewhere other than the marked place, answer true). "moved" is false in every other case, and false is the default: talking, fighting, searching, resting, waiting, looking around, moving about inside the place the hero is already in, the scene giving that place a new detail, a more specific name or a different wording, or merely discussing, planning or being invited to a trip not yet made (that belongs in "travelOffer" or "nearbyMentioned", never here). When unsure, answer false: a missed short move is repaired on the next scene, but a move that never happened litters the map for good. If no known-locations list appears above (the story's very first scene), answer true and give the starting place as "current". With "moved": false, leave "current" out (the other fields below still apply, and then describe the place the hero is already in), except in the one placeholder-rename case described next. With "moved": true, "current" is REQUIRED: the place the hero has now arrived at. Whenever you give "current": if it matches somewhere in the known list above, reuse that exact name (do not rename or rephrase it, and never write an id, a code or a numbered/suffixed variant of a known name) UNLESS this exact place was so far only tracked under a generic or placeholder label (a bare description like "the village" or "a small settlement", never yet its own proper name) and this scene is genuinely the first time its real name is learned — in that case report the real name as "current" and set "previousName" to exactly the old placeholder label as it appears in the known list above, so that SAME map entry is renamed rather than a second, duplicate entry being created for the same place (mirrors how a placeholder-tracked NPC above gets renamed rather than duplicated). Omit "previousName" every other turn, including every later turn about this now-named place, and never use it to rephrase or "improve" a name the place already properly had — only for a genuine first-time reveal of a name that wasn't known before. The same applies to any "nearbyMentioned" entry below, via its own "previousName". Only give a brand-new name with no "previousName" set if this is genuinely a place the story hasn't referenced in any form before. "kind" is exactly one of "settlement", "wilderness", "dungeon", "landmark". "description" is one short evocative sentence — include it ONLY the first time this name appears (it's cached after that, so repeating it later is wasted). "questId" links this place to one of the active quest ids above ONLY when the scene establishes it as that quest's actual objective or destination — omit otherwise. If that quest already has stages listed above, also set "stageId" to whichever of its stages this specific place actually serves, so the map only reveals this location once the story reaches that particular stage rather than the moment the quest itself began — leave "stageId" out if the quest has no stages yet, or if this place is the quest's overall destination rather than one specific stage's. "directionFromPrevious" is a rough compass heading (N, NE, E, SE, S, SW, W, or NW) to this place from the place it lies beside — the one you gave as "nextTo", or when you gave none the hero's previous location — needed only when "current" is a brand-new name. "nearbyMentioned" lists any OTHER named places the scene mentions as visible, nearby, or rumored but not currently occupied by the hero — each needs "name", "kind", "direction" (heading from its "nextTo" place, or from the current location when it has none) and, first mention only, "description". This includes every distinct path or destination the scene actually presents from here as part of the setting, not only whichever one (if any) becomes this turn's "travelOffer" below — a fork described with two named directions means two "nearbyMentioned" entries, one per path, even when only one of them is also being offered as an immediate trip right now. Add "far": true on an entry for somewhere the scene places at a real remove — spoken of from afar, rumored, recalled from a character's own travels, or otherwise clearly not a path leading out from here — rather than an adjacent place actually reachable from the current location; omit "far" (or set it false) for anywhere genuinely nearby. When a far place lies close to somewhere already on the map — a quest objective in the hills above a village the hero has already been to, say — give that known place as "nextTo" (and "inside" if it is part of something): it is then drawn beside THAT place, which is what keeps a remote destination from showing up right next to the hero. "direction" may be left off a "far": true entry the scene gives no real sense of bearing for. Whenever this scene has a character name or clearly imply a specific place where a quest — new or already active — actually needs to be carried out, that place MUST be reported here (on "location" itself, with "moved": false, if the hero is already standing there, otherwise as an entry in "nearbyMentioned") with "questId" set to that quest's id and, as for any new place, with where it lies in the world ("inside", "nextTo", and "far": true when it is remote from the hero — a quest objective somewhere away from here is NOT drawn beside the hero), even if the hero's own position didn't change and nothing else about "location" would otherwise be worth reporting. Only omit "location" entirely on a turn where neither the hero's place changed nor any quest's destination was named. "faction" (on "current" and on each "nearbyMentioned" entry) is the name of whichever faction visibly controls or holds authority over that place — a garrison's banner, a guild's sign, whose law is enforced there — reusing an exact known faction name from the list below where possible; omit it for anywhere with no clear controlling faction (a lawless waystop, untouched wilderness). Once a place has a faction, it stays that faction's territory turn after turn — repeat the SAME value every time this place is reported as "current" (an omitted "faction" on a later turn leaves it unchanged, it does NOT clear it) and only give a genuinely different value the turn the story itself shows control actually changing hands (a conquest, a garrison driven out, a new authority moving in). "danger" (on "current" and on each "nearbyMentioned" entry) is true ONLY when this specific place currently has a genuine, known hostile threat sitting there right now — an enemy, monster, or hostile group the hero could plausibly end up fighting there — something the scene has actually established, never a vague sense that an area is generally unsafe. Set it to false the turn the story itself shows that specific threat resolved (defeated, fled, no longer there); omit it entirely on any turn that neither introduces nor resolves a threat at that place — like "faction", an omitted "danger" leaves the location's existing flag exactly as it was, it does NOT clear it. "verticalMove" (on "current" and on each "nearbyMentioned" entry) is "up" or "down", and ONLY applies the one time a place is first being created — set it when, and only when, this place is a different floor/level of the exact same structure the hero is moving from (the place you gave as "nextTo"; when you gave none, for "current" the hero's previous location, for a "nearbyMentioned" entry the hero's current location this turn) — climbing a stairwell to the floor above, descending into a cellar or basement below, and so on. Judge only the single, immediate step: is THIS specific place directly one level above, or directly one level below, wherever it connects from — never try to work out or state an absolute floor number yourself, the game tracks that. Leave "verticalMove" out entirely for any place reached by ordinary horizontal travel (use "directionFromPrevious"/"direction" for those instead, never both on the same place), and also leave it out for a place that already exists (reusing a known name) — its level was already fixed the first time it was created and never changes after. WHERE A PLACE SITS IN THE WORLD: the map is meant to show how the world is actually put together, not simply where the hero happened to walk — so every place you report for the FIRST time (a new "current", or a new "nearbyMentioned" entry) also says where it belongs among the places already known. "inside" is the exact known name of the place that physically CONTAINS it — the building a room belongs to, the settlement a building stands in, the vessel, station, fortress or dungeon a compartment or chamber is part of — or null when it stands on its own out in the open (a settlement, an outpost, a camp, a ruin or a tower out in the countryside). Containment only: NOT where the hero came from, and not what merely happens to be close by. Containers are discrete places like the ones on this map — never a whole region, realm, country, sea, planet or the world itself (something that simply lies somewhere out in the countryside is "inside": null); if the container is a real, named place that is not on the map yet, give its name anyway and it will be added. "nextTo" is optional: the exact known name of the place at the SAME level (inside the same container, or likewise out in the open) that this one lies closest to — NOT necessarily where the hero is standing — and "directionFromPrevious" / "direction" is then the heading from THAT place; leave "nextTo" out when the place the hero is at or came from really is the closest same-level neighbour. A place is never joined to somewhere it could not actually be reached from directly: from a room inside a building the hero can only get to somewhere outside the settlement by leaving the building and then the settlement, so a tower out in the countryside is "inside": null and "nextTo" the settlement (or whatever it truly adjoins), never the room the hero happened to leave it from. "placeLinks" (optional) states the structure of places that are ALREADY on the map: {"place": exact known name, "inside": exact known name of its container, or null}. The known list above shows "inside" wherever a place's container is established; use "placeLinks" ONLY for the places listed under STRUCTURE NOT YET ESTABLISHED (when you can state with confidence what contains each — from the story so far, or from what is firmly established about this world) and when the story itself shows a listed "inside" was wrong. Omit anything you are unsure of; never guess.
 "factions" lists ONLY named GROUPS that matter to the ongoing story — a squad, legion, guild, cult, noble house, gang, cartel, order, a state, an empire, or anything else the story treats as acting with one will; groups of ANY size are allowed, but a big one must be modelled as it really is (see "scale" and "parent" below). Skip anything mentioned only once in passing with no ongoing role. Each entry has a "name" and a short "note" — one sentence on what this group is, does, or wants. ${factionScaleRule} Include an entry here for EVERY faction referenced anywhere else this turn (as a "location.faction", a "nearbyMentioned[].faction", or an "npcs[].faction") the first time it's established, so the registry never falls out of sync with what's actually controlling places or backing characters. ${factionsReportingRule} Each entry may also include "relations" — this faction's own declared relationships with OTHER known factions, each an object with a "faction" (reusing an exact known faction name) and a "stance": "war" (open, active hostility — real, ongoing conflict, not just a passing insult), "allied" (active cooperation — shared goals, coordination, backing each other), "vassal" (THIS faction is sworn to, pays tribute to or answers to the target as its overlord), "suzerain" (THIS faction is the overlord of the target), "trade" (steady commerce or exchange without a political bond), "truce" (an agreed halt to a fight that could resume — use it instead of leaving a war on record once a ceasefire holds), or "rival" (open competition and mistrust short of war). Only declare a relation once the story has genuinely established it, and only from whichever side is natural in the scene — no need to duplicate it onto the other faction's own list too, and omit it once it's no longer true (a war that ends, an alliance that breaks) rather than leaving a stale entry in place.
 
 === EVENT: NEW QUESTS AND REWARDS ===
@@ -72171,6 +72656,7 @@ const APP_STYLES = `
   .map-node-danger-text { color: var(--red-400); font-style: normal; }
   .map-node-cleared-tag { font-family: var(--font-mono); font-style: normal; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--stone-500); }
   .map-node-npcs-label { font-style: normal; color: var(--amber-400); }
+.map-node-inside { font-style: normal; color: var(--stone-400); font-size: 0.8rem; }
   .map-node-progress-tag { font-family: var(--font-mono); font-style: normal; font-size: 0.68rem; letter-spacing: 0.02em; color: var(--amber-400); }
   .map-node-quest-info { border-top: 1px dashed var(--stone-700); padding-top: 0.35rem; margin-top: 0.35rem; }
   .map-node-quest-info:first-child { border-top: none; padding-top: 0; margin-top: 0; }
@@ -72237,6 +72723,22 @@ const APP_STYLES = `
   .map-travel-name-box { flex: 1; min-width: 0; height: 2.6rem; overflow-y: auto; display: flex; }
   .map-travel-name { margin: auto 0; line-height: 1.3; overflow-wrap: anywhere; }
   .map-travel-queued-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--amber-400); margin: 0.3rem 0 0; height: 1.2rem; line-height: 1.2rem; overflow-y: auto; }
+/* A phone held sideways has well under 400px of height, and the fullscreen
+   map's bottom strip (place name, road risk, distance, go button) used to stack
+   three rows and take about a third of it. Here it becomes one compact row:
+   name on the left, risk and distance beside it, the go button at the end. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .map-card-fs .map-travel-offer { padding-top: 0.3rem; padding-bottom: calc(0.3rem + env(safe-area-inset-bottom, 0px)); }
+  .map-card-fs .map-travel-offer .item-offer-group { margin: 0; display: flex; align-items: center; gap: 0.15rem 1rem; min-width: 0; }
+  .map-card-fs .map-travel-offer .item-offer-row { display: contents; }
+  .map-card-fs .map-travel-offer .map-travel-label { order: 1; flex: 1 1 0; min-width: 0; }
+  .map-card-fs .map-travel-offer .map-travel-name-box { height: auto; max-height: 1.9rem; }
+  .map-card-fs .map-travel-offer .map-travel-name { margin: 0; line-height: 1.2; font-size: 0.85rem; }
+  .map-card-fs .map-travel-offer .map-travel-queued-note { order: 2; flex: 0 1 auto; margin: 0; height: auto; line-height: 1.2; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-card-fs .map-travel-offer .map-travel-queued-note + .map-travel-queued-note { order: 3; }
+  .map-card-fs .map-travel-offer .item-offer-choice { order: 4; }
+  .map-card-fs .map-travel-offer .map-travel-toggle-btn { width: 1.9rem; height: 1.9rem; }
+}
   .map-node-radar { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
   .map-node-radar span { position: absolute; left: 0; top: 0; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--emerald-600); animation: map-radar-hero 2.4s ease-out infinite; }
   .map-node-radar-quest span { width: 30px; height: 30px; margin: -15px; background: var(--amber-500); animation-name: map-radar-quest; }
