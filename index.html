@@ -33139,6 +33139,114 @@ function canRepairCategory(skills, category) {
         return !!skills.jeweler;
     return false;
 }
+// ---- REPAIR LEDGER ----
+// The ONE place that decides what a craftsman can repair for the hero's whole
+// company. The repair window and the repair handler both read it, so what the
+// player is shown and what actually gets fixed and charged can never drift
+// apart. It covers the hero and every companion in the party, whatever the
+// setting: nothing here knows about swords or forges, only about owners, their
+// bag, what each one wears, and which trades the craftsman has (`skills`).
+//   owners   [{ owner: null | partyKey, ownerName }] in display order (hero first)
+//   result   [{ owner, ownerName, rows, total }] only owners with something to fix;
+//            a row is { owner, ownerName, index, item, rarity, info, cost, worn }
+//            and rows list the worn pieces first, since those matter most.
+// `skills` null means "no craft restriction" (used by tools that are not a trade).
+function buildRepairLedger({ inventory, equipment, party, partyInventories, partyEquipment, npcs, itemRarities, skills, heroName }) {
+    const owners = [{ owner: null, ownerName: heroName || '', list: inventory, wornMap: equipment }];
+    const seen = new Set();
+    for (const key of (party || [])) {
+        if (typeof key !== 'string' || !key || seen.has(key))
+            continue;
+        seen.add(key);
+        const npc = (npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
+        owners.push({ owner: key, ownerName: npc ? npc.name : key, list: (partyInventories || {})[key], wornMap: (partyEquipment || {})[key] });
+    }
+    const groups = [];
+    for (const o of owners) {
+        if (!Array.isArray(o.list) || o.list.length === 0)
+            continue;
+        // Identity based, exactly like the paper doll: the worn copies are the ones
+        // resolveEquippedItems hands to the slots, not "any item with that name".
+        const wornItems = new Set(Object.values(resolveEquippedItems(o.wornMap, o.list)));
+        const rows = [];
+        o.list.forEach((item, index) => {
+            if (!item || typeof item.name !== 'string')
+                return;
+            const rarity = findItemRarity(item.name, itemRarities || {});
+            const info = getItemDurability(item, rarity);
+            if (!info || info.cur >= info.max - 0.005)
+                return;
+            if (skills && !canRepairCategory(skills, info.category))
+                return;
+            rows.push({ owner: o.owner, ownerName: o.ownerName, index, item, rarity, info, cost: getRepairCost(item, rarity), worn: wornItems.has(item) });
+        });
+        if (rows.length === 0)
+            continue;
+        rows.sort((a, b) => (a.worn === b.worn ? a.index - b.index : (a.worn ? -1 : 1)));
+        groups.push({ owner: o.owner, ownerName: o.ownerName, rows, total: rows.reduce((sum, r) => sum + r.cost, 0) });
+    }
+    return groups;
+}
+// A request to repair one row: { owner, index, name }. The name is a guard so a
+// request that went stale (the bag changed under it) never repairs, or bills,
+// the wrong piece.
+function repairTargetOf(row) {
+    return { owner: row.owner, index: row.index, name: row.item.name };
+}
+// Applies repair requests to the hero's bag and the companions' bags without
+// mutating anything. Requests that no longer point at a damaged piece this
+// craftsman can mend are skipped. Returns { inventory, partyInventories,
+// total, repaired }; the same objects come back when nothing changed.
+function applyRepairTargets({ inventory, partyInventories, itemRarities, skills, targets }) {
+    const wanted = new Map();
+    for (const tg of (targets || [])) {
+        if (!tg || !Number.isInteger(tg.index))
+            continue;
+        const id = tg.owner === null || tg.owner === undefined ? '' : tg.owner;
+        if (!wanted.has(id))
+            wanted.set(id, new Map());
+        wanted.get(id).set(tg.index, tg.name);
+    }
+    let total = 0;
+    let repaired = 0;
+    const mend = (list, id) => {
+        const picks = wanted.get(id);
+        if (!picks || !Array.isArray(list))
+            return list;
+        let changed = false;
+        const next = list.map((item, i) => {
+            if (!picks.has(i) || !item)
+                return item;
+            if (picks.get(i) !== undefined && picks.get(i) !== item.name)
+                return item;
+            const rarity = findItemRarity(item.name, itemRarities || {});
+            const info = getItemDurability(item, rarity);
+            if (!info || info.cur >= info.max - 0.005)
+                return item;
+            if (skills && !canRepairCategory(skills, info.category))
+                return item;
+            total += getRepairCost(item, rarity);
+            repaired += 1;
+            changed = true;
+            return repairItemFully(item);
+        });
+        return changed ? next : list;
+    };
+    const nextInventory = mend(inventory, '');
+    let nextPartyInventories = partyInventories;
+    for (const id of wanted.keys()) {
+        if (id === '')
+            continue;
+        const before = (partyInventories || {})[id];
+        const after = mend(before, id);
+        if (after !== before) {
+            if (nextPartyInventories === partyInventories)
+                nextPartyInventories = { ...partyInventories };
+            nextPartyInventories[id] = after;
+        }
+    }
+    return { inventory: nextInventory, partyInventories: nextPartyInventories, total, repaired };
+}
 function durabilityColor(ratio) {
     if (ratio > 0.5)
         return '#34d399';
@@ -43034,38 +43142,20 @@ function GivePartyItemModal({ npcName, gameState, itemRarities, equipment, membe
 // and the confirm button simply won't fire (canTrade below) if either side
 // would end up short.
 // ---- Repair ----
-// Lists the hero's damaged gear this particular NPC has the trade to fix
-// (see inferNpcRepairSkills/canRepairCategory), each with its own price
-// (missing durability x rarity coefficient — see getRepairCost) and a
-// per-item button, plus a repair-everything button when there's more than one.
-function RepairModal({ npcName, gameState, itemRarities, equipment, party, partyInventories, partyEquipment, skills, onRepair, onClose, t }) {
-    const wornCounts = countEquippedByName(equipment);
-    const entries = [];
-    gameState.inventory.forEach((item, index) => {
-        const rarity = findItemRarity(item.name, itemRarities);
-        const info = getItemDurability(item, rarity);
-        if (!info || info.cur >= info.max - 0.005)
-            return;
-        if (!canRepairCategory(skills, info.category))
-            return;
-        entries.push({ owner: null, ownerName: null, item, index, rarity, info, cost: getRepairCost(item, rarity), worn: (wornCounts.get(item.name) || 0) > 0 });
+// Lists every damaged piece of the whole company this particular NPC has the
+// trade to fix: the hero's and each companion's, grouped by owner with the worn
+// pieces first (see buildRepairLedger, which the repair handler uses as well).
+// Each piece has its own price (missing durability x rarity coefficient, see
+// getRepairCost) and a button, plus a repair-everything button, and one per
+// owner when more than one person has something to fix.
+function RepairModal({ npcName, heroName, gameState, itemRarities, equipment, party, partyInventories, partyEquipment, skills, onRepair, onClose, t }) {
+    const groups = buildRepairLedger({
+        inventory: gameState.inventory, equipment, party, partyInventories, partyEquipment,
+        npcs: gameState.npcs, itemRarities, skills, heroName: heroName || t('combatYouLabel')
     });
-    // Companions' handed-over gear is repairable too.
-    (party || []).forEach(key => {
-        const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key);
-        const ownerName = npc ? npc.name : key;
-        const ownerWorn = countEquippedByName((partyEquipment || {})[key]);
-        ((partyInventories || {})[key] || []).forEach((item, index) => {
-            const rarity = findItemRarity(item.name, itemRarities);
-            const info = getItemDurability(item, rarity);
-            if (!info || info.cur >= info.max - 0.005)
-                return;
-            if (!canRepairCategory(skills, info.category))
-                return;
-            entries.push({ owner: key, ownerName, item, index, rarity, info, cost: getRepairCost(item, rarity), worn: (ownerWorn.get(item.name) || 0) > 0 });
-        });
-    });
-    const totalCost = entries.reduce((sum, e) => sum + e.cost, 0);
+    const allRows = groups.flatMap(g => g.rows);
+    const totalCost = groups.reduce((sum, g) => sum + g.total, 0);
+    const showOwners = (party || []).length > 0;
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
             onClose(); } },
         React.createElement("div", { className: "modal-card" },
@@ -43077,23 +43167,29 @@ function RepairModal({ npcName, gameState, itemRarities, equipment, party, party
                 React.createElement("span", { className: "trade-currency" },
                     "\uD83E\uDE99 ",
                     gameState.currency)),
-            entries.length === 0 ? (React.createElement("p", { className: "hint-text hint-text-block" }, t('repairEmptyText'))) : (React.createElement("div", { className: "repair-list" }, entries.map(e => (React.createElement("div", { key: (e.owner || '') + ':' + e.index, className: "repair-row" },
-                React.createElement("div", { className: "repair-row-info" },
-                    React.createElement("span", { className: "repair-row-name", style: { color: e.rarity ? rarityColor(e.rarity) : undefined } },
-                        "[",
-                        e.item.name,
-                        "]",
-                        e.worn ? ' ✓' : '',
-                        e.ownerName ? ' — ' + e.ownerName : ''),
-                    React.createElement("span", { className: 'repair-row-dur' }, Math.ceil(e.info.cur) + ' / ' + e.info.max),
-                    React.createElement(DurabilityBar, { info: e.info })),
-                React.createElement("button", { onClick: () => onRepair([{ owner: e.owner, index: e.index }]), disabled: e.cost > gameState.currency, className: "btn btn-primary repair-row-btn", type: "button", title: e.cost > gameState.currency ? t('repairCantAfford') : undefined },
-                    t('repairButton'),
-                    " \u00B7 \uD83E\uDE99 ",
-                    e.cost)))))),
+            allRows.length === 0 ? (React.createElement("p", { className: "hint-text hint-text-block" }, t('repairEmptyText'))) : (React.createElement("div", { className: "repair-groups", style: { maxHeight: '60vh', overflowY: 'auto' } }, groups.map(g => (React.createElement("div", { key: g.owner === null ? 'hero' : g.owner, className: "repair-group" },
+                showOwners && (React.createElement("div", { className: "repair-group-head", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, margin: '8px 0 4px', fontWeight: 600 } },
+                    React.createElement("span", { className: "repair-group-name" }, g.ownerName),
+                    groups.length > 1 && g.rows.length > 1 && (React.createElement("button", { onClick: () => onRepair(g.rows.map(repairTargetOf)), disabled: g.total > gameState.currency, className: "btn btn-ghost repair-row-btn", type: "button", title: g.total > gameState.currency ? t('repairCantAfford') : undefined },
+                        t('repairAllButton'),
+                        " \u00B7 \uD83E\uDE99 ",
+                        g.total)))),
+                React.createElement("div", { className: "repair-list" }, g.rows.map(e => (React.createElement("div", { key: (e.owner || '') + ':' + e.index, className: "repair-row" },
+                    React.createElement("div", { className: "repair-row-info" },
+                        React.createElement("span", { className: "repair-row-name", style: { color: e.rarity ? rarityColor(e.rarity) : undefined } },
+                            "[",
+                            e.item.name,
+                            "]",
+                            e.worn ? ' ✓' : ''),
+                        React.createElement("span", { className: 'repair-row-dur' }, Math.ceil(e.info.cur) + ' / ' + e.info.max),
+                        React.createElement(DurabilityBar, { info: e.info })),
+                    React.createElement("button", { onClick: () => onRepair([repairTargetOf(e)]), disabled: e.cost > gameState.currency, className: "btn btn-primary repair-row-btn", type: "button", title: e.cost > gameState.currency ? t('repairCantAfford') : undefined },
+                        t('repairButton'),
+                        " \u00B7 \uD83E\uDE99 ",
+                        e.cost)))))))))),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton')),
-                entries.length > 1 && (React.createElement("button", { onClick: () => onRepair(entries.map(e => ({ owner: e.owner, index: e.index }))), disabled: totalCost > gameState.currency, className: "btn btn-primary", type: "button" },
+                allRows.length > 1 && (React.createElement("button", { onClick: () => onRepair(allRows.map(repairTargetOf)), disabled: totalCost > gameState.currency, className: "btn btn-primary", type: "button" },
                     t('repairAllButton'),
                     " \u00B7 \uD83E\uDE99 ",
                     totalCost))))));
@@ -64565,46 +64661,26 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         saveGame(messages, nextState, res.itemRarities, res.equipment);
         return res;
     }
-    // Fully repairs the items at `indexes` (into gameState.inventory), charging
-    // the summed cost. Re-checks affordability before anything changes.
-    // `targets` is a list of { owner, index }: owner null = the hero's own
-    // bag, otherwise a companion's key in partyInventories.
+    // Fully repairs the requested pieces, charging the summed cost. `targets` is a
+    // list of { owner, index, name }: owner null = the hero's own bag, otherwise a
+    // companion's key in partyInventories (see buildRepairLedger, which produces
+    // them). The craftsman's trades, affordability and every request are checked
+    // again here against the live state before anything changes.
     function repairItems(targets) {
         if (blockedWhileTurnRuns())
             return;
-        const heroSet = new Set(targets.filter(tg => tg.owner === null).map(tg => tg.index));
-        const allySets = {};
-        for (const tg of targets) {
-            if (tg.owner === null)
-                continue;
-            (allySets[tg.owner] = allySets[tg.owner] || new Set()).add(tg.index);
-        }
-        let total = 0;
-        gameState.inventory.forEach((item, i) => {
-            if (heroSet.has(i))
-                total += getRepairCost(item, findItemRarity(item.name, itemRarities));
-        });
-        for (const k of Object.keys(allySets)) {
-            (partyInventories[k] || []).forEach((item, i) => {
-                if (allySets[k].has(i))
-                    total += getRepairCost(item, findItemRarity(item.name, itemRarities));
-            });
-        }
-        if (total <= 0 || total > gameState.currency)
+        const repairKey = typeof repairingNpc === 'string' ? repairingNpc.trim().toLowerCase() : '';
+        const repairNpc = repairKey ? (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === repairKey) : null;
+        const skills = inferNpcRepairSkills(repairNpc ? repairNpc.role : '');
+        const res = applyRepairTargets({ inventory: gameState.inventory, partyInventories, itemRarities, skills, targets });
+        if (res.repaired === 0 || res.total <= 0 || res.total > gameState.currency)
             return;
-        const nextInventory = gameState.inventory.map((it, i) => (heroSet.has(i) ? repairItemFully(it) : it));
-        let nextPartyInventories = partyInventories;
-        if (Object.keys(allySets).length > 0) {
-            nextPartyInventories = { ...partyInventories };
-            for (const k of Object.keys(allySets)) {
-                nextPartyInventories[k] = (partyInventories[k] || []).map((it, i) => (allySets[k].has(i) ? repairItemFully(it) : it));
-            }
-            setPartyInventories(nextPartyInventories);
-        }
-        const nextState = { ...gameState, inventory: nextInventory, currency: gameState.currency - total };
+        if (res.partyInventories !== partyInventories)
+            setPartyInventories(res.partyInventories);
+        const nextState = { ...gameState, inventory: res.inventory, currency: gameState.currency - res.total };
         playMoneySound();
         setGameState(nextState);
-        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, nextPartyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, res.partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
     }
     // Player buying one of the NPC's items — priced off rarity and, if this
     // NPC belongs to a faction, the hero's standing with it (see
@@ -71903,7 +71979,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         repairingNpc && (() => {
             const repairKey = repairingNpc.trim().toLowerCase();
             const repairNpc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === repairKey);
-            return (React.createElement(RepairModal, { npcName: repairingNpc, gameState: gameState, itemRarities: itemRarities, equipment: equipment, party: party, partyInventories: partyInventories, partyEquipment: partyEquipment, skills: inferNpcRepairSkills(repairNpc ? repairNpc.role : ''), onRepair: repairItems, onClose: closeRepair, t: t }));
+            return (React.createElement(RepairModal, { npcName: repairingNpc, heroName: heroName, gameState: gameState, itemRarities: itemRarities, equipment: equipment, party: party, partyInventories: partyInventories, partyEquipment: partyEquipment, skills: inferNpcRepairSkills(repairNpc ? repairNpc.role : ''), onRepair: repairItems, onClose: closeRepair, t: t }));
         })(),
         workshopTarget && (() => {
             const wsNpc = findWorkshopNpc(workshopTarget);
