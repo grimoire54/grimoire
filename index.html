@@ -17965,6 +17965,19 @@ const TRANSLATIONS = {
         talentCostLabel: 'Стоимость',
         talentBackButton: 'Назад',
         talentLearnButton: 'Изучить',
+        // -- Companion growth (see COMPANION GROWTH) --
+        talentSubjectHero: 'Герой',
+        talentSubjectLevel: 'ур. {level}',
+        talentAutoOn: 'Авто-развитие: вкл',
+        talentAutoOff: 'Авто-развитие: выкл',
+        talentAutoHint: 'Когда включено, спутник сам тратит очки талантов так, как подсказывает его роль в бою. Выключите, чтобы распределять очки вручную.',
+        talentResetButton: 'Сбросить таланты',
+        talentResetHint: 'Вернуть все потраченные очки и взять развитие спутника в свои руки (авто-развитие выключится).',
+        talentCompanionHint: 'Спутники растут по тому же дереву, что и герой, но пользуются только прибавками к характеристикам и пассивными талантами; активные умения и заклинания остаются за героем.',
+        companionGrowthLabel: 'Рост',
+        companionSpecialtiesLabel: 'Особенности',
+        growthToastLevel: 'ур. {level}',
+        growthToastPoints: 'очков талантов: {n}',
         talentBranch_blade: 'Клинок',
         talentBranch_fortitude: 'Стойкость',
         talentBranch_shadow: 'Тень',
@@ -19247,6 +19260,19 @@ const TRANSLATIONS = {
         talentCostLabel: 'Cost',
         talentBackButton: 'Back',
         talentLearnButton: 'Learn',
+        // -- Companion growth (see COMPANION GROWTH) --
+        talentSubjectHero: 'Hero',
+        talentSubjectLevel: 'Lv {level}',
+        talentAutoOn: 'Auto-grow: on',
+        talentAutoOff: 'Auto-grow: off',
+        talentAutoHint: 'When on, the companion spends their talent points on their own, following their role in combat. Turn it off to spend them by hand.',
+        talentResetButton: 'Reset talents',
+        talentResetHint: 'Refund every spent point and take over the build (auto-grow switches off).',
+        talentCompanionHint: 'Companions grow along the same tree as the hero, but use only its stat tracks and passive talents; active abilities and spells stay with the hero.',
+        companionGrowthLabel: 'Growth',
+        companionSpecialtiesLabel: 'Specialties',
+        growthToastLevel: 'level {level}',
+        growthToastPoints: '{n} talent points to spend',
         talentBranch_blade: 'Blade',
         talentBranch_fortitude: 'Fortitude',
         talentBranch_shadow: 'Shadow',
@@ -20100,6 +20126,12 @@ const EMPTY_STATE = {
     // never the narrator's to set, and lives on state so regenerating a turn
     // (stateBefore) rolls it back for free.
     companionBonds: {},
+    // Levels, XP and talents of the party members — see COMPANION GROWTH. Sparse
+    // map keyed by the companion's lowercased name; a record appears when someone
+    // is recruited (or first earns XP). Client-owned like companionBonds: the
+    // narrator never sets it, and living on state makes a regenerated turn
+    // (stateBefore) roll it back for free.
+    companionGrowth: {},
     // The hero's own standing among the factions — see HERO FACTIONS. Client-
     // owned (the narrator never sets it) and lives on state, so regenerating
     // a turn (stateBefore) rolls it back for free, like companionBonds. A
@@ -20783,8 +20815,14 @@ function buildTalentDefs() {
 }
 const TALENT_DEFS = buildTalentDefs();
 const TALENT_TOTAL_ROWS = Math.max(TALENT_TRACK_NODE_COUNT, ...TALENT_KEYSTONES.map(k => k.row + 1));
-function isTalentVisible(def, traits) { return !!def && worldAllows(traits, def.world); }
-function visibleTalentBranches(traits) { return TALENT_BRANCHES.filter(b => worldAllows(traits, b.world)); }
+// `scope` (optional) is who the tree is being shown for: omitted/'hero' is the
+// hero's full tree; 'companion' narrows it to what a party member can use (see
+// isTalentAvailableFor in COMPANION GROWTH below). The hero path is unchanged.
+function isTalentVisible(def, traits, scope) { return !!def && worldAllows(traits, def.world) && isTalentAvailableFor(def, scope); }
+function visibleTalentBranches(traits, scope) {
+    return TALENT_BRANCHES.filter(b => worldAllows(traits, b.world)
+        && (scope !== TALENT_SCOPE_COMPANION || Object.values(TALENT_DEFS).some(d => d.branch === b.key && isTalentVisible(d, traits, scope))));
+}
 // Save-load hygiene for gameState.talents — drops any id no longer in
 // TALENT_DEFS (a renamed or retired node since the save was made) and
 // clamps every rank into [0, maxRank], dropping zero-rank entries entirely.
@@ -20990,17 +21028,517 @@ function getTalentLootBonusFraction(talents) { return sumTalentField(talents, 'l
 // and unspent points: not already at its own max rank, its prerequisite
 // (if any) already has at least 1 rank in it, and enough points on hand to
 // cover its cost.
-function canLearnTalent(talents, points, id, traits) {
+// `scope` is the same optional who-is-asking switch as isTalentVisible's: a
+// companion can never learn a node the ally combat pipeline would not honour,
+// even if a caller passes no world traits.
+function canLearnTalent(talents, points, id, traits, scope) {
     const def = TALENT_DEFS[id];
     if (!def)
         return false;
-    if (traits !== undefined && !isTalentVisible(def, traits))
+    if (!isTalentAvailableFor(def, scope))
+        return false;
+    if (traits !== undefined && !isTalentVisible(def, traits, scope))
         return false;
     if ((talents[id] || 0) >= def.maxRank)
         return false;
     if (def.requires && !(talents[def.requires] > 0))
         return false;
     return points >= def.cost;
+}
+// ==============================================================================
+// COMPANION GROWTH — levels, XP and talents for party members
+// ==============================================================================
+// Party members grow by the SAME rules as the hero, through the SAME code — there
+// is no second, parallel progression system to keep in step with later updates:
+//  - XP and levels: every award in the game goes through awardExperience, which
+//    runs the very same addXp / computeNewlyGainedLevels / TALENT_POINTS_PER_LEVEL
+//    for the hero and for each companion present. Change a level-up rule once and
+//    both follow.
+//  - Talents: a companion learns nodes of the very same TALENT_DEFS registry (stat
+//    tracks and passive keystones), behind the very same world traits
+//    (worldAllows). A setting without magic or firearms hides those branches for
+//    companions exactly as it does for the hero, so growth fits any universe.
+//  - What a companion CAN use is derived, not hand-listed node by node. A stat
+//    track is available when the ally combat pipeline reads its effect field
+//    (COMPANION_STAT_FIELDS); a keystone when it is a passive whose every mechanic
+//    is one the pipeline honours (COMPANION_PASSIVE_FIELDS) and its gate node is
+//    available too. A node a later update adds to the registry therefore works for
+//    companions by itself the moment it reuses a field the pipeline already reads,
+//    and is withheld — never silently dead — until the pipeline learns the new
+//    field (companionParityReport lists exactly what is withheld and why).
+//  - Combat: computeAllyMods builds a companion's mods from their own effects,
+//    their own learned talents and abilities, and the hero's commander aura —
+//    one function for every roll, as the SINGLE SOURCES OF TRUTH note says.
+//
+// State: gameState.companionGrowth[key] = { level, xp, talents, talentPoints,
+// auto }, keyed by the same lowercased NPC name every name-keyed map uses (see
+// normNameKey / relocateMapKeys). It lives on gameState on purpose, like
+// companionBonds: regenerating a turn (stateBefore) rolls it back for free, saves
+// and exports carry it, and the narrator — who judges a companion's stats,
+// health and effects each turn — can never overwrite it. `auto` means the engine
+// spends the companion's points itself (see autoSpendTalentPoints); the player
+// can turn it off and spend them by hand in the same talent tree the hero uses.
+const TALENT_SCOPE_HERO = 'hero';
+const TALENT_SCOPE_COMPANION = 'companion';
+// Share of every XP award a companion earns, relative to the hero.
+const COMPANION_XP_SHARE = 1;
+// A companion who trails the hero catches up faster: each level behind adds
+// this to their XP multiplier, up to the cap — a late recruit is not stuck at
+// the back of the party for the rest of the campaign.
+const COMPANION_CATCHUP_PER_LEVEL = 0.05;
+const COMPANION_CATCHUP_MAX_BONUS = 0.5;
+// A newly recruited companion starts this many levels under the hero (never below 1),
+// their points spent as if they had earned them on the road.
+const COMPANION_JOIN_LEVEL_LAG = 2;
+// The auto-planner deepens its favoured tracks in these steps (a focused build
+// first, then the remaining ranks) rather than spreading one point everywhere.
+const COMPANION_AUTO_TRACK_DEPTHS = [6, TALENT_TRACK_NODE_COUNT];
+// The mods fields the ALLY combat pipeline actually reads off a companion's mods
+// object (computeAllyMods + its call sites in combat). A stat track is available
+// to companions only if its effectField is listed here.
+const COMPANION_STAT_FIELDS = ['critChanceDelta', 'damageMultiplier', 'hitChanceDelta', 'defenseChanceDelta', 'armorBonusFraction', 'initiativeBonus', 'gunHitDelta', 'gunDamageMult'];
+// Same for passive keystones: every mechanic key of the ability's ABILITY_DEFS entry
+// must be one of these (they all ride in the mods object the pipeline reads).
+const ABILITY_META_KEYS = ['icon', 'nameKey', 'descKey', 'type', 'trigger', 'frequency', 'promptLabel', 'promptHint'];
+const COMPANION_PASSIVE_FIELDS = ['critChanceDelta', 'hitChanceDelta', 'defenseChanceDelta', 'berserkMaxBonus', 'backstabDamageMult', 'flankCritBonus', 'duelistDamageMult', 'duelistHitDelta', 'duelistDefenseDelta', 'stunResist', 'partHpBonusFraction', 'coverHitReduction', 'initiativeBonus'];
+// Whether a node exists for `scope`: everything for the hero; for a companion, only
+// what the rules above allow — and only if the node it hangs off is available too
+// (a keystone behind a track companions cannot use is unavailable, not orphaned).
+function isTalentAvailableFor(def, scope) {
+    if (!def)
+        return false;
+    if (scope !== TALENT_SCOPE_COMPANION)
+        return true;
+    let ok;
+    if (def.kind === 'stat') {
+        ok = COMPANION_STAT_FIELDS.includes(def.effectField);
+    }
+    else {
+        const ability = ABILITY_DEFS[def.abilityId];
+        ok = !!ability && ability.type === 'passive' && !ability.weaponFx && !ability.spellFx
+            && Object.keys(ability).filter(k => !ABILITY_META_KEYS.includes(k)).every(k => COMPANION_PASSIVE_FIELDS.includes(k));
+    }
+    if (ok && def.requires)
+        ok = isTalentAvailableFor(TALENT_DEFS[def.requires], scope);
+    return ok;
+}
+// Dev-panel / test aid: every node the companion tree withholds from companions,
+// with the reason, so a registry change that leaves a node unusable is visible
+// instead of silent. Returns [{ id, branch, kind, reason }].
+function companionParityReport() {
+    const out = [];
+    for (const def of Object.values(TALENT_DEFS)) {
+        if (isTalentAvailableFor(def, TALENT_SCOPE_COMPANION))
+            continue;
+        let reason;
+        if (def.kind === 'stat')
+            reason = 'field:' + def.effectField;
+        else {
+            const ability = ABILITY_DEFS[def.abilityId];
+            if (!ability)
+                reason = 'missing-ability';
+            else if (ability.type !== 'passive' || ability.weaponFx || ability.spellFx)
+                reason = 'active-ability';
+            else {
+                const unknown = Object.keys(ability).filter(k => !ABILITY_META_KEYS.includes(k) && !COMPANION_PASSIVE_FIELDS.includes(k));
+                reason = unknown.length > 0 ? 'field:' + unknown.join(',') : 'gate:' + def.requires;
+            }
+        }
+        out.push({ id: def.id, branch: def.branch, kind: def.kind, reason });
+    }
+    return out;
+}
+// ---- Normalization ----------------------------------------------------------
+// One companion's record, healed the way save-load hygiene heals the hero's:
+// level/xp re-clamped into range, and talents re-validated against what the
+// registry offers companions TODAY — a node that no longer exists, or that
+// companions can no longer use, is dropped and its points refunded (never silently
+// lost, never silently kept dead); a node whose prerequisite is gone goes with it.
+function normalizeCompanionGrowthEntry(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const level = clampLevel(src.level, 1);
+    const rawXp = Number(src.xp);
+    const xpCeiling = level >= LEVEL_CAP ? 0 : xpRequiredForLevel(level) - 1;
+    const xp = level >= LEVEL_CAP ? 0 : Math.max(0, Math.min(xpCeiling, Number.isFinite(rawXp) ? Math.round(rawXp) : 0));
+    const rawTalents = src.talents && typeof src.talents === 'object' && !Array.isArray(src.talents) ? src.talents : {};
+    const talents = {};
+    let refund = 0;
+    for (const id of Object.keys(rawTalents)) {
+        const rank = Math.max(0, Math.round(Number(rawTalents[id]) || 0));
+        if (rank <= 0)
+            continue;
+        const def = TALENT_DEFS[id];
+        if (!def) {
+            refund += RETIRED_TALENT_REFUNDS[id] || 0;
+            continue;
+        }
+        if (!isTalentAvailableFor(def, TALENT_SCOPE_COMPANION)) {
+            refund += def.cost * Math.min(rank, def.maxRank);
+            continue;
+        }
+        talents[id] = Math.min(rank, def.maxRank);
+    }
+    for (let changed = true; changed;) {
+        changed = false;
+        for (const id of Object.keys(talents)) {
+            const def = TALENT_DEFS[id];
+            if (def.requires && !(talents[def.requires] > 0)) {
+                refund += def.cost * talents[id];
+                delete talents[id];
+                changed = true;
+            }
+        }
+    }
+    return { level, xp, talents, talentPoints: Math.max(0, Math.round(Number(src.talentPoints) || 0)) + refund, auto: src.auto !== false };
+}
+function normalizeCompanionGrowth(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+        return {};
+    const out = {};
+    for (const [k, v] of Object.entries(raw)) {
+        const key = normNameKey(k);
+        if (!key || !v || typeof v !== 'object')
+            continue;
+        out[key] = normalizeCompanionGrowthEntry(v);
+    }
+    return out;
+}
+function getCompanionGrowth(state, name) {
+    const key = normNameKey(name);
+    const rec = key && state && state.companionGrowth ? state.companionGrowth[key] : null;
+    return rec || null;
+}
+// ---- The shared progression step ---------------------------------------------
+// A progression record is { level, xp, talents, talentPoints }: the hero's lives
+// flat on gameState, a companion's in companionGrowth[key]. grantXp is the ONE
+// place "XP in -> levels and talent points out" is decided, for both.
+function heroProgression(state) {
+    return { level: state.level, xp: state.xp, talents: state.talents, talentPoints: state.talentPoints };
+}
+function grantXp(rec, amount) {
+    const { level, xp } = addXp(rec.level, rec.xp, amount);
+    const levels = computeNewlyGainedLevels(rec.level, level);
+    return { rec: { ...rec, level, xp, talentPoints: rec.talentPoints + levels.length * TALENT_POINTS_PER_LEVEL }, levels };
+}
+function companionJoinLevel(heroLevel) {
+    return Math.max(1, clampLevel(heroLevel, 1) - COMPANION_JOIN_LEVEL_LAG);
+}
+function companionCatchUpMultiplier(companionLevel, heroLevel) {
+    const behind = Math.max(0, clampLevel(heroLevel, 1) - clampLevel(companionLevel, 1));
+    return 1 + Math.min(COMPANION_CATCHUP_MAX_BONUS, behind * COMPANION_CATCHUP_PER_LEVEL);
+}
+// ---- The auto-planner --------------------------------------------------------
+// Spends a companion's points the way their role suggests — deterministically (no
+// dice, so a regenerated turn plans exactly as the first attempt did). The role
+// comes from what the companion actually fights with (melee / bow / firearm — see
+// companionProfileFromLoadout), the stat nudge from their own stats. Weights are
+// DATA keyed by track, in one table: a track missing from it (added by a later
+// update) is simply neutral, never an error.
+const COMPANION_TRACK_AFFINITY = {
+    critChance: { melee: 1.0, ranged: 1.1, firearm: 0.8, stat: 'agility' },
+    damage: { melee: 1.3, ranged: 1.0, firearm: 0.7, stat: 'strength' },
+    defenseChance: { melee: 1.0, ranged: 0.7, firearm: 0.7, stat: 'agility' },
+    armor: { melee: 1.1, ranged: 0.6, firearm: 0.6, stat: 'strength' },
+    hitChance: { melee: 0.8, ranged: 1.4, firearm: 1.1, stat: 'agility' },
+    initiative: { melee: 0.6, ranged: 0.8, firearm: 0.9, stat: 'initiative' },
+    gunHit: { melee: 0, ranged: 1.0, firearm: 1.6, stat: 'agility' },
+    gunDamage: { melee: 0, ranged: 0.8, firearm: 1.5, stat: 'agility' }
+};
+const COMPANION_ROLES = ['melee', 'ranged', 'firearm'];
+// What a companion fights with, from their loadout: a firearm in hand is 'firearm', a
+// bow/crossbow is 'ranged', everything else (blades, shields, fists) is 'melee'. Pure —
+// the caller supplies the equipment/inventory, since those live outside gameState.
+function companionProfileFromLoadout(npc, equipmentObj, inventoryList) {
+    const eq = equipmentObj || {};
+    let role = 'melee';
+    if (getLoadoutGunFxId(eq))
+        role = 'firearm';
+    else if (getLoadoutWeaponType(eq, inventoryList) === 'ranged' || isBowLoadout(eq))
+        role = 'ranged';
+    return { role, stats: npc && npc.stats && typeof npc.stats === 'object' ? npc.stats : null };
+}
+const DEFAULT_COMPANION_PROFILE = { role: 'melee', stats: null };
+function companionTrackWeight(trackKey, profile) {
+    const aff = COMPANION_TRACK_AFFINITY[trackKey];
+    if (!aff)
+        return 1;
+    const p = profile || DEFAULT_COMPANION_PROFILE;
+    const role = COMPANION_ROLES.includes(p.role) ? p.role : 'melee';
+    const base = typeof aff[role] === 'number' ? aff[role] : 1;
+    if (base <= 0)
+        return 0;
+    const stats = p.stats;
+    if (!stats || !aff.stat || !Number.isFinite(Number(stats[aff.stat])))
+        return base;
+    const vals = ['strength', 'agility', 'intelligence', 'initiative'].map(k => Number(stats[k])).filter(Number.isFinite);
+    const mean = vals.reduce((a, b) => a + b, 0) / Math.max(1, vals.length);
+    const rel = (Number(stats[aff.stat]) - mean) / Math.max(1, mean);
+    return base * (1 + Math.max(-0.4, Math.min(0.6, rel)));
+}
+function learnedTrackRank(talents, trackKey) {
+    let rank = 0;
+    for (let r = 1; r <= TALENT_TRACK_NODE_COUNT; r++) {
+        if ((talents[trackKey + '_' + r] || 0) > 0)
+            rank = r;
+        else
+            break;
+    }
+    return rank;
+}
+// The next node the planner wants, or null. Keystones whose gate is already learned
+// come first (worth more than the stat ranks they would delay — so the planner will
+// SAVE points for one rather than spend them one by one); otherwise the most
+// favoured track is deepened to the next depth step, then the next favoured, etc.
+function pickAutoTalentTarget(talents, traits, profile) {
+    const scope = TALENT_SCOPE_COMPANION;
+    const tracks = TALENT_TRACKS
+        .map((tr, i) => ({ tr, i, first: TALENT_DEFS[tr.key + '_1'], w: companionTrackWeight(tr.key, profile) }))
+        .filter(x => x.w > 0 && isTalentVisible(x.first, traits, scope))
+        .sort((a, b) => (b.w - a.w) || (a.i - b.i));
+    const weightOfTrack = key => { const f = tracks.find(x => x.tr.key === key); return f ? f.w : 0; };
+    const keystones = Object.values(TALENT_DEFS)
+        .map((d, i) => ({ d, i }))
+        .filter(({ d }) => d.kind === 'keystone' && !(talents[d.id] > 0) && isTalentVisible(d, traits, scope) && d.requires && talents[d.requires] > 0)
+        .map(({ d, i }) => ({ d, i, w: weightOfTrack((TALENT_DEFS[d.requires] || {}).track) }))
+        .filter(x => x.w > 0)
+        .sort((a, b) => (b.w - a.w) || (a.i - b.i));
+    if (keystones.length > 0)
+        return keystones[0].d.id;
+    for (const depth of COMPANION_AUTO_TRACK_DEPTHS) {
+        for (const { tr } of tracks) {
+            const rank = learnedTrackRank(talents, tr.key);
+            if (rank < depth)
+                return tr.key + '_' + (rank + 1);
+        }
+    }
+    return null;
+}
+// Spends as many of the record's points as the plan allows. Returns the next
+// record and the ids learned, in order. Stops when the next wanted node costs more
+// than what is on hand (saving up) or nothing is left to want.
+function autoSpendTalentPoints(rec, traits, profile) {
+    let cur = rec;
+    const learned = [];
+    for (let guard = 0; guard < 500 && cur.talentPoints > 0; guard++) {
+        const id = pickAutoTalentTarget(cur.talents, traits, profile);
+        if (!id || !canLearnTalent(cur.talents, cur.talentPoints, id, traits, TALENT_SCOPE_COMPANION))
+            break;
+        cur = { ...cur, talents: { ...cur.talents, [id]: (cur.talents[id] || 0) + 1 }, talentPoints: cur.talentPoints - TALENT_DEFS[id].cost };
+        learned.push(id);
+    }
+    return { rec: cur, learned };
+}
+// ---- Creating records and awarding XP ----------------------------------------
+function newCompanionRecord(heroLevel, traits, profile) {
+    const level = companionJoinLevel(heroLevel);
+    const base = { level, xp: 0, talents: {}, talentPoints: (level - 1) * TALENT_POINTS_PER_LEVEL, auto: true };
+    return autoSpendTalentPoints(base, traits, profile).rec;
+}
+// A companion's record brought up to date for the hero's current level: created when
+// there is none, and raised to the join level when the hero has outgrown them while
+// they were away (dismissed, sent off on an errand) — a returning companion is no
+// worse off than a stranger recruited today. A record already at or above the join
+// level is returned as is (the SAME object, so callers can compare by identity).
+function readyCompanionRecord(rec, heroLevel, traits, profile) {
+    if (!rec)
+        return newCompanionRecord(heroLevel, traits, profile);
+    const joinLevel = companionJoinLevel(heroLevel);
+    if (rec.level >= joinLevel)
+        return rec;
+    const lifted = { ...rec, level: joinLevel, xp: 0, talentPoints: rec.talentPoints + (joinLevel - rec.level) * TALENT_POINTS_PER_LEVEL };
+    return lifted.auto ? autoSpendTalentPoints(lifted, traits, profile).rec : lifted;
+}
+// The roster as awardExperience / ensureCompanionGrowth want it: one entry per living
+// tracked character found under the given name keys, with the profile the auto-planner
+// reads off their loadout. Characters the story no longer tracks, or has killed, are
+// skipped — nobody earns experience from beyond the grave. Pure: the equipment and
+// inventory maps (App's partyEquipment / partyInventories) are passed in.
+function companionMembersFor(keys, npcs, equipmentMap, inventoryMap) {
+    const out = [];
+    const seen = new Set();
+    for (const raw of keys || []) {
+        const key = normNameKey(raw);
+        if (!key || seen.has(key))
+            continue;
+        seen.add(key);
+        const npc = (npcs || []).find(n => n && typeof n.name === 'string' && normNameKey(n.name) === key);
+        if (!npc || npc.dead === true)
+            continue;
+        out.push({ key, name: npc.name, profile: companionProfileFromLoadout(npc, (equipmentMap || {})[key], (inventoryMap || {})[key]) });
+    }
+    return out;
+}
+// members: [{ key, name?, profile? }]. Pure; returns the SAME state when every
+// member already has an up-to-date record.
+function ensureCompanionGrowth(state, members) {
+    const growth = state.companionGrowth || {};
+    let next = growth;
+    for (const m of members || []) {
+        const key = normNameKey(m && m.key);
+        if (!key)
+            continue;
+        const ready = readyCompanionRecord(next[key], state.level, state.worldTraits, m.profile);
+        if (ready === next[key])
+            continue;
+        if (next === growth)
+            next = { ...growth };
+        next[key] = ready;
+    }
+    return next === growth ? state : { ...state, companionGrowth: next };
+}
+// One companion's step for a share of XP: the shared grantXp, then — while `auto` is on —
+// the planner spends what that left. Returns { rec, levels, learned }. awardExperience
+// and the dev panel both go through it, so a companion grows the same way everywhere.
+function growCompanion(rec, share, traits, profile) {
+    const res = grantXp(rec, share);
+    if (!res.rec.auto || res.rec.talentPoints <= 0)
+        return { rec: res.rec, levels: res.levels, learned: [] };
+    const spent = autoSpendTalentPoints(res.rec, traits, profile);
+    return { rec: spent.rec, levels: res.levels, learned: spent.learned };
+}
+// THE entry point for every in-game XP award (a quest turn-in, a combat victory; the
+// dev panel's Hero tab only moves the hero's own bar). The hero progresses by the
+// shared grantXp; each present companion earns
+// COMPANION_XP_SHARE of it (with the catch-up bonus when behind), through the same
+// grantXp, and — while `auto` is on — has their points spent by the planner. A
+// companion with no record yet gets one first (and one the hero has far outgrown while
+// they were away is brought up to the join level), so a first award is never lost.
+// members: [{ key, name?, profile? }]. Returns
+//   { state, hero: { from, to, levels, points, xp } | null,
+//     companions: [{ key, name, from, to, levels, points, xp, learned, auto, unspent }] }
+// where `levels` are the level numbers crossed, `learned` the node ids the planner
+// bought this time and `unspent` the points still on hand afterwards. A zero award
+// returns `state` as is.
+function awardExperience(state, amount, members) {
+    const gained = Math.round(Number(amount) || 0);
+    const result = { state, hero: null, companions: [] };
+    if (gained <= 0)
+        return result;
+    const heroRes = grantXp(heroProgression(state), gained);
+    let next = { ...state, level: heroRes.rec.level, xp: heroRes.rec.xp, talentPoints: heroRes.rec.talentPoints };
+    result.hero = { from: state.level, to: heroRes.rec.level, levels: heroRes.levels, points: heroRes.levels.length * TALENT_POINTS_PER_LEVEL, xp: gained };
+    const growth = { ...(state.companionGrowth || {}) };
+    let touched = false;
+    const seen = new Set();
+    for (const m of members || []) {
+        const key = normNameKey(m && m.key);
+        if (!key || seen.has(key))
+            continue;
+        seen.add(key);
+        const rec = readyCompanionRecord(growth[key], state.level, state.worldTraits, m.profile);
+        const share = Math.round(gained * COMPANION_XP_SHARE * companionCatchUpMultiplier(rec.level, state.level));
+        const grown = growCompanion(rec, share, state.worldTraits, m.profile);
+        const after = grown.rec;
+        growth[key] = after;
+        touched = true;
+        result.companions.push({ key, name: (m && m.name) || key, from: rec.level, to: after.level, levels: grown.levels, points: grown.levels.length * TALENT_POINTS_PER_LEVEL, xp: share, learned: grown.learned, auto: after.auto, unspent: after.talentPoints });
+    }
+    if (touched)
+        next = { ...next, companionGrowth: growth };
+    result.state = next;
+    return result;
+}
+// ---- Spending points by hand, for hero and companion alike -------------------
+// subjectKey: null/undefined = the hero, otherwise a companion's key. Returns the
+// next state, or null when the node cannot be learned right now. The hero path is
+// exactly what App's learnTalent always did; the companion path is the same rule
+// against the companion's own record.
+function learnTalentFor(state, subjectKey, id) {
+    const def = TALENT_DEFS[id];
+    if (!def)
+        return null;
+    if (!subjectKey) {
+        if (!canLearnTalent(state.talents, state.talentPoints, id, state.worldTraits))
+            return null;
+        const nextTalents = { ...state.talents, [id]: (state.talents[id] || 0) + 1 };
+        return { ...state, talents: nextTalents, talentPoints: state.talentPoints - def.cost, abilities: mergeWeaponAbilities(deriveAbilitiesFromTalents(nextTalents), state.abilities) };
+    }
+    const key = normNameKey(subjectKey);
+    const rec = getCompanionGrowth(state, key);
+    if (!rec || !canLearnTalent(rec.talents, rec.talentPoints, id, state.worldTraits, TALENT_SCOPE_COMPANION))
+        return null;
+    const nextRec = { ...rec, talents: { ...rec.talents, [id]: (rec.talents[id] || 0) + 1 }, talentPoints: rec.talentPoints - def.cost };
+    return { ...state, companionGrowth: { ...state.companionGrowth, [key]: nextRec } };
+}
+// Hands every spent point back so the build can be redone (companions only; the
+// hero's tree has no such control). Turning auto on afterwards re-plans from scratch.
+function resetCompanionTalents(state, key) {
+    const k = normNameKey(key);
+    const rec = getCompanionGrowth(state, k);
+    if (!rec)
+        return state;
+    let refund = 0;
+    for (const id of Object.keys(rec.talents)) {
+        const def = TALENT_DEFS[id];
+        if (def)
+            refund += def.cost * rec.talents[id];
+    }
+    if (refund === 0)
+        return state;
+    return { ...state, companionGrowth: { ...state.companionGrowth, [k]: { ...rec, talents: {}, talentPoints: rec.talentPoints + refund } } };
+}
+// Flips the record's auto flag; switching it ON immediately spends whatever the
+// planner can with the points already on hand.
+function setCompanionAuto(state, key, auto, profile) {
+    const k = normNameKey(key);
+    const rec = getCompanionGrowth(state, k);
+    if (!rec || rec.auto === !!auto)
+        return state;
+    let next = { ...rec, auto: !!auto };
+    if (next.auto && next.talentPoints > 0)
+        next = autoSpendTalentPoints(next, state.worldTraits, profile).rec;
+    return { ...state, companionGrowth: { ...state.companionGrowth, [k]: next } };
+}
+// The talents a companion's record contributes to combat, as a plain talents map
+// plus the ability ids its keystones derive — everything filtered through the
+// same availability rule, so a record from an older/newer registry can never feed
+// the pipeline a node it does not honour.
+function companionCombatTalents(rec) {
+    const talents = {};
+    for (const id of Object.keys((rec && rec.talents) || {})) {
+        if (isTalentAvailableFor(TALENT_DEFS[id], TALENT_SCOPE_COMPANION))
+            talents[id] = rec.talents[id];
+    }
+    return { talents, abilities: deriveAbilitiesFromTalents(talents) };
+}
+// ---- Narrator-facing text and small display helpers ---------------------------
+function companionLevelTier(level) {
+    if (level >= 40)
+        return 'legendary';
+    if (level >= 20)
+        return 'elite';
+    if (level >= 10)
+        return 'veteran';
+    if (level >= 5)
+        return 'seasoned';
+    return 'novice';
+}
+// partyNames are display names. Quiet by default: nothing is added until a
+// companion has actually grown (level above 1 or a learned talent).
+function buildCompanionGrowthPromptSection(state, partyNames) {
+    const lines = [];
+    for (const name of partyNames || []) {
+        const rec = getCompanionGrowth(state, name);
+        if (!rec || (rec.level <= 1 && Object.keys(rec.talents).length === 0))
+            continue;
+        const abilityLabels = companionCombatTalents(rec).abilities.map(id => ABILITY_DEFS[id]).filter(Boolean).map(d => d.promptLabel);
+        lines.push(`${name}: ${companionLevelTier(rec.level)} (level ${rec.level})${abilityLabels.length ? '; specialties: ' + abilityLabels.join(', ') : ''}`);
+    }
+    if (lines.length === 0)
+        return '';
+    return `
+
+COMPANION GROWTH — companions gain experience and skill alongside the hero by the game's own rules (client-owned: you never set or change it): ${lines.join('; ')}. Let this color how capable and seasoned each one comes across — a novice is green and unsure, a veteran steady under pressure, an elite or legendary companion plainly formidable — and let any specialty flavor how they fight. Show it through behavior, never quote levels or numbers in the prose.`;
+}
+// Everything the talent screen and the group roster need about one companion:
+// null when the party member has no record yet.
+function describeCompanionGrowth(state, key) {
+    const rec = getCompanionGrowth(state, key);
+    if (!rec)
+        return null;
+    const k = normNameKey(key);
+    const npc = (state.npcs || []).find(n => n && typeof n.name === 'string' && normNameKey(n.name) === k);
+    return { key: k, name: npc ? npc.name : titleCaseName(k), ...rec };
 }
 // Shared "how often does this work" line for an active ability, used by
 // both LevelUpModal's option cards and CharacterSheet's abilities block so
@@ -23661,6 +24199,7 @@ function normalizeGameStateCore(raw) {
         heroFactions: normalizeHeroFactions(raw.heroFactions),
         heroDeeds: normalizeHeroDeeds(raw.heroDeeds),
         companionBonds: normalizeCompanionBonds(raw.companionBonds),
+        companionGrowth: normalizeCompanionGrowth(raw.companionGrowth),
         // abilities is no longer stored directly — see
         // deriveAbilitiesFromTalents — so it's always rebuilt fresh from the
         // (possibly just-migrated) resolvedTalents above.
@@ -26667,6 +27206,46 @@ function NarrativeText({ text, entityIndex, onOpenEntity }) {
             } } }, piece.match));
     })));
 }
+// The level-progress bar the hero's sheet and every companion's card share
+// (see CompanionGrowthBlock) — one markup, so a later restyle reaches both.
+function XpBar({ level, xp, t }) {
+    const xpInfo = computeXpBarInfo(level, xp);
+    return (React.createElement("div", { className: "xp-bar-track", "aria-label": t('xpLabel') + ': ' + xpInfo.current + '/' + xpInfo.needed },
+        React.createElement("div", { className: "xp-bar-fill", style: { width: xpInfo.percent + '%' } }),
+        React.createElement("span", { className: "xp-bar-label" }, xpInfo.maxed ? t('xpLabel') + ' MAX' : xpInfo.current + ' / ' + xpInfo.needed + ' ' + t('xpLabel'))));
+}
+// One party member's growth at a glance (see COMPANION GROWTH): level, XP bar,
+// talent points waiting to be spent and the specialties their talents grant. With
+// `onOpenTalents` it also carries a button into that companion's talent tree.
+// Shared by NpcInfoModal, the character sheet's expanded NPC row and GroupModal;
+// renders nothing for a character who is not a tracked companion.
+function CompanionGrowthBlock({ npcName, gameState, party, onOpenTalents, t }) {
+    const key = normNameKey(npcName);
+    if (!Array.isArray(party) || !party.includes(key))
+        return null;
+    const growth = describeCompanionGrowth(gameState, key);
+    if (!growth)
+        return null;
+    const specialties = companionCombatTalents(growth).abilities.map(id => ABILITY_DEFS[id]).filter(Boolean);
+    return (React.createElement("div", { className: "npc-relations-block companion-growth-block" },
+        React.createElement("p", { className: "sheet-npc-note" }, t('companionGrowthLabel')),
+        React.createElement("div", { className: "sheet-vital-row" },
+            React.createElement("span", { className: "sheet-stat-label" }, t('levelLabel')),
+            React.createElement("span", { className: "sheet-vital-value" },
+                growth.level,
+                growth.talentPoints > 0 && React.createElement("span", { className: "sheet-set-indicator" },
+                    ' ',
+                    "\u2726",
+                    growth.talentPoints))),
+        React.createElement(XpBar, { level: growth.level, xp: growth.xp, t: t }),
+        specialties.length > 0 && (React.createElement("p", { className: "sheet-npc-note" },
+            t('companionSpecialtiesLabel'),
+            ": ",
+            specialties.map(d => d.icon + ' ' + t(d.nameKey)).join(', '))),
+        onOpenTalents && (React.createElement("button", { onClick: () => onOpenTalents(key), className: "sheet-heading-link", type: "button" },
+            "\uD83D\uDCD6 ",
+            t('talentsButton')))));
+}
 // One party member's bonds with each of the OTHER living companions (see
 // COMPANION BONDS). Shared by NpcInfoModal and the character sheet's
 // expanded NPC row; renders nothing for a non-companion or a lone companion.
@@ -26762,6 +27341,7 @@ function NpcInfoModal({ name, gameState, npcReputations, factionReputations, par
                     React.createElement("span", { className: "npc-relation-icon" }, NPC_RELATION_ICONS[r.type] || '•'),
                     React.createElement("span", null, r.name),
                     React.createElement("span", { className: "npc-relation-type" }, t(NPC_RELATION_LABEL_KEYS[r.type] || 'npcRelationFriend')))))))),
+            React.createElement(CompanionGrowthBlock, { npcName: npc.name, gameState: gameState, party: party, t: t }),
             React.createElement(CompanionBondsBlock, { npcName: npc.name, gameState: gameState, party: party, t: t }),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-ghost", type: "button" }, t('closeButton'))))));
@@ -35774,7 +36354,8 @@ function allyArmorFromLoadout(equipmentObj, inventoryList, rarities) {
 // buildAllyCombatants). raw is either { npcName, tier?, outfit?, weaponDescription?, armorPiercing? } binding to a
 // tracked character, or an anonymous unit { name, tier, role, weaponDescription, armorPiercing, outfit, and for
 // an allied creature kind/species/damageResist/fearless/spells }. env carries the live game data:
-// { npcs, partyEquipment, partyInventories, itemRarities, narrativeItemSlots, fallbackName }.
+// { npcs, partyEquipment, partyInventories, itemRarities, narrativeItemSlots, fallbackName, state } — state is
+// the hero's game state: a tracked character's growth record (see COMPANION GROWTH) scales their combat body.
 //  - A tracked character with real stats/health keeps those numbers; their gear is their party loadout if they
 //    have one, otherwise it is built from their established belongings (buildAllyGear).
 //  - Everyone else is rolled like an enemy of that tier (stats from the tier, gear from buildAllyGear), a named
@@ -35799,8 +36380,11 @@ function buildAllyCombatant(raw, id, env) {
         const hasPartyGear = !!((e.partyEquipment || {})[key] || (e.partyInventories || {})[key]);
         const ownGear = hasPartyGear ? undefined : buildAllyGear({ tierKey: validTier, name: npc.name, belongings: npc.inventory, classify, rarityOf, outfit: r.outfit, weaponDescription: said, armorPiercing: r.armorPiercing });
         const load = ownGear || { equipment: (e.partyEquipment || {})[key], inventory: (e.partyInventories || {})[key], itemRarities: rarities };
-        const { armor, armorPools } = allyArmorFromLoadout(load.equipment, load.inventory, load.itemRarities);
-        return { id, name: npc.name, stats: npc.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts: buildCombatantParts(npc.health, npc.maxHealth), armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false, ...(ownGear ? { ownGear } : {}) };
+        const { armor, armorPools: baseArmorPools } = allyArmorFromLoadout(load.equipment, load.inventory, load.itemRarities);
+        // Same growth scaling as a party member's (someone who once traveled with the hero keeps what they earned).
+        // Needs the game state (growth records); without one the body is built as it always was.
+        const { parts, armorPools } = applyGrowthToAllyBody(buildCombatantParts(npc.health, npc.maxHealth), baseArmorPools, e.state ? computeAllyMods(e.state, npc.name) : null);
+        return { id, name: npc.name, stats: npc.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false, ...(ownGear ? { ownGear } : {}) };
     }
     const name = isNamedNpc
         ? (npcRecord ? npcRecord.name : r.npcName.trim())
@@ -36575,6 +37159,22 @@ function applyDefenseContextMods(mods, ctx) {
         return mods;
     return { ...mods, defenseChanceDelta: (mods.defenseChanceDelta || 0) + mods.duelistDefenseDelta };
 }
+// The context flags the two functions above read, worked out the same way for
+// ANY pair of combatants — a companion who learned Backstab or Duelist gets
+// them exactly like the hero does. Keys are the combatant keys used everywhere
+// in combat ('hero:hero', 'ally:<id>', 'enemy:<id>'); `state` is the combat
+// state (its lock map). `forceCrit` is isBackstabOnLocked's verdict for the swing.
+function attackContextFor(state, attackerKey, defenderKey, forceCrit) {
+    const targetPartner = getActiveLockPartner(state, defenderKey);
+    return {
+        backstab: !!forceCrit,
+        flank: !forceCrit && !!targetPartner && targetPartner !== attackerKey,
+        duel: getDuelPartner(state, attackerKey) === defenderKey
+    };
+}
+function defenseContextFor(state, attackerKey, defenderKey) {
+    return { duel: getDuelPartner(state, defenderKey) === attackerKey };
+}
 // Ranged talents (Gunner branch): hit chance and damage for any ranged attack.
 function applyRangedTalentMods(mods, isRanged) {
     if (!mods || !isRanged)
@@ -36631,10 +37231,8 @@ function computeHeroMods(state, fightState, healthRatioOverride) {
     // live reserve is the fight's own copy (fightState.psyche), outside one it is the hero's.
     return applyPsycheMods(out, fightMindOf(state, fightState), fightState || null);
 }
-// A party member's mods come from THEIR OWN tracked effects (the npc record
-// in gameState.npcs — see reconcileNpcs) and never from the hero's. A
-// reinforcement ally with no npc record simply has none. Companions have no
-// abilities (yet), so nothing else folds in.
+// Current/max health of a body-parts object as a 0-1 ratio — what Berserker's
+// Fury reads, for the hero's heroParts and any ally's parts alike.
 function heroPartsHealthRatio(parts) {
     let hp = 0, max = 0;
     for (const p of BODY_PARTS) {
@@ -36645,12 +37243,43 @@ function heroPartsHealthRatio(parts) {
     }
     return max > 0 ? hp / max : 1;
 }
-function computeAllyMods(npcs, allyName, aura) {
-    const key = typeof allyName === 'string' ? allyName.trim().toLowerCase() : '';
-    const npc = key ? (npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key) : null;
-    const mods = aggregateEffectModifiers(npc && Array.isArray(npc.effects) ? npc.effects : []);
+// A party member's mods come from THEIR OWN tracked effects (the npc record in
+// gameState.npcs — see reconcileNpcs), THEIR OWN learned talents and the passive
+// abilities those derive (gameState.companionGrowth — see COMPANION GROWTH), and
+// the hero's commander aura — never from the hero's own effects, talents or
+// abilities. A reinforcement ally with no npc/growth record simply has no personal
+// bonuses. The talent folding is the very same applyTalentStatMods /
+// applyHeroAbilityMods the hero's mods go through, so a rule changed there
+// changes both.
+//
+// `state` is the hero's gameState (npcs, companionGrowth, and the hero's own
+// talents/abilities for the commander aura). opts.healthRatio (0-1, e.g.
+// heroPartsHealthRatio(ally.parts)) feeds Berserker's Fury the way
+// computeHeroMods feeds it for the hero; omitted means unhurt.
+//
+// The earlier signature computeAllyMods(npcs, allyName, aura) is still accepted,
+// so a call site written against it keeps working — minus the growth bonuses,
+// which is why it warns once: new code should pass the state.
+let legacyAllyModsWarned = false;
+function computeAllyMods(stateOrNpcs, allyName, optsOrAura) {
+    const legacy = Array.isArray(stateOrNpcs);
+    if (legacy && !legacyAllyModsWarned) {
+        legacyAllyModsWarned = true;
+        console.warn('[Grimoire RPG] computeAllyMods(npcs, name, aura) is the old signature — pass the game state instead so companion growth applies');
+    }
+    const state = legacy ? { npcs: stateOrNpcs } : (stateOrNpcs || {});
+    const opts = legacy ? {} : (optsOrAura || {});
+    const key = normNameKey(allyName);
+    const npc = key ? (state.npcs || []).find(n => n && typeof n.name === 'string' && normNameKey(n.name) === key) : null;
+    let mods = aggregateEffectModifiers(npc && Array.isArray(npc.effects) ? npc.effects : []);
+    const growth = legacy ? null : getCompanionGrowth(state, key);
+    if (growth) {
+        const learned = companionCombatTalents(growth);
+        mods = applyHeroAbilityMods(applyTalentStatMods(mods, learned.talents), learned.abilities, null, typeof opts.healthRatio === 'number' ? opts.healthRatio : 1);
+    }
     // Commander talents (see computeCommanderAura): allies and reinforcements
     // on the hero's side hit harder, defend better, keep their nerve longer.
+    const aura = legacy ? optsOrAura : computeCommanderAura(state);
     if (aura) {
         mods.damageMultiplier *= aura.allyDamageMult;
         mods.defenseChanceDelta += aura.allyDefenseDelta;
@@ -36659,6 +37288,20 @@ function computeAllyMods(npcs, allyName, aura) {
     }
     // A companion's own mind weighs on them exactly as the hero's does on the hero (see the PSYCHE section).
     return applyPsycheMods(mods, npc ? { psyche: npc.psyche, maxPsyche: npc.maxPsyche } : null, null);
+}
+// Fight-start scaling a companion's talents earn, applied once when their combat
+// body is built (see buildAllyCombatants / makeAllyCombatant) — the ally mirror of
+// what startCombat does for the hero's heroParts / heroArmorMax: Vitality's
+// partHpBonusFraction widens every body part's HP pool, the Armor track's
+// armorBonusFraction the head/body armor pools (max and cur alike). `mods` is
+// the ally's computeAllyMods result.
+function applyGrowthToAllyBody(parts, armorPools, mods) {
+    return {
+        parts: scaleHeroParts(parts, mods && mods.partHpBonusFraction),
+        armorPools: armorPools && armorPools.max
+            ? { max: scaleHeroArmorPools(armorPools.max, mods && mods.armorBonusFraction), cur: scaleHeroArmorPools(armorPools.cur, mods && mods.armorBonusFraction) }
+            : armorPools
+    };
 }
 // One combat round's worth of bleed/poison damage — summed flat (not
 // stacked multiplicatively) across every DOT-capable effect currently
@@ -41034,6 +41677,20 @@ function CurrencyToastStack({ toasts, t }) {
         React.createElement("span", { className: "currency-toast-label" }, t('lootCurrencyToastLabel')),
         React.createElement("span", { className: "currency-toast-delta" }, '+' + toast.amount))))));
 }
+// The same self-dismissing chip for "a companion just grew a level" (see
+// announceCompanionGrowth) — companions level up on their own as the story and
+// fights go on, so without a cue the player would never learn that Aldric just
+// reached level 6 or picked up a new specialty. Its own fixed stack (like the
+// currency one) so growth never reads as a reputation or money change.
+function GrowthToastStack({ toasts, t }) {
+    if (!toasts || toasts.length === 0)
+        return null;
+    return (React.createElement("div", { className: "growth-toast-stack", "aria-live": "polite" }, toasts.map(toast => (React.createElement("div", { key: toast.id, className: 'growth-toast' + (toast.exiting ? ' growth-toast-exit' : '') },
+        React.createElement("span", { className: "growth-toast-icon" }, "\u25B2"),
+        React.createElement("span", { className: "growth-toast-name" }, toast.name),
+        React.createElement("span", { className: "growth-toast-level" }, t('growthToastLevel').replace('{level}', toast.level)),
+        toast.detail && React.createElement("span", { className: "growth-toast-detail" }, toast.detail))))));
+}
 // tapping ✓/✗ only stages a pending choice, a separate "Confirm" button
 // beneath is what actually commits it — and confirming flags the row as
 // exiting, which drives the same item-offer-row-exit CSS transition
@@ -41499,7 +42156,7 @@ function WorkshopModal({ station, vocab, gameState, itemRarities, equipment, buy
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
-function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, tokenUsage, itemRarities, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onOpenTalents, onOpenSociety, onGiftNpc, onRecruitNpc, onTradeNpc, onRepairNpc, onWorkshopNpc, onOpenEffect, onReleasePrisoner, onKillPrisoner, t }) {
+function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, tokenUsage, itemRarities, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onOpenTalents, onOpenCompanionTalents, onOpenSociety, onGiftNpc, onRecruitNpc, onTradeNpc, onRepairNpc, onWorkshopNpc, onOpenEffect, onReleasePrisoner, onKillPrisoner, t }) {
     const isEmpty = !gameState.time &&
         gameState.effects.length === 0 &&
         (gameState.prisoners || []).length === 0 &&
@@ -41569,12 +42226,7 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
             React.createElement("div", { className: "sheet-vital-row" },
                 React.createElement("span", { className: "sheet-stat-label" }, t('levelLabel')),
                 React.createElement("span", { className: "sheet-vital-value" }, gameState.level)),
-            (() => {
-                const xpInfo = computeXpBarInfo(gameState.level, gameState.xp);
-                return (React.createElement("div", { className: "xp-bar-track", "aria-label": t('xpLabel') + ': ' + xpInfo.current + '/' + xpInfo.needed },
-                    React.createElement("div", { className: "xp-bar-fill", style: { width: xpInfo.percent + '%' } }),
-                    React.createElement("span", { className: "xp-bar-label" }, xpInfo.maxed ? t('xpLabel') + ' MAX' : xpInfo.current + ' / ' + xpInfo.needed + ' ' + t('xpLabel'))));
-            })(),
+            React.createElement(XpBar, { level: gameState.level, xp: gameState.xp, t: t }),
             React.createElement("div", { className: "sheet-vital-row" },
                 React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
                 React.createElement("span", { className: "sheet-vital-value" },
@@ -41852,6 +42504,7 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
                                 "\uD83D\uDD28 ",
                                 t('workshopLink')))),
                         React.createElement("p", { className: "sheet-npc-note" }, n.note),
+                        React.createElement(CompanionGrowthBlock, { npcName: n.name, gameState: gameState, party: party, onOpenTalents: onOpenCompanionTalents, t: t }),
                         React.createElement(CompanionBondsBlock, { npcName: n.name, gameState: gameState, party: party, t: t })))));
             }))),
         typeof tokenUsage === 'number' && tokenUsage > 0 && (React.createElement("div", { className: "sheet-section" },
@@ -42106,6 +42759,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
                                 "\uD83D\uDD28 ",
                                 t('workshopLink')))),
                         React.createElement("div", { className: "sheet-action-row" }, factionActions && React.createElement(FactionNpcActions, { npc: n, status: heroFactionStatus, need: PARTY_REPUTATION_THRESHOLD, stats: heroFactionStats(gameState, npcReputations), gameState: gameState, npcReputations: npcReputations, actions: factionActions, confirmKey: confirmKey, setConfirmKey: setConfirmKey, t: t })),
+                        React.createElement(CompanionGrowthBlock, { npcName: n.name, gameState: gameState, party: party, t: t }),
                         React.createElement(CompanionBondsBlock, { npcName: n.name, gameState: gameState, party: party, t: t }))))));
     };
     return (React.createElement("div", { className: "modal-backdrop", onClick: e => { if (e.target === e.currentTarget)
@@ -42599,7 +43253,10 @@ function RecruitModal({ npcName, partyFull, onConfirm, onCancel, t }) {
 // view, so it gets the same list->confirm swap as PartyGearModal's
 // take-back flow (see dismissConfirmName below) before it actually calls
 // onDismiss.
-function GroupModal({ worldProfile, party, npcs, narrativeItemSlots, onDismiss, onOpenGear, onOpenEffect, onClose, t }) {
+// `gameState` (optional) carries each member's growth record (see COMPANION
+// GROWTH): their level shows next to the name, the expanded card gets the
+// growth block, and with `onOpenTalents` a button into their talent tree.
+function GroupModal({ worldProfile, party, npcs, gameState, narrativeItemSlots, onDismiss, onOpenGear, onOpenTalents, onOpenEffect, onClose, t }) {
     const members = (party || [])
         .map(key => (npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === key))
         .filter(Boolean);
@@ -42643,6 +43300,7 @@ function GroupModal({ worldProfile, party, npcs, narrativeItemSlots, onDismiss, 
             members.map((n, i) => {
                 const memberKey = n.name.trim().toLowerCase();
                 const isMemberExpanded = expandedMembers.has(memberKey);
+                const memberGrowth = gameState ? describeCompanionGrowth(gameState, memberKey) : null;
                 return (React.createElement("div", { key: i, className: "group-member" },
                     React.createElement("div", { className: "sheet-npc-header", onClick: () => {
                             setExpandedMembers(prev => {
@@ -42655,7 +43313,13 @@ function GroupModal({ worldProfile, party, npcs, narrativeItemSlots, onDismiss, 
                             });
                         } },
                         React.createElement("span", { className: "sheet-npc-toggle" }, isMemberExpanded ? '▾' : '▸'),
-                        React.createElement("span", { className: "sheet-npc-name" }, n.name)),
+                        React.createElement("span", { className: "sheet-npc-name" }, n.name),
+                        memberGrowth && (React.createElement("span", { className: "group-member-level" },
+                            t('talentSubjectLevel').replace('{level}', memberGrowth.level),
+                            memberGrowth.talentPoints > 0 && React.createElement("span", { className: "sheet-set-indicator" },
+                                ' ',
+                                "\u2726",
+                                memberGrowth.talentPoints)))),
                     isMemberExpanded && (React.createElement(React.Fragment, null,
                         React.createElement("div", { className: "group-member-actions" },
                             onOpenGear && React.createElement("button", { onClick: () => onOpenGear(n.name), className: "btn btn-ghost", type: "button" },
@@ -42664,6 +43328,7 @@ function GroupModal({ worldProfile, party, npcs, narrativeItemSlots, onDismiss, 
                                 t('equipmentButton')),
                             React.createElement("button", { onClick: () => setDismissConfirmName(n.name), className: "btn btn-ghost", type: "button" }, t('dismissFromPartyButton'))),
                         n.note && React.createElement("p", { className: "sheet-npc-note" }, n.note),
+                        gameState && React.createElement(CompanionGrowthBlock, { npcName: n.name, gameState: gameState, party: party, onOpenTalents: onOpenTalents, t: t }),
                         React.createElement("div", { className: "sheet-vitals" },
                             React.createElement("div", { className: "sheet-vital-row" },
                                 React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
@@ -42740,8 +43405,10 @@ function GroupModal({ worldProfile, party, npcs, narrativeItemSlots, onDismiss, 
 // member's own equipment/inventory; the base stat block above them (health/
 // psyche/strength/etc.) comes from npc — the matching gameState.npcs entry
 // App() looks up for this modal, same lookup GroupModal's own members does.
-// NPCs carry no level field, so unlike the hero's panel this one has no
-// Уровень row. One real difference from the hero's screen remains, and it's
+// A companion's level and XP live in gameState.companionGrowth (see COMPANION
+// GROWTH, not on the NPC record), so the stats page's Уровень row and XP bar
+// read them from there — and hide when the member has no record yet. One real
+// difference from the hero's screen remains, and it's
 // deliberate: a third section stays below both pages — переданные
 // предметы, the pool of items the player has physically handed over (see
 // GivePartyItemModal below) that can be equipped/taken back here, never the
@@ -42827,8 +43494,8 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
     // equipment/inventory instead of the hero's. memberStats is the base
     // (pre-gear) stat block shown above them — npc is the matching
     // gameState.npcs entry App() looks up for this modal (see the comment
-    // above this component) — note NPCs carry no level field, so unlike the
-    // hero's stats panel this one has no Уровень row.
+    // above this component); memberGrowth is their level/XP record, if any.
+    const memberGrowth = gameState ? describeCompanionGrowth(gameState, npcName) : null;
     const totalDefense = computeTotalArmorDefense(equipment, inventory, itemRarities);
     const headDefense = computeArmorPoolMax(equipment, inventory, itemRarities, 'head');
     const bodyDefense = computeArmorPoolMax(equipment, inventory, itemRarities, 'body');
@@ -42898,6 +43565,16 @@ function PartyGearModal({ npcName, inventory, equipment, itemRarities, heldCurre
                         React.createElement("div", { className: "equipment-stats-panel" },
                             React.createElement("p", { className: "sheet-heading" }, t('equipmentStatsHeading')),
                             React.createElement("div", { className: "sheet-vitals equipment-stats-merged" },
+                                memberGrowth && (React.createElement(React.Fragment, null,
+                                    React.createElement("div", { className: "sheet-vital-row" },
+                                        React.createElement("span", { className: "sheet-stat-label" }, t('levelLabel')),
+                                        React.createElement("span", { className: "sheet-vital-value" },
+                                            memberGrowth.level,
+                                            memberGrowth.talentPoints > 0 && React.createElement("span", { className: "sheet-set-indicator" },
+                                                ' ',
+                                                "\u2726",
+                                                memberGrowth.talentPoints))),
+                                    React.createElement(XpBar, { level: memberGrowth.level, xp: memberGrowth.xp, t: t }))),
                                 React.createElement("div", { className: "sheet-vital-row" },
                                     React.createElement("span", { className: "sheet-stat-label" }, t('healthLabel')),
                                     React.createElement("span", { className: "sheet-vital-value" }, typeof (npc && npc.health) === 'number' ? (npc.health + '/' + (typeof npc.maxHealth === 'number' ? npc.maxHealth : npc.health)) : '—')),
@@ -50838,28 +51515,54 @@ function talentNodeDesc(def, t) {
         return t(ABILITY_DEFS[def.abilityId].descKey);
     return t('talentStatDescTemplate').replace('{stat}', t(def.trackNameKey)).replace('{amount}', talentNodeAmountText(def));
 }
+// A short "what was just learned" line for a list of node ids (the planner's
+// purchases in a growth toast): a track by its name — repeats folded into "×n" —
+// a keystone by its ability's name; at most three entries, then an ellipsis.
+function summarizeLearnedTalents(ids, t) {
+    const counts = new Map();
+    for (const id of ids || []) {
+        const def = TALENT_DEFS[id];
+        if (!def)
+            continue;
+        const label = def.kind === 'keystone' ? t(ABILITY_DEFS[def.abilityId].nameKey) : t(def.trackNameKey);
+        counts.set(label, (counts.get(label) || 0) + 1);
+    }
+    const parts = [...counts.entries()].map(([label, n]) => (n > 1 ? label + ' ×' + n : label));
+    return parts.length > 3 ? parts.slice(0, 3).join(', ') + '…' : parts.join(', ');
+}
 // Pixel position (top-left) of a node's cell on the shared canvas —
 // branches sit left to right (see TALENT_BRANCHES), each TALENT_COLS_PER_
 // BRANCH wide with a small gap between branches; TALENT_LABEL_H reserves a
 // header row above row 0 for that branch's own name label.
 function talentNodePos(def, layout) {
     const branchX = (layout && layout.xOff[def.branch]) || 0;
-    return { x: branchX + def.col * TALENT_CELL, y: TALENT_LABEL_H + def.row * TALENT_CELL };
+    // layout.cols[branch] lists the node columns that branch actually shows (all of
+    // them for the hero; a companion's tree squeezes out the empty ones), so a node's
+    // place is its index in that list — the node's own col for the hero's full tree.
+    const cols = layout && layout.cols && layout.cols[def.branch];
+    const col = cols ? Math.max(0, cols.indexOf(def.col)) : def.col;
+    return { x: branchX + col * TALENT_CELL, y: TALENT_LABEL_H + def.row * TALENT_CELL };
 }
 // Only the branches this world allows (see WORLD TRAITS) take space on the
-// canvas, side by side; each is as wide as its own track count + 1.
-function buildTalentLayout(traits) {
-    const branches = visibleTalentBranches(traits);
+// canvas, side by side; each is as wide as its own track count + 1. `scope` is
+// whose tree it is (see isTalentVisible): the hero's by default.
+function buildTalentLayout(traits, scope) {
+    const branches = visibleTalentBranches(traits, scope);
     const xOff = {};
     const widths = {};
+    const cols = {};
     let x = 0;
     branches.forEach(b => {
+        const all = Array.from({ length: TALENT_BRANCH_COLS[b.key] }, (_, i) => i);
+        cols[b.key] = scope === TALENT_SCOPE_COMPANION
+            ? all.filter(c => Object.values(TALENT_DEFS).some(d => d.branch === b.key && d.col === c && isTalentVisible(d, traits, scope)))
+            : all;
         xOff[b.key] = x;
-        widths[b.key] = TALENT_BRANCH_COLS[b.key] * TALENT_CELL;
+        widths[b.key] = cols[b.key].length * TALENT_CELL;
         x += widths[b.key] + TALENT_BRANCH_GAP;
     });
     return {
-        branches, xOff, widths,
+        branches, xOff, widths, cols,
         width: Math.max(TALENT_CELL, x - TALENT_BRANCH_GAP + TALENT_CELL),
         height: TALENT_LABEL_H + TALENT_TOTAL_ROWS * TALENT_CELL + TALENT_CELL * 0.6
     };
@@ -50868,8 +51571,8 @@ function buildTalentLayout(traits) {
 // beneath the node buttons — each line just joins a node's own center to
 // its `requires` predecessor's center, so the whole tree reads as chains
 // the moment it renders rather than needing any per-node wiring.
-function TalentConnectors({ layout, traits }) {
-    const nodes = Object.values(TALENT_DEFS).filter(n => isTalentVisible(n, traits));
+function TalentConnectors({ layout, traits, scope }) {
+    const nodes = Object.values(TALENT_DEFS).filter(n => isTalentVisible(n, traits, scope));
     const half = TALENT_NODE_SIZE / 2;
     return (React.createElement("svg", { className: "talent-connectors", width: layout.width, height: layout.height }, nodes.filter(n => n.requires).map(n => {
         const parent = TALENT_DEFS[n.requires];
@@ -50896,7 +51599,13 @@ function TalentNodeButton({ def, layout, learned, learnable, selected, onSelect 
 // player the moment a level lands, unlike the old LevelUpModal this
 // replaces: points just quietly accumulate until the player chooses to
 // come spend them.
-function TalentTreeScreen({ gameState, onLearn, onToggleTrait, onClose, t }) {
+// The same screen shows every companion's tree too (see COMPANION GROWTH): with
+// `partyKeys` and the companion callbacks given, a row of tabs switches between
+// the hero and each party member who has a growth record, and the tree below
+// narrows to what that subject can use (isTalentVisible's `scope`). Every
+// companion prop is optional — without them this is the hero's screen exactly as
+// before. `initialSubject` (a companion's key) opens straight on their tab.
+function TalentTreeScreen({ gameState, partyKeys, initialSubject, onLearn, onLearnCompanion, onResetCompanion, onToggleCompanionAuto, onToggleTrait, onClose, t }) {
     // Pan (drag) + pinch/wheel zoom, anchored to a specific viewport point (the
     // pinch midpoint or the cursor) so the spot you're actually zooming on
     // stays under your fingers/cursor instead of the tree sliding toward its
@@ -50905,6 +51614,7 @@ function TalentTreeScreen({ gameState, onLearn, onToggleTrait, onClose, t }) {
     const [pan, setPan] = useState({ x: 12, y: 12 });
     const [zoom, setZoom] = useState(1);
     const [selectedId, setSelectedId] = useState(null);
+    const [subjectKey, setSubjectKey] = useState(initialSubject || null);
     const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false });
     const activePointersRef = useRef(new Map());
     const pinchRef = useRef(null);
@@ -50988,21 +51698,55 @@ function TalentTreeScreen({ gameState, onLearn, onToggleTrait, onClose, t }) {
         const rect = viewportRef.current ? viewportRef.current.getBoundingClientRect() : { left: 0, top: 0 };
         zoomAroundPoint(zoom - e.deltaY * 0.0012, e.clientX - rect.left, e.clientY - rect.top);
     }
-    const talents = gameState.talents;
-    const points = gameState.talentPoints;
     const traits = normalizeWorldTraits(gameState.worldTraits);
-    const layout = buildTalentLayout(traits);
+    // Who the tree is open for: the hero, or one party member with a growth record.
+    // A tab whose companion has since left the party falls back to the hero.
+    const companions = (partyKeys || []).map(k => describeCompanionGrowth(gameState, k)).filter(Boolean);
+    const subject = subjectKey ? (companions.find(c => c.key === subjectKey) || null) : null;
+    const scope = subject ? TALENT_SCOPE_COMPANION : TALENT_SCOPE_HERO;
+    const talents = subject ? subject.talents : gameState.talents;
+    const points = subject ? subject.talentPoints : gameState.talentPoints;
+    const layout = buildTalentLayout(traits, scope);
+    // Read-only views (a past turn) pass no handlers: nothing is learnable there.
+    const learnHandler = subject ? (onLearnCompanion ? id => onLearnCompanion(subject.key, id) : null) : (onLearn || null);
     const selectedDef = selectedId ? TALENT_DEFS[selectedId] : null;
     const learned = selectedDef ? (talents[selectedId] || 0) >= selectedDef.maxRank : false;
-    const learnable = selectedDef ? canLearnTalent(talents, points, selectedId, traits) : false;
+    const learnable = selectedDef ? !!learnHandler && canLearnTalent(talents, points, selectedId, traits, scope) : false;
     const lockedByPrereq = !!(selectedDef && !learned && selectedDef.requires && !(talents[selectedDef.requires] > 0));
+    function pickSubject(key) {
+        if (key === (subject ? subject.key : null))
+            return;
+        setSubjectKey(key);
+        setSelectedId(null);
+        setPan({ x: 12, y: 12 });
+        setZoom(1);
+    }
     return (React.createElement("div", { className: "modal-backdrop" },
         React.createElement("div", { className: "modal-card talent-tree-card" },
             React.createElement("div", { className: "talent-tree-header" },
-                React.createElement("p", { className: "talent-tree-title" }, t('talentsTitle')),
+                React.createElement("p", { className: "talent-tree-title" }, subject ? subject.name : t('talentsTitle')),
                 React.createElement("span", { className: "talent-tree-points", title: t('talentPointsLabel') },
                     "\uD83D\uDCD6 ",
                     points)),
+            companions.length > 0 && (React.createElement("div", { className: "talent-subject-row", role: "tablist" },
+                React.createElement("button", { type: "button", role: "tab", "aria-selected": !subject, className: 'talent-subject-chip' + (!subject ? ' talent-subject-chip-on' : ''), onClick: () => pickSubject(null) },
+                    t('talentSubjectHero'),
+                    React.createElement("span", { className: "talent-subject-level" }, t('talentSubjectLevel').replace('{level}', gameState.level)),
+                    gameState.talentPoints > 0 && React.createElement("span", { className: "talent-subject-points" },
+                        "\u2726",
+                        gameState.talentPoints)),
+                companions.map(c => (React.createElement("button", { key: c.key, type: "button", role: "tab", "aria-selected": !!subject && subject.key === c.key, className: 'talent-subject-chip' + (subject && subject.key === c.key ? ' talent-subject-chip-on' : ''), onClick: () => pickSubject(c.key) },
+                    c.name,
+                    React.createElement("span", { className: "talent-subject-level" }, t('talentSubjectLevel').replace('{level}', c.level)),
+                    c.talentPoints > 0 && React.createElement("span", { className: "talent-subject-points" },
+                        "\u2726",
+                        c.talentPoints)))))),
+            subject && (React.createElement("div", { className: "talent-companion-panel" },
+                React.createElement(XpBar, { level: subject.level, xp: subject.xp, t: t }),
+                React.createElement("div", { className: "talent-companion-controls" },
+                    React.createElement("button", { type: "button", className: 'talent-world-chip' + (subject.auto ? ' talent-world-chip-on' : ''), disabled: !onToggleCompanionAuto, title: t('talentAutoHint'), onClick: () => onToggleCompanionAuto && onToggleCompanionAuto(subject.key) }, subject.auto ? t('talentAutoOn') : t('talentAutoOff')),
+                    React.createElement("button", { type: "button", className: "talent-world-chip", disabled: !onResetCompanion || Object.keys(subject.talents).length === 0, title: t('talentResetHint'), onClick: () => onResetCompanion && onResetCompanion(subject.key) }, t('talentResetButton'))),
+                React.createElement("p", { className: "talent-companion-hint" }, t('talentCompanionHint')))),
             React.createElement("div", { className: "talent-world-row" },
                 React.createElement("span", { className: "talent-world-label" },
                     t('talentWorldLabel'),
@@ -51010,9 +51754,9 @@ function TalentTreeScreen({ gameState, onLearn, onToggleTrait, onClose, t }) {
                 [['magic', 'talentWorldMagic'], ['firearms', 'talentWorldFirearms'], ['scifi', 'talentWorldScifi']].map(([key, labelKey]) => (React.createElement("button", { key: key, type: "button", className: 'talent-world-chip' + (traits[key] ? ' talent-world-chip-on' : ''), disabled: !onToggleTrait, onClick: () => onToggleTrait && onToggleTrait(key) }, t(labelKey))))),
             React.createElement("div", { className: "talent-tree-viewport", ref: viewportRef, onPointerDown: onPointerDown, onPointerMove: onPointerMove, onPointerUp: onPointerUp, onPointerCancel: onPointerUp, onWheel: onWheel },
                 React.createElement("div", { className: "talent-tree-canvas", style: { width: layout.width, height: layout.height, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' } },
-                    React.createElement(TalentConnectors, { layout: layout, traits: traits }),
+                    React.createElement(TalentConnectors, { layout: layout, traits: traits, scope: scope }),
                     layout.branches.map(b => (React.createElement("div", { key: b.key, className: "talent-branch-label", style: { left: layout.xOff[b.key], width: layout.widths[b.key] } }, t(b.nameKey)))),
-                    Object.values(TALENT_DEFS).filter(def => isTalentVisible(def, traits)).map(def => (React.createElement(TalentNodeButton, { key: def.id, def: def, layout: layout, learned: (talents[def.id] || 0) >= def.maxRank, learnable: canLearnTalent(talents, points, def.id, traits), selected: def.id === selectedId, onSelect: id => { if (!dragRef.current.moved)
+                    Object.values(TALENT_DEFS).filter(def => isTalentVisible(def, traits, scope)).map(def => (React.createElement(TalentNodeButton, { key: def.id, def: def, layout: layout, learned: (talents[def.id] || 0) >= def.maxRank, learnable: canLearnTalent(talents, points, def.id, traits, scope), selected: def.id === selectedId, onSelect: id => { if (!dragRef.current.moved)
                             setSelectedId(id); } }))))),
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton')))),
@@ -51033,7 +51777,8 @@ function TalentTreeScreen({ gameState, onLearn, onToggleTrait, onClose, t }) {
                     " \uD83D\uDCD6"),
                 React.createElement("div", { className: "modal-actions" },
                     React.createElement("button", { type: "button", className: "btn btn-ghost", onClick: () => setSelectedId(null) }, t('talentBackButton')),
-                    !learned && (React.createElement("button", { type: "button", className: "btn btn-primary", disabled: !learnable, onClick: () => { onLearn(selectedDef.id); setSelectedId(null); } }, t('talentLearnButton')))))))));
+                    !learned && (React.createElement("button", { type: "button", className: "btn btn-primary", disabled: !learnable, onClick: () => { if (learnHandler)
+                            learnHandler(selectedDef.id); setSelectedId(null); } }, t('talentLearnButton')))))))));
 }
 // ---- Death, resurrection & captivity ----
 // The one number controlling how often a hero death even gets a chance to
@@ -54229,6 +54974,113 @@ function DevItemsTab({ api }) {
                 gs.confiscatedInventory.length,
                 " \u0448\u0442."))));
 }
+// -- Companion growth ----------------------------------------------------------
+// Every control here goes through the engine functions a real turn uses (growCompanion,
+// awardExperience, resetCompanionTalents, setCompanionAuto — see COMPANION GROWTH), so
+// what the panel does is exactly what the game would do; there is no second code path
+// to drift out of step with later updates.
+function DevCompanionGrowth({ api }) {
+    const gs = api.gameState;
+    const [xp, setXp] = useDevDraft('growth.xp', '200');
+    const [pts, setPts] = useDevDraft('growth.pts', '3');
+    const [lvl, setLvl] = useDevDraft('growth.lvl', '10');
+    const [parityOpen, setParityOpen] = useDevDraft('growth.parity', false);
+    const crew = (api.party || []).map(k => describeCompanionGrowth(gs, k)).filter(Boolean);
+    const patch = fn => { api.setGameState(fn); api.commit(); };
+    const profileFor = (s, key) => {
+        const member = companionMembersFor([key], s.npcs, api.partyEquipment, api.partyInventories)[0];
+        return member ? member.profile : DEFAULT_COMPANION_PROFILE;
+    };
+    const patchRec = (key, fn) => patch(s => {
+        const rec = getCompanionGrowth(s, key);
+        return rec ? { ...s, companionGrowth: { ...s.companionGrowth, [key]: fn(rec, s) } } : s;
+    });
+    function awardAll() {
+        const amount = devClamp(xp, 0, 1000000, 0);
+        patch(s => awardExperience(s, amount, companionMembersFor(api.party, s.npcs, api.partyEquipment, api.partyInventories)).state);
+    }
+    function giveXp(key) {
+        const amount = devClamp(xp, 0, 1000000, 0);
+        patchRec(key, (rec, s) => growCompanion(rec, amount, s.worldTraits, profileFor(s, key)).rec);
+    }
+    function givePoints(key) {
+        const delta = devClamp(pts, -1000, 1000, 0);
+        patchRec(key, rec => ({ ...rec, talentPoints: Math.max(0, rec.talentPoints + delta) }));
+    }
+    function setLevel(key) {
+        const level = devClamp(lvl, 1, LEVEL_CAP, 1);
+        patchRec(key, (rec, s) => {
+            const gained = level > rec.level ? computeNewlyGainedLevels(rec.level, level).length * TALENT_POINTS_PER_LEVEL : 0;
+            const next = { ...rec, level, xp: level === rec.level ? rec.xp : 0, talentPoints: rec.talentPoints + gained };
+            return next.auto ? autoSpendTalentPoints(next, s.worldTraits, profileFor(s, key)).rec : next;
+        });
+    }
+    function learnAll(key) {
+        patchRec(key, rec => ({ ...rec, talents: Object.fromEntries(Object.keys(TALENT_DEFS).filter(id => isTalentAvailableFor(TALENT_DEFS[id], TALENT_SCOPE_COMPANION)).map(id => [id, 1])) }));
+        api.flash('Все доступные спутникам таланты изучены');
+    }
+    function recreate(key) {
+        patch(s => { const growth = { ...(s.companionGrowth || {}) }; delete growth[key]; return { ...s, companionGrowth: growth }; });
+        api.flash('Запись пересоздана: старт на ' + COMPANION_JOIN_LEVEL_LAG + ' ур. ниже героя');
+    }
+    const withheld = parityOpen ? companionParityReport() : [];
+    const byReason = {};
+    for (const w of withheld)
+        (byReason[w.reason] = byReason[w.reason] || []).push(w.id);
+    return (React.createElement(DevSection, { title: 'Рост спутников (' + crew.length + ')' },
+        React.createElement(DevRow, null,
+            React.createElement(DevField, { label: "\u041E\u043F\u044B\u0442" },
+                React.createElement(DevNum, { value: xp, onChange: setXp })),
+            React.createElement(DevField, { label: "\u041E\u0447\u043A\u0438" },
+                React.createElement(DevNum, { value: pts, onChange: setPts })),
+            React.createElement(DevField, { label: "\u0423\u0440\u043E\u0432\u0435\u043D\u044C" },
+                React.createElement(DevNum, { value: lvl, onChange: setLvl }))),
+        React.createElement(DevRow, null,
+            React.createElement(DevBtn, { kind: "primary", onClick: awardAll }, "\uFF0B \u041E\u043F\u044B\u0442 \u0433\u0435\u0440\u043E\u044E \u0438 \u0433\u0440\u0443\u043F\u043F\u0435"),
+            React.createElement("span", { className: "dev-hint" }, "\u043A\u0430\u043A \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0430\u044F \u043D\u0430\u0433\u0440\u0430\u0434\u0430: \u0433\u0435\u0440\u043E\u0439 \u0438 \u043A\u0430\u0436\u0434\u044B\u0439 \u0441\u043F\u0443\u0442\u043D\u0438\u043A \u043F\u043E \u043F\u0440\u0430\u0432\u0438\u043B\u0430\u043C \u0440\u043E\u0441\u0442\u0430")),
+        crew.length === 0 && React.createElement("p", { className: "dev-hint" }, "\u0412 \u0433\u0440\u0443\u043F\u043F\u0435 \u043D\u0435\u0442 \u0441\u043F\u0443\u0442\u043D\u0438\u043A\u043E\u0432 \u0441 \u0437\u0430\u043F\u0438\u0441\u044C\u044E \u0440\u043E\u0441\u0442\u0430."),
+        crew.map(c => {
+            const bar = computeXpBarInfo(c.level, c.xp);
+            return (React.createElement("div", { className: "dev-item dev-item-wrap", key: c.key },
+                React.createElement("div", { className: "dev-item-main" },
+                    React.createElement("div", { className: "dev-item-name" }, c.name),
+                    React.createElement("div", { className: "dev-item-sub" },
+                        "\u0443\u0440. ",
+                        c.level,
+                        " \u00B7 ",
+                        bar.maxed ? 'макс.' : 'опыт ' + bar.current + '/' + bar.needed,
+                        " \u00B7 \u043E\u0447\u043A\u0438 ",
+                        c.talentPoints,
+                        " \u00B7 \u0442\u0430\u043B\u0430\u043D\u0442\u043E\u0432 ",
+                        Object.keys(c.talents).length,
+                        " \u00B7 ",
+                        c.auto ? 'авто' : 'вручную')),
+                React.createElement("div", { className: "dev-actions" },
+                    React.createElement(DevBtn, { small: true, onClick: () => giveXp(c.key) }, "\uFF0B \u043E\u043F\u044B\u0442"),
+                    React.createElement(DevBtn, { small: true, onClick: () => givePoints(c.key) }, "\uFF0B \u043E\u0447\u043A\u0438"),
+                    React.createElement(DevBtn, { small: true, onClick: () => setLevel(c.key) }, "\u0443\u0440\u043E\u0432\u0435\u043D\u044C \u2192"),
+                    React.createElement(DevBtn, { small: true, onClick: () => patch(s => setCompanionAuto(s, c.key, !c.auto, profileFor(s, c.key))) }, c.auto ? 'авто: выкл' : 'авто: вкл'),
+                    React.createElement(DevBtn, { small: true, onClick: () => learnAll(c.key) }, "\uD83D\uDCD6 \u0432\u0441\u0435"),
+                    React.createElement(DevBtn, { small: true, onClick: () => patch(s => resetCompanionTalents(s, c.key)) }, "\u0441\u0431\u0440\u043E\u0441"),
+                    React.createElement(DevBtn, { small: true, onClick: () => recreate(c.key), title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C: \u0441\u0432\u0435\u0440\u043A\u0430 \u0441\u043E\u0437\u0434\u0430\u0441\u0442 \u0435\u0451 \u0437\u0430\u043D\u043E\u0432\u043E \u043D\u0430 \u0441\u0442\u0430\u0440\u0442\u043E\u0432\u043E\u043C \u0443\u0440\u043E\u0432\u043D\u0435" }, "\u21BA"))));
+        }),
+        React.createElement(DevRow, null,
+            React.createElement(DevBtn, { small: true, onClick: () => setParityOpen(o => !o) }, parityOpen ? 'Скрыть отчёт о паритете' : 'Отчёт о паритете талантов')),
+        parityOpen && (React.createElement(React.Fragment, null,
+            React.createElement("p", { className: "dev-hint" },
+                "\u0423\u0437\u043B\u043E\u0432 \u0432 \u0440\u0435\u0435\u0441\u0442\u0440\u0435: ",
+                Object.keys(TALENT_DEFS).length,
+                "; \u0441\u043F\u0443\u0442\u043D\u0438\u043A\u0430\u043C \u0437\u0430\u043A\u0440\u044B\u0442\u043E: ",
+                withheld.length,
+                ". \u0417\u0430\u043A\u0440\u044B\u0442\u043E\u0435 \u0436\u0434\u0451\u0442, \u043F\u043E\u043A\u0430 \u0431\u043E\u0435\u0432\u043E\u0439 \u043A\u043E\u0434 \u043D\u0430\u0447\u043D\u0451\u0442 \u0447\u0438\u0442\u0430\u0442\u044C \u043D\u0443\u0436\u043D\u043E\u0435 \u043F\u043E\u043B\u0435, \u2014 \u043D\u0435 \u00AB\u043C\u0451\u0440\u0442\u0432\u044B\u043C \u0433\u0440\u0443\u0437\u043E\u043C\u00BB, \u0430 \u0441\u043A\u0440\u044B\u0442\u043E."),
+            Object.keys(byReason).map(reason => (React.createElement("p", { className: "dev-hint", key: reason },
+                reason,
+                " \u00D7",
+                byReason[reason].length,
+                ": ",
+                byReason[reason].slice(0, 6).join(', '),
+                byReason[reason].length > 6 ? '…' : '')))))));
+}
 // -- NPCs --------------------------------------------------------------------
 function DevNpcTab({ api }) {
     const gs = api.gameState;
@@ -54301,7 +55153,11 @@ function DevNpcTab({ api }) {
     }
     function removeNpc(npc) {
         const key = devKey(npc.name);
-        api.setGameState(s => ({ ...s, npcs: s.npcs.filter(n => !(n && devKey(n.name) === key)) }));
+        api.setGameState(s => {
+            const growth = { ...(s.companionGrowth || {}) };
+            delete growth[key];
+            return { ...s, npcs: s.npcs.filter(n => !(n && devKey(n.name) === key)), companionGrowth: growth };
+        });
         api.setParty(p => p.filter(k => k !== key));
         api.setNpcReputations(r => { const c = { ...r }; delete c[key]; return c; });
         api.setNpcInventories(r => { const c = { ...r }; delete c[key]; return c; });
@@ -54371,7 +55227,8 @@ function DevNpcTab({ api }) {
                         React.createElement(DevBtn, { small: true, onClick: () => patchNpc(npc.name, n => ({ ...n, presentNow: true, location: currentNode ? currentNode.name : n.location })) }, "\uD83D\uDCCD \u043A\u043E \u043C\u043D\u0435"),
                         Number.isFinite(npc.maxHealth) && React.createElement(DevBtn, { small: true, onClick: () => patchNpc(npc.name, n => ({ ...n, health: n.maxHealth, psyche: n.maxPsyche })) }, "\u2764"),
                         React.createElement(DevBtn, { small: true, kind: "danger", onClick: () => removeNpc(npc) }, "\u2715"))));
-            }))));
+            })),
+        React.createElement(DevCompanionGrowth, { api: api })));
 }
 // -- Quests ------------------------------------------------------------------
 function DevQuestsTab({ api }) {
@@ -56973,6 +57830,10 @@ function App() {
     // story turn made to the hero's psyche, so a drop (or relief) is never left unexplained.
     const [mindToasts, setMindToasts] = useState([]);
     const mindToastTimers = useRef({});
+    // "A companion just grew" chips (see announceCompanionGrowth and
+    // GrowthToastStack) — same transient, never-saved UI cue as the two above.
+    const [growthToasts, setGrowthToasts] = useState([]);
+    const growthToastTimers = useRef({});
     const [equipment, setEquipment] = useState(EMPTY_EQUIPMENT);
     // Roster of party name-keys (see normalizeParty/PARTY_REPUTATION_THRESHOLD)
     // — a separate, client-owned side-state exactly like npcReputations above,
@@ -57037,7 +57898,11 @@ function App() {
     // attempt itself reads these maps (the narrator prompt, and the kindness
     // cooldown check in reconcileReputationHits) consult this whenever it is
     // set, and the handlers commit the result themselves once the request has
-    // succeeded. null the rest of the time.
+    // succeeded. null the rest of the time. When the discarded turns renamed
+    // characters or moved the roster, the view also carries `party` and `gear`
+    // (the reverted roster and party gear maps, see revertHeroIdentityForRegen):
+    // the companion-growth award of the fresh attempt reads those instead of the
+    // closure's still-unreverted values (see generateStateAndEvents).
     const regenViewRef = useRef(null);
     // Baseline snapshot of each party member's narrative inventory
     // (gameState.npcs[key].inventory), taken right after the previous turn's
@@ -57120,6 +57985,14 @@ function App() {
     const [equipPickerSlot, setEquipPickerSlot] = useState(null);
     // -- Talent tree modal (see TalentTreeScreen) --
     const [talentTreeModalOpen, setTalentTreeModalOpen] = useState(false);
+    // Which companion's tab the tree opens on (their name key); null = the hero's.
+    // Cleared whenever the tree closes, so the plain "Talents" entries always open
+    // on the hero.
+    const [talentSubject, setTalentSubject] = useState(null);
+    function openCompanionTalents(key) {
+        setTalentSubject(key || null);
+        setTalentTreeModalOpen(true);
+    }
     // -- Combat --
     // null when no fight is active. See startCombat for the shape seeded at
     // the start of a fight. Deliberately separate from gameState: combat HP
@@ -57762,8 +58635,8 @@ function App() {
         setHeroName(saved.heroName || '');
         setHeroConcept(saved.heroConcept || '');
         setMessages(saved.messages || []);
-        const normalizedState = normalizeGameState(saved.gameState);
-        setGameState(normalizedState);
+        const loadedState = normalizeGameState(saved.gameState);
+        setGameState(loadedState);
         setItemRarities(saved.itemRarities || {});
         setNpcReputations(saved.npcReputations || {});
         setNpcKindnessCooldowns(saved.npcKindnessCooldowns || {});
@@ -57777,6 +58650,13 @@ function App() {
         setPartyInventories(normalizedPartyInventories);
         const normalizedPartyEquipment = normalizePartyEquipment(saved.partyEquipment);
         setPartyEquipment(normalizedPartyEquipment);
+        // A save from before companions grew (or one whose party outran their records)
+        // gets every current party member's growth record here, at the join level —
+        // see COMPANION GROWTH. Done once the party and its gear are known, since the
+        // auto-planner reads what each companion fights with.
+        const normalizedState = ensureCompanionGrowth(loadedState, companionMembersFor(normalizedParty, loadedState.npcs, normalizedPartyEquipment, normalizedPartyInventories));
+        if (normalizedState !== loadedState)
+            setGameState(normalizedState);
         const normalizedNpcInventories = normalizeNpcInventories(saved.npcInventories);
         setNpcInventories(normalizedNpcInventories);
         const normalizedNpcCurrencies = normalizeNpcCurrencies(saved.npcCurrencies);
@@ -58787,8 +59667,10 @@ function App() {
         const trimmedMap = buildMapPromptView(state.map);
         // companionBonds goes to the narrator as readable text instead (see
         // buildCompanionBondsPromptSection in sharedContext), not as a raw
-        // "name|name" map.
-        const { companionBonds: _bondsOmitted, agents: _agentsOmitted, heroCover: _coverOmitted, paranoia: _paranoiaOmitted, canaries: _canariesOmitted, operatives: _opsOmitted, ...stateForPrompt } = state;
+        // "name|name" map. Same for companionGrowth (see
+        // buildCompanionGrowthPromptSection): the narrator hears how seasoned each
+        // companion has become, never the raw XP/talent bookkeeping it must not touch.
+        const { companionBonds: _bondsOmitted, companionGrowth: _growthOmitted, agents: _agentsOmitted, heroCover: _coverOmitted, paranoia: _paranoiaOmitted, canaries: _canariesOmitted, operatives: _opsOmitted, ...stateForPrompt } = state;
         // The chronicle is shown to the narrator as text (see buildFactionHierarchyBriefing); the raw log would only cost tokens here.
         const factionsForPrompt = Array.isArray(stateForPrompt.factions) ? stateForPrompt.factions.map(f => { if (!f || typeof f !== 'object')
             return f; const { chronicle: _chronicleOmitted, ...rest } = f; return rest; }) : stateForPrompt.factions;
@@ -58822,7 +59704,7 @@ ${narrativeSummaryRef.current}`
         const partySection = partyMemberNames.length > 0
             ? `
 
-CURRENT PARTY — these characters are established traveling companions of the hero, having formally agreed to journey together: ${partyMemberNames.join(', ')}. Treat them as continuously present alongside the hero in every scene from now on unless the story explicitly and deliberately separates them (a real parting of ways, someone left behind, a genuine split) — never let one simply vanish from the narrative without that being an actual story beat.${buildCompanionBondsPromptSection(state, partyMemberNames)}`
+CURRENT PARTY — these characters are established traveling companions of the hero, having formally agreed to journey together: ${partyMemberNames.join(', ')}. Treat them as continuously present alongside the hero in every scene from now on unless the story explicitly and deliberately separates them (a real parting of ways, someone left behind, a genuine split) — never let one simply vanish from the narrative without that being an actual story beat.${buildCompanionBondsPromptSection(state, partyMemberNames)}${buildCompanionGrowthPromptSection(state, partyMemberNames)}`
             : '';
         return { narrativeLanguage, partyMemberNames, context: `WORLD AND SETTING:
 ${worldSetting}
@@ -61288,11 +62170,23 @@ ${chunkText}`;
         // endCombatAndClose, the moment the fight resolves (level/xp otherwise
         // just carry forward unchanged here, same as any other currentState
         // field the model doesn't have a say over).
-        const { level, xp } = addXp(currentState.level, currentState.xp, questXpGained);
         // See TALENT TREE above — quest XP can cross a level threshold exactly
         // like combat XP does in endCombatAndClose, so it grants talent points
         // the same way (spent later, freely, in TalentTreeScreen).
-        const talentPoints = currentState.talentPoints + computeNewlyGainedLevels(currentState.level, level).length * TALENT_POINTS_PER_LEVEL;
+        // Both go through awardExperience (see COMPANION GROWTH): the hero is
+        // advanced by the very same addXp / computeNewlyGainedLevels rules as
+        // ever, and every companion travelling with the hero earns their share of
+        // the same award. The roster is the one this turn's party logic already
+        // works from (current party + the opening party), moved onto any new name a
+        // placeholder companion was just given, so a renamed companion keeps their
+        // record.
+        // A regenerated turn starts from the roster and gear its discarded turns found
+        // (regenViewRef), not from the closure's still-unreverted ones.
+        const growthView = regenViewRef.current;
+        const growthGear = (growthView && growthView.gear) || { partyEquipment, partyInventories };
+        const growthPartyKeys = relocateNameList([...((growthView && growthView.party) || party), ...startingPartyKeys], npcRenames);
+        const xpAward = awardExperience({ ...currentState, companionGrowth: relocateMapKeys(currentState.companionGrowth || {}, npcRenames) }, questXpGained, companionMembersFor(growthPartyKeys, npcs, relocateMapKeys(growthGear.partyEquipment, npcRenames), relocateMapKeys(growthGear.partyInventories, npcRenames)));
+        const { level, xp, talentPoints, companionGrowth } = xpAward.state;
         // Missing/non-array "effects" (a badly truncated response, same edge
         // case the old fallback guarded) just carries the prior list forward
         // completely untouched — no reconciliation, no aging — rather than
@@ -61405,6 +62299,9 @@ ${chunkText}`;
             // Client-owned (see COMPANION BONDS) — the narrator never reports
             // these; they only move in endCombatAndClose.
             companionBonds: currentState.companionBonds || {},
+            // Client-owned (see COMPANION GROWTH) — party members' XP, levels and
+            // talents; moves only through awardExperience and the talent screen.
+            companionGrowth: companionGrowth || {},
             // Client-owned (see HERO FACTIONS) — only the player's own actions move it.
             heroFactions: currentState.heroFactions || { memberships: [], departed: [], own: null },
             // Reconciled from the SAME response as everything else above now —
@@ -61497,7 +62394,7 @@ ${chunkText}`;
         const secretsText = scrubAgentSecretsText(/^\(none\)$/i.test(secretsTextRaw) ? '' : secretsTextRaw, agentRes.agents);
         // Never on the opening turn: the hero's identity was just typed on the setup screen.
         const heroIdentity = isOpeningTurn ? null : gateHeroIdentity(normalizeHeroIdentity(parsed.heroIdentity), (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName), (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.concept : heroConcept), narrativeText);
-        return { state, mindApplied: mind.applied, surpriseItems, deeds: normalizeDeeds(parsed.deeds), unmasked: (Array.isArray(parsed.heroUnmasked) ? parsed.heroUnmasked : []).filter(x => typeof x === 'string').map(hfKey).filter(Boolean).slice(0, 8), reputationDeltas, factionReputationDeltas, npcRenames, kindnessCooldownNpcs, suggestions, questOffers, rewardOffers, travelOffer, combatEncounter, itemOffers, startingPartyMembers, secretsText, heroIdentity, partyChanges: (opRes.partyChanges.remove.length || opRes.partyChanges.add.length) ? opRes.partyChanges : null };
+        return { state, mindApplied: mind.applied, surpriseItems, deeds: normalizeDeeds(parsed.deeds), unmasked: (Array.isArray(parsed.heroUnmasked) ? parsed.heroUnmasked : []).filter(x => typeof x === 'string').map(hfKey).filter(Boolean).slice(0, 8), reputationDeltas, factionReputationDeltas, npcRenames, kindnessCooldownNpcs, suggestions, questOffers, rewardOffers, travelOffer, combatEncounter, itemOffers, startingPartyMembers, secretsText, heroIdentity, partyChanges: (opRes.partyChanges.remove.length || opRes.partyChanges.add.length) ? opRes.partyChanges : null, companionGrowthEvents: xpAward.companions };
     }
     // Returns null when nothing in the story could revive the hero (also the
     // safe fallback on any parsing/network failure — see tryResurrection,
@@ -63048,6 +63945,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             startingPartyMembers: combined.startingPartyMembers || [],
             heroIdentity: combined.heroIdentity || null,
             partyChanges: combined.partyChanges || null,
+            companionGrowthEvents: combined.companionGrowthEvents || [],
             tokenUsage
         };
     }
@@ -64115,7 +65013,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return;
         const nextParty = [...party, key];
         setParty(nextParty);
-        saveGame(messages, gameState, itemRarities, equipment, npcReputations, nextParty);
+        // A new companion starts growing right away (see COMPANION GROWTH): they get
+        // their record at the join level, and one who comes back after a long absence
+        // is brought up to it — the same rule awardExperience applies on its own.
+        const grownState = ensureCompanionGrowth(gameState, companionMembersFor([key], gameState.npcs, partyEquipment, partyInventories));
+        if (grownState !== gameState)
+            setGameState(grownState);
+        saveGame(messages, grownState, itemRarities, equipment, npcReputations, nextParty);
     }
     function dismissFromParty(npcName) {
         const key = typeof npcName === 'string' ? npcName.trim().toLowerCase() : '';
@@ -64131,6 +65035,18 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // whatever gear they were carrying, so re-recruiting them later picks
         // back up right where it left off instead of resetting their loadout.
     }
+    // The standing rule behind COMPANION GROWTH: everyone travelling with the hero has an
+    // up-to-date growth record. Recruiting, loading a save and the opening write theirs on
+    // the spot (so the save taken right after already carries it); this settles every other
+    // way the roster or the hero's level can move — a companion back from an errand, a
+    // branch or regenerate restoring an older snapshot, a join path a later update adds —
+    // without each of those having to remember to. Idempotent: once every record is current
+    // the updater returns the same state and React renders nothing.
+    useEffect(() => {
+        if (party.length === 0)
+            return;
+        setGameState(s => ensureCompanionGrowth(s, companionMembersFor(party, s.npcs, partyEquipment, partyInventories)));
+    }, [party, gameState.npcs, gameState.level, gameState.companionGrowth]);
     // ---- PARTY GEAR HANDLERS ----
     // Give/take-back mirrors confirmGiftBundle's own item-by-array-index
     // handling exactly (see it above) — the difference is purely mechanical:
@@ -64802,7 +65718,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // soaks up hits (see resolveOneAttack), same full-block-until-broken
             // rule. max is fixed for the fight (portrait bar denominator); cur is
             // what actually drains.
-            const { armor, armorPools } = allyArmorFromLoadout(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
+            const { armor, armorPools: baseArmorPools } = allyArmorFromLoadout(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || [], itemRarities);
+            // Talents a companion earned (Vitality's wider HP pools, the Armor track's
+            // bigger armor pools) apply once, as the fight opens — the ally mirror of
+            // startCombat's heroParts/heroArmorMax scaling (see applyGrowthToAllyBody).
+            const { parts, armorPools } = applyGrowthToAllyBody(buildCombatantParts(npc.health, npc.maxHealth), baseArmorPools, computeAllyMods(gameState, npc.name));
             // A companion's nerve in a fight IS the morale system; their psyche decides how much of it they
             // start with (see psycheStartingMorale) and the fight's toll on it is paid back at the close.
             const startMorale = psycheStartingMorale(npc.psyche, npc.maxPsyche);
@@ -64817,7 +65737,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // player directly commands in combat (see resolveAttack/runAutoTurn's
             // ally branch) — distinct from an AI-run reinforcement built by
             // makeAllyCombatant below, which is always left off (undefined/false).
-            return { id: 'ally_' + i, name, stats: npc.stats || EMPTY_STATE.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts: buildCombatantParts(npc.health, npc.maxHealth), armor, armorPools, morale: startMorale, startMorale, playerControlled: true };
+            return { id: 'ally_' + i, name, stats: npc.stats || EMPTY_STATE.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: startMorale, startMorale, playerControlled: true };
         }).filter(Boolean);
     }
     // Non-party companions the story establishes as already fighting
@@ -64879,7 +65799,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     // weapon and outfit for the rest — never from a bare die roll. See buildAllyGear.
     function makeAllyCombatant(raw, id) {
         return buildAllyCombatant(raw, id, {
-            npcs: gameState.npcs, partyEquipment, partyInventories, itemRarities, narrativeItemSlots,
+            npcs: gameState.npcs, state: gameState, partyEquipment, partyInventories, itemRarities, narrativeItemSlots,
             fallbackName: t('combatReinforcementAllyFallbackName')
         });
     }
@@ -65636,7 +66556,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             { type: 'hero', initiative: gameState.stats.initiative + computeEquipmentInitiativeModifier(equipment, gameState.inventory) + (computeHeroMods(gameState, null, 1).initiativeBonus || 0) },
             ...allies.map(a => {
                 const load = getAllyLoadout(a);
-                return { type: 'ally', id: a.id, initiative: a.stats.initiative + computeEquipmentInitiativeModifier(load.equipment, load.inventory) + computeCommanderAura(gameState).allyInitiativeBonus };
+                return { type: 'ally', id: a.id, initiative: a.stats.initiative + computeEquipmentInitiativeModifier(load.equipment, load.inventory) + computeCommanderAura(gameState).allyInitiativeBonus + (allyModsFor(a).initiativeBonus || 0) };
             }),
             ...enemies.map(e => ({ type: 'enemy', id: e.id, initiative: e.initiative }))
         ];
@@ -66122,6 +67042,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         // this build" stat display (computeTotalArmorDefense), not for combat math.
         return { name: heroName || t('combatYouLabel'), parts, isEnemy: false, agility: gameState.stats.agility, defenseAvailability: availability, physAbsorb: absorbPctFromDefense(computeTotalArmorDefense(equipment, wear ? overlayGearWear(gameState.inventory, wear, itemRarities) : gameState.inventory, itemRarities)), getDefenseForPart: (k) => getPlayerDefenseForPart(k, wear), weaponDamage: getPlayerWeaponInfo(wear).damage, armorPiercing: getPlayerWeaponInfo(wear).armorPiercing || 0, mods, guaranteedBlock: !!guaranteedBlock, armorPools: { cur: armorCur || { body: 0, head: 0 } } };
     }
+    // The ONE place a combat ally's per-roll mods are assembled (see computeAllyMods):
+    // their own effects + learned talents/abilities (companion growth) + the hero's
+    // commander aura, with the ally's live wounds feeding Berserker's Fury. Every
+    // attack/defense/opportunity roll below goes through here.
+    function allyModsFor(ally) {
+        return computeAllyMods(gameState, ally.name, { healthRatio: heroPartsHealthRatio(ally.parts) });
+    }
     function makeAllyActor(ally, mods, wear, eqOverride) {
         const load = getAllyLoadout(ally);
         const weaponInfo = { ...getWeaponInfoForLoadout(eqOverride || load.equipment, overlayGearWear(load.inventory, wear, load.itemRarities), t('combatUnarmedLabel'), load.itemRarities) };
@@ -66205,7 +67132,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return makeHeroActor(computeHeroMods(gameState, state.abilityState, heroPartsHealthRatio(state.heroParts)), state.gearWear);
         if (who.type === 'ally') {
             const ally = state.allies.find(a => a.id === who.id);
-            return makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(state, ally));
+            return makeAllyActor(ally, allyModsFor(ally), allyWearOf(state, ally));
         }
         return makeEnemyActor(state.enemies.find(e => e.id === who.id));
     }
@@ -66214,7 +67141,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             return makeHeroDefender(state.heroParts, computeHeroMods(gameState, state.abilityState), state.gearWear, state.abilityState && state.abilityState.resilienceActive, state.heroArmorCur);
         if (who.type === 'ally') {
             const ally = state.allies.find(a => a.id === who.id);
-            return makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(state, ally));
+            return makeAllyDefender(ally, allyModsFor(ally), allyWearOf(state, ally));
         }
         return makeEnemyDefender(state.enemies.find(e => e.id === who.id), state.enemies);
     }
@@ -66311,12 +67238,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const attackerKey = h.type === 'hero' ? 'hero:hero' : h.type + ':' + h.id;
             const defenderKey = mover.type === 'hero' ? 'hero:hero' : mover.type + ':' + mover.id;
             const forceCrit = isBackstabOnLocked(state, attackerKey, defenderKey, h.pos, mover.pos);
-            if (h.type === 'hero') {
-                const targetPartner = getActiveLockPartner(state, defenderKey);
-                attacker = { ...attacker, mods: applyAttackContextMods(attacker.mods, { backstab: forceCrit, flank: !forceCrit && !!targetPartner && targetPartner !== 'hero:hero', duel: getDuelPartner(state, 'hero:hero') === defenderKey }) };
+            // Backstab / Duelist belong to whoever learned them — the hero or a
+            // companion, on either end of the swing (see attackContextFor).
+            if (h.type !== 'enemy') {
+                attacker = { ...attacker, mods: applyAttackContextMods(attacker.mods, attackContextFor(state, attackerKey, defenderKey, forceCrit)) };
             }
-            else if (mover.type === 'hero') {
-                defender = { ...defender, mods: applyDefenseContextMods(defender.mods, { duel: getDuelPartner(state, 'hero:hero') === attackerKey }) };
+            else if (mover.type !== 'enemy') {
+                defender = { ...defender, mods: applyDefenseContextMods(defender.mods, defenseContextFor(state, attackerKey, defenderKey)) };
             }
             const outcome = resolveOneAttack(attacker, defender, t, 1, forceCrit); // always melee — h is already adjacent
             let log = [...state.log, ...outcome.log];
@@ -66627,7 +67555,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             defenderKey = 'enemy:' + blocker.id;
         }
         else if (blocker.type === 'ally') {
-            defender = makeAllyDefender(blocker.ally, computeAllyMods(gameState.npcs, blocker.ally.name, computeCommanderAura(gameState)), allyWearOf({ allyGearWear }, blocker.ally));
+            defender = makeAllyDefender(blocker.ally, allyModsFor(blocker.ally), allyWearOf({ allyGearWear }, blocker.ally));
             defenderKey = 'ally:' + blocker.id;
         }
         else {
@@ -66763,7 +67691,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const al = cur.allies.find(a => a.id === shooterId);
                 if (!al)
                     break;
-                actor = makeAllyActor(al, computeAllyMods(gameState.npcs, al.name, computeCommanderAura(gameState)), allyWearOf(cur, al));
+                actor = makeAllyActor(al, allyModsFor(al), allyWearOf(cur, al));
             }
             else {
                 const en = cur.enemies.find(e => e.id === shooterId);
@@ -66895,12 +67823,16 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const allyRangedMult = allyIsRanged ? computeRangedHitMultiplier(ally.pos, enemy.pos, prev.coverCells) : 1;
                 let log = lineBlockLog ? [...prev.log, lineBlockLog] : prev.log;
-                const attacker = allyLockedShooter
-                    ? asUnarmedActor(makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), allyKit.equipment))
-                    : makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), allyKit.equipment);
+                // Gunner-track talents apply to any ranged attack — a companion's, like the hero's.
+                const allyAttackMods = applyRangedTalentMods(allyModsFor(ally), allyIsRanged);
+                let attacker = allyLockedShooter
+                    ? asUnarmedActor(makeAllyActor(ally, allyAttackMods, allyWearOf(prev, ally), allyKit.equipment))
+                    : makeAllyActor(ally, allyAttackMods, allyWearOf(prev, ally), allyKit.equipment);
                 if (friendlyBlocker)
                     return applyFriendlyFireShot(prev, { type: 'ally', id: ally.id, pos: ally.pos, actor: attacker, gunFx: allyGunFx }, friendlyBlocker, log);
                 const forceCrit = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + enemy.id, ally.pos, enemy.pos);
+                // Backstab / Flank / Duelist, when this companion has learned them (see attackContextFor).
+                attacker = { ...attacker, mods: applyAttackContextMods(attacker.mods, attackContextFor(prev, 'ally:' + ally.id, 'enemy:' + enemy.id, forceCrit)) };
                 const outcome = (allyGunFx && allyIsRanged)
                     ? resolveGunVolley(attacker, gunVolleyDamages(allyGunFx, attacker.weaponDamage), makeEnemyDefender(enemy, prev.enemies), makeEnemyVolleyChain(enemy, prev.enemies), allyRangedMult, forceCrit)
                     : resolveOneAttack(attacker, makeEnemyDefender(enemy, prev.enemies), t, allyRangedMult, forceCrit, allyIsRanged);
@@ -67044,11 +67976,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const defender = makeEnemyDefender(enemy, prev.enemies);
             const forceCrit = isBackstabOnLocked(prev, 'hero:hero', 'enemy:' + enemy.id, prev.heroPos, enemy.pos);
             // Talent context bonuses (Backstab / Duelist): see applyAttackContextMods.
-            {
-                const targetPartner = getActiveLockPartner(prev, 'enemy:' + enemy.id);
-                const heroPartner = getDuelPartner(prev, 'hero:hero');
-                attacker = { ...attacker, mods: applyAttackContextMods(attacker.mods, { backstab: forceCrit, flank: !forceCrit && !!targetPartner && targetPartner !== 'hero:hero', duel: heroPartner === 'enemy:' + enemy.id }) };
-            }
+            attacker = { ...attacker, mods: applyAttackContextMods(attacker.mods, attackContextFor(prev, 'hero:hero', 'enemy:' + enemy.id, forceCrit)) };
             // Gun ability with a usable gun in hand: every bullet is its own
             // attack (own hit roll / body part / damage) — see getGunShotPlan.
             // The loop leaves `outcome` as an aggregate shaped like a single
@@ -67917,18 +68845,68 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
     }
     function learnTalent(id) {
-        if (!canLearnTalent(gameState.talents, gameState.talentPoints, id, gameState.worldTraits))
+        // The hero's path through the shared learnTalentFor — the very rule this
+        // handler always applied (canLearnTalent, cost, derived abilities), now
+        // also what a companion's talent purchase runs (see learnCompanionTalent).
+        const nextState = learnTalentFor(gameState, null, id);
+        if (!nextState)
             return;
-        const def = TALENT_DEFS[id];
-        const nextTalents = { ...gameState.talents, [id]: (gameState.talents[id] || 0) + 1 };
-        const nextState = {
-            ...gameState,
-            talents: nextTalents,
-            talentPoints: gameState.talentPoints - def.cost,
-            abilities: mergeWeaponAbilities(deriveAbilitiesFromTalents(nextTalents), gameState.abilities)
-        };
         setGameState(nextState);
         saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+    }
+    // ---- COMPANION GROWTH HANDLERS (see COMPANION GROWTH above the talent tree) ----
+    // Whatever the talent screen / group roster does for a companion goes through
+    // the same pure state functions the engine uses, then saves exactly like
+    // learnTalent does for the hero.
+    function commitCompanionGrowthState(nextState) {
+        if (!nextState || nextState === gameState)
+            return;
+        setGameState(nextState);
+        saveGame(messages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns);
+    }
+    function learnCompanionTalent(key, id) {
+        commitCompanionGrowthState(learnTalentFor(gameState, key, id));
+    }
+    // Hands the spent points back and takes the build into the player's own hands
+    // (auto-planning off) — otherwise the planner would quietly re-spend them at
+    // the next level-up and the reset would mean nothing.
+    function resetCompanionBuild(key) {
+        commitCompanionGrowthState(setCompanionAuto(resetCompanionTalents(gameState, key), key, false));
+    }
+    function toggleCompanionAuto(key) {
+        const rec = getCompanionGrowth(gameState, key);
+        if (!rec)
+            return;
+        const member = companionMembersFor([key], gameState.npcs, partyEquipment, partyInventories)[0];
+        commitCompanionGrowthState(setCompanionAuto(gameState, key, !rec.auto, member ? member.profile : undefined));
+    }
+    // Queues one self-dismissing chip per companion that crossed a level in an
+    // XP award (awardExperience's `companions` events): who, which level, and
+    // either the talents the planner just bought or — when the player manages
+    // that companion's build by hand — how many points are waiting to be spent.
+    function announceCompanionGrowth(events) {
+        const ups = (events || []).filter(e => e && Array.isArray(e.levels) && e.levels.length > 0);
+        if (ups.length === 0)
+            return;
+        const stamp = Date.now();
+        const newToasts = ups.map((e, i) => ({
+            id: stamp + '-grow-' + e.key + '-' + i,
+            name: e.name,
+            level: e.to,
+            detail: e.learned && e.learned.length > 0
+                ? summarizeLearnedTalents(e.learned, t)
+                : (!e.auto && e.unspent > 0 ? t('growthToastPoints').replace('{n}', e.unspent) : '')
+        }));
+        setGrowthToasts(prev => [...prev, ...newToasts]);
+        newToasts.forEach(toast => {
+            growthToastTimers.current[toast.id] = window.setTimeout(() => {
+                setGrowthToasts(prev => prev.map(x => x.id === toast.id ? { ...x, exiting: true } : x));
+                growthToastTimers.current[toast.id] = window.setTimeout(() => {
+                    setGrowthToasts(prev => prev.filter(x => x.id !== toast.id));
+                    delete growthToastTimers.current[toast.id];
+                }, REPUTATION_TOAST_EXIT_MS);
+            }, REPUTATION_TOAST_DISPLAY_MS);
+        });
     }
     // One ally or enemy's fully-automatic turn — picks a random living target
     // on the opposing side and resolves the attack via resolveOneAttack, same
@@ -68385,7 +69363,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     return { ...prev, log, result: 'victory' };
                 // Locked in melee with a bow/crossbow in hand: punch instead of shooting.
                 const aiAllyLockedShooter = isBowLoadout(getAllyLoadout(ally).equipment) && !!getActiveLockPartner(prev, 'ally:' + ally.id);
-                const aiAllyBaseActor = makeAllyActor(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally), aiKit.equipment);
+                // Gunner-track talents ride on any ranged shot (see applyRangedTalentMods) — a companion's too.
+                const aiAllyBaseActor = makeAllyActor(ally, applyRangedTalentMods(allyModsFor(ally), !!aiGunFx && !aiAllyLockedShooter), allyWearOf(prev, ally), aiKit.equipment);
                 const attackerRaw = aiAllyLockedShooter ? asUnarmedActor(aiAllyBaseActor) : aiAllyBaseActor;
                 const attacker = ally.suppressed ? { ...attackerRaw, weaponDamage: attackerRaw.weaponDamage * COMBAT_TUNING.suppressedDamageMult } : attackerRaw;
                 // Firearm magazine (see FIREARM MAGAZINES): an empty gun spends the action on a (free) reload.
@@ -68424,9 +69403,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 }
                 const forceCrit4 = isBackstabOnLocked(prev, 'ally:' + ally.id, 'enemy:' + target.id, ally.pos, target.pos);
                 const aiShotTarget = target;
+                // Backstab / Flank / Duelist, when this ally has them (see attackContextFor).
+                const aiStrikeActor = { ...attacker, mods: applyAttackContextMods(attacker.mods, attackContextFor(prev, 'ally:' + ally.id, 'enemy:' + target.id, forceCrit4)) };
                 const outcome = aiGunFx
-                    ? resolveGunVolley(attacker, gunVolleyDamages(aiGunFx, attacker.weaponDamage), makeEnemyDefender(aiShotTarget, prev.enemies), makeEnemyVolleyChain(aiShotTarget, prev.enemies), computeRangedHitMultiplier(ally.pos, aiShotTarget.pos, prev.coverCells), forceCrit4)
-                    : resolveOneAttack(attacker, makeEnemyDefender(target, prev.enemies), t, undefined, forceCrit4, false); // non-firearm AI allies only ever swing at melee-reachable targets
+                    ? resolveGunVolley(aiStrikeActor, gunVolleyDamages(aiGunFx, aiStrikeActor.weaponDamage), makeEnemyDefender(aiShotTarget, prev.enemies), makeEnemyVolleyChain(aiShotTarget, prev.enemies), computeRangedHitMultiplier(ally.pos, aiShotTarget.pos, prev.coverCells), forceCrit4)
+                    : resolveOneAttack(aiStrikeActor, makeEnemyDefender(target, prev.enemies), t, undefined, forceCrit4, false); // non-firearm AI allies only ever swing at melee-reachable targets
                 log = [...log, ...outcome.log];
                 // A landed strike wears the companion's weapon(s), same as the hero's.
                 let allyGearWear = prev.allyGearWear || {};
@@ -68903,7 +69884,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     return npcCast;
             }
             if (targetChoice.kind === 'hero') {
-                const heroMods = applyDefenseContextMods(computeHeroMods(gameState, prev.abilityState), { duel: getDuelPartner(prev, 'hero:hero') === 'enemy:' + enemy.id });
+                const heroMods = applyDefenseContextMods(computeHeroMods(gameState, prev.abilityState), defenseContextFor(prev, 'enemy:' + enemy.id, 'hero:hero'));
                 const defender = makeHeroDefender(prev.heroParts, heroMods, prev.gearWear, prev.abilityState && prev.abilityState.resilienceActive, prev.heroArmorCur);
                 const forceCrit5 = isBackstabOnLocked(prev, 'enemy:' + enemy.id, 'hero:hero', enemy.pos, prev.heroPos);
                 const enemyVsHeroMult = (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, prev.heroPos, prev.coverCells, heroMods.coverHitReduction) * steadyAimMult : 1);
@@ -68964,9 +69945,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 return spendActions({ ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks }, 1);
             }
             const ally = targetChoice.ally;
-            const defender = makeAllyDefender(ally, computeAllyMods(gameState.npcs, ally.name, computeCommanderAura(gameState)), allyWearOf(prev, ally));
+            // Duelist's defense bonus and Cover's hit reduction belong to a companion who learned them, exactly as to the hero (see defenseContextFor).
+            const allyDefMods = applyDefenseContextMods(allyModsFor(ally), defenseContextFor(prev, 'enemy:' + enemy.id, 'ally:' + ally.id));
+            const defender = makeAllyDefender(ally, allyDefMods, allyWearOf(prev, ally));
             const forceCrit6 = isBackstabOnLocked(prev, 'enemy:' + enemy.id, 'ally:' + ally.id, enemy.pos, ally.pos);
-            const enemyVsAllyMult = (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, ally.pos, prev.coverCells) * steadyAimMult : 1);
+            const enemyVsAllyMult = (enemy.role === 'ranged' && !enemyPunching ? computeRangedHitMultiplier(enemy.pos, ally.pos, prev.coverCells, allyDefMods.coverHitReduction) * steadyAimMult : 1);
             const outcome = enemyGunFx
                 ? resolveGunVolley(attacker, gunVolleyDamages(enemyGunFx, attacker.weaponDamage), defender, chainPlainDefender, enemyVsAllyMult, forceCrit6)
                 : resolveOneAttack(attacker, defender, t, enemyVsAllyMult, forceCrit6, enemyShotIsRanged);
@@ -69569,6 +70552,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         let nextLevel = gameState.level;
         let nextXp = gameState.xp;
         let defeatedNames = [];
+        // The fight's XP goes through awardExperience (see COMPANION GROWTH): the hero
+        // levels by the very same rules as ever, and every party member who stood in
+        // this fight (the playerControlled allies — not hired hands or anonymous
+        // reinforcements) earns their share of the same award, downed or not.
+        let xpAward = { state: gameState, hero: null, companions: [] };
         if (combat.result === 'victory') {
             // Everyone killed or taken prisoner earns XP. Only the dead count as kills
             // for quests and the story, a prisoner is alive.
@@ -69579,11 +70567,12 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             nextQuests = result.nextQuests;
             failedQuests = result.failed;
             const combatXp = defeatedEnemies.reduce((sum, e) => sum + (COMBAT_XP_BY_TIER[e.tier] || COMBAT_XP_BY_TIER.average), 0);
-            const leveled = addXp(gameState.level, gameState.xp, combatXp);
-            nextLevel = leveled.level;
-            nextXp = leveled.xp;
+            const fought = (combat.allies || []).filter(a => a && a.playerControlled).map(a => a.name);
+            xpAward = awardExperience(gameState, combatXp, companionMembersFor(fought, gameState.npcs, partyEquipment, partyInventories));
+            nextLevel = xpAward.state.level;
+            nextXp = xpAward.state.xp;
         }
-        const nextTalentPoints = gameState.talentPoints + computeNewlyGainedLevels(gameState.level, nextLevel).length * TALENT_POINTS_PER_LEVEL;
+        const nextTalentPoints = xpAward.state.talentPoints;
         // Prisoners taken this fight join the ones already held. A hero who was
         // taken captive instead loses theirs, their captors free them.
         const capturedNow = combat.result === 'victory'
@@ -69607,7 +70596,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             pushReputationToasts(bondToasts, false);
         // The story carries on in the weather the fight ended on (unless it was an editor-pinned/ranged test fight).
         const endWeather = combat.environment && !combat.environment.weatherRange && !combat.environment.indoors && combat.environment.realm === 'material' && COMBAT_WEATHERS.includes(combat.environment.weather) ? combat.environment.weather : gameState.weather;
-        const nextState = { ...gameState, weather: endWeather, health: newHealth, psyche: newPsyche, effects: newEffects, inventory: finalInventory, confiscatedInventory: finalConfiscatedInventory, prisoners: nextPrisoners, currency: nextCurrency, quests: nextQuests, level: nextLevel, xp: nextXp, npcs: nextNpcs, talentPoints: nextTalentPoints, companionBonds: bondOutcome.bonds };
+        const nextState = { ...gameState, weather: endWeather, health: newHealth, psyche: newPsyche, effects: newEffects, inventory: finalInventory, confiscatedInventory: finalConfiscatedInventory, prisoners: nextPrisoners, currency: nextCurrency, quests: nextQuests, level: nextLevel, xp: nextXp, npcs: nextNpcs, talentPoints: nextTalentPoints, companionBonds: bondOutcome.bonds, companionGrowth: xpAward.state.companionGrowth || {} };
         const summaryTag = buildCombatSummaryTag(combat, failedQuests, bondOutcome.applied);
         const sourceNarratorIndex = combat.sourceNarratorIndex;
         // Computed and applied BEFORE saveGame (rather than after, as this used
@@ -69689,6 +70678,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         saveGame(updatedMessages, nextState, nextItemRarities, equipment, nextNpcReputations, party, nextPartyInventories, partyEquipment, nextFactionReputations);
         if (lootCurrency > 0)
             pushCurrencyToast(lootCurrency, 'lootCurrencyToastReason');
+        announceCompanionGrowth(xpAward.companions);
         setCombat(null);
         setCombatModalOpen(false);
         if (isCaptivity) {
@@ -70225,6 +71215,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
     function commitOpening(result) {
         // Which magic / tech the world allows decides the talent tree's branches.
         result = { ...result, state: { ...result.state, worldTraits: detectWorldTraits(worldSetting, heroConcept) } };
+        // The starting companions begin their growth record with the campaign itself
+        // (see COMPANION GROWTH); no gear map exists yet, so the planner's loadout
+        // profile falls back to the default until their kit is handed out.
+        result = { ...result, state: ensureCompanionGrowth(result.state, companionMembersFor((result.startingPartyMembers || []).slice(0, MAX_PARTY_SIZE), result.state.npcs, {}, {})) };
         const openingMessages = [{ role: 'narrator', text: result.narrative, secrets: result.secrets, suggestions: result.suggestions, itemOffers: result.itemOffers, questOffers: result.questOffers, rewardOffers: result.rewardOffers, travelOffer: result.travelOffer, combatEncounter: result.combatEncounter, appliedReputationDeltas: result.reputationDeltas, appliedFactionReputationDeltas: result.factionReputationDeltas, appliedKindnessCooldownNpcs: result.kindnessCooldownNpcs, appliedKindnessCooldownTurn: result.turnIndex, stateBefore: EMPTY_STATE, equipmentBefore: EMPTY_EQUIPMENT, partyBefore: [], itemRaritiesBefore: {}, tokenUsage: result.tokenUsage }];
         const startingEquipment = autoEquipStartingGear(result.state.inventory);
         const startingRarities = {};
@@ -70490,7 +71484,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             patchUndone: u => (revBases && u ? {
                 ...u,
                 npcReputations: relocateMapKeys(u.npcReputations || {}, npcReverse),
-                npcKindnessCooldowns: relocateMapKeys(u.npcKindnessCooldowns || {}, npcReverse)
+                npcKindnessCooldowns: relocateMapKeys(u.npcKindnessCooldowns || {}, npcReverse),
+                party: revBases.party,
+                gear: revBases.gear
             } : u)
         };
     }
@@ -70718,6 +71714,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             setMessages(updatedMessages);
             setGameState(stateAfterTurn);
             setLastTokenUsage(result.tokenUsage);
+            announceCompanionGrowth(result.companionGrowthEvents);
             // Chained the same way as handleStart above: each call's returned
             // value feeds the next, and the final values go straight to saveGame
             // instead of letting it fall back to the pre-turn closure state (which
@@ -70991,7 +71988,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             uiLang, t,
             gameState, setGameState, equipment, setEquipment, itemRarities, setItemRarities,
             npcReputations, setNpcReputations, factionReputations, setFactionReputations,
-            party, setParty, partyInventories, setPartyInventories,
+            party, setParty, partyInventories, setPartyInventories, partyEquipment,
             npcInventories, setNpcInventories, npcCurrencies, setNpcCurrencies, shopClock, setShopClock,
             turnsCount: totalTurns,
             commit: () => setDevSaveTick(n => n + 1),
@@ -71329,6 +72326,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             setMessages(updatedMessages);
             setGameState(stateAfterTurn);
             setLastTokenUsage(result.tokenUsage);
+            announceCompanionGrowth(result.companionGrowthEvents);
             // See the matching comment in sendBatch — same chaining, same reason.
             // Built on top of the UNDONE maps (not the pre-undo closure values, which
             // would silently discard the undo), then committed explicitly — a base
@@ -71440,6 +72438,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             setMessages(updatedMessages);
             setGameState(stateAfterTurn);
             setLastTokenUsage(result.tokenUsage);
+            announceCompanionGrowth(result.companionGrowthEvents);
             // See the matching comment in sendBatch — same chaining, same reason.
             // Built on top of the UNDONE maps (not the pre-undo closure values, which
             // would silently discard the undo), then committed explicitly — a base
@@ -71779,6 +72778,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         React.createElement(CurrencyToastStack, { toasts: currencyToasts, t: t }),
         React.createElement(MindToastStack, { toasts: mindToasts, t: t }),
         React.createElement(ItemLossToastStack, { toasts: itemLossToasts, t: t }),
+        React.createElement(GrowthToastStack, { toasts: growthToasts, t: t }),
         noticeKey && React.createElement("div", { className: "notice-chip", role: "status", "aria-live": "polite" }, t(noticeKey)),
         React.createElement("div", { className: "play-header" },
             React.createElement("div", { className: "play-brand" },
@@ -71903,14 +72903,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             React.createElement("button", { onClick: handleSend, disabled: loading || combatBlocksInput || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
             React.createElement("div", { className: "sidebar" },
-                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t }))),
+                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenCompanionTalents: isLatestTurn ? openCompanionTalents : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t }))),
         sheetOpen && (React.createElement("div", { className: "sheet-overlay" },
             React.createElement("div", { className: "sheet-overlay-backdrop", onClick: () => setSheetOpen(false) }),
             React.createElement("div", { className: "sheet-overlay-panel" },
                 React.createElement("div", { className: "sheet-overlay-header" },
                     React.createElement("p", { className: "title-display title-display-small" }, t('sheetOverlayTitle')),
                     React.createElement("button", { onClick: () => setSheetOpen(false), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
-                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t })))),
+                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenCompanionTalents: isLatestTurn ? openCompanionTalents : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: viewedState, equipment: viewedEquipment, itemRarities: viewedItemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: isLatestTurn ? openEquipPicker : undefined, onOpenItemDetail: openItemDetailFromEquipment, onEquip: isLatestTurn ? equipItemInSlot : undefined, onUnequip: isLatestTurn ? unequipSlot : undefined, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
@@ -71928,7 +72928,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const l = getAllyLoadout(a);
                 return [k, getLoadoutWeaponType(l.equipment, l.inventory)];
             })), introActive: combatIntroActive, fxBusy: combatFxBusy, abilities: gameState.abilities, onAttack: resolveAttack, onMove: resolveMove, onLeave: resolveLeaveCombat, onSkipTurn: resolveSkipTurn, onReload: reloadInCombat, reloadInfo: getReloadInfo(combat), repairAllInfo: getRepairAllInfo(combat), onRepairAll: repairAllAfterCombat, movementRange: combat.order[combat.turnPos] ? computeActorMovementRange(combat.order[combat.turnPos]) : 0, onUseItem: useConsumableInCombat, onUseAbility: onUseAbility, onToggleLoot: toggleLootSelection, onCapture: resolveCapture, heroAgility: heroStat(gameState, 'agility'), prisonerSlots: Math.max(0, MAX_PRISONERS - (gameState.prisoners || []).length), onClose: endCombatAndClose, captivityChecking: captivityChecking, t: t })),
-        talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, onLearn: isLatestTurn ? learnTalent : undefined, onToggleTrait: isLatestTurn ? toggleWorldTrait : undefined, onClose: () => setTalentTreeModalOpen(false), t: t })),
+        talentTreeModalOpen && (React.createElement(TalentTreeScreen, { gameState: viewedState, partyKeys: viewedParty, initialSubject: talentSubject, onLearn: isLatestTurn ? learnTalent : undefined, onLearnCompanion: isLatestTurn ? learnCompanionTalent : undefined, onResetCompanion: isLatestTurn ? resetCompanionBuild : undefined, onToggleCompanionAuto: isLatestTurn ? toggleCompanionAuto : undefined, onToggleTrait: isLatestTurn ? toggleWorldTrait : undefined, onClose: () => { setTalentTreeModalOpen(false); setTalentSubject(null); }, t: t })),
         deathModalOpen && (React.createElement(DeathModal, { resurrectionChecking: resurrectionChecking, resurrectionDenied: resurrectionDenied, onClose: () => setDeathModalOpen(false), onGoBack: goBackFromDeath, onTryResurrection: tryResurrection, t: t })),
         inventoryModalOpen && (React.createElement(InventoryModal, { gameState: viewedState, itemRarities: viewedItemRarities, equipment: viewedEquipment, inventorySort: inventorySort, onInventorySortChange: setInventorySort, inventoryFilter: inventoryFilter, onInventoryFilterChange: setInventoryFilter, onOpenItemDetail: openItemDetailFromInventory, party: viewedParty, partyInventories: partyInventories, partyEquipment: partyEquipment, repairKitName: isLatestTurn && repairKitIndex !== null && gameState.inventory[repairKitIndex] && gameState.inventory[repairKitIndex].slot === 'repairKit' ? gameState.inventory[repairKitIndex].name : null, onApplyRepairKit: isLatestTurn ? applyRepairKitToIndex : undefined, onCancelRepairKit: cancelRepairKit, onRestoreLostItem: isLatestTurn ? restoreLostItem : undefined, onClose: () => { setInventoryModalOpen(false); setRepairKitIndex(null); }, t: t })),
         (itemDetailIndex !== null || itemDetailEmptySlot !== null) && (React.createElement(ItemDetailModal, { itemIndex: itemDetailIndex, 
@@ -71988,7 +72988,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const wsStation = wsNpc ? makeNpcStation(wsNpc, craftVocab) : makeFieldStation();
             return (React.createElement(WorkshopModal, { station: wsStation, vocab: craftVocab, gameState: gameState, itemRarities: itemRarities, equipment: equipment, buyMult: workshopBuyMultiplier(wsNpc), onRun: runWorkshopOp, onRequestVocab: requestCraftVocab, vocabBusy: craftVocabBusy, vocabCanRequest: !(craftProfileLive.vocab && craftProfileLive.vocab.lang === forgeLang(uiLang)) && craftProfileLive.vocabTried && !!geminiApiKey && !devOfflineActive(), onClose: closeWorkshop, t: t }));
         })(),
-        groupModalOpen && (React.createElement(GroupModal, { worldProfile: gameState.worldProfile, party: viewedParty, npcs: viewedState.npcs, narrativeItemSlots: narrativeItemSlots, onDismiss: isLatestTurn ? dismissFromParty : undefined, onOpenGear: setPartyGearTarget, onOpenEffect: setEffectDetail, onClose: () => setGroupModalOpen(false), t: t })),
+        groupModalOpen && (React.createElement(GroupModal, { worldProfile: gameState.worldProfile, party: viewedParty, npcs: viewedState.npcs, gameState: viewedState, narrativeItemSlots: narrativeItemSlots, onDismiss: isLatestTurn ? dismissFromParty : undefined, onOpenGear: setPartyGearTarget, onOpenTalents: isLatestTurn ? (key => { setGroupModalOpen(false); openCompanionTalents(key); }) : undefined, onOpenEffect: setEffectDetail, onClose: () => setGroupModalOpen(false), t: t })),
         partyGearTarget && (React.createElement(PartyGearModal, { npcName: partyGearTarget, inventory: partyInventories[partyGearKey] || [], equipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, itemRarities: viewedItemRarities, heldCurrency: partyCurrency[partyGearKey] || 0, npc: (viewedState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === partyGearKey), gameState: viewedState, onEquip: isLatestTurn ? ((slotKey, itemName, itemRef) => equipPartyItemInSlot(partyGearTarget, slotKey, itemName, itemRef)) : undefined, onUnequip: isLatestTurn ? (slotKey => unequipPartySlot(partyGearTarget, slotKey)) : undefined, onGiveItem: isLatestTurn ? (() => setPartyGiveModalOpen(true)) : undefined, onTakeBack: isLatestTurn ? (index => takeItemsFromPartyMember(partyGearTarget, [index])) : undefined, onClose: () => { setPartyGearTarget(null); setPartyGiveModalOpen(false); }, t: t })),
         partyGiveModalOpen && partyGearTarget && (React.createElement(GivePartyItemModal, { npcName: partyGearTarget, gameState: gameState, itemRarities: itemRarities, equipment: equipment, memberEquipment: partyEquipment[partyGearKey] || EMPTY_EQUIPMENT, inventory: partyInventories[partyGearKey] || [], onConfirm: indexes => giveItemsToPartyMember(partyGearTarget, indexes), onTakeBack: indexes => takeItemsFromPartyMember(partyGearTarget, indexes), onCancel: () => setPartyGiveModalOpen(false), t: t })),
         restartConfirmOpen && React.createElement(RestartConfirmModal, { onConfirm: confirmRestart, onCancel: () => setRestartConfirmOpen(false), t: t }),
@@ -72384,6 +73384,21 @@ const APP_STYLES = `
   .currency-toast-label { color: var(--amber-200); }
   .currency-toast-delta { font-weight: 600; color: var(--amber-400); }
   @media (prefers-reduced-motion: reduce) { .currency-toast, .currency-toast-exit { animation: none !important; } }
+  /* Companion growth chips — "Aldric ▲ level 6 · Damage ×2, Duelist" (see
+     announceCompanionGrowth). Same fixed top-center stack idea as the ones above,
+     in the slot below the lost-item chips (.item-loss-toast-stack, 6.4rem) so a
+     turn that pays out money, moves standing, takes an item away and levels the
+     party all at once never stacks two chips on one spot. */
+  .growth-toast-stack { position: fixed; top: 9.4rem; left: 50%; transform: translateX(-50%); z-index: 70; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; pointer-events: none; max-width: calc(100vw - 1.5rem); }
+  .growth-toast { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0.2rem 0.5rem; padding: 0.5rem 0.95rem; border-radius: 18px; background: var(--stone-900); border: 1px solid rgba(56, 189, 248, 0.45); box-shadow: 0 4px 14px rgba(0,0,0,0.45); font-family: var(--font-mono); font-size: 1rem; color: var(--amber-100); animation: growth-toast-in 0.36s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .growth-toast-exit { animation: growth-toast-out 0.3s ease-in forwards; }
+  @keyframes growth-toast-in { from { opacity: 0; transform: translateY(-12px) scale(0.88); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes growth-toast-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-8px) scale(0.94); } }
+  .growth-toast-icon { font-size: 0.7em; color: var(--sky-400); }
+  .growth-toast-name { color: var(--amber-200); }
+  .growth-toast-level { font-weight: 600; color: var(--sky-400); }
+  .growth-toast-detail { flex-basis: 100%; text-align: center; font-size: 0.78rem; color: var(--stone-400); }
+  @media (prefers-reduced-motion: reduce) { .growth-toast, .growth-toast-exit { animation: none !important; } }
   /* Short notice chip — see flashNotice (busy-turn, autosave problems).
      Fixed above the modals (their backdrop is z-index 50) so it reads from
      inside one too. */
@@ -72405,6 +73420,8 @@ const APP_STYLES = `
   .group-member:last-child { border-bottom: none; }
   .group-member-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .group-member-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0; }
+  .group-member-level { margin-left: auto; padding-left: 0.5rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--stone-400); white-space: nowrap; }
+  .companion-growth-block .xp-bar-track { margin: 0.3rem 0 0.4rem; }
   .quest-journal-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
   .quest-journal-header .modal-title { margin: 0; }
   .quest-journal-controls { margin: 0 0 0.9rem; }
@@ -73455,6 +74472,16 @@ const APP_STYLES = `
   .talent-world-chip { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--stone-700); background: transparent; color: var(--stone-400); cursor: pointer; }
   .talent-world-chip-on { border-color: var(--amber-500); color: var(--amber-300); background: rgba(217, 119, 6, 0.15); }
   .talent-world-chip:disabled { opacity: 0.6; cursor: default; }
+  .talent-subject-row { display: flex; gap: 0.35rem; padding: 0.5rem 0 0.15rem; flex: none; overflow-x: auto; scrollbar-width: thin; }
+  .talent-subject-chip { display: inline-flex; align-items: baseline; gap: 0.35rem; flex: none; font-family: var(--font-mono); font-size: 0.74rem; padding: 0.28rem 0.7rem; border-radius: 999px; border: 1px solid var(--stone-700); background: transparent; color: var(--stone-300); cursor: pointer; white-space: nowrap; }
+  .talent-subject-chip:hover { border-color: var(--amber-700); }
+  .talent-subject-chip-on { border-color: var(--amber-500); color: var(--amber-200); background: rgba(217, 119, 6, 0.15); }
+  .talent-subject-level { font-size: 0.64rem; color: var(--stone-500); }
+  .talent-subject-chip-on .talent-subject-level { color: var(--amber-400); }
+  .talent-subject-points { font-size: 0.68rem; color: #22d3ee; }
+  .talent-companion-panel { flex: none; padding: 0.4rem 0 0.1rem; }
+  .talent-companion-controls { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.3rem 0 0.1rem; }
+  .talent-companion-hint { font-family: var(--font-serif); font-style: italic; font-size: 0.74rem; line-height: 1.35; color: var(--stone-500); margin: 0.25rem 0 0; }
   .talent-tree-viewport { position: relative; flex: 1 1 auto; overflow: hidden; touch-action: none; margin-top: 0.6rem; background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px; cursor: grab; }
   .talent-tree-canvas { position: relative; }
   .talent-connectors { position: absolute; top: 0; left: 0; pointer-events: none; }
