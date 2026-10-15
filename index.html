@@ -17693,6 +17693,12 @@ const TRANSLATIONS = {
         heroNamePlaceholder: 'Дарен',
         heroConceptLabel: 'Кто он',
         heroConceptPlaceholder: 'беглый наёмник (необязательно)',
+        heroAppearanceLabel: 'Внешность',
+        heroAppearancePlaceholder: 'сложение, лицо, волосы, приметы — как он выглядит (необязательно)',
+        heroAppearanceHint: 'Можно оставить пустым: рассказчик сам опишет внешность героя под мир и его историю.',
+        appearanceLabel: 'Внешность',
+        heroAppearanceNone: 'Внешность героя пока не описана.',
+        heroAppearanceEdit: 'Изменить внешность',
         missingFieldsError: 'Нужно описать мир и указать имя героя, прежде чем начать игру.',
         missingApiKeyError: 'Нужно указать ключ Gemini API в настройках, прежде чем начать игру.',
         openBookButton: 'Начать игру',
@@ -18988,6 +18994,12 @@ const TRANSLATIONS = {
         heroNamePlaceholder: 'Daren',
         heroConceptLabel: 'Who they are',
         heroConceptPlaceholder: 'a fugitive mercenary (optional)',
+        heroAppearanceLabel: 'Appearance',
+        heroAppearancePlaceholder: 'build, face, hair, distinguishing marks — how they look (optional)',
+        heroAppearanceHint: 'You can leave this empty: the narrator will describe the hero to fit the world and their story.',
+        appearanceLabel: 'Appearance',
+        heroAppearanceNone: "The hero's appearance has not been described yet.",
+        heroAppearanceEdit: 'Edit appearance',
         missingFieldsError: 'Describe the world and name your hero before opening the book.',
         missingApiKeyError: 'Enter your Gemini API key in settings before opening the book.',
         openBookButton: 'Start Game',
@@ -20157,8 +20169,75 @@ const EMPTY_STATE = {
     // WORKSHOP (see the WORKSHOP engine): the hero's crafting experience, and the
     // per-game vocabulary profile that themes every workshop word.
     craft: { xp: 0 },
-    craftProfile: null
+    craftProfile: null,
+    // The hero's lasting physical look (see APPEARANCE). Lives on state, not in a
+    // React hook beside heroName/heroConcept, so saves, the cloud and the
+    // regenerate/undo snapshots (stateBefore) carry and roll it back for free.
+    heroAppearance: ''
 };
+// ----------------------------------------------------------------------------
+// APPEARANCE — the lasting physical look of every character.
+//
+// A tracked character (gameState.npcs[i].appearance) and the hero
+// (gameState.heroAppearance) each carry a short free-text description of how
+// they LOOK. It is deliberately plain text in the story's own language and
+// the setting's own terms (a human, an android, a hound, a spirit — whatever
+// the world holds), never a fixed set of fields or a vocabulary: nothing here
+// assumes a genre, a species or a body plan, which is what lets it serve any
+// setting. The code only guarantees three things:
+//   * it is a clean, bounded string (normalizeAppearance);
+//   * it is STICKY — once recorded it survives every turn, rename, split and
+//     save/load, and a later model reply can only replace it on purpose
+//     (resolveNpcAppearance — a real, lasting change is reported with an
+//     explicit "appearanceChanged": true, the same contract as "renamed"),
+//     so a look can never drift just because the model re-worded it;
+//   * the narrator and the state pass are shown it and told to keep to it.
+// ----------------------------------------------------------------------------
+const APPEARANCE_MAX_LEN = 500;
+const APPEARANCE_EMPTY_WORDS = /^(none|null|n\/a|unknown|undefined|нет|неизвестно|—|–|-)\.?$/i;
+function normalizeAppearance(value) {
+    if (typeof value !== 'string')
+        return '';
+    let s = value.replace(/\s+/g, ' ').trim();
+    if (!s || APPEARANCE_EMPTY_WORDS.test(s))
+        return '';
+    if (s.length > APPEARANCE_MAX_LEN) {
+        const cut = s.slice(0, APPEARANCE_MAX_LEN);
+        const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+        s = stop > APPEARANCE_MAX_LEN * 0.5 ? cut.slice(0, stop + 1) : cut.replace(/\s+\S*$/, '').replace(/[,;:\s]+$/, '') + '…';
+    }
+    return s;
+}
+// What a character's appearance becomes after a turn: the recorded one stays
+// unless the model sends a new one AND flags it as a real change; a character
+// with nothing recorded yet simply takes whatever valid text arrives.
+function resolveNpcAppearance(rawAppearance, rawChanged, priorAppearance) {
+    const prior = normalizeAppearance(priorAppearance);
+    const next = normalizeAppearance(rawAppearance);
+    if (!next)
+        return prior;
+    if (!prior)
+        return next;
+    return rawChanged === true ? next : prior;
+}
+// Returns a copy of an npc entry with its appearance set to `appearance`
+// (or removed when empty) and the transient "appearanceChanged" flag dropped.
+function withAppearance(entry, appearance) {
+    const { appearance: _old, appearanceChanged: _flag, ...rest } = entry;
+    return appearance ? { ...rest, appearance } : rest;
+}
+// The hero's appearance after a turn. `typed` is the player's own words from the
+// setup screen (only ever passed on the opening turn) and always wins; the
+// model's "heroAppearance" fills a blank (the opening scene, or a save that
+// predates this feature) and, afterwards, is only sent for a lasting change.
+function resolveHeroAppearance(current, reported, typed) {
+    const own = normalizeAppearance(typed);
+    if (own)
+        return own;
+    const cur = normalizeAppearance(current);
+    const rep = normalizeAppearance(reported);
+    return rep || cur;
+}
 function clampStat(value, fallback) {
     const n = Number(value);
     if (!Number.isFinite(n))
@@ -24176,7 +24255,7 @@ function normalizeGameStateCore(raw) {
         // normalizeFactionRelations on load rather than trusted as-is.
         npcs: Array.isArray(raw.npcs)
             ? raw.npcs.map(n => (n && typeof n === 'object')
-                ? { ...n, ...(Array.isArray(n.effects) ? { effects: normalizeStoredEffects(n.effects) } : {}), relations: normalizeNpcRelations(n.relations, n.name) }
+                ? withAppearance({ ...n, ...(Array.isArray(n.effects) ? { effects: normalizeStoredEffects(n.effects) } : {}), relations: normalizeNpcRelations(n.relations, n.name) }, normalizeAppearance(n.appearance))
                 : n)
             : [],
         quests: normalizeQuests(raw.quests),
@@ -24208,7 +24287,8 @@ function normalizeGameStateCore(raw) {
         abilities: mergeWeaponAbilities(deriveAbilitiesFromTalents(resolvedTalents), raw.abilities),
         worldTraits: normalizeWorldTraits(raw.worldTraits),
         craft: normalizeCraftState(raw.craft),
-        craftProfile: normalizeCraftProfile(raw.craftProfile)
+        craftProfile: normalizeCraftProfile(raw.craftProfile),
+        heroAppearance: normalizeAppearance(raw.heroAppearance)
     };
 }
 // A faction's own declared stance toward another known faction — "war"
@@ -27291,6 +27371,45 @@ function CompanionBondsBlock({ npcName, gameState, party, t }) {
 // (passed in fresh each render) rather than captured at click time, so if
 // the character dies or moves on a later turn while this happens to still
 // be open, it reflects that instead of showing stale info.
+// One character's recorded look (see APPEARANCE) as a quiet italic line; renders nothing
+// for a character without one (an older save, or someone not yet described).
+function NpcAppearanceLine({ npc, t }) {
+    const text = npc && typeof npc.appearance === 'string' ? npc.appearance.trim() : '';
+    if (!text)
+        return null;
+    return React.createElement("p", { className: "sheet-npc-note npc-appearance" },
+        React.createElement("span", { className: "npc-appearance-label" },
+            t('appearanceLabel'),
+            ":"),
+        " ",
+        text);
+}
+// The hero's look in the character sheet. Editable by the player while the sheet shows the
+// live state (onChange is omitted when a past turn is being viewed).
+function HeroAppearanceBlock({ appearance, onChange, t }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState('');
+    const text = typeof appearance === 'string' ? appearance.trim() : '';
+    if (!editing) {
+        if (!text && !onChange)
+            return null;
+        return (React.createElement("div", { className: "sheet-hero-appearance" },
+            React.createElement("p", { className: "sheet-npc-note npc-appearance" },
+                React.createElement("span", { className: "npc-appearance-label" },
+                    t('appearanceLabel'),
+                    ":"),
+                " ",
+                text || t('heroAppearanceNone')),
+            onChange && React.createElement("button", { type: "button", className: "chip-btn hero-appearance-edit", onClick: () => { setDraft(text); setEditing(true); } },
+                "\u270E ",
+                t('heroAppearanceEdit'))));
+    }
+    return (React.createElement("div", { className: "sheet-hero-appearance" },
+        React.createElement("textarea", { className: "text-field hero-appearance-input", rows: 4, maxLength: APPEARANCE_MAX_LEN, value: draft, onChange: e => setDraft(e.target.value), placeholder: t('heroAppearancePlaceholder'), "aria-label": t('heroAppearanceLabel') }),
+        React.createElement("div", { className: "hero-appearance-actions" },
+            React.createElement("button", { type: "button", className: "btn btn-ghost", onClick: () => { onChange(draft); setEditing(false); } }, t('saveButton')),
+            React.createElement("button", { type: "button", className: "btn btn-ghost", onClick: () => setEditing(false) }, t('cancelButton')))));
+}
 function NpcInfoModal({ name, gameState, npcReputations, factionReputations, party, t, onClose }) {
     const npc = (gameState.npcs || []).find(n => n && typeof n.name === 'string' && n.name.trim().toLowerCase() === name.trim().toLowerCase());
     if (!npc)
@@ -27335,6 +27454,7 @@ function NpcInfoModal({ name, gameState, npcReputations, factionReputations, par
                     reputation,
                     " / 100")),
             npc.note && React.createElement("p", { className: "sheet-npc-note" }, npc.note),
+            React.createElement(NpcAppearanceLine, { npc: npc, t: t }),
             Array.isArray(npc.relations) && npc.relations.length > 0 && (React.createElement("div", { className: "npc-relations-block" },
                 React.createElement("p", { className: "sheet-npc-note" }, t('npcRelationsLabel')),
                 React.createElement("ul", { className: "npc-relations-list" }, npc.relations.map(r => (React.createElement("li", { key: r.name + ':' + r.type, className: "npc-relations-item" },
@@ -42156,7 +42276,7 @@ function WorkshopModal({ station, vocab, gameState, itemRarities, equipment, buy
             React.createElement("div", { className: "modal-actions" },
                 React.createElement("button", { onClick: onClose, className: "btn btn-primary", type: "button" }, t('closeButton'))))));
 }
-function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, tokenUsage, itemRarities, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onOpenTalents, onOpenCompanionTalents, onOpenSociety, onGiftNpc, onRecruitNpc, onTradeNpc, onRepairNpc, onWorkshopNpc, onOpenEffect, onReleasePrisoner, onKillPrisoner, t }) {
+function CharacterSheet({ heroName, onHeroNameChange, heroConcept, onHeroAppearanceChange, gameState, tokenUsage, itemRarities, equipment, npcReputations, factionReputations, party, onOpenEquipment, onOpenInventory, onOpenQuests, onOpenTalents, onOpenCompanionTalents, onOpenSociety, onGiftNpc, onRecruitNpc, onTradeNpc, onRepairNpc, onWorkshopNpc, onOpenEffect, onReleasePrisoner, onKillPrisoner, t }) {
     const isEmpty = !gameState.time &&
         gameState.effects.length === 0 &&
         (gameState.prisoners || []).length === 0 &&
@@ -42207,7 +42327,8 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
         React.createElement("div", { className: "sheet-hero" },
             React.createElement("p", { className: "sheet-hero-name" }, heroName || t('heroFallback')),
             !heroName && onHeroNameChange && React.createElement(HeroNameRecovery, { onSubmit: onHeroNameChange, t: t }),
-            heroConcept && React.createElement("p", { className: "sheet-hero-concept" }, heroConcept)),
+            heroConcept && React.createElement("p", { className: "sheet-hero-concept" }, heroConcept),
+            React.createElement(HeroAppearanceBlock, { appearance: gameState.heroAppearance, onChange: onHeroAppearanceChange, t: t })),
         onOpenEquipment && (React.createElement("button", { onClick: onOpenEquipment, className: "btn btn-ghost sheet-equipment-btn", type: "button" },
             React.createElement("img", { src: EQUIP_ICON_ARMOR, alt: "", style: { width: 20, height: 20, verticalAlign: 'middle', marginRight: 4 } }),
             " ",
@@ -42504,6 +42625,7 @@ function CharacterSheet({ heroName, onHeroNameChange, heroConcept, gameState, to
                                 "\uD83D\uDD28 ",
                                 t('workshopLink')))),
                         React.createElement("p", { className: "sheet-npc-note" }, n.note),
+                        React.createElement(NpcAppearanceLine, { npc: n, t: t }),
                         React.createElement(CompanionGrowthBlock, { npcName: n.name, gameState: gameState, party: party, onOpenTalents: onOpenCompanionTalents, t: t }),
                         React.createElement(CompanionBondsBlock, { npcName: n.name, gameState: gameState, party: party, t: t })))));
             }))),
@@ -42732,6 +42854,7 @@ function SocietyModal({ gameState, npcReputations, factionReputations, party, on
                                 isPresent ? t('npcHereLabel') : t('npcAwayLabel'),
                                 ")")),
                         n.note && React.createElement("p", { className: "sheet-npc-note society-npc-desc" }, n.note),
+                        React.createElement(NpcAppearanceLine, { npc: n, t: t }),
                         React.createElement("p", { className: "reputation-bar-caption" }, t('reputationLabel')),
                         React.createElement("div", { className: "reputation-bar-track", "aria-label": t('reputationLabel') + ': ' + reputation },
                             React.createElement("div", { className: "reputation-bar-fill", style: { width: barPercent + '%', backgroundColor: barColor } }),
@@ -43328,6 +43451,7 @@ function GroupModal({ worldProfile, party, npcs, gameState, narrativeItemSlots, 
                                 t('equipmentButton')),
                             React.createElement("button", { onClick: () => setDismissConfirmName(n.name), className: "btn btn-ghost", type: "button" }, t('dismissFromPartyButton'))),
                         n.note && React.createElement("p", { className: "sheet-npc-note" }, n.note),
+                        React.createElement(NpcAppearanceLine, { npc: n, t: t }),
                         gameState && React.createElement(CompanionGrowthBlock, { npcName: n.name, gameState: gameState, party: party, onOpenTalents: onOpenTalents, t: t }),
                         React.createElement("div", { className: "sheet-vitals" },
                             React.createElement("div", { className: "sheet-vital-row" },
@@ -57696,6 +57820,9 @@ function App() {
     const turnNarrativeRef = useRef('');
     const turnRenameCountRef = useRef(0);
     const [heroConcept, setHeroConcept] = useState('');
+    // The setup screen's optional "appearance" field. Only the OPENING call reads it (see
+    // sharedContext / resolveHeroAppearance); once the story runs, gameState.heroAppearance is the source of truth.
+    const [heroAppearanceDraft, setHeroAppearanceDraft] = useState('');
     // How many companions (0..MAX_PARTY_SIZE) to start the game already
     // traveling with, chosen via the "🤝 Группа" picker on the setup screen —
     // see OPENING SCENE STARTING COMPANIONS in buildNarrativeSystemPrompt and
@@ -58556,6 +58683,20 @@ function App() {
         saveFailureShownRef.current = true;
         flashNotice('autosaveFailedNotice', 7000);
     }
+    // The player rewrites the hero's look from the character sheet (live turn only). The
+    // regenerate/undo snapshots carry the old text, so it is patched into every earlier
+    // snapshot too — otherwise regenerating the last turn would quietly bring it back.
+    function updateHeroAppearance(text) {
+        const value = normalizeAppearance(text);
+        const nextState = { ...gameState, heroAppearance: value };
+        const nextMessages = messages.map(m => (m && m.stateBefore && typeof m.stateBefore === 'object' && m.stateBefore !== EMPTY_STATE)
+            ? { ...m, stateBefore: { ...m.stateBefore, heroAppearance: value } }
+            : m);
+        setHeroAppearanceDraft(value);
+        setGameState(nextState);
+        setMessages(nextMessages);
+        saveGame(nextMessages, nextState, itemRarities, equipment, npcReputations, party, partyInventories, partyEquipment, factionReputations, npcKindnessCooldowns, npcInventories, npcCurrencies, partyCurrency);
+    }
     // Lets the player re-enter a hero name that an older build wiped from the
     // autosave (see the nextIdentity note on saveGame) — shown in the
     // character sheet only while heroName is empty.
@@ -58634,6 +58775,7 @@ function App() {
         setWorldSetting(saved.worldSetting || '');
         setHeroName(saved.heroName || '');
         setHeroConcept(saved.heroConcept || '');
+        setHeroAppearanceDraft('');
         setMessages(saved.messages || []);
         const loadedState = normalizeGameState(saved.gameState);
         setGameState(loadedState);
@@ -59670,7 +59812,7 @@ function App() {
         // "name|name" map. Same for companionGrowth (see
         // buildCompanionGrowthPromptSection): the narrator hears how seasoned each
         // companion has become, never the raw XP/talent bookkeeping it must not touch.
-        const { companionBonds: _bondsOmitted, companionGrowth: _growthOmitted, agents: _agentsOmitted, heroCover: _coverOmitted, paranoia: _paranoiaOmitted, canaries: _canariesOmitted, operatives: _opsOmitted, ...stateForPrompt } = state;
+        const { companionBonds: _bondsOmitted, companionGrowth: _growthOmitted, agents: _agentsOmitted, heroCover: _coverOmitted, paranoia: _paranoiaOmitted, canaries: _canariesOmitted, operatives: _opsOmitted, heroAppearance: _heroLookOmitted, ...stateForPrompt } = state;
         // The chronicle is shown to the narrator as text (see buildFactionHierarchyBriefing); the raw log would only cost tokens here.
         const factionsForPrompt = Array.isArray(stateForPrompt.factions) ? stateForPrompt.factions.map(f => { if (!f || typeof f !== 'object')
             return f; const { chronicle: _chronicleOmitted, ...rest } = f; return rest; }) : stateForPrompt.factions;
@@ -59706,10 +59848,13 @@ ${narrativeSummaryRef.current}`
 
 CURRENT PARTY — these characters are established traveling companions of the hero, having formally agreed to journey together: ${partyMemberNames.join(', ')}. Treat them as continuously present alongside the hero in every scene from now on unless the story explicitly and deliberately separates them (a real parting of ways, someone left behind, a genuine split) — never let one simply vanish from the narrative without that being an actual story beat.${buildCompanionBondsPromptSection(state, partyMemberNames)}${buildCompanionGrowthPromptSection(state, partyMemberNames)}`
             : '';
+        // The hero's lasting look (see APPEARANCE): from state once the story runs, from the setup screen's field on the opening call.
+        const heroLook = normalizeAppearance(state.heroAppearance) || (state === EMPTY_STATE ? normalizeAppearance(heroAppearanceDraft) : '');
+        const heroLookLine = heroLook ? `\nTHE HERO'S APPEARANCE (established fact — keep to it): ${heroLook}` : '';
         return { narrativeLanguage, partyMemberNames, context: `WORLD AND SETTING:
 ${worldSetting}
 
-THE PLAYER'S HERO: ${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName)}${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.concept : heroConcept) ? ', ' + (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.concept : heroConcept) : ''}${buildNameHistoryNote(turnHistoryRef.current, (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName))}${summarySection}
+THE PLAYER'S HERO: ${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName)}${(heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.concept : heroConcept) ? ', ' + (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.concept : heroConcept) : ''}${buildNameHistoryNote(turnHistoryRef.current, (heroIdentityOverrideRef.current ? heroIdentityOverrideRef.current.name : heroName))}${heroLookLine}${summarySection}
 
 CURRENT GAME STATE (take this into account and do not contradict it):
 ${JSON.stringify(buildPromptState(state))}${partySection}` };
@@ -60091,6 +60236,8 @@ ${JSON.stringify(buildPromptState(state))}${partySection}` };
         const opsLive = (state.operatives || []).length > 0;
         const opsRuleNum = ++ruleNum;
         const opsRule = `\n${opsRuleNum}. SENDING A COMPANION ON A SECRET MISSION: the hero may, in their own words, order one of their own party companions to go undercover or spy somewhere else for them. Treat it like any other order from the hero: the companion answers in character — agrees (and leaves with a plan, a cover name, and a way to report back), asks for something in return, or refuses — and only where this world's setting really allows such missions (distances, couriers, rival powers, intrigue); where it does not, it simply does not work out. It is never suggested to the hero as an option, and a joke, a hypothetical, or a passing remark is not an order.${opsLive ? ' Operatives who are away are NOT in the scene: their news reaches the hero only as the lines under "THE HERO\'S OPERATIVES" say (a report, silence, word of them, an arrival). Never narrate what an operative is doing in the field, never confirm that a turned operative is a traitor, and never let a curated report show that it is — the hero learns the truth only from proof the story itself provides. A returning operative is received exactly as the lines say.' : ''}`;
+        const appearanceRuleNum = ++ruleNum;
+        const appearanceRule = `\n${appearanceRuleNum}. CHARACTER APPEARANCE: every character — the hero and each tracked character — has a fixed physical look, and a look never changes by accident. Where a tracked character has an "appearance" in the CURRENT GAME STATE (and the hero's own look is given under THE HERO'S APPEARANCE above), it is established fact: whenever you describe them, stay inside it — the same build, features, colouring, markings, species or make — and never contradict it or quietly give them a different face. Show a look the way a person actually notices one: the one or two traits that strike first, worked into an action or a reaction, never a stat-block list, and never the same head-to-toe inventory in every scene. The FIRST time a named or story-relevant character steps on stage — and the first time a returning one has no "appearance" recorded yet — put a few concrete visual traits into the prose itself, fitting who and what they are and the world they live in, so the look is established on the page and then stays the same. The hero is "you" in this narration, so their look surfaces sparingly and only where it naturally shows: a reflection, someone's reaction or remark, a wound, a change. Describe whatever the setting holds in the setting's own terms — a human, a non-human, a machine, a spirit, an animal, a creature of any kind — never forcing human features onto something that is not human and never importing anything the world has not established. A look changes only when the story really changes it (an injury that scars, age, a haircut, a transformation, a curse, an upgrade, a repair): when that happens, show the change clearly in the prose so it can be recorded. Clothing and gear follow the inventory and equipment in the state; a disguise is temporary and the look beneath it stays.`;
         const opsSection = opsBriefing ? `\n\nTHE HERO'S OPERATIVES (companions the hero sent away on missions; the player knows the mission, NOT the hidden truth marked HIDDEN TRUTH):\n${opsBriefing}` : '';
         return `You are an experienced text role-playing game master, in the spirit of interactive fiction like Infinite Worlds or AI Dungeon.
 
@@ -60118,7 +60265,7 @@ GAME MASTER RULES:
 7. Some lines are marked with the prefix "[DIRECTOR NOTE, not the hero's action or line]:" — this is a wish for what should happen in the story, not something the hero themselves says or does. Weave it naturally into the narrative that follows, so it plays out as an organic event, not the execution of a command. Lines marked "[ITEM DECISIONS FROM PREVIOUS TURN]:" tell you what the hero did or didn't take last turn — reflect that outcome naturally (in their hands, mentioned in passing, etc.) without dwelling on it.
 8. UNIVERSAL CURRENCY: this world has one ordinary in-story currency the hero can earn, spend, and lose — describe it using whatever term fits the setting (gold coins, credits, shells, chits, or anything else appropriate), but treat it as the same single kind of money throughout. Whenever it changes hands for any reason — a payment, a price paid, money found and pocketed, a bribe or toll, winnings or a loss at a wager, a theft — state a concrete number in the prose (e.g. "she counts out 12 coins into your hand," not "she pays you well" or "you find some money"). Never leave the amount vague when currency is genuinely changing hands. The one exception: a merchant or vendor buying or selling their ordinary goods from/to the hero is never written as a completed exchange here at all, with or without a number — see the trade rule below.
 9. CHARACTER COMMUNICATION DISTANCE: an ordinary person cannot hear or speak with the hero across real distance. A character who is not physically present with the hero right now — not in the same place, face to face — cannot converse with them, answer them, or otherwise communicate directly, UNLESS the story has already genuinely established a specific means of remote contact for that character (a radio, telephone, walkie-talkie, messenger, magical link, telepathy, or similar) that plausibly fits both the setting and that character. When such an established channel is genuinely used, make the medium explicit in the prose itself — a voice crackling over a radio, words arriving by messenger, a whispered link carried by magic — never write the exchange as if they were simply standing together. Without an established channel like this, a distant character is out of reach right now, however convenient it would be for the scene.
-10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${riskyLootRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${buildCharacterBriefRule(state)}${captivityRule}${mindRule}${prisonersRule}${groupIndividualsRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${enemyRule}${incapacitatedRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${weatherRule}${worldRule}${partyRule}${abilitiesRule}${pendingSecretsRule}${identityRule}${agentRule}${coverRule}${dialRule}${opsRule}
+10. ENTITY TAGGING: the CURRENT GAME STATE above lists the hero's inventory items, tracked characters (npcs), and map locations by name. Tag a name in square brackets ONLY at the exact moment a character — the hero or an NPC — speaks about that entity out loud, by name, in a way that matters to a quest or task: sending someone to a place, telling them who to seek out, asking after a specific item, offering or handing one over, and similar. This is meant to be rare — most scenes will have only one or two such moments, some none at all. Do NOT bracket a name anywhere else: not in the narrator's own descriptive prose (what the hero is wearing, what a room contains, how someone looks), not when a character simply uses, holds, or glances at something without naming it for another character's benefit, not in idle or non-quest-relevant dialogue, and never more than once for the same entity in a scene. When you do bracket a name, write it exactly as the sentence's grammar naturally calls for — decline, inflect, or conjugate it however reads correctly, never forcing it into the state's base/dictionary form. Example: "«Отнеси [Меч Дракона] старьевщику», — велит [Елена], указывая на тропу к [Старой мельнице]." Only tag entities genuinely already present in the state above — never invent brackets around an ordinary noun, a brand-new name not yet tracked, a generic description, or a group/plural reference. This tagging must never be visible as anything other than the brackets themselves — do not comment on it, explain it, or let any character notice it.${itemRule}${riskyLootRule}${tradeRule}${questRule}${questDepthRule}${rewardHaggleRule}${travelRule}${checkRule}${buildCharacterBriefRule(state)}${captivityRule}${mindRule}${prisonersRule}${groupIndividualsRule}${openingGearRule}${openingPartyRule}${reactionRule}${setGearRule}${resentfulRule}${hostileRule}${enemyRule}${incapacitatedRule}${territoryResentfulRule}${territoryHostileRule}${factionRelationsRule}${factionTrustGateRule}${dayPhaseRule}${weatherRule}${worldRule}${partyRule}${abilitiesRule}${pendingSecretsRule}${identityRule}${agentRule}${coverRule}${dialRule}${opsRule}${appearanceRule}
 
 Respond with ONLY the scene's text, written in ${narrativeLanguage}. No headings, no markdown, no JSON, no commentary of your own, and no bracketed note copied in from above (see the "never reproduce a bracketed note" rule) — just the scene itself.`;
     }
@@ -60251,7 +60398,7 @@ ${knownSecrets}
         // and openingGearRule/openingPartyRule above already assume the old
         // full-list shape for this very first turn.
         const useStateDeltaMode = stateDeltaMode && !isOpeningTurn;
-        const npcEntryShape = `[{"name": "name", "note": "brief note", "individuals": 1, "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "renamed": true, "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "factionLeader": true, "unyielding": true, "enemy": true, "incapacitated": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8, "charisma": 10}, "temperament": {"candor": 35, "wariness": 70, "pride": 55, "warmth": 40, "resolve": 60}, "values": {"order": 60, "mercy": 35, "honor": 55, "gain": 70, "kin": 65}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "mindEvents": [{"kind": "fear", "severity": "mild", "label": "short cause"}]}]`;
+        const npcEntryShape = `[{"name": "name", "note": "brief note", "individuals": 1, "inventory": ["item name", "item name"], "location": "name of the place this character is currently at, exactly matching a known location name where possible, or the literal string \"with the hero\" if they are actively travelling alongside the hero right now", "presentNow": true, "previousName": "the placeholder this character was tracked under, ONLY the turn their real name is learned", "renamed": true, "faction": "the faction/group this character visibly belongs to or serves, reusing an exact known faction name from above where possible — omit if none", "role": "their profession or position, 1-3 words (blacksmith, captain of the guard, innkeeper) — omit if the scene hasn't established one", "appearance": "their lasting physical look, 1-3 short plain sentences in the scene's language — REQUIRED when adding a character; afterwards only when it really and lastingly changes", "appearanceChanged": true, "factionLeader": true, "unyielding": true, "enemy": true, "incapacitated": true, "dead": true, "health": 500, "maxHealth": 500, "psyche": 500, "maxPsyche": 500, "stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8, "charisma": 10}, "temperament": {"candor": 35, "wariness": 70, "pride": 55, "warmth": 40, "resolve": 60}, "values": {"order": 60, "mercy": 35, "honor": 55, "gain": 70, "kin": 65}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], "mindEvents": [{"kind": "fear", "severity": "mild", "label": "short cause"}]}]`;
         const facEntryShape = `[{"name": "faction name", "note": "one short sentence on what this group is/does/wants, first mention only", "scale": "organization", "parent": "exact name of the larger faction this one is part of — omit for a top-level faction; null on the turn a unit breaks away from its parent", "values": ["what this group honors or despises, 1-3 short phrases, first mention only"], "splitFrom": "exact name of the tracked faction a NEW group breaks away from, only on the turn it appears", "absorbs": ["exact names of tracked factions merged INTO this one, only on the turn the merger happens"], "previousName": "the wrong or partial name this faction was tracked under, ONLY the turn it is corrected", "fate": "destroyed", "relations": [{"faction": "another known faction name", "stance": "war"}]}]`;
         const stateContractNote = useStateDeltaMode
             ? ` Several fields below (marked as such) ask only for what changed this turn, not a full restatement — the current game state above already has everything that didn't change.`
@@ -60265,6 +60412,20 @@ ${knownSecrets}
         // The hero's current psyche is the GAME's to track from the second turn on (see the PSYCHE section):
         // the model only reports a STARTING value on the opening scene and, from then on, witnesses what
         // happened to the mind (mindEvents). Same for a party member from the turn after they are recruited.
+        // APPEARANCE (see the helpers at the top of the file): the extractor records each
+        // character's lasting look. One shared description of the form, then the
+        // hero's field phrased for the situation (opening / unknown / known).
+        const appearanceSpec = `a lasting physical description of 1-3 plain sentences, at most about 300 characters, written in ${narrativeLanguage}: only what an onlooker would see and what stays true from scene to scene — apparent age or life stage, build and height, face and distinguishing features, the colouring and texture of hair, fur, skin, scales or surface, lasting marks (scars, tattoos, augmentations, damage, natural markings), bearing, and a signature habitual piece of dress only when it is truly part of how they are recognised. Use the terms of THIS world and of what the character actually IS — a human, an elf, an android, a hound, a spirit, a dragon, a ship's avatar, anything — never force human features onto a non-human and never import anything the setting does not contain (no machine parts in a world without them, no magic in one without it). Leave out personality, backstory, mood, temporary states (blood, dust, wet clothes, a fresh wound — those are "effects") and ordinary changeable gear (that is "inventory"). Take it from what the scene text and the state already show: use the exact traits the prose gave and, where it gave only some, keep them and fill the rest modestly and consistently with the character's note, role and kind. It must never contradict anything already established.`;
+        const heroLookKnown = !!normalizeAppearance(state.heroAppearance);
+        const heroLookTyped = isOpeningTurn && !!normalizeAppearance(heroAppearanceDraft);
+        const heroAppearanceInstruction = heroLookTyped
+            ? `"heroAppearance": OMIT THE FIELD — the player already wrote the hero's appearance (shown under THE HERO'S APPEARANCE above) and it is kept exactly as written.`
+            : isOpeningTurn
+                ? `"heroAppearance" is a string in the same form as an npc "appearance" above, and it is REQUIRED on this opening scene: write the hero's own lasting look from their name, their concept and the world (and from anything the opening prose already showed of them), consistent with their race/species and sex/gender in the concept text.`
+                : heroLookKnown
+                    ? `"heroAppearance" (the hero's own look, shown under THE HERO'S APPEARANCE above): OMIT THE FIELD ENTIRELY on almost every scene. Include it ONLY when the scene shows a real, lasting change to the hero's own look (a scar, a lost limb, aging, a shaved head, a transformation, an augmentation, a repair) — then give the COMPLETE updated description in the same form as an npc "appearance", rewriting only what changed and keeping the rest word for word. Nothing for a disguise, an illusion, a passing state or a change that was only attempted.`
+                    : `"heroAppearance": the game has no recorded appearance for the hero yet (there is no THE HERO'S APPEARANCE line above) — report one NOW, in this response, as a string in the same form as an npc "appearance" above. Use anything the story so far has already established about the hero's look; otherwise write one consistent with their name, concept and the world.`;
+        const appearanceStateRule = `APPEARANCE OF CHARACTERS — every tracked character has a lasting physical look, recorded as "appearance" on their entry. An npc "appearance" is ${appearanceSpec} It is REQUIRED on every character you add for the first time (${useStateDeltaMode ? 'every "npcAdd" entry' : 'every new entry in "npcs"'}). A tracked character who has no "appearance" in the state yet gets one the first turn they are on stage or their look is shown: the traits this scene shows first, otherwise a modest consistent description. ${useStateDeltaMode ? 'Never restate an existing appearance in "npcUpdate"; send "appearance" only on the turn it really changes.' : 'On a character who already has an "appearance" in the state, either copy it back exactly or leave the field out (leaving it out keeps the recorded one); never reword it.'} An existing appearance changes ONLY when the scene shows a real, lasting change to that character's body or make (a scar, a lost limb, aging, a shaved head, a transformation, an augmentation, a repair): send the COMPLETE new "appearance" together with "appearanceChanged": true — nothing for a disguise, an illusion, a passing state or an attempted change, and a rename never changes a look. ${heroAppearanceInstruction}`;
         const psycheSchemaFields = isOpeningTurn ? `"psyche": 500, "maxPsyche": 500, ` : `"maxPsyche": 500, `;
         const psycheRule = isOpeningTurn
             ? `"psyche" is an integer from 1 to 1000 representing the hero's CURRENT mental/spiritual state right now — their nerve, composure and will, the thing fear, trauma and grief wear down and rest restores — and must never exceed "maxPsyche" (below). Use the same calibration as health: an ordinary person sits around 50, the hundreds are for truly exceptional willpower, and 1000 is reserved for a deity-tier being. It has nothing to do with spellcasting or the use of abilities, which never cost psyche. This is the opening scene: your read of the hero's starting state sets the reserve the game tracks from here on, so judge it carefully.`
@@ -60313,7 +60474,7 @@ ${context}${questContext}${mapContext}${itemBudgetContext}${pendingSecretsContex
 Return the FULL updated state accounting for everything that happened (not just new elements), plus each event field below — most event fields will be empty/null/false on most turns; only fill one in when the scene clearly, unambiguously contains that specific kind of moment.${stateContractNote}
 
 Respond with ONLY valid JSON and nothing else (no markdown, no \`\`\`json, no text before or after):
-{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "weather": "none", "health": 500, "maxHealth": 500, ${psycheSchemaFields}"stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8, "charisma": 10}, "temperament": {"candor": 35, "wariness": 70, "pride": 55, "warmth": 40, "resolve": 60}, "values": {"order": 60, "mercy": 35, "honor": 55, "gain": 70, "kin": 65}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${isOpeningTurn ? '' : '"mindEvents": [{"kind": "fear", "severity": "moderate", "label": "short cause"}], '}${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"moved": false, "current": "ONLY when moved is true: the name of the place the hero has just arrived at — omit it when moved is false", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "inside": "exact known name of the place that physically contains this one, or null if it stands on its own out in the open — new places only", "nextTo": "optional: exact known name of the same-level place this one lies closest to", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "inside": "exact known name of its container, or null if it stands on its own out in the open — new places only", "nextTo": "optional: exact known name of the same-level place it lies closest to", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}], "placeLinks": [{"place": "exact known name", "inside": "exact known name of its container, or null"}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "prisonersGone": [], ${secretsSchemaField}"newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
+{"suggestions": ["short action", "short action", "short action"], "time": "current in-story date and time of day", "weather": "none", "health": 500, "maxHealth": 500, ${psycheSchemaFields}"stats": {"strength": 8, "agility": 12, "intelligence": 10, "initiative": 8, "charisma": 10}, "temperament": {"candor": 35, "wariness": 70, "pride": 55, "warmth": 40, "resolve": 60}, "values": {"order": 60, "mercy": 35, "honor": 55, "gain": 70, "kin": 65}, "effects": [{"kind": "bleed", "label": "short description", "severity": "moderate"}], ${isOpeningTurn ? '' : '"mindEvents": [{"kind": "fear", "severity": "moderate", "label": "short cause"}], '}${inventorySchemaField}"currencyChange": {"amount": 0, "reason": "short reason, omit whole field if amount is 0"}, ${npcsSchemaField}"quests": [{"id": "id from the active quest list above", "status": "completed", "progress": "short, dry, log-style note of what happened on this quest this turn, or omit if nothing did", "npcs": ["character name, already tracked in npcs above"], "newStages": [{"id": "short_id", "title": "short evocative stage title", "description": "one dry sentence stating this stage's own objective"}], "stageUpdates": [{"id": "id of an existing stage on this quest, from the list above", "status": "completed", "progress": "short, dry note on this ONE stage, or omit if nothing changed"}]}], "reputationHits": [{"name": "npc name exactly as tracked", "type": "insult"}], "factionReputationHits": [{"faction": "faction name exactly as tracked", "type": "insult"}], "location": {"moved": false, "current": "ONLY when moved is true: the name of the place the hero has just arrived at — omit it when moved is false", "previousName": "if this exact place was already tracked under a placeholder/generic label and its real proper name is only now revealed, the exact old label — omit every other turn", "kind": "settlement", "description": "one short evocative sentence, first mention only", "questId": "id from active quests above, only if this place IS that quest's objective", "stageId": "id of one of that quest's own stages above, only when this place is specifically THAT stage's objective rather than the quest's as a whole — omit if the quest has no stages, or if this is the quest's overall destination", "inside": "exact known name of the place that physically contains this one, or null if it stands on its own out in the open — new places only", "nextTo": "optional: exact known name of the same-level place this one lies closest to", "directionFromPrevious": "NE", "faction": "name of the faction/group that controls or holds authority here, reusing an exact known faction name from above where possible — omit if none or unclear", "danger": true, "verticalMove": "up", "nearbyMentioned": [{"name": "name", "previousName": "same idea as location.previousName above, for this specific place — omit every other turn", "kind": "wilderness", "direction": "N", "inside": "exact known name of its container, or null if it stands on its own out in the open — new places only", "nextTo": "optional: exact known name of the same-level place it lies closest to", "description": "one short sentence, first mention only", "faction": "controlling faction, omit if none or unclear", "danger": false, "verticalMove": "down", "far": false}], "placeLinks": [{"place": "exact known name", "inside": "exact known name of its container, or null"}]}, ${factionsSchemaField}"newQuestOffers": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "giver": "character name", "reward": "the concrete reward stated explicitly in the scene's dialogue on completion — a specific sum, item, favor, or other tangible thing, in the scene's own words; never a vague phrase and never a note that no reward was given", "advance": "what's offered as an upfront advance right now, or null if none", "description": "one dry, factual sentence stating what the hero actually has to do, in the scene's own language", "rewardNegotiable": true}], "newDiscoveredQuests": [{"id": "short_id", "title": "short evocative title, in the scene's own language", "description": "one dry, factual sentence stating what the hero actually has to do or look into, in the scene's own language"}], "rewardOffers": [{"id": "short_id", "questId": "id from the active quest list above", "giver": "character name", "reward": "what's being handed over now"}], "travelOffer": null, "combat": {"combat": false}, "captivityResolved": false, "prisonersGone": [], ${secretsSchemaField}"newPendingSecrets": [{"text": "concrete plan/intention", "trigger": "exact firing condition, omit field if none"}], "pendingSecretUpdates": [{"id": "id from the list above", "status": "fulfilled"}], \"heroAppearance\": \"the hero's lasting physical look, 1-3 short plain sentences — see APPEARANCE OF CHARACTERS; omit when not required\", \"heroIdentity\": {\"name\": \"the hero's new name\", \"concept\": \"the hero's full updated concept line\"}, \"agentPlants\": [{\"npc\": \"exact tracked name\", \"allegiance\": \"who they secretly serve\", \"mission\": \"the overall goal\", \"target\": \"faction or group spied on\", \"mole\": false, \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"objectives\": [\"step one\", \"step two\"], \"tells\": [{\"text\": \"optional short tell\", \"strength\": \"weak|solid|damning\"}]}], \"agentNoticed\": [{\"npc\": \"name\", \"tell\": \"tell id\"}], \"agentPressure\": [\"name\"], \"agentBlocked\": [\"name\"], \"agentExposed\": [{\"npc\": \"name\", \"how\": \"hero|self|gone\"}], \"heroCoverStart\": {\"allegiance\": \"who they secretly serve\", \"mission\": \"the goal\", \"target\": \"faction or group spied on\", \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\", \"handler\": \"exact tracked name\"}, \"heroSlips\": [{\"npc\": \"name\", \"gravity\": \"minor|serious\", \"kind\": \"enemy|neutral|ally\"}], \"heroCleared\": [\"name\"], \"heroAliases\": [{\"alias\": \"false name\", \"to\": [\"name\"]}], \"handlerVerdict\": \"pleased|displeased\", \"heroCoverEnd\": true, \"canaryPlanted\": {\"variants\": [{\"npc\": \"name\", \"info\": \"the distinct false detail\"}]}, \"operativeSend\": {\"npc\": \"party companion name\", \"alias\": \"false name\", \"target\": \"faction or group\", \"mission\": \"the goal\", \"objectives\": [\"step one\", \"step two\"], \"craft\": \"novice|trained|master\", \"patience\": \"brisk|steady|long\"}, \"operativeOrders\": [{\"npc\": \"name\", \"objectives\": [\"new step\"]}], \"operativeRecall\": [\"name\"], \"operativeTreatment\": [{\"npc\": \"name\", \"how\": \"supported|neglected|betrayed\"}], \"operativeRescued\": [\"name\"], \"operativeNoticed\": [\"name\"], \"operativeExposed\": [\"name\"]${itemOffersSchemaField}${openingPartySchemaField}}
 
 === STATE FIELDS ===
 "weather" is exactly one of "none", "lightSnow", "heavySnow", "blizzard", "lightMist", "heavyMist", "denseMist", "lightRain", "heavyRain", "downpour" — the OUTDOOR weather at the hero's location as it stands at the END of this scene, taken ONLY from what the scene shows or states. Keep the previous value (see CURRENT GAME STATE) unless the scene itself shows a change or the hero moved somewhere with different weather; weather described in the narration always wins. Being indoors does not change this value (it is the weather outside). "lightMist" is a thin low haze, "heavyMist" a thick fog with short visibility, "denseMist" an impenetrable murk; "lightRain" is a drizzle or light rain, "heavyRain" a steady heavy rain, "downpour" a torrential rain with a thunderstorm; snow, fog and rain are different weathers, pick the one the scene shows.
@@ -60385,6 +60546,7 @@ ${knownSecrets ? hiddenInfoAlreadyWrittenText(knownSecrets) : hiddenInfoRulesTex
 "heroIdentity" reports a change to WHO THE HERO IS that this scene actually shows happening — OMIT THE FIELD ENTIRELY on every scene without one (that is almost every scene). Include only the parts that changed. "name": the hero's new name, ONLY when the scene shows the hero really taking, or being given, a new name that they and everyone around them now go by (they asked to be called something else and it was accepted, a renaming ritual or formal renaming, an identity taken on for good), written exactly as the scene writes it, in its plain nominative form — the new name may be identical to a tracked character's name, that is allowed; never for a cover identity used once, a nickname or insult someone tosses at them, a name merely discussed, or one character alone choosing to call them something else. "concept": the hero's complete updated concept line, ONLY when the scene shows a real, finished change to the hero's race/species or sex/gender (or another core trait already stated in the concept text of THE PLAYER'S HERO above), whether the hero asked for it or the story deliberately did it to them (a curse, a transformation) — rewrite that exact concept text with only the changed trait swapped, keeping the same wording and language and leaving everything else untouched; if that concept text is empty, write a minimal one-line description of just the changed trait. Report nothing for a change that was only attempted, failed, was refused in-world, or was only asked about, nor for a disguise, illusion, or short-lived effect.
 A tracked character OTHER than the hero can change too, but only when the scene really shows it (a deliberate story event — a renaming, a curse, a transformation, a new identity taken on for good — never a whim or an accident): (1) NAME — report that same character's entry in the same list as any other update to them, with the new "name", "previousName" set to exactly their old name as written in the state above, AND "renamed": true. That is what tells the game the person genuinely changed what they are called and to rewrite the old name to the new one throughout the story so far. It is different from the placeholder case above: a character tracked under a role/description label, or whose TRUE name was merely hidden and is now revealed, uses "previousName" WITHOUT "renamed" — earlier scenes keep the name as written. Never set "renamed" for an alias used once, a nickname or insult, a name merely discussed, or the hero's own new name (that goes in "heroIdentity"). (2) RACE/SPECIES or SEX/GENDER — when it really and finally changes in the scene, update that character's "note" in the same entry, rewriting only the changed trait and keeping the rest; nothing for attempts, illusions, disguises, or short-lived effects.
 A NAME NEVER CHANGES BECAUSE OF A SLIP OR A NICKNAME: never add a new character, and never report "previousName", "renamed", or a heroIdentity name, just because the hero's own action or the narration spells a tracked character's name slightly differently (a typo, a missing or swapped letter, a wrong case ending, different capitalisation) — always keep the exact spelling already in the state above. A nickname, pet name, insult, or a name the hero proposes for someone else (or tosses out for themselves in passing) is NOT a rename unless the scene shows that character plainly accepting it as their own name from now on (for the hero: clearly and deliberately taking it as their name). If the character refuses, bristles, corrects the hero, or just keeps using their own name, nothing changes.
+${appearanceStateRule}
 COVERT AGENTS — hidden espionage, in five optional fields: "agentPlants", "agentNoticed", "agentPressure", "agentBlocked", "agentExposed". OMIT every one of them on almost every scene. "agentPlants": ONLY when this world's setting or the current plot genuinely calls for hidden infiltration (court intrigue, war, rival factions, a heist, guild politics — never a plain adventure with no such thread) AND a specific tracked, living, non-party character who is in this scene fits it, you may secretly make that character a covert agent: {"npc": their exact tracked name, "allegiance": who they secretly serve, "mission": the overall goal, "target": the group or faction they are spying on (use a tracked faction's exact name when one fits), "mole": true ONLY for a companion who is already in the hero's party (at most one at a time; a mole among the hero's companions is a rare, serious twist), "craft": "novice"|"trained"|"master", "patience": "brisk"|"steady"|"long" (how slowly they work — a grand mission may take hundreds of scenes, so "long" is fine and often best), "objectives": 2 to 6 concrete steps toward the mission, in order, "tells": 0 to 3 optional short details that could give them away, each with "strength": "weak"|"solid"|"damning" — leave it EMPTY unless a clue genuinely fits, an agent with no clues at all is perfectly good} — the truth must fit everything earlier scenes already showed of them and contradict none of it. This is rare: at most one every several scenes and never more than three at once, never for a companion in the party unless they are THE mole, never a twist for its own sake. It is entirely fine, often better, for an agent to succeed at everything and never be found out. The game itself advances the agent's steps on its own clock — do NOT report their progress. NEVER write a hidden agent's allegiance or mission into "secretsText", "newPendingSecrets", a note, a quest, or any other field the hero can read, until they are exposed. "agentNoticed": [{"npc": name, "tell": the tell's id}] ONLY for a tell the briefing lists as already shown, and only when the hero's own action or words show they caught exactly that detail. "agentPressure": [name] when the hero is actively probing, tailing, testing, or questioning that specific character. "agentBlocked": [name] ONLY when the hero's own action has clearly thwarted the agent's current step (destroyed the thing, warned the target, caught them in the act without unmasking them). "agentExposed": [{"npc": name, "how": "hero"|"self"|"gone"}] — "hero": the scene really shows the hero has proven or forced out the truth; "self": the agent drops the mask by their own choice; "gone": the agent leaves the story. When a scene reveals an agent's real name, report it through their normal character entry (previousName = the cover name, no "renamed").
 THE HERO AS A SECRET AGENT — six more optional fields, OMIT all of them on almost every scene: "heroCoverStart" (ONLY when the hero's own concept describes them as a spy, agent, infiltrator, or undercover operative, or the hero themself, in their own action this scene, takes on such a secret role — accepts a spy's job, goes undercover; never on your own initiative, and never once the hero already has a cover): {"allegiance": who they secretly serve, "mission": the goal, "target": the group or faction they are spying on, "craft": "novice"|"trained"|"master", "patience": "brisk"|"steady"|"long" (how often their handler checks in), "handler": the exact tracked name of their contact, or omit it}. "heroSlips": [{"npc": exact name, "gravity": "minor"|"serious", "kind": "enemy"|"neutral"|"ally"}] — ONLY when, in this scene, the hero did something that does not fit their cover in front of that specific character AND the narration shows that character noticing it (the briefing says which characters were SHARP; a DULL one notices nothing). "heroCleared": [name] — the hero, by their own action, has convincingly put a suspicious character's doubts to rest. "heroAliases": [{"alias": a false name, "to": [exact names of the people who now know the hero by it]}] — the hero introduces themself under a false name; an alias used as a cover is NEVER a rename and never goes in "heroIdentity". "handlerVerdict": "pleased" or "displeased" — ONLY right after the handler's contact, when the hero carried out the order (pleased) or defied or botched it (displeased). "heroCoverEnd": true — the hero drops the secret role for good. "heroUnmasked": [exact names] — ONLY characters who, in this scene, learned or saw through who the hero really is (they no longer know the hero only by a false name); a character who merely grows suspicious is not unmasked.
 CANARY TRAPS — one more optional field, "canaryPlanted": {"variants": [{"npc": exact tracked name, "info": the distinct false detail the hero gave that person}]} — ONLY when the hero, in this scene, deliberately gives two to four different tracked characters each a DIFFERENT false detail about the same matter, precisely to see which one turns up later. Never for an ordinary lie or a rumour. The game itself decides when and whether a planted detail surfaces and whose it is — do NOT report the result. Faction jumpiness is also kept entirely by the game; never report or write it.
@@ -61204,7 +61366,7 @@ ${chunkText}`;
         const npcs = guardedNpcs.map(n => {
             if (!n || typeof n !== 'object')
                 return n;
-            const { previousName, renamed, health, maxHealth, psyche, maxPsyche, stats, effects, mindEvents, ...rest } = n;
+            const { previousName, renamed, health, maxHealth, psyche, maxPsyche, stats, effects, mindEvents, appearanceChanged, ...rest } = n;
             const hasPreviousName = typeof previousName === 'string' && previousName.trim();
             if (hasPreviousName &&
                 typeof n.name === 'string' && n.name.trim() &&
@@ -61275,7 +61437,9 @@ ${chunkText}`;
             // back would be re-issued for free.
             const starterGearGiven = !!(prior && prior.starterGearGiven === true);
             const starterGearAudit = prior && prior.starterGearAudit === STARTER_GEAR_AUDIT_VERSION ? STARTER_GEAR_AUDIT_VERSION : null;
-            const base = { ...rest, location, dead, factionLeader, unyielding, enemy, incapacitated, presentNow: n.presentNow === true && locationMatchesHero, ...(starterGearGiven ? { starterGearGiven: true } : {}), ...(starterGearAudit ? { starterGearAudit } : {}) };
+            // Sticky look (see APPEARANCE): the recorded one is kept unless this reply flags a real change.
+            const appearance = resolveNpcAppearance(n.appearance, appearanceChanged, prior && prior.appearance);
+            const base = withAppearance({ ...rest, location, dead, factionLeader, unyielding, enemy, incapacitated, presentNow: n.presentNow === true && locationMatchesHero, ...(starterGearGiven ? { starterGearGiven: true } : {}), ...(starterGearAudit ? { starterGearAudit } : {}) }, appearance);
             const key = typeof n.name === 'string' ? n.name.trim().toLowerCase() : '';
             if (!key || !partyKeys.includes(key))
                 return base;
@@ -61506,7 +61670,7 @@ ${chunkText}`;
     // correct for a brand-new character too.
     function mergeNpcEntry(raw, prior, partyKeys, currentLocationName) {
         const p = prior || {};
-        const { previousName, renamed, health, maxHealth, psyche, maxPsyche, stats, effects, mindEvents, ...rest } = raw;
+        const { previousName, renamed, health, maxHealth, psyche, maxPsyche, stats, effects, mindEvents, appearanceChanged, ...rest } = raw;
         const mergedRest = { ...p, ...rest };
         const location = (typeof raw.location === 'string' && raw.location.trim())
             ? raw.location.trim()
@@ -61520,7 +61684,9 @@ ${chunkText}`;
         // Sticky "enemy"/"incapacitated" — same contract as reconcileNpcs above.
         const enemy = typeof raw.enemy === 'boolean' ? raw.enemy : !!(p.enemy === true);
         const incapacitated = typeof raw.incapacitated === 'boolean' ? raw.incapacitated : !!(p.incapacitated === true);
-        const base = { ...mergedRest, location, dead, factionLeader, unyielding, enemy, incapacitated, presentNow: raw.presentNow === true && locationMatchesHero };
+        // Sticky look (see APPEARANCE): the recorded one is kept unless the patch flags a real change.
+        const appearance = resolveNpcAppearance(raw.appearance, appearanceChanged, p.appearance);
+        const base = withAppearance({ ...mergedRest, location, dead, factionLeader, unyielding, enemy, incapacitated, presentNow: raw.presentNow === true && locationMatchesHero }, appearance);
         const key = typeof base.name === 'string' ? base.name.trim().toLowerCase() : '';
         if (!key || !partyKeys.includes(key))
             return base;
@@ -62270,6 +62436,9 @@ ${chunkText}`;
             worldTraits: currentState.worldTraits,
             craft: currentState.craft || { xp: 0 },
             craftProfile: currentState.craftProfile || null,
+            // The hero's lasting look (see APPEARANCE): the player's own words win on the opening turn, afterwards
+            // only a reported lasting change replaces it.
+            heroAppearance: resolveHeroAppearance(currentState.heroAppearance, parsed.heroAppearance, isOpeningTurn ? heroAppearanceDraft : ''),
             talentPoints,
             effects: mind.effects,
             inventory: finalInventory,
@@ -62441,12 +62610,13 @@ ${JSON.stringify(shown)}
 ${howMany}
 
 Respond with ONLY valid JSON and nothing else (no markdown, no text before or after):
-{"members": [{"name": "personal name", "note": "short note"}]}
+{"members": [{"name": "personal name", "note": "short note", "appearance": "1-2 short sentences on this individual's lasting physical look"}]}
 
 Rules:
 - One object per individual, never a group.
 - "name" is a distinct personal name for that one individual, written in ${narrativeLanguage}. If the scene text already gives personal names, reuse them exactly. If it does not, invent a fitting name for each in the style of the setting. If a personal name would not suit them at all, use a short distinguishing handle based on something the scene showed instead. Never use the group's name, a plural, or the same name twice.
 - "note" is one short sentence in ${narrativeLanguage} about this individual, drawn from the entry and the scene, with something that sets them apart from the others where the scene gives it.
+- "appearance" is one or two plain sentences in ${narrativeLanguage} on this one individual's lasting physical look (build, features, colouring, marks), in the terms of this world and of what they are, using the scene's own details where it gives them and making each individual visibly distinct from the others. Nothing about mood, gear or personality.
 - Do not add individuals the entry and the scene do not support.`;
     }
     async function generateNpcSplit(entry, count, sceneText, state) {
@@ -71566,7 +71736,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (taken.has(key) && key !== originalKey)
                 continue;
             seen.add(key);
-            out.push({ name, note: typeof m.note === 'string' ? m.note.trim() : '' });
+            out.push({ name, note: typeof m.note === 'string' ? m.note.trim() : '', appearance: normalizeAppearance(m.appearance) });
             if (out.length >= MAX_SPLIT_MEMBERS)
                 break;
         }
@@ -71587,15 +71757,17 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         if ((partyKeys || []).includes(originalKey))
             return null;
         const { individuals: _count, previousName: _prev, ...base } = npcs[index];
-        const entries = members.map((m, i) => ({
-            ...base,
+        // The group entry's own look describes the group, not any one person: every individual gets theirs.
+        const { appearance: _groupLook, ...baseNoLook } = base;
+        const entries = members.map((m, i) => withAppearance({
+            ...baseNoLook,
             name: m.name,
             note: m.note || base.note,
             // Each individual carries their own copy of the gear the group entry had.
             ...(Array.isArray(base.inventory) ? { inventory: base.inventory.map(it => (it && typeof it === 'object' ? { ...it } : it)) } : {}),
             // Only one person can be a faction's leader, so it stays with the first.
             ...(i > 0 && base.factionLeader === true ? { factionLeader: false } : {})
-        }));
+        }, m.appearance));
         return {
             npcs: [...npcs.slice(0, index), ...entries, ...npcs.slice(index + 1)],
             rename: { from: npcs[index].name.trim(), to: members[0].name, alsoTo: members.slice(1).map(m => m.name) },
@@ -72583,6 +72755,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         setWorldSetting('');
         setHeroName('');
         setHeroConcept('');
+        setHeroAppearanceDraft('');
         setStartingPartySize(0);
         setStartingPartyPickerOpen(false);
         setMessages([]);
@@ -72720,6 +72893,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                         React.createElement("div", null,
                             React.createElement("label", { className: "field-label field-label-nowrap" }, t('heroConceptLabel')),
                             React.createElement("input", { value: heroConcept, onChange: e => setHeroConcept(e.target.value), placeholder: t('heroConceptPlaceholder'), className: "text-field" }))),
+                    React.createElement("div", { className: "hero-appearance-field" },
+                        React.createElement("label", { className: "field-label" }, t('heroAppearanceLabel')),
+                        React.createElement("textarea", { value: heroAppearanceDraft, onChange: e => setHeroAppearanceDraft(e.target.value), rows: 2, maxLength: APPEARANCE_MAX_LEN, placeholder: t('heroAppearancePlaceholder'), className: "text-field hero-appearance-input" }),
+                        React.createElement("p", { className: "hint-text" }, t('heroAppearanceHint'))),
                     React.createElement("div", { className: "preset-row party-row" },
                         React.createElement("div", { className: "party-picker-wrap" },
                             React.createElement("button", { onClick: () => setStartingPartyPickerOpen(o => !o), className: "chip-btn", type: "button" },
@@ -72903,14 +73080,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             React.createElement("button", { onClick: handleSend, disabled: loading || combatBlocksInput || !input.trim(), className: "btn btn-dark" }, editingTurnIndex !== null ? t('saveButton') : t('sendTurnButton'))))),
                     error && React.createElement("p", { className: "error-text error-text-light" }, error))),
             React.createElement("div", { className: "sidebar" },
-                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenCompanionTalents: isLatestTurn ? openCompanionTalents : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t }))),
+                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, onHeroAppearanceChange: isLatestTurn ? updateHeroAppearance : undefined, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenCompanionTalents: isLatestTurn ? openCompanionTalents : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t }))),
         sheetOpen && (React.createElement("div", { className: "sheet-overlay" },
             React.createElement("div", { className: "sheet-overlay-backdrop", onClick: () => setSheetOpen(false) }),
             React.createElement("div", { className: "sheet-overlay-panel" },
                 React.createElement("div", { className: "sheet-overlay-header" },
                     React.createElement("p", { className: "title-display title-display-small" }, t('sheetOverlayTitle')),
                     React.createElement("button", { onClick: () => setSheetOpen(false), className: "icon-btn", "aria-label": t('closeAria'), type: "button" }, "\u2715")),
-                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenCompanionTalents: isLatestTurn ? openCompanionTalents : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t })))),
+                React.createElement(CharacterSheet, { heroName: heroName, onHeroNameChange: recoverHeroName, heroConcept: heroConcept, onHeroAppearanceChange: isLatestTurn ? updateHeroAppearance : undefined, gameState: viewedState, tokenUsage: lastTokenUsage, itemRarities: viewedItemRarities, equipment: viewedEquipment, npcReputations: viewedNpcReputations, factionReputations: viewedFactionReputations, party: viewedParty, onOpenEquipment: isLatestTurn ? () => setEquipmentModalOpen(true) : undefined, onOpenTalents: isLatestTurn ? () => setTalentTreeModalOpen(true) : undefined, onOpenCompanionTalents: isLatestTurn ? openCompanionTalents : undefined, onOpenInventory: () => setInventoryModalOpen(true), onOpenQuests: () => setQuestJournalOpen(true), onOpenSociety: () => setSocietyModalOpen(true), onGiftNpc: isLatestTurn ? setGiftTargetNpc : undefined, onRecruitNpc: isLatestTurn ? setRecruitTargetNpc : undefined, onTradeNpc: isLatestTurn ? openTrade : undefined, onRepairNpc: isLatestTurn ? openRepair : undefined, onWorkshopNpc: isLatestTurn ? openWorkshop : undefined, onOpenEffect: setEffectDetail, onReleasePrisoner: isLatestTurn ? releasePrisoner : undefined, onKillPrisoner: isLatestTurn ? killPrisoner : undefined, t: t })))),
         directorModalOpen && (React.createElement(DirectorModal, { value: directorInput, onChange: setDirectorInput, onSave: saveDirectorNote, onCancel: () => setDirectorModalOpen(false), t: t })),
         secretsModalOpen && React.createElement(SecretsModal, { text: secretsText, onClose: () => setSecretsModalOpen(false), t: t }),
         equipmentModalOpen && (React.createElement(EquipmentModal, { gameState: viewedState, equipment: viewedEquipment, itemRarities: viewedItemRarities, pickerSlot: equipPickerSlot, isSlotDisabled: isWeaponSlotDisabled, onOpenPicker: isLatestTurn ? openEquipPicker : undefined, onOpenItemDetail: openItemDetailFromEquipment, onEquip: isLatestTurn ? equipItemInSlot : undefined, onUnequip: isLatestTurn ? unequipSlot : undefined, onClose: () => { setEquipmentModalOpen(false); setEquipPickerSlot(null); }, t: t })),
@@ -74635,6 +74812,13 @@ const APP_STYLES = `
   .sheet-npc-toggle { display: inline-block; width: 1rem; color: var(--stone-500); flex-shrink: 0; }
   .sheet-npc-name { color: var(--amber-100); }
   .sheet-npc-note { color: var(--stone-500); font-size: 0.75rem; margin: 0.15rem 0 0; }
+  .npc-appearance { font-style: italic; }
+  .npc-appearance-label { font-style: normal; font-weight: 600; opacity: 0.85; }
+  .sheet-hero-appearance { margin: 0.35rem 0 0; }
+  .hero-appearance-edit { margin-top: 0.3rem; }
+  .hero-appearance-field { margin: 0.6rem 0 0; }
+  .hero-appearance-input { display: block; width: 100%; box-sizing: border-box; resize: vertical; font-family: inherit; line-height: 1.35; }
+  .hero-appearance-actions { display: flex; gap: 0.4rem; margin-top: 0.3rem; }
   .sheet-npc-block-hint { color: var(--orange-500); margin: 0.35rem 0 0.15rem; }
   .sheet-faction-row { cursor: pointer; padding: 0.3rem; margin: -0.3rem -0.3rem 0.2rem; border-radius: 6px; }
   .sheet-faction-row:hover { background: var(--stone-900); }
