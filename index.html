@@ -18252,6 +18252,8 @@ const TRANSLATIONS = {
         // combined head bar and the combined body bar (torso+руки+ноги).
         combatArmorHeadLabel: 'Защита головы',
         combatArmorBodyLabel: 'Защита тела',
+        // Stamina bar (see the STAMINA/FATIGUE section) — every combatant's 4th bar.
+        combatStaminaLabel: 'Выносливость',
         combatLogArmorAbsorbSuffix: 'броня полностью поглощает удар',
         combatHeadArmorBrokenLog: '🛡️ Защита головы разбита!',
         combatBodyArmorBrokenLog: '🛡️ Защита тела разбита!',
@@ -19550,6 +19552,8 @@ const TRANSLATIONS = {
         // combined head bar and the combined body bar (torso+arms+legs).
         combatArmorHeadLabel: 'Head armor',
         combatArmorBodyLabel: 'Body armor',
+        // Stamina bar (see the STAMINA/FATIGUE section) — every combatant's 4th bar.
+        combatStaminaLabel: 'Stamina',
         combatLogArmorAbsorbSuffix: 'armor fully absorbs the blow',
         combatHeadArmorBrokenLog: '🛡️ Head armor shattered!',
         combatBodyArmorBrokenLog: '🛡️ Body armor shattered!',
@@ -20071,6 +20075,12 @@ const EMPTY_STATE = {
     psyche: 50,
     maxPsyche: 50,
     stats: { strength: 10, agility: 10, intelligence: 10, initiative: 10, charisma: 10 },
+    // Base stamina cap (see the STAMINA/FATIGUE section in COMBAT) before any
+    // per-fight heavy-armor penalty. Entirely client-owned, like dayPhase
+    // above — the narrator never sees or sets this. Starts at
+    // STAMINA_TUNING.baseMax's own default and, unlike the five core stats,
+    // is meant to grow later via a stamina-upgrade talent (not built yet).
+    maxStamina: 65,
     skills: {},
     groundwork: [],
     clocks: [],
@@ -24228,6 +24238,7 @@ function normalizeGameStateCore(raw) {
             initiative: clampStat(rawStats && rawStats.initiative, EMPTY_STATE.stats.initiative),
             charisma: clampStat(rawStats && rawStats.charisma, EMPTY_STATE.stats.charisma)
         },
+        maxStamina: clampStat(raw.maxStamina, EMPTY_STATE.maxStamina),
         skills: normalizeSkills(raw.skills),
         groundwork: normalizeGroundwork(raw.groundwork),
         clocks: normalizeClocks(raw.clocks),
@@ -31299,6 +31310,51 @@ const COMBAT_TUNING = {
     underFireCoverHoldChance: 80, // % chance an under-fire ranged/caster enemy that is already shielded from at least one threat stays where it is instead of relocating
     retreatCoverWeight: 3 // when a ranged enemy does back away from melee, each threat a cell is shielded from counts like this many cells of extra distance
 };
+// ==============================================================================
+// STAMINA / FATIGUE (see recomputeInitiativeOrder, spendStamina, restStamina)
+// ------------------------------------------------------------------------
+// A per-fight resource, same shape as the hero's own armor pools
+// (heroArmorMax/heroArmorCur): every combatant (hero, ally, enemy alike)
+// opens a fight at a full stamina pool and drains it by moving and
+// attacking. A drained pool doesn't stop anyone from acting — it just
+// drags down their EFFECTIVE initiative (see STAMINA_TUNING.
+// fatigueInitiativeDivisor below), which now actually matters turn to
+// turn: unlike the fight's opening initiative roll, the turn order is
+// re-sorted at the start of every new round off each living combatant's
+// CURRENT effective initiative (base stat + gear mod − fatigue penalty),
+// so a character who's been swinging and sprinting non-stop gradually
+// slides later in the order, while someone who spent a turn resting
+// (see resolveSkipTurn) both recovers stamina AND — the next time the
+// order is rebuilt — climbs back toward the front. See
+// recomputeInitiativeOrder for the actual resort.
+const STAMINA_TUNING = {
+    // A flat, code-only baseline every combatant starts from before any
+    // gear penalty — not narrator-declared (the model has no reason to
+    // reason about stamina), so this deliberately sits in the same 50-80
+    // "standard" band asked for rather than being individually rolled.
+    // The hero's own copy of this is stored on gameState.maxStamina
+    // instead (see EMPTY_STATE) purely so a future talent-tree node has
+    // somewhere to raise it later; allies/enemies just read this constant
+    // directly since they have no such upgrade path yet.
+    baseMax: 65,
+    // Flat cost per action — NOT a percentage of the pool, same spirit as
+    // the heavy-armor cap penalty below. Attacking is slightly more taxing
+    // than repositioning.
+    moveCost: 4,
+    attackCost: 6,
+    // Deliberately doing nothing this turn (see resolveSkipTurn) recovers
+    // more than either action costs, so a single rest turn meaningfully
+    // undoes a couple of turns' wear rather than just breaking even.
+    restRecover: 10,
+    // Converts leftover fatigue (maxStamina − curStamina) into a flat
+    // initiative penalty applied only when the order is rebuilt at a new
+    // round (see recomputeInitiativeOrder) — never mid-round, so a
+    // character's place for the round they're currently acting in never
+    // shifts under them mid-turn. Divisor rather than a straight 1:1 so a
+    // fully spent pool costs a meaningful but not run-away chunk of
+    // initiative (at baseMax 65, fully drained ≈ -8).
+    fatigueInitiativeDivisor: 8
+};
 // Weapon damage is deliberately the dominant factor in a hit (see
 // computeWeaponDamage) — strength only nudges it. Numbers are per hit,
 // one-handed; a two-handed weapon doubles its tier's number (see
@@ -34464,6 +34520,10 @@ function armorPoolKeyForPart(partKey) {
 // light-armored build (helmet+armor+gloves+boots all light) stacks the
 // full ×4 bonus and a fully heavy-armored one stacks the full ×4 penalty.
 const ARMOR_WEIGHT_CLASS_INITIATIVE_DELTA = { light: 1, medium: 0, heavy: -1 };
+// Same light/medium/heavy tier, but for the stamina cap penalty (see
+// computeEquipmentStaminaCapModifier / the STAMINA/FATIGUE section) —
+// flat per piece, only heavy ever costs anything.
+const ARMOR_WEIGHT_CLASS_STAMINA_DELTA = { light: 0, medium: 0, heavy: -5 };
 // Total initiative delta from the current loadout's ARMOR-type slots —
 // same per-slot walk as computeTotalArmorDefense just above, but keyed off
 // each equipped item's own weightCategory instead of rarity, so (unlike
@@ -34489,6 +34549,32 @@ function computeEquipmentInitiativeModifier(equipmentObj, inventoryList) {
     }
     // `swift` affixes on any worn piece (see WORKSHOP).
     total += forgeAuraTotals(eq, inv, null).init;
+    return total;
+}
+// Same per-slot walk as computeEquipmentInitiativeModifier just above, but
+// for the OTHER cost heavy armor imposes: how much it eats into the
+// wearer's stamina cap for the fight (see the STAMINA/FATIGUE section).
+// Flat per piece, not a percentage — "не процентами а просто" — so a
+// fully heavy-armored loadout (helmet+armor+gloves+boots all heavy) costs
+// the full 4x ARMOR_WEIGHT_CLASS_STAMINA_DELTA.heavy off the base cap.
+// Light/medium gear never adds to the cap, only heavy ever subtracts from
+// it — matching how the initiative delta above is the only one of the two
+// that goes both ways. Deliberately no forgeAuraTotals hookup here (unlike
+// initiative above) — no crafted affix currently touches stamina, so
+// there's nothing to add.
+function computeEquipmentStaminaCapModifier(equipmentObj, inventoryList) {
+    const eq = equipmentObj || EMPTY_EQUIPMENT;
+    const inv = inventoryList || [];
+    const resolvedWorn = resolveEquippedItems(eq, inv);
+    let total = 0;
+    for (const slotKey of Object.keys(ARMOR_SLOT_PROTECTION)) {
+        const itemName = eq[slotKey];
+        if (!itemName)
+            continue;
+        const item = resolvedWorn[slotKey];
+        const weightClass = (item && item.weightCategory) || 'medium';
+        total += ARMOR_WEIGHT_CLASS_STAMINA_DELTA[weightClass] || 0;
+    }
     return total;
 }
 // Total damage the hero's current loadout swings for — the same tally as
@@ -36381,7 +36467,11 @@ function upgradeLegacyEnemy(enemy) {
     }, enemy.id, enemy.enemyName, enemy.weaponDescription);
 }
 function makeEnemyCombatant(enemy) {
-    return { ...enemy, parts: buildCombatantParts(enemy.totalHp, enemy.totalHp, normalizeEnemyBodyParts(enemy.bodyParts)), morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false, engaged: false };
+    // Enemies carry no tracked equipment (see computeEquipmentInitiativeModifier's
+    // own comment on why their initiative is left exactly as rolled) — same
+    // reasoning applies to their stamina cap, so every enemy just opens at
+    // the flat STAMINA_TUNING.baseMax with no gear-based adjustment.
+    return { ...enemy, parts: buildCombatantParts(enemy.totalHp, enemy.totalHp, normalizeEnemyBodyParts(enemy.bodyParts)), morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false, engaged: false, staminaMax: STAMINA_TUNING.baseMax, staminaCur: STAMINA_TUNING.baseMax };
 }
 // ---- ALLY GEAR — a fighter on the hero's side is dressed from the story, not from a die ----------------------
 // An ally who is not one of the hero's recruited party (a guard who joins in, a hired guide, a patrol) used to
@@ -36504,7 +36594,12 @@ function buildAllyCombatant(raw, id, env) {
         // Same growth scaling as a party member's (someone who once traveled with the hero keeps what they earned).
         // Needs the game state (growth records); without one the body is built as it always was.
         const { parts, armorPools } = applyGrowthToAllyBody(buildCombatantParts(npc.health, npc.maxHealth), baseArmorPools, e.state ? computeAllyMods(e.state, npc.name) : null);
-        return { id, name: npc.name, stats: npc.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false, ...(ownGear ? { ownGear } : {}) };
+        // Same gear-driven cap as the hero's own (see
+        // computeEquipmentStaminaCapModifier) — reads off whichever loadout
+        // this ally actually has (party gear or its own built ownGear), same
+        // as the armor pools just above.
+        const allyStaminaMax = Math.max(1, STAMINA_TUNING.baseMax + computeEquipmentStaminaCapModifier(load.equipment, load.inventory));
+        return { id, name: npc.name, stats: npc.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false, staminaMax: allyStaminaMax, staminaCur: allyStaminaMax, ...(ownGear ? { ownGear } : {}) };
     }
     const name = isNamedNpc
         ? (npcRecord ? npcRecord.name : r.npcName.trim())
@@ -36522,6 +36617,11 @@ function buildAllyCombatant(raw, id, env) {
         ? rollEnemyInventory(tier, kind, [], '', name)
         : buildAllyGear({ tierKey: tier, name, belongings: npcRecord ? npcRecord.inventory : [], classify, rarityOf, outfit: r.outfit, weaponDescription: said, armorPiercing: r.armorPiercing });
     const { armor, armorPools } = allyArmorFromLoadout(ownGear.equipment, ownGear.inventory, ownGear.itemRarities);
+    // Same gear-driven cap as the branch above, reading off this
+    // combatant's own built/rolled gear (see buildAllyGear/rollEnemyInventory
+    // above) — a creature ally's bare-handed inventory just comes out to the
+    // flat baseline here, same as any other creature enemy.
+    const anonAllyStaminaMax = Math.max(1, STAMINA_TUNING.baseMax + computeEquipmentStaminaCapModifier(ownGear.equipment, ownGear.inventory));
     const allySpells = speciesSpellKit(species, kind, r.spells);
     return {
         id, name,
@@ -36537,6 +36637,7 @@ function buildAllyCombatant(raw, id, env) {
         parts: buildCombatantParts(rolled.totalHp, rolled.totalHp),
         armor, armorPools, morale: COMBAT_TUNING.moraleStart, playerControlled: false,
         ownGear,
+        staminaMax: anonAllyStaminaMax, staminaCur: anonAllyStaminaMax,
         ...(isNamedNpc ? {} : {
             weaponDescription: said,
             armorPiercing: r.armorPiercing === true,
@@ -44973,7 +45074,7 @@ function EnemyRankBadge({ tier, t }) {
 // number for this specific portrait — see CombatModal's fx effect, which
 // derives them from combat.lastAction and clears them again a moment
 // later so a repeat hit on the same target still replays visibly.
-function CombatPortrait({ name, parts, isDown, isFled, isCaptured, isLeaving, isArriving, isActive, targetable, onClick, healTargetable, onHealClick, selectable, selected, onSelectClick, t, variant, side, fx, dmgPopup, portraitRef, armor, armorPools, role, tier, protectTarget, weaponType, firearm, lockFx, locked, suppressed, emoji, mind }) {
+function CombatPortrait({ name, parts, isDown, isFled, isCaptured, isLeaving, isArriving, isActive, targetable, onClick, healTargetable, onHealClick, selectable, selected, onSelectClick, t, variant, side, fx, dmgPopup, portraitRef, armor, armorPools, role, tier, protectTarget, weaponType, firearm, lockFx, locked, suppressed, emoji, staminaCur, staminaMax, mind }) {
     // Per-card random seed so idle sway (see swayCls below) is desynchronised
     // between cards — otherwise every combatant would bob in perfect unison.
     const [idleSeed] = useState(() => Math.random());
@@ -44988,18 +45089,22 @@ function CombatPortrait({ name, parts, isDown, isFled, isCaptured, isLeaving, is
     const displayMaxHp = Math.max(1, Math.round(maxHp / COMBAT_TUNING.hpScale));
     const displayHp = Math.max(0, Math.round(hp / COMBAT_TUNING.hpScale));
     const pct = maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0;
-    // The three portrait bars — helmet armor / body armor / HP — must always
-    // render in this fixed order for EVERY combatant (hero, ally, enemy),
-    // never appearing/disappearing slot to slot. Hero, ally, and enemy all
-    // now carry a real head/body armorPools (see buildAllyCombatants/
-    // rollEnemyFromSpec/computeHeroArmorPoolMaxes and resolveOneAttack's
-    // shared pool-absorption math) — `armor` is only ever a fallback for a
-    // combatant whose pools genuinely couldn't be built (kept so nothing
-    // regresses to a missing bar rather than a zeroed one).
+    // The four portrait bars — helmet armor / body armor / HP / stamina —
+    // must always render in this fixed order for EVERY combatant (hero,
+    // ally, enemy), never appearing/disappearing slot to slot. Hero, ally,
+    // and enemy all now carry a real head/body armorPools (see
+    // buildAllyCombatants/rollEnemyFromSpec/computeHeroArmorPoolMaxes and
+    // resolveOneAttack's shared pool-absorption math) — `armor` is only
+    // ever a fallback for a combatant whose pools genuinely couldn't be
+    // built (kept so nothing regresses to a missing bar rather than a
+    // zeroed one). Same for staminaCur/staminaMax (see the STAMINA/FATIGUE
+    // section) — every combatant is seeded with a pool at combat start, so
+    // the 4th bar is never conditionally absent either.
     const headArmorMax = armorPools ? armorPools.head.max : 0;
     const headArmorCur = armorPools ? Math.max(0, armorPools.head.cur) : 0;
     const bodyArmorMax = armorPools ? armorPools.body.max : (typeof armor === 'number' ? armor : 0);
     const bodyArmorCur = armorPools ? Math.max(0, armorPools.body.cur) : (typeof armor === 'number' ? armor : 0);
+    const staminaPct = staminaMax > 0 ? Math.round((Math.max(0, staminaCur || 0) / staminaMax) * 100) : 0;
     const fxCls = fx && fx.cls ? fx.cls : '';
     // The attacker's lunge is aimed at the defender's actual on-screen
     // position — see CombatModal's fx effect — via these two CSS custom
@@ -45092,7 +45197,9 @@ function CombatPortrait({ name, parts, isDown, isFled, isCaptured, isLeaving, is
                         React.createElement("div", { className: 'combat-armor-bar combat-armor-bar-body' + (bodyArmorMax > 0 ? '' : ' combat-armor-bar-inactive'), "aria-label": t('combatArmorBodyLabel') + ': ' + bodyArmorCur + '/' + bodyArmorMax },
                             React.createElement("div", { className: "combat-armor-bar-fill", style: { width: (bodyArmorMax > 0 ? Math.round((bodyArmorCur / bodyArmorMax) * 100) : 0) + '%' } })),
                         React.createElement("div", { className: "combat-hp-bar", "aria-label": displayHp + '/' + displayMaxHp },
-                            React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } })))))),
+                            React.createElement("div", { className: "combat-hp-bar-fill", style: { width: pct + '%' } })),
+                        React.createElement("div", { className: "combat-stamina-bar", "aria-label": t('combatStaminaLabel') + ': ' + Math.max(0, staminaCur || 0) + '/' + (staminaMax || 0) },
+                            React.createElement("div", { className: "combat-stamina-bar-fill", style: { width: staminaPct + '%' } })))))),
         fx && fx.spark && (React.createElement("span", { key: 'spark-' + fx.seq, className: 'combat-spark-burst' + (fx.spark === 'block' ? ' combat-spark-burst-block' : ''), "aria-hidden": "true" },
             React.createElement("span", null),
             React.createElement("span", null),
@@ -51442,7 +51549,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             return (React.createElement("div", { className: "combat-grid-token combat-grid-ghost-token", style: { left: unitCenterPx(dest.x, GRID_RENDER_MIN_X, dest.span), top: unitCenterPx(dest.y, GRID_RENDER_MIN_Y, dest.span) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                     React.createElement("div", { className: "combat-grid-token-inner" },
-                                        React.createElement(CombatPortrait, { name: ghostName, parts: ghostParts, isDown: false, isActive: false, armorPools: isHeroTurn ? heroArmorPools : toAllyPortraitArmorPools(currentAlly.armorPools), armor: isHeroTurn || currentAlly.armorPools ? undefined : currentAlly.armor, variant: isHeroTurn ? 'hero' : undefined, side: isHeroTurn ? 'hero' : (currentAlly && currentAlly.playerControlled ? 'party' : 'ally'), weaponType: ghostWeaponType, firearm: isHeroTurn ? heroFirearm : allyFirearms[currentAlly.name.trim().toLowerCase()], t: t })))));
+                                        React.createElement(CombatPortrait, { name: ghostName, parts: ghostParts, isDown: false, isActive: false, armorPools: isHeroTurn ? heroArmorPools : toAllyPortraitArmorPools(currentAlly.armorPools), armor: isHeroTurn || currentAlly.armorPools ? undefined : currentAlly.armor, variant: isHeroTurn ? 'hero' : undefined, side: isHeroTurn ? 'hero' : (currentAlly && currentAlly.playerControlled ? 'party' : 'ally'), weaponType: ghostWeaponType, firearm: isHeroTurn ? heroFirearm : allyFirearms[currentAlly.name.trim().toLowerCase()], staminaCur: isHeroTurn ? combat.heroStaminaCur : currentAlly.staminaCur, staminaMax: isHeroTurn ? combat.heroStaminaMax : currentAlly.staminaMax, t: t })))));
                         })(),
                         visibleEnemies.map((enemy, i) => {
                             const isThisActive = !combat.result && current && current.type === 'enemy' && current.id === enemy.id;
@@ -51472,7 +51579,7 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                                             // ENEMY_ROLES.ranged) wears the melee badge instead of
                                             // the bow until it breaks away again; engaged is
                                             // cleared the moment it retreats, so the bow comes back.
-                                            role: enemy.role === 'ranged' && !isBodyDestroyed(shownParts) && (enemy.engaged || getActiveLockPartner(combat, 'enemy:' + enemy.id)) ? 'melee' : enemy.role, tier: enemy.tier, weaponType: portraitTypeFor('enemy:' + enemy.id, getEnemyWeaponType(enemy), isEnemyBowUser(enemy)), firearm: getEnemyGunFxId(enemy), t: t })))));
+                                            role: enemy.role === 'ranged' && !isBodyDestroyed(shownParts) && (enemy.engaged || getActiveLockPartner(combat, 'enemy:' + enemy.id)) ? 'melee' : enemy.role, tier: enemy.tier, weaponType: portraitTypeFor('enemy:' + enemy.id, getEnemyWeaponType(enemy), isEnemyBowUser(enemy)), firearm: getEnemyGunFxId(enemy), staminaCur: enemy.staminaCur, staminaMax: enemy.staminaMax, t: t })))));
                         }),
                         visibleAllies.map(ally => {
                             const isThisAllyPlanner = isAllyPlayerTurn && currentAlly.id === ally.id && !inputLocked && pendingItemIndex === null;
@@ -51485,12 +51592,12 @@ function CombatModal({ combat, heroName, inventory, itemRarities, introActive, f
                             return (React.createElement("div", { key: ally.id, "data-fxkey": 'ally:' + ally.id, className: 'combat-grid-token' + (isBodyDestroyed(shownParts) || (heldShot ? !!heldShot.fled : !!ally.fled) ? ' combat-grid-token-down' : '') + (allyFogged ? ' combat-grid-token-fogged' : ''), style: { left: unitCenterPx(ally.pos.x, GRID_RENDER_MIN_X, ally.pos.span), top: unitCenterPx(ally.pos.y, GRID_RENDER_MIN_Y, ally.pos.span) } },
                                 React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + (COMBAT_CARD_GRID_SCALE * posSpan(ally.pos) / UNIT_SPAN) + ')' } },
                                     React.createElement("div", { className: 'combat-grid-token-inner' + (isThisAllyPlanner && planningMove ? ' combat-grid-token-bounce' : '') },
-                                        React.createElement(CombatPortrait, { emoji: ally.portraitEmoji, suppressed: !!ally.suppressed, side: ally.playerControlled ? 'party' : 'ally', name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), firearm: allyFirearms[ally.name.trim().toLowerCase()], t: t })))));
+                                        React.createElement(CombatPortrait, { emoji: ally.portraitEmoji, suppressed: !!ally.suppressed, side: ally.playerControlled ? 'party' : 'ally', name: ally.name, parts: shownParts, isDown: isBodyDestroyed(shownParts), isFled: heldShot ? !!heldShot.fled : !!ally.fled, isLeaving: isCardOut('ally', ally), isArriving: !!arrivedKeys['ally:' + ally.id], isActive: isThisActive, targetable: false, healTargetable: pendingItemIndex !== null && !isBodyDestroyed(ally.parts) && !ally.fled, onHealClick: gridClick(() => pickHealTarget('ally', ally.id)), selected: isThisAllyPlanner && planningMove, fx: fx['ally:' + ally.id], lockFx: lockFx['ally:' + ally.id], locked: !!getActiveLockPartner(combat, 'ally:' + ally.id), dmgPopup: popups['ally:' + ally.id], portraitRef: setPortraitRef('ally:' + ally.id), armor: ally.armorPools ? undefined : ally.armor, armorPools: heldShot ? heldShot.armorPools : toAllyPortraitArmorPools(ally.armorPools), protectTarget: ally.id === protectTargetId, weaponType: portraitTypeFor('ally:' + ally.id, allyWeaponTypes[ally.name.trim().toLowerCase()], !!allyBows[ally.name.trim().toLowerCase()]), firearm: allyFirearms[ally.name.trim().toLowerCase()], staminaCur: ally.staminaCur, staminaMax: ally.staminaMax, t: t })))));
                         }),
                         React.createElement("div", { "data-fxkey": "hero", className: "combat-grid-token", style: { left: unitCenterPx(combat.heroPos.x, GRID_RENDER_MIN_X, combat.heroPos.span), top: unitCenterPx(combat.heroPos.y, GRID_RENDER_MIN_Y, combat.heroPos.span) } },
                             React.createElement("div", { className: "combat-grid-token-scale", style: { transform: 'scale(' + COMBAT_CARD_GRID_SCALE + ')' } },
                                 React.createElement("div", { className: 'combat-grid-token-inner' + (isHeroTurn && planningMove ? ' combat-grid-token-bounce' : '') },
-                                    React.createElement(CombatPortrait, { suppressed: !!combat.heroSuppressed, mind: combat.abilityState && Number.isFinite(combat.abilityState.psyche) ? { psyche: combat.abilityState.psyche, maxPsyche: combat.abilityState.maxPsyche, panic: combat.abilityState.panic } : null, name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", side: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), firearm: heroFirearm, t: t })))),
+                                    React.createElement(CombatPortrait, { suppressed: !!combat.heroSuppressed, mind: combat.abilityState && Number.isFinite(combat.abilityState.psyche) ? { psyche: combat.abilityState.psyche, maxPsyche: combat.abilityState.maxPsyche, panic: combat.abilityState.panic } : null, name: heroName || t('combatYouLabel'), parts: heldHeroShot ? heldHeroShot.parts : combat.heroParts, isDown: false, isActive: isHeroTurn, targetable: false, healTargetable: pendingItemIndex !== null, onHealClick: gridClick(() => pickHealTarget('hero', null)), selected: isHeroTurn && planningMove, variant: "hero", side: "hero", fx: fx['hero:hero'], lockFx: lockFx['hero:hero'], locked: !!getActiveLockPartner(combat, 'hero:hero'), dmgPopup: popups['hero:hero'], portraitRef: setPortraitRef('hero:hero'), armorPools: heldHeroShot ? heldHeroShot.armorPools : heroArmorPools, weaponType: portraitTypeFor('hero:hero', heroWeaponType, heroBow), firearm: heroFirearm, staminaCur: combat.heroStaminaCur, staminaMax: combat.heroStaminaMax, t: t })))),
                         fogOn && (React.createElement("canvas", { ref: fogCanvasRef, className: "combat-fog", style: { width: (GRID_RENDER_MAX_X - GRID_RENDER_MIN_X + 1) * GRID_CELL_PX, height: (GRID_RENDER_MAX_Y - GRID_RENDER_MIN_Y + 1) * GRID_CELL_PX }, "aria-hidden": "true" })),
                         fogOn && partyFogSources.filter(sr => sr.kind === 'flare').map(sr => (React.createElement("div", { key: 'glow' + sr.key, className: "combat-fog-flare-glow", style: {
                                 left: (sr.x - GRID_RENDER_MIN_X - sr.r) * GRID_CELL_PX, top: (sr.y - GRID_RENDER_MIN_Y - sr.r) * GRID_CELL_PX,
@@ -54743,6 +54850,7 @@ function DevHeroTab({ api }) {
     const [v, setV] = useState({
         health: String(gs.health), maxHealth: String(gs.maxHealth), psyche: String(gs.psyche), maxPsyche: String(gs.maxPsyche),
         strength: String(gs.stats.strength), agility: String(gs.stats.agility), intelligence: String(gs.stats.intelligence), initiative: String(gs.stats.initiative), charisma: String(heroStat(gs, 'charisma')),
+        maxStamina: String(gs.maxStamina),
         level: String(gs.level)
     });
     const [xp, setXp] = useDevDraft('hero.xp', '200');
@@ -54767,6 +54875,7 @@ function DevHeroTab({ api }) {
                     strength: clampStat(v.strength, s.stats.strength), agility: clampStat(v.agility, s.stats.agility),
                     intelligence: clampStat(v.intelligence, s.stats.intelligence), initiative: clampStat(v.initiative, s.stats.initiative), charisma: clampStat(v.charisma, heroStat(s, 'charisma'))
                 },
+                maxStamina: clampStat(v.maxStamina, s.maxStamina),
                 level, xp: level === s.level ? s.xp : 0, talentPoints: (s.talentPoints || 0) + gained
             };
         });
@@ -54834,6 +54943,8 @@ function DevHeroTab({ api }) {
                     React.createElement(DevNum, { value: v.charisma, onChange: x => set('charisma', x) })),
                 React.createElement(DevField, { label: "\u0418\u043D\u0438\u0446\u0438\u0430\u0442\u0438\u0432\u0430" },
                     React.createElement(DevNum, { value: v.initiative, onChange: x => set('initiative', x) })),
+                React.createElement(DevField, { label: "\u041C\u0430\u043A\u0441. \u0432\u044B\u043D\u043E\u0441\u043B\u0438\u0432\u043E\u0441\u0442\u044C" },
+                    React.createElement(DevNum, { value: v.maxStamina, onChange: x => set('maxStamina', x) })),
                 React.createElement(DevField, { label: "\u0423\u0440\u043E\u0432\u0435\u043D\u044C" },
                     React.createElement(DevNum, { value: v.level, onChange: x => set('level', x) }))),
             React.createElement(DevRow, null,
@@ -65896,6 +66007,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // A companion's nerve in a fight IS the morale system; their psyche decides how much of it they
             // start with (see psycheStartingMorale) and the fight's toll on it is paid back at the close.
             const startMorale = psycheStartingMorale(npc.psyche, npc.maxPsyche);
+            // Same per-fight stamina pool as the hero's own — full at the start
+            // of every fight, gear-adjusted the same way (see
+            // computeEquipmentStaminaCapModifier), drained by moving/attacking
+            // and partly restored by resting (see the STAMINA/FATIGUE section).
+            const allyStaminaMax = Math.max(1, STAMINA_TUNING.baseMax + computeEquipmentStaminaCapModifier(partyEquipment[key] || EMPTY_EQUIPMENT, partyInventories[key] || []));
             // Party members track morale the same way enemies do (see
             // COMBAT_TUNING's morale* block) — the hero never does (no
             // makeHeroDefender.morale field), only companions. A companion whose
@@ -65907,7 +66023,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // player directly commands in combat (see resolveAttack/runAutoTurn's
             // ally branch) — distinct from an AI-run reinforcement built by
             // makeAllyCombatant below, which is always left off (undefined/false).
-            return { id: 'ally_' + i, name, stats: npc.stats || EMPTY_STATE.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: startMorale, startMorale, playerControlled: true };
+            return { id: 'ally_' + i, name, stats: npc.stats || EMPTY_STATE.stats, originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: startMorale, startMorale, playerControlled: true, staminaMax: allyStaminaMax, staminaCur: allyStaminaMax };
         }).filter(Boolean);
     }
     // Non-party companions the story establishes as already fighting
@@ -66065,6 +66181,13 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // separate from item durability.
             heroArmorMax: scaleHeroArmorPools(computeHeroArmorPoolMaxes(equipment, gameState.inventory, itemRarities), computeHeroMods(gameState, null, 1).armorBonusFraction),
             heroArmorCur: scaleHeroArmorPools(computeHeroArmorPoolMaxes(equipment, gameState.inventory, itemRarities), computeHeroMods(gameState, null, 1).armorBonusFraction),
+            // Hero's per-fight stamina pool — see the STAMINA/FATIGUE section.
+            // Rolled fresh every fight off the persisted maxStamina stat (see
+            // EMPTY_STATE) plus the same gear delta as initiative
+            // (computeEquipmentStaminaCapModifier), same pattern as the armor
+            // pools right above.
+            heroStaminaMax: Math.max(1, gameState.maxStamina + computeEquipmentStaminaCapModifier(equipment, gameState.inventory)),
+            heroStaminaCur: Math.max(1, gameState.maxStamina + computeEquipmentStaminaCapModifier(equipment, gameState.inventory)),
             order,
             turnPos: 0,
             round: 1,
@@ -66168,7 +66291,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         else {
             log = [{ text: t('stealthKillMissLogText'), kind: 'miss' }];
         }
-        const enemies = [{ ...enemy, armorPools: armorPoolsAfter, parts: enemyParts, morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false, engaged: false }];
+        const enemies = [{ ...enemy, armorPools: armorPoolsAfter, parts: enemyParts, morale: COMBAT_TUNING.moraleStart, fearless: !!enemy.fearless, fled: false, engaged: false, staminaMax: STAMINA_TUNING.baseMax, staminaCur: STAMINA_TUNING.baseMax }];
         const layout = layoutInitialPositions(allies, enemies);
         combatClosingRef.current = false;
         setCombat(openCombatMind({
@@ -66182,6 +66305,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // fresh here too — a stealth-opened fight still gets full armor bars.
             heroArmorMax: scaleHeroArmorPools(computeHeroArmorPoolMaxes(equipment, gameState.inventory, itemRarities), computeHeroMods(gameState, null, 1).armorBonusFraction),
             heroArmorCur: scaleHeroArmorPools(computeHeroArmorPoolMaxes(equipment, gameState.inventory, itemRarities), computeHeroMods(gameState, null, 1).armorBonusFraction),
+            // See startCombat's identical stamina fields — a stealth-opened
+            // fight still gets a full stamina pool.
+            heroStaminaMax: Math.max(1, gameState.maxStamina + computeEquipmentStaminaCapModifier(equipment, gameState.inventory)),
+            heroStaminaCur: Math.max(1, gameState.maxStamina + computeEquipmentStaminaCapModifier(equipment, gameState.inventory)),
             order: buildInitiativeOrder(allies, enemies),
             turnPos: 0,
             round: 1,
@@ -66711,11 +66838,14 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         wornNow.log.forEach(l => log.push(l));
         return { parts, armorPools, dmg, partLabel, justDisabled, defeated, morale, moraleBreak, defended: null, gearWear: wornNow.gearWear, log };
     }
-    // One shared turn order for the whole fight, highest initiative first,
-    // fixed for the fight's whole duration (a real initiative roll, not
-    // re-rolled every round) — exactly what was asked for. Ties keep the
-    // player's side going first (hero, then allies, then enemies) purely so
-    // ties resolve deterministically rather than flickering between renders.
+    // The fight's OPENING turn order, highest initiative first. This used to
+    // be fixed for the fight's whole duration; it's now just the round-1
+    // seed — see recomputeInitiativeOrder just below, which re-sorts this
+    // same way at every later round boundary once fatigue is actually in
+    // play (nobody's tired yet on round 1, so the two produce the same
+    // ranking here). Ties keep the player's side going first (hero, then
+    // allies, then enemies) purely so ties resolve deterministically rather
+    // than flickering between renders.
     function buildInitiativeOrder(allies, enemies) {
         // Each side's own gear nudges its place in the order — light armor
         // pulls it earlier, heavy armor pushes it later (see
@@ -66734,6 +66864,84 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             .map((e, i) => ({ ...e, tieBreak: (e.type === 'hero' ? 0 : e.type === 'ally' ? 1 : 2), i }))
             .sort((a, b) => (b.initiative - a.initiative) || (a.tieBreak - b.tieBreak) || (a.i - b.i))
             .map(({ type, id }) => (type === 'hero' ? { type } : { type, id }));
+    }
+    // How much a combatant's currently-spent stamina (see the STAMINA/
+    // FATIGUE tuning block and heroStaminaCur/staminaCur below) drags their
+    // initiative down by. Flat division, not a percentage — a fully-spent
+    // pool costs a fixed, bounded amount (≈8 at the 65 baseline) rather than
+    // scaling with however big that pool happens to be.
+    function computeFatigueInitiativePenalty(cur, max) {
+        if (!max || max <= 0)
+            return 0;
+        const fatigue = Math.max(0, max - Math.max(0, cur || 0));
+        return Math.floor(fatigue / STAMINA_TUNING.fatigueInitiativeDivisor);
+    }
+    // Re-sorts the WHOLE turn order fresh off each still-standing
+    // combatant's CURRENT effective initiative (base stat + gear mod + any
+    // buffs, same inputs buildInitiativeOrder used at the fight's start,
+    // minus whatever fatigue they've since built up moving and attacking —
+    // see computeFatigueInitiativePenalty). Only ever called at a ROUND
+    // boundary (see advanceTurn) — mid-round the order stays exactly as
+    // dealt, so fatigue piling up during a round can never shuffle anyone
+    // out from under an action already under way; it only ever changes who
+    // goes first THE FOLLOWING round. A routing/fleeing combatant is still
+    // included (they're not isAllyOut/isEnemyOut yet — they still take a
+    // turn every round while retreating); a dead or already-fled one is
+    // simply dropped instead of carried forward, since it will never act
+    // again. Same tie-break as buildInitiativeOrder (hero, then allies,
+    // then enemies, then stable array order) so equal-initiative ties don't
+    // flicker from round to round.
+    function recomputeInitiativeOrder(state) {
+        const entries = [
+            {
+                type: 'hero',
+                initiative: gameState.stats.initiative + computeEquipmentInitiativeModifier(equipment, gameState.inventory) + (computeHeroMods(gameState, null, 1).initiativeBonus || 0)
+                    - computeFatigueInitiativePenalty(state.heroStaminaCur, state.heroStaminaMax)
+            },
+            ...state.allies.filter(a => !isAllyOut(a)).map(a => {
+                const load = getAllyLoadout(a);
+                const raw = a.stats.initiative + computeEquipmentInitiativeModifier(load.equipment, load.inventory) + computeCommanderAura(gameState).allyInitiativeBonus + (allyModsFor(a).initiativeBonus || 0);
+                return { type: 'ally', id: a.id, initiative: raw - computeFatigueInitiativePenalty(a.staminaCur, a.staminaMax) };
+            }),
+            ...state.enemies.filter(e => !isEnemyOut(e)).map(e => ({ type: 'enemy', id: e.id, initiative: e.initiative - computeFatigueInitiativePenalty(e.staminaCur, e.staminaMax) }))
+        ];
+        return entries
+            .map((e, i) => ({ ...e, tieBreak: (e.type === 'hero' ? 0 : e.type === 'ally' ? 1 : 2), i }))
+            .sort((a, b) => (b.initiative - a.initiative) || (a.tieBreak - b.tieBreak) || (a.i - b.i))
+            .map(({ type, id }) => (type === 'hero' ? { type } : { type, id }));
+    }
+    // Spends or restores a combatant's stamina pool (see the STAMINA/
+    // FATIGUE tuning block) — negative delta on a move/attack, positive on
+    // a deliberate rest (see resolveSkipTurn). Always clamped to
+    // [0, that combatant's own max]; a no-op for a combatant type this
+    // isn't tracked for. Pure — returns a new combat state.
+    function applyStaminaChange(state, actorType, actorId, delta) {
+        if (actorType === 'hero') {
+            const max = state.heroStaminaMax || 0;
+            const cur = Math.max(0, Math.min(max, (typeof state.heroStaminaCur === 'number' ? state.heroStaminaCur : max) + delta));
+            return { ...state, heroStaminaCur: cur };
+        }
+        if (actorType === 'ally') {
+            const allies = state.allies.map(a => {
+                if (a.id !== actorId)
+                    return a;
+                const max = a.staminaMax || 0;
+                const cur = Math.max(0, Math.min(max, (typeof a.staminaCur === 'number' ? a.staminaCur : max) + delta));
+                return { ...a, staminaCur: cur };
+            });
+            return { ...state, allies };
+        }
+        if (actorType === 'enemy') {
+            const enemies = state.enemies.map(e => {
+                if (e.id !== actorId)
+                    return e;
+                const max = e.staminaMax || 0;
+                const cur = Math.max(0, Math.min(max, (typeof e.staminaCur === 'number' ? e.staminaCur : max) + delta));
+                return { ...e, staminaCur: cur };
+            });
+            return { ...state, enemies };
+        }
+        return state;
     }
     // Whether the order entry at this position still has someone able to act
     // — the hero (unless the fight already ended), a living ally, or a living
@@ -67586,7 +67794,10 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 if (opp.blocked)
                     return advanceTurn(opp.state);
                 const log = [...opp.state.log, { text: (heroName || t('combatYouLabel')) + ' — ' + t('combatLogMoveText'), kind: 'defended' }];
-                return spendActions({ ...opp.state, heroPos: { x, y }, log }, moveCost);
+                // Moving costs stamina (see the STAMINA/FATIGUE section), scaled by
+                // moveCost itself — a 2-action dash covers more ground than a
+                // single-action step, so it costs proportionally more.
+                return spendActions(applyStaminaChange({ ...opp.state, heroPos: { x, y }, log }, 'hero', 'hero', -STAMINA_TUNING.moveCost * moveCost), moveCost);
             }
             if (current.type === 'ally') {
                 const ally = prev.allies.find(a => a.id === current.id);
@@ -67608,7 +67819,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     return advanceTurn(opp.state);
                 const allies = opp.state.allies.map(a => a.id === ally.id ? { ...a, pos: { x, y } } : a);
                 const log = [...opp.state.log, { text: ally.name + ' — ' + t('combatLogMoveText'), kind: 'defended' }];
-                return spendActions({ ...opp.state, allies, log }, moveCost);
+                // Same moveCost-scaled stamina spend as the hero's own branch above.
+                return spendActions(applyStaminaChange({ ...opp.state, allies, log }, 'ally', ally.id, -STAMINA_TUNING.moveCost * moveCost), moveCost);
             }
             return prev;
         });
@@ -67631,14 +67843,18 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 return prev;
             if (current.type === 'hero') {
                 const log = [...prev.log, { text: (heroName || t('combatYouLabel')) + ' — ' + t('combatLogSkipTurnText'), kind: 'defended' }];
-                return advanceTurn({ ...prev, log });
+                // Doing nothing this turn is the one action that RECOVERS stamina
+                // instead of costing it (see the STAMINA/FATIGUE section) — a
+                // deliberate rest, unlike the morale-panic branch in runAutoTurn
+                // which spends the turn too but is never a chosen rest.
+                return advanceTurn(applyStaminaChange({ ...prev, log }, 'hero', 'hero', STAMINA_TUNING.restRecover));
             }
             if (current.type === 'ally') {
                 const ally = prev.allies.find(a => a.id === current.id);
                 if (!ally || !ally.playerControlled || ally.routing || isAllyOut(ally))
                     return prev;
                 const log = [...prev.log, { text: ally.name + ' — ' + t('combatLogSkipTurnText'), kind: 'defended' }];
-                return advanceTurn({ ...prev, log });
+                return advanceTurn(applyStaminaChange({ ...prev, log }, 'ally', ally.id, STAMINA_TUNING.restRecover));
             }
             return prev;
         });
@@ -68030,7 +68246,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const locks = deriveLocksAfterAction(prev, 'ally:' + ally.id, defenderKey);
                 if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
-                return spendActions({ ...prev, enemies, log, lastAction, stunned, allyGearWear, locks }, 1);
+                // Attacking costs stamina too (see the STAMINA/FATIGUE section),
+                // whether or not the swing actually lands.
+                return spendActions(applyStaminaChange({ ...prev, enemies, log, lastAction, stunned, allyGearWear, locks }, 'ally', ally.id, -STAMINA_TUNING.attackCost), 1);
             }
             if (current.type !== 'hero')
                 return prev;
@@ -68242,7 +68460,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             if (enemies.every(isEnemyOut)) {
                 return { ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'victory' };
             }
-            return spendActions({ ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState, locks, dotTickedKey: dotKey }, heroAttackCost);
+            // Attacking costs stamina too (see the STAMINA/FATIGUE section),
+            // scaled by heroAttackCost itself — a burst/finisher that eats the
+            // whole turn's worth of actions is proportionally more tiring than a
+            // single swing.
+            return spendActions(applyStaminaChange({ ...prev, heroParts, enemies, log, lastAction, stunned, gearWear, abilityState, locks, dotTickedKey: dotKey }, 'hero', 'hero', -STAMINA_TUNING.attackCost * heroAttackCost), heroAttackCost);
         });
     }
     // Pure predicate — see checkReinforcementWaves, which runs this once per
@@ -68613,7 +68835,18 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const next = findNextTurn(state.order, state.allies, state.enemies, state.turnPos + 1, state.round);
         if (!next)
             return state;
-        const advancedBase = fogExpireFlares(tickSuppression({ ...state, turnPos: next.pos, round: next.round }));
+        // Crossing into a new round is exactly when fatigue built up over the
+        // round that just ended is allowed to matter (see the STAMINA/FATIGUE
+        // section and recomputeInitiativeOrder) — the whole order is rebuilt
+        // fresh off everyone's current effective initiative rather than
+        // reusing the list findNextTurn just walked (that walk only needed
+        // the OLD order to detect the round rollover in the first place).
+        // turnPos resets to the top of the freshly-sorted list; there's no
+        // meaningful position to carry over once the list itself changed.
+        const roundAdvanced = next.round > state.round;
+        const order = roundAdvanced ? recomputeInitiativeOrder(state) : state.order;
+        const turnPos = roundAdvanced ? 0 : next.pos;
+        const advancedBase = fogExpireFlares(tickSuppression({ ...state, order, turnPos, round: next.round }));
         // a new round may shift the weather one notch (see rollWeatherShift)
         const advanced = next.round !== state.round && advancedBase.environment
             ? { ...advancedBase, environment: rollWeatherShift(advancedBase.environment) }
@@ -69184,7 +69417,11 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const listKey = side === 'enemy' ? 'enemies' : 'allies';
         const list = opp.state[listKey].map(u => u.id === unit.id ? { ...u, pos: move.pos, aiMovedRound: state.round } : u);
         const name = side === 'enemy' ? unit.enemyName : unit.name;
-        return spendActions({ ...opp.state, [listKey]: list, log: [...opp.state.log, { text: name + ' — ' + t(move.reasonKey), kind: 'defended' }] }, 1);
+        // Moving costs stamina (see the STAMINA/FATIGUE section) — this one
+        // helper now covers every tactical AI reposition (gun positioning,
+        // melee closing, caster/ranged repositioning) for both allies and
+        // enemies, so spending it here covers all of them at once.
+        return spendActions(applyStaminaChange({ ...opp.state, [listKey]: list, log: [...opp.state.log, { text: name + ' — ' + t(move.reasonKey), kind: 'defended' }] }, side, unit.id, -STAMINA_TUNING.moveCost), 1);
     }
     // The turn is spent holding position on purpose (e.g. the "pack" tactic
     // waiting for the rest of the group).
@@ -69192,7 +69429,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
         const listKey = side === 'enemy' ? 'enemies' : 'allies';
         const list = state[listKey].map(u => u.id === unit.id ? { ...u, aiHeldRound: state.round } : u);
         const name = side === 'enemy' ? unit.enemyName : unit.name;
-        return advanceTurn({ ...state, [listKey]: list, log: [...state.log, { text: name + ' — ' + t(reasonKey), kind: 'defended' }] });
+        // Deliberately holding position is this side's version of a rest turn
+        // (see resolveSkipTurn) — recovers stamina instead of costing it.
+        return advanceTurn(applyStaminaChange({ ...state, [listKey]: list, log: [...state.log, { text: name + ' — ' + t(reasonKey), kind: 'defended' }] }, side, unit.id, STAMINA_TUNING.restRecover));
     }
     // Fog of war for the AI (an AI-run 'ally' or an 'enemy').
     // Flares: a flare-capable shooter (SMG/rifle, energy rifle, railgun; see
@@ -69508,7 +69747,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             if (opp.blocked)
                                 return advanceTurn(opp.state);
                             const allies = opp.state.allies.map(a => a.id === ally.id ? { ...a, pos: step } : a);
-                            return spendActions({ ...opp.state, allies }, 1);
+                            return spendActions(applyStaminaChange({ ...opp.state, allies }, 'ally', ally.id, -STAMINA_TUNING.moveCost), 1);
                         }
                         return advanceTurn(prev);
                     }
@@ -69603,7 +69842,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                 const locks = deriveLocksAfterAction(prev, 'ally:' + ally.id, defenderKey);
                 if (enemies.every(isEnemyOut))
                     return { ...prev, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
-                return spendActions({ ...prev, enemies, log, lastAction, stunned, allyGearWear, locks }, 1);
+                return spendActions(applyStaminaChange({ ...prev, enemies, log, lastAction, stunned, allyGearWear, locks }, 'ally', ally.id, -STAMINA_TUNING.attackCost), 1);
             }
             // Enemy turn: attacks a random living hero/ally, automatically
             // defended (see resolveOneAttack/pickAutoDefenseKey). Role (see
@@ -69856,7 +70095,7 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                             return advanceTurn(opp.state);
                         const enemies = opp.state.enemies.map(e => e.id === enemy.id ? { ...e, pos: step } : e);
                         const stepLog = [...opp.state.log, { text: enemy.enemyName + ' — ' + t('combatLogEnemyCloseDistanceText'), kind: 'defended' }];
-                        return spendActions({ ...opp.state, enemies, log: stepLog }, 1);
+                        return spendActions(applyStaminaChange({ ...opp.state, enemies, log: stepLog }, 'enemy', enemy.id, -STAMINA_TUNING.moveCost), 1);
                     }
                     // Boxed in with nothing else to do — just pass the turn rather
                     // than attacking from out of range.
@@ -70112,7 +70351,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
                     return { ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'death', killedBy: enemy.enemyName };
                 if (enemies.every(isEnemyOut))
                     return { ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks, result: 'victory' };
-                return spendActions({ ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks }, 1);
+                // Attacking costs the enemy stamina too (see the STAMINA/FATIGUE
+                // section), whether or not the swing actually lands.
+                return spendActions(applyStaminaChange({ ...prev, heroParts: outcome.parts, heroArmorCur, enemies, log, lastAction, stunned, gearWear, abilityState, locks }, 'enemy', enemy.id, -STAMINA_TUNING.attackCost), 1);
             }
             const ally = targetChoice.ally;
             // Duelist's defense bonus and Cover's hit reduction belong to a companion who learned them, exactly as to the hero (see defenseContextFor).
@@ -70159,7 +70400,9 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             const locks = deriveLocksAfterAction(prev, 'enemy:' + enemy.id, defenderKey);
             if (enemies.every(isEnemyOut))
                 return { ...prev, allies, enemies, log, lastAction, stunned, allyGearWear, locks, result: 'victory' };
-            return spendActions({ ...prev, allies, enemies, log, lastAction, stunned, allyGearWear, locks }, 1);
+            // Attacking costs the enemy stamina too (see the STAMINA/FATIGUE
+            // section), whether or not the swing actually lands.
+            return spendActions(applyStaminaChange({ ...prev, allies, enemies, log, lastAction, stunned, allyGearWear, locks }, 'enemy', enemy.id, -STAMINA_TUNING.attackCost), 1);
         });
         // A caster's turn (see ENEMY_ROLES.caster above) may have decided to
         // inflict an effect on the hero — apply it now that setCombat's own
@@ -74517,19 +74760,27 @@ const APP_STYLES = `
      reshuffling the stack below it. */
   .combat-armor-bar-inactive { opacity: 0.4; }
   .combat-hp-value { font-size: 0.62rem; color: var(--stone-500); margin: 0.15rem 0 0; font-family: var(--font-mono); }
-  /* Portrait-only: the HP+armor bars, no number/shield-icon labels (see
-     the aria-labels in CombatPortrait's JSX instead). margin-top:0 on the
-     nested .combat-hp-bar hands its usual top spacing over to this flex
+  /* Stamina bar (see the STAMINA/FATIGUE section) — every combatant's 4th
+     bar, bottommost, amber to read as "energy" distinct from the blue
+     armor bars and green HP bar above it. Always renders at 0-100% off
+     staminaCur/staminaMax (see CombatPortrait), never inactive-dimmed like
+     an empty armor slot, since every combatant is always seeded with a
+     pool. */
+  .combat-stamina-bar { width: 100%; height: 3px; background: var(--stone-800); border-radius: 2px; overflow: hidden; }
+  .combat-stamina-bar-fill { height: 100%; background: var(--amber-400); transition: width 0.3s ease; }
+  /* Portrait-only: the HP+armor+stamina bars, no number/shield-icon labels
+     (see the aria-labels in CombatPortrait's JSX instead). margin-top:0 on
+     the nested .combat-hp-bar hands its usual top spacing over to this flex
      gap instead, so every gap in the stack — name→top bar, bar→bar, and
      bottom bar→the overlay's own 0.3rem bottom padding — ends up the same
      0.3rem. Every combatant (hero, ally, enemy) always renders the same
-     three bars in the same fixed order, top to bottom: helmet armor, body
-     armor, HP — so HP always reads as the bottommost bar and the stack
-     never changes height or order from portrait to portrait (see
-     CombatPortrait's headArmorMax/bodyArmorMax and
-     .combat-armor-bar-inactive above for the "no armor here" case). The
-     body-part grid's own .combat-hp-bar (outside this wrapper) keeps its
-     original margin-top untouched. */
+     four bars in the same fixed order, top to bottom: helmet armor, body
+     armor, HP, stamina — so the stack never changes height or order from
+     portrait to portrait (see CombatPortrait's headArmorMax/bodyArmorMax/
+     staminaPct and .combat-armor-bar-inactive above for the "no armor
+     here" case — stamina has no such inactive state). The body-part
+     grid's own .combat-hp-bar (outside this wrapper) keeps its original
+     margin-top untouched. */
   .combat-portrait-bars { width: 100%; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
   .combat-portrait-bars .combat-hp-bar { margin-top: 0; }
   .combat-log { margin-top: 0.85rem; padding: 0.6rem 0.75rem; background: var(--stone-950); border: 1px solid var(--stone-800); border-radius: 4px; max-height: 8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem; }
