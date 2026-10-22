@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -95,6 +97,15 @@ jobs:
         with:
           name: grimoire-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Publish AAB to the release-builds branch
+        run: |
+          VER=$(grep -oP 'versionName "\K[^"]+' android/app/build.gradle)
+          mkdir -p /tmp/rb && cp android/app/build/outputs/bundle/release/app-release.aab /tmp/rb/grimoire-$VER.aab
+          cd /tmp/rb && git init -q && git checkout -q -b release-builds
+          git config user.name "github-actions" && git config user.email "actions@github.com"
+          git add . && git commit -q -m "AAB $VER"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" release-builds
 
       - name: Build debug APK
         working-directory: android
