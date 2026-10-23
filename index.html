@@ -88475,7 +88475,8 @@ Respond with ONLY valid JSON and nothing else: {"resolved": false, "safeSentence
             // player directly commands in combat (see resolveAttack/runAutoTurn's
             // ally branch) — distinct from an AI-run reinforcement built by
             // makeAllyCombatant below, which is always left off (undefined/false).
-            return { id: 'ally_' + i, name, stats: companionStatsOf(gameState, npc), originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: startMorale, startMorale, playerControlled: true, staminaMax: allyStaminaMax, staminaCur: allyStaminaMax };
+            // (the name as the story writes it, not the roster's key in lower case: it is shown on the card, in the log and in the report)
+            return { id: 'ally_' + i, name: npc.name.trim() || name, stats: companionStatsOf(gameState, npc), originalHealth: npc.health, originalMaxHealth: typeof npc.maxHealth === 'number' && npc.maxHealth > 0 ? npc.maxHealth : npc.health, parts, armor, armorPools, morale: startMorale, startMorale, playerControlled: true, staminaMax: allyStaminaMax, staminaCur: allyStaminaMax };
         }).filter(Boolean);
     }
     // Non-party companions the story establishes as already fighting
